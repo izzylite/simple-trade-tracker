@@ -1,8 +1,19 @@
-import { format, eachDayOfInterval, startOfMonth, endOfMonth, isSameMonth, getDay, parseISO } from 'date-fns';
+import {
+  format,
+  eachDayOfInterval,
+  startOfMonth,
+  endOfMonth,
+  isSameMonth,
+  getDay,
+  parseISO,
+  startOfQuarter,
+  endOfQuarter,
+  startOfYear,
+} from 'date-fns';
 import { Trade } from '../types/dualWrite';
 import { Theme } from '@mui/material';
 
-export type TimePeriod = 'month' | 'year' | 'all';
+export type TimePeriod = 'month' | 'quarter' | 'ytd' | 'year' | 'all';
 
 export interface ChartDataPoint {
   date: string;
@@ -48,6 +59,22 @@ export const getFilteredTrades = (trades: Trade[], selectedDate: Date, period: T
   switch (period) {
     case 'month':
       return trades.filter(trade => isSameMonth(new Date(trade.trade_date), selectedDate));
+    case 'quarter': {
+      const qStart = startOfQuarter(selectedDate).getTime();
+      const qEnd = endOfQuarter(selectedDate).getTime();
+      return trades.filter(trade => {
+        const t = new Date(trade.trade_date).getTime();
+        return t >= qStart && t <= qEnd;
+      });
+    }
+    case 'ytd': {
+      const yStart = startOfYear(selectedDate).getTime();
+      const cutoff = selectedDate.getTime();
+      return trades.filter(trade => {
+        const t = new Date(trade.trade_date).getTime();
+        return t >= yStart && t <= cutoff;
+      });
+    }
     case 'year':
       return trades.filter(trade => new Date(trade.trade_date).getFullYear() === selectedDate.getFullYear());
     case 'all':
@@ -182,6 +209,12 @@ export const calculateChartData = async (
   if (timePeriod === 'month') {
     startDate = startOfMonth(selectedDate);
     endDate = endOfMonth(selectedDate);
+  } else if (timePeriod === 'quarter') {
+    startDate = startOfQuarter(selectedDate);
+    endDate = endOfQuarter(selectedDate);
+  } else if (timePeriod === 'ytd') {
+    startDate = startOfYear(selectedDate);
+    endDate = selectedDate;
   } else if (timePeriod === 'year') {
     startDate = new Date(selectedDate.getFullYear(), 0, 1);
     endDate = new Date(selectedDate.getFullYear(), 11, 31);
@@ -229,7 +262,7 @@ export const calculateChartData = async (
       cumulative += dailyPnL;
 
       chunkResult.push({
-        date: format(day, timePeriod === 'month' ? 'MM/dd' : 'MM/dd/yyyy'),
+        date: format(day, (timePeriod === 'month' || timePeriod === 'quarter' || timePeriod === 'ytd') ? 'MM/dd' : 'MM/dd/yyyy'),
         pnl: dailyPnL,
         cumulativePnL: cumulative,
         isIncreasing: cumulative > prevCumulative,
@@ -569,7 +602,7 @@ export const calculateRiskRewardStatsAsync = async (
 
   // Create data points for the line graph
   const data = filteredTrades_.map(trade => ({
-    date: format(new Date(trade.trade_date), timePeriod === 'month' ? 'MM/dd' : 'MM/dd/yyyy'),
+    date: format(new Date(trade.trade_date), (timePeriod === 'month' || timePeriod === 'quarter' || timePeriod === 'ytd') ? 'MM/dd' : 'MM/dd/yyyy'),
     rr: trade.risk_to_reward || 0
   }));
 

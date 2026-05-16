@@ -6,7 +6,7 @@
  * Clicking opens the NotesBottomSheet for that note.
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -24,6 +24,7 @@ import type { Theme } from '@mui/material';
 import { Note } from '../../types/note';
 import { Calendar } from '../../types/calendar';
 import NotesBottomSheet from './NotesBottomSheet';
+import { useUserPinnedEvents } from '../../contexts/UserPinnedEventsContext';
 
 export interface StickyReminderCardsProps {
   notes: Note[];
@@ -94,11 +95,31 @@ const StickyReminderCards: React.FC<StickyReminderCardsProps> = ({
 }) => {
   const theme = useTheme();
   const colorMap = getColorMap(theme);
+  const { pins: userPinnedEvents } = useUserPinnedEvents();
   const [bottomSheetOpen, setBottomSheetOpen] = useState(false);
   const [initialNoteIndex, setInitialNoteIndex] = useState(0);
+  // Tracks which front card is mid-exit so its slide-up + fade animation
+  // plays before the parent removes it from the active list.
+  const [dismissingId, setDismissingId] = useState<string | null>(null);
+  const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const activeNotes = notes.filter(
     (n) => !dismissedIds.has(n.id)
+  );
+
+  const DISMISS_DURATION_MS = 240;
+
+  const handleDismissClick = useCallback(
+    (noteId: string) => {
+      if (dismissingId) return;
+      setDismissingId(noteId);
+      if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+      dismissTimerRef.current = setTimeout(() => {
+        onDismiss(noteId);
+        setDismissingId(null);
+      }, DISMISS_DURATION_MS);
+    },
+    [dismissingId, onDismiss]
   );
 
   const handleCardClick = useCallback(
@@ -129,7 +150,7 @@ const StickyReminderCards: React.FC<StickyReminderCardsProps> = ({
           flexShrink: 0,
         }}
       >
-        {/* Front card */}
+        {/* Front card. Mid-dismiss it slides up + fades out before unmount. */}
         <Box
           onClick={() => handleCardClick(frontNote)}
           sx={{
@@ -138,7 +159,23 @@ const StickyReminderCards: React.FC<StickyReminderCardsProps> = ({
             height: 200,
             border: `1px solid ${alpha(frontColor, 0.3)}`,
             cursor: 'pointer',
-            transition: 'all 0.3s ease',
+            // Deeper, layered shadow — lifts the card above the panel surface.
+            boxShadow: theme.palette.mode === 'dark'
+              ? `0 1px 2px ${alpha('#000', 0.4)}, 0 8px 20px ${alpha('#000', 0.45)}, 0 16px 40px ${alpha(frontColor, 0.18)}`
+              : `0 1px 2px ${alpha(frontColor, 0.18)}, 0 8px 20px ${alpha(frontColor, 0.22)}, 0 16px 40px ${alpha(frontColor, 0.14)}`,
+            opacity: dismissingId === frontNote.id ? 0 : 1,
+            transform:
+              dismissingId === frontNote.id
+                ? 'translateY(-12px)'
+                : 'translateY(0)',
+            transition: `
+              opacity ${DISMISS_DURATION_MS}ms cubic-bezier(0.22, 1, 0.36, 1),
+              transform ${DISMISS_DURATION_MS}ms cubic-bezier(0.22, 1, 0.36, 1),
+              background-color 200ms cubic-bezier(0.22, 1, 0.36, 1),
+              border-color 200ms cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 200ms cubic-bezier(0.22, 1, 0.36, 1)
+            `,
+            pointerEvents: dismissingId === frontNote.id ? 'none' : 'auto',
             px: 2,
             py: 1.5,
             '&:hover': {
@@ -185,7 +222,7 @@ const StickyReminderCards: React.FC<StickyReminderCardsProps> = ({
               size="small"
               onClick={(e) => {
                 e.stopPropagation();
-                onDismiss(frontNote.id);
+                handleDismissClick(frontNote.id);
               }}
               sx={{
                 p: 0.25,
@@ -227,7 +264,7 @@ const StickyReminderCards: React.FC<StickyReminderCardsProps> = ({
         onNoteSaved={onNoteSaved}
         onNoteDeleted={onNoteDeleted}
         availableTradeTags={calendar.tags}
-        pinnedEvents={calendar.pinned_events}
+        pinnedEvents={userPinnedEvents}
       />
     </>
   );

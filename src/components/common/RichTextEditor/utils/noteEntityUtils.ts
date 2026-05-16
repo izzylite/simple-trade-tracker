@@ -102,8 +102,18 @@ export const replaceNoteTriggerWithLink = (
   const entityKey =
     contentStateWithEntity.getLastCreatedEntityKey();
 
-  // Replace trigger text with note title chip
-  const displayText = ` ${noteTitle} `;
+  // Decide whether to inject a leading space. If the char immediately
+  // before triggerOffset is BOL or whitespace, the inserted entity-space
+  // would visibly double up. Mirror logic for tag/event utils.
+  const block = contentState.getBlockForKey(blockKey);
+  const charBefore = triggerOffset > 0
+    ? block.getText().charAt(triggerOffset - 1)
+    : '';
+  const needLeadingSpace = charBefore !== '' && !/\s/.test(charBefore);
+
+  // Entity wraps only the title. Trailing space is plain so the cursor
+  // lands outside the IMMUTABLE entity instead of inside it.
+  const displayText = `${needLeadingSpace ? ' ' : ''}${noteTitle}`;
   let newContentState = Modifier.replaceText(
     contentStateWithEntity,
     replaceSelection,

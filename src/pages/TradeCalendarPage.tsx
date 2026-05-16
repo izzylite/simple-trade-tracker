@@ -17,7 +17,6 @@ import {
   Toolbar,
   Snackbar,
   Alert,
-  Fab,
   Fade,
   LinearProgress,
   Badge,
@@ -39,15 +38,12 @@ import {
   LocalOffer as TagIcon,
   Search as SearchIcon,
   Event as EventIcon,
-  SmartToy as AIIcon,
   Home as HomeIcon,
-  CalendarToday as CalendarIcon,
   Notes as NotesIcon,
   Edit as EditIcon,
   Flag as TargetIcon,
   EventNote as GamePlanIcon,
   HelpOutline as HelpOutlineIcon,
-  DeleteOutline as TrashIcon,
   Insights as InsightsIcon,
   MoreVert as MoreVertIcon,
   FileUpload as FileUploadIcon,
@@ -74,7 +70,6 @@ import DayDialog from '../components/trades/DayDialog';
 import SelectDateDialog from '../components/SelectDateDialog';
 
 import TagFilterDialog from '../components/TagFilterDialog';
-import TagManagementDialog from '../components/TagManagementDialog';
 import TagManagementDrawer from '../components/TagManagementDrawer';
 import SearchDrawer from '../components/SearchDrawer';
 import TargetBadge from '../components/TargetBadge';
@@ -89,36 +84,19 @@ import {
   TradeCount,
 
 } from '../components/StyledComponents';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 
-import ImageZoomDialog, { ImageZoomProp } from '../components/ImageZoomDialog';
-
-import CalendarSelectorBar, { CalendarSelectorItem } from '../components/common/CalendarSelectorBar';
-import { NewTradeForm, TradeImage } from '../components/trades/TradeForm';
+import PageActionBar from '../components/common/PageActionBar';
 import { Calendar } from '../types/calendar';
 import { CalendarRepository } from '../services/repository/repositories/CalendarRepository';
-import TradeFormDialog, { createEditTradeData } from '../components/trades/TradeFormDialog';
 import CalendarFormDialog, { CalendarFormData } from '../components/CalendarFormDialog';
-import ConfirmationDialog from '../components/common/ConfirmationDialog';
-import CalendarManagementDialogs from '../components/calendars/CalendarManagementDialogs';
-import { useCalendarPanelActions } from '../hooks/useCalendarPanelActions';
 import PinnedTradesDrawer from '../components/PinnedTradesDrawer';
-import TradeGalleryDialog from '../components/TradeGalleryDialog';
 import ShareButton from '../components/sharing/ShareButton';
 import { exportTrades } from '../utils/tradeExportImport';
-import { ImportMappingDialog } from '../components/import/ImportMappingDialog';
-
-import AIChatDrawer from '../components/aiChat/AIChatDrawer';
-import { useNotifications } from '../contexts/NotificationsContext';
-import {
-  isOrionTaskResultPayload,
-  isReminderFiredPayload,
-} from '../types/notification';
-import OrionIcon from '../components/aiChat/OrionIcon';
-import NotesDrawer from '../components/notes/NotesDrawer';
-import FAQDrawer from '../components/faq/FAQDrawer';
-import FAQContent from '../components/faq/FAQContent';
+import { useAIChat } from '../contexts/AIChatContext';
 import NoteEditorDialog from '../components/notes/NoteEditorDialog';
+import CalendarNotesPanel from '../components/notes/CalendarNotesPanel';
+import UnifiedDrawer from '../components/common/UnifiedDrawer';
 import {
   StackedNotesWidget,
   StickyReminderCards,
@@ -134,17 +112,17 @@ import { Z_INDEX } from '../styles/zIndex';
 
 import FloatingMonthNavigation from '../components/FloatingMonthNavigation';
 import { calculateDayStats, calculateTargetProgress } from '../utils/statsUtils';
-import EconomicCalendarDrawer, { DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS } from '../components/economicCalendar/EconomicCalendarDrawer';
-import EconomicCalendarPanel from '../components/economicCalendar/EconomicCalendarPanel';
-import { useEconomicEventWatcher, useEconomicEventsUpdates } from '../hooks/useEconomicEventWatcher';
+import { DEFAULT_FILTER_SETTINGS as DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS } from '../hooks/useEconomicCalendarFilters';
+import EconomicEventsView from '../components/economicCalendar/EconomicEventsView';
+import { useEconomicEventsUpdates } from '../hooks/useEconomicEventWatcher';
 import { TradeOperationsProps } from '../types/tradeOperations';
-import EconomicEventNotification from '../components/notifications/EconomicEventNotification';
 import { EconomicEvent } from '../types/economicCalendar';
 import { useHighImpactEvents } from '../hooks/useHighImpactEvents';
 import { log, logger } from '../utils/logger';
-import { playNotificationSound } from '../utils/notificationSound';
-import { useCalendarTrades } from '../hooks/useCalendarTrades';
-import { useOrionTasks } from '../hooks/useOrionTasks';
+import { useTradesContext } from '../contexts/TradesContext';
+import { useTradeOperations } from '../contexts/TradeOperationsContext';
+import { useTradeViewer } from '../contexts/TradeViewerContext';
+import { useUserPinnedEvents } from '../contexts/UserPinnedEventsContext';
 import {
   SidePanelProvider,
   useSidePanel,
@@ -153,17 +131,23 @@ import {
   EconomicCalendarView,
   AIAnalysisView,
 } from '../contexts/SidePanelContext';
+import { usePanelMutexSlot } from '../contexts/PanelMutexContext';
 import SidePanel from '../components/sidePanel/SidePanel';
 import AIChatContent from '../components/sidePanel/content/AIChatContent';
-import NotesContent from '../components/sidePanel/content/NotesContent';
 import SearchContent from '../components/sidePanel/content/SearchContent';
 import PinnedContent from '../components/sidePanel/content/PinnedContent';
 import TagManagementContent from '../components/sidePanel/content/TagManagementContent';
 import DayTradesContent from '../components/sidePanel/content/DayTradesContent';
-import CalendarsListContent from '../components/sidePanel/content/CalendarsListContent';
-import CalendarsListDrawer from '../components/calendars/CalendarsListDrawer';
 import StatsContent from '../components/sidePanel/content/StatsContent';
 import StatsDrawer from '../components/StatsDrawer';
+
+// Lazy-load: ImportMappingDialog pulls xlsx + multi-step wizard. Only mount
+// when the user actually opens the import flow.
+const ImportMappingDialog = React.lazy(() =>
+  import('../components/import/ImportMappingDialog').then((m) => ({
+    default: m.ImportMappingDialog,
+  }))
+);
 
 interface TradeCalendarProps {
   // Trade CRUD operations now handled internally via useCalendarTrades hook
@@ -176,14 +160,17 @@ interface TradeCalendarProps {
   mode: 'light' | 'dark';
   // Read-only mode for shared calendars
   isReadOnly?: boolean;
-  // Optional management callbacks for the calendars-list panel/drawer.
-  // When omitted, "more options" actions are hidden.
-  onDuplicateCalendar?: (sourceCalendarId: string, newName: string, includeContent?: boolean) => Promise<void> | void;
-  onDeleteCalendar?: (id: string) => Promise<void> | void;
-  onUpdateCalendar?: (id: string, updates: Partial<Calendar>) => Promise<void> | void;
+  /** Dispatches to the app-level SidePanelProvider (outside this page's local
+   *  one). Used for panels migrated to the global registry. */
+  openGlobalPanel?: (view: SidePanelView) => void;
 }
 
-
+/**
+ * Module-level caches that survive route remounts so Home → Performance →
+ * Home doesn't repeat work. Realtime / write paths invalidate as needed.
+ */
+const gamePlanNotesCache = new Map<string, Map<string, Note>>();
+const pnlBeforeMonthCache = new Map<string, number>();
 
 interface WeeklyPnLProps {
   trade_date: Date;
@@ -360,30 +347,6 @@ const WeeklyPnL: React.FC<WeeklyPnLProps> = React.memo(({
 
   return content;
 });
-
-
-
-export const createNewTradeData = (): NewTradeForm => ({
-  id: uuidv4()!!,
-  name: '',
-  amount: 0,
-  trade_type: 'win',
-  entry_price: 0,
-  trade_date: null,
-  exit_price: 0,
-  stop_loss: 0,
-  take_profit: 0,
-  tags: [],
-  risk_to_reward: 0,
-  partials_taken: false,
-  session: '',
-  notes: '',
-  pending_images: [],
-  uploaded_images: [],
-  economic_events: [],
-});
-
-
 
 
 // TagFilter component for filtering trades by tags
@@ -577,9 +540,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     onToggleTheme,
     mode,
     isReadOnly = false,
-    onDuplicateCalendar,
-    onDeleteCalendar,
-    onUpdateCalendar,
+    openGlobalPanel,
   } = props;
 
 
@@ -588,7 +549,14 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
   // Use calendarId from URL params, or fall back to calendar prop ID (for shared calendars)
   const calendarId = calendarIdFromParams || selectedCalendar?.id;
 
-  // Fetch trades using custom hook - this now handles all trade CRUD operations
+  // Pinned events live on the user (replaces per-calendar pin storage).
+  const { pins: userPinnedEvents } = useUserPinnedEvents();
+
+  // Trades + CRUD ops come from the app-level TradesContext (single
+  // useCalendarTrades subscription shared across routes). The hook keys on
+  // the active calendarId and disables realtime for shared/read-only
+  // calendars in the provider itself.
+  const { hook: tradesHook } = useTradesContext();
   const {
     trades,
     calendar: hookCalendar,
@@ -606,12 +574,10 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     isTradeUpdating,
     loadMonthTrades,
     loadVisibleRangeTrades,
-  } = useCalendarTrades({
-    calendarId,
-    selectedCalendar,
-    setLoading,
-    enableRealtime: !isReadOnly // Disable real-time for read-only mode
-  });
+  } = tradesHook;
+
+  const globalTradeOps = useTradeOperations();
+  const tradeViewer = useTradeViewer();
 
   // Prevent outer page scroll — this page uses a fixed-height flex layout
   useEffect(() => {
@@ -641,7 +607,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
   const calendarName = calendar.name;
   const heroImageUrl = calendar.hero_image_url;
   const heroImageAttribution = calendar.hero_image_attribution;
-  const scoreSettings = calendar.score_settings;
   const totalPnL = calendar.total_pnl;
 
   const dynamicRiskSettings: DynamicRiskSettings = useMemo(() => ({
@@ -684,21 +649,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isMonthSelectorOpen, setIsMonthSelectorOpen] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [newTrade, setNewTrade] = useState<NewTradeForm | null>(null);
-  const [showAddForm, setShowAddForm] = useState<{ open: boolean, trade_date: Date, editTrade?: Trade | null, createTempTrade?: boolean, showDayDialogWhenDone: boolean } | null>(null);
-  const [zoomedImages, setZoomedImagesState] = useState<ImageZoomProp | null>(null);
-  const [tradesToDelete, setTradesToDelete] = useState<string[]>([]);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [deletingTradeIds, setDeletingTradeIds] = useState<string[]>([]);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
-
-  // Custom function to handle setting zoomed image and related state
-  const setZoomedImage = useCallback((url: string, allImages?: string[], initialIndex?: number) => {
-    setZoomedImagesState({ selectetdImageIndex: initialIndex || 0, allImages: allImages || [url] });
-
-  }, []);
-
-  const [isTagManagementDialogOpen, setIsTagManagementDialogOpen] = useState(false);
   const [isTagManagementDrawerOpen, setIsTagManagementDrawerOpen] = useState(false);
   const [isSearchDrawerOpen, setIsSearchDrawerOpen] = useState(false);
   const [isDynamicRiskToggled, setIsDynamicRiskToggled] = useState(true); // Default to true (using actual amounts)
@@ -717,21 +667,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
   );
   const [showFloatingMonthNav, setShowFloatingMonthNav] = useState(false);
   const [pinnedTradesDrawerOpen, setPinnedTradesDrawerOpen] = useState(false);
-  const [galleryMode, setGalleryMode] = useState<{
-    open: boolean;
-    trades: Trade[];
-    initialTradeId?: string;
-    title?: string;
-    aiOnlyMode?: boolean;
-    fetchYear?: number;
-  }>({
-    open: false,
-    trades: [],
-    initialTradeId: undefined,
-    title: undefined,
-    aiOnlyMode: false,
-    fetchYear: undefined
-  });
 
   // Calendar edit dialog state
   const [isCalendarEditOpen, setIsCalendarEditOpen] = useState(false);
@@ -753,74 +688,18 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     setDismissedReminderIds(prev => new Set(prev).add(noteId));
   }, []);
 
-  // AI Chat drawer state
-  const [isAIChatOpen, setIsAIChatOpen] = useState(false);
-  const [aiChatDeepLink, setAiChatDeepLink] = useState<{
-    conversationId: string;
-    messageId?: string;
-  } | null>(null);
-  const [aiChatRequestedTab, setAiChatRequestedTab] = useState<number | null>(null);
-
-  // Local-route handler: intercept notification clicks while this calendar is
-  // mounted.
-  //  - reminder_fired (same calendar) → open drawer on Chat tab with deep-link
-  //  - orion_task_result (any calendar) → open drawer on Tasks tab; tasks are
-  //    user-scoped, so any calendar surface is a valid host
-  // Other cases fall through (handler returns false) so the bell's URL
-  // fallback runs.
-  const { registerRouteHandler } = useNotifications();
-  useEffect(() => {
-    if (!calendar?.id) return;
-    return registerRouteHandler((n) => {
-      if (isReminderFiredPayload(n)) {
-        if (n.payload.calendarId !== calendar.id) return false;
-        setAiChatDeepLink({
-          conversationId: n.payload.conversationId,
-          messageId: n.payload.messageId,
-        });
-        setAiChatRequestedTab(0);
-        setIsAIChatOpen(true);
-        return true;
-      }
-      if (isOrionTaskResultPayload(n)) {
-        setAiChatRequestedTab(1);
-        setIsAIChatOpen(true);
-        return true;
-      }
-      return false;
-    });
-  }, [calendar?.id, registerRouteHandler]);
-
-  // URL deep-link: ?openTasks=1 lands here when a task notification was
-  // clicked from a surface that couldn't host the drawer (bell on a non-
-  // calendar route fell back to URL navigation). Open drawer on Tasks tab,
-  // then strip the param so refresh doesn't re-trigger.
-  const [searchParams, setSearchParams] = useSearchParams();
-  useEffect(() => {
-    if (searchParams.get('openTasks') !== '1') return;
-    setAiChatRequestedTab(1);
-    setIsAIChatOpen(true);
-    const next = new URLSearchParams(searchParams);
-    next.delete('openTasks');
-    setSearchParams(next, { replace: true });
-  }, [searchParams, setSearchParams]);
-
-  const aiTasks = useOrionTasks(calendar?.user_id, calendar?.id);
-  const taskUnreadCount = aiTasks.unreadCount;
+  // AI Chat drawer — dispatched through global AIChatContext. The drawer
+  // itself mounts once at App level (GlobalAIChat) along with the global
+  // FAB (GlobalAIChatFab); this page just opens it for in-trade actions.
+  const globalAIChat = useAIChat();
 
   // Notes drawer state
   const [isNotesDrawerOpen, setIsNotesDrawerOpen] = useState(false);
-
-  // FAQ drawer state
-  const [isFAQDrawerOpen, setIsFAQDrawerOpen] = useState(false);
 
   // Header overflow menu (Import / Export) state
   const [moreMenuAnchor, setMoreMenuAnchor] = useState<null | HTMLElement>(null);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [showImportDialog, setShowImportDialog] = useState(false);
-
-  // Calendars list drawer state (<lg fallback for 'calendars-list' panel)
-  const [isCalendarsListDrawerOpen, setIsCalendarsListDrawerOpen] = useState(false);
 
   // Stats drawer state (<lg fallback for 'stats' panel)
   const [isStatsDrawerOpen, setIsStatsDrawerOpen] = useState(false);
@@ -839,33 +718,13 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     day: DayAbbreviation;
     existingNote: Note | null;
   } | null>(null);
-  const [gamePlanNotes, setGamePlanNotes] = useState<Map<string, Note>>(new Map());
+  const [gamePlanNotes, setGamePlanNotes] = useState<Map<string, Note>>(
+    () => calendarId ? gamePlanNotesCache.get(calendarId) ?? new Map() : new Map()
+  );
 
-  // Economic event notification state
-  // Notification stack state (moved from App.tsx)
-  const [notifications, setNotifications] = useState<EconomicEvent[]>([]);
-  const [removingNotifications, setRemovingNotifications] = useState<Set<string>>(new Set());
+  // Drawer-update payload still lives here (page-local). Notification stack
+  // state moved to EventNotificationsProvider at App level.
   const [economicCalendarUpdatedEvent, setEconomicCalendarUpdatedEvent] = useState<{ updatedEvents: EconomicEvent[], allEvents: EconomicEvent[] } | null>(null);
-
-  // User calendars for breadcrumb dropdown
-  const [userCalendars, setUserCalendars] = useState<Calendar[]>([]);
-
-  // Fetch user's calendars for breadcrumb dropdown
-  const loadUserCalendars = useCallback(async () => {
-    if (!calendar?.user_id) return;
-
-    try {
-      const calendarRepo = new CalendarRepository();
-      const calendars = await calendarRepo.findByUserId(calendar.user_id);
-      setUserCalendars(calendars);
-    } catch (error) {
-      logger.error('Error loading user calendars for dropdown:', error);
-    }
-  }, [calendar?.user_id]);
-
-  useEffect(() => {
-    loadUserCalendars();
-  }, [loadUserCalendars]);
 
   const theme = useTheme();
   const isMdDown = useMediaQuery(theme.breakpoints.down('md'));
@@ -882,23 +741,14 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     setOpen: setPanelOpen,
   } = useSidePanel();
 
-  // Open the calendars list panel (lg+) or drawer (<lg)
-  const handleViewAllCalendars = useCallback(() => {
-    if (isLgUp) {
-      replacePanel({ id: 'calendars-list' });
-      setPanelOpen(true);
-    } else {
-      setIsCalendarsListDrawerOpen(true);
-    }
-  }, [isLgUp, replacePanel, setPanelOpen]);
-
-  // Select a calendar from the list panel/drawer by navigating to its route
-  const handleSelectCalendar = useCallback((id: string) => {
-    setIsCalendarsListDrawerOpen(false);
+  // ── Panel mutex ─────────────────────────────────────────────────────────
+  // Register this page's local panel as a mutex slot. The mutex broadcasts
+  // opens across all three surfaces (global SidePanel, CalendarsList panel,
+  // and this one) — only one can be open at a time.
+  const closeLocalPanel = useCallback(() => {
     setPanelOpen(false);
-    resetPanel();
-    navigate(`/calendar/${id}`);
-  }, [navigate, setPanelOpen, resetPanel]);
+  }, [setPanelOpen]);
+  usePanelMutexSlot('page-side-panel', isPanelOpen, closeLocalPanel);
 
   // Ref for main content scroll container (used by floating nav scroll detection)
   const mainContentRef = useRef<HTMLDivElement>(null);
@@ -914,8 +764,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
       setPinnedTradesDrawerOpen(false);
       setIsTagManagementDrawerOpen(false);
       setIsEconomicCalendarOpen(false);
-      setIsFAQDrawerOpen(false);
-      setIsCalendarsListDrawerOpen(false);
       setIsStatsDrawerOpen(false);
       setSelectedDate(null);
     };
@@ -939,12 +787,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
         case 'economic-calendar':
           setIsEconomicCalendarOpen(true);
           break;
-        case 'faq':
-          setIsFAQDrawerOpen(true);
-          break;
-        case 'calendars-list':
-          setIsCalendarsListDrawerOpen(true);
-          break;
         case 'stats':
           setIsStatsDrawerOpen(true);
           break;
@@ -956,13 +798,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
       }
     } else if (!prevIsLgUp.current && isLgUp) {
       // <lg → lg+: hand off open drawer to panel; then close all drawers
-      if (isFAQDrawerOpen) {
-        replacePanel({ id: 'faq' });
-        setPanelOpen(true);
-      } else if (isCalendarsListDrawerOpen) {
-        replacePanel({ id: 'calendars-list' });
-        setPanelOpen(true);
-      } else if (isStatsDrawerOpen) {
+      if (isStatsDrawerOpen) {
         replacePanel({ id: 'stats' });
         setPanelOpen(true);
       }
@@ -972,47 +808,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     prevIsLgUp.current = isLgUp;
   }, [isLgUp]);
 
-  // Recent-calendars dropdown: trash-filtered, sorted by updated_at desc,
-  // top 3. Always include the active calendar even if it's not in top 3.
-  const recentCalendarItems = useMemo<CalendarSelectorItem[]>(() => {
-    const sortedRecent = [...userCalendars]
-      .filter(c => !c.deleted_at)
-      .sort(
-        (a, b) =>
-          new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-      );
-    const top3 = sortedRecent.slice(0, 3);
-    const includesActive = top3.some(c => c.id === calendarId);
-    const activeCal = !includesActive
-      ? sortedRecent.find(c => c.id === calendarId)
-      : undefined;
-    const source = activeCal ? [activeCal, ...top3] : top3;
-
-    // Overlay live data for the active calendar so name/totals reflect
-    // in-session edits (renames, new trades) instead of the snapshot.
-    return source.map(cal => {
-      const isActive = cal.id === calendarId;
-      const live = isActive ? calendar : cal;
-      return {
-        id: cal.id,
-        name: live.name,
-        totalTrades: live.total_trades,
-        pnl: live.total_pnl,
-        hero_image_url: live.hero_image_url,
-        active: isActive,
-      };
-    });
-  }, [calendarName, calendarId, userCalendars, calendar]);
-
-  const activeSelectorItem = useMemo<CalendarSelectorItem>(
-    () => ({
-      id: calendarId || '',
-      name: calendarName || 'Calendar',
-      hero_image_url: calendar?.hero_image_url,
-    }),
-    [calendarId, calendarName, calendar?.hero_image_url]
-  );
-
   // Use optimized hook for high-impact economic events
   const { highImpactEventDates: monthlyHighImpactEvents } = useHighImpactEvents({
     currentDate,
@@ -1021,12 +816,9 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     enabled: !!calendar?.economic_calendar_filters
   });
 
-  // Economic event watcher for real-time updates
-  const { watchingStatus } = useEconomicEventWatcher({
-    calendarId,
-    economic_calendar_filters: calendar?.economic_calendar_filters,
-    isActive: true // Always active when TradeCalendar is mounted
-  });
+  // Economic event watcher + notification firing now live at App level
+  // (EventNotificationsProvider). This page just listens for updates to
+  // refresh the still-page-local drawer (see useEconomicEventsUpdates below).
 
   // Load trades for visible calendar range when month changes
   // This ensures overflow days from adjacent months show their trades
@@ -1043,87 +835,15 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     loadVisibleRangeTrades(visibleStart, visibleEnd);
   }, [currentDate, calendarId, loadVisibleRangeTrades]);
 
-  // Listen for multiple economic event updates (same release time)
+  // Page-local drawer still consumes event updates to refresh its content.
+  // Notification firing moved to EventNotificationsProvider (App level).
   useEconomicEventsUpdates((updatedEvents, allEvents, updatedCalendarId) => {
-    if (updatedCalendarId === calendarId) {
-      log(`📊 ${updatedEvents.length} economic events were updated simultaneously for this calendar`);
-
-      // Check if notifications are enabled before showing them
-      const notificationsEnabled = calendar?.economic_calendar_filters?.notificationsEnabled ?? true;
-
-      // 1. Show notification sliders for each event (leveraging stacking behavior) - only if enabled
-      if (notificationsEnabled) {
-        log(`🔔 Notifications enabled - showing ${updatedEvents.length} event notification(s)`);
-        updatedEvents.forEach(event => {
-          addNotification(event);
-        });
-      } else {
-        log(`🔕 Notifications disabled - skipping ${updatedEvents.length} event notification(s)`);
-      }
-
-      // 2. Pass events to Economic Calendar Drawer if it's open (always update drawer regardless of notification setting)
-      if (isEconomicCalendarOpen) {
-        // For multiple events, we'll pass the first event but include all events in the events array
-        setEconomicCalendarUpdatedEvent({
-          updatedEvents, // Primary events for display
-          allEvents // All updated events
-        });
-        // Clear the updated event after a short delay to prevent re-triggering
-        setTimeout(() => {
-          setEconomicCalendarUpdatedEvent(null);
-        }, 1000);
-      }
-    }
+    if (updatedCalendarId !== calendarId) return;
+    if (!isEconomicCalendarOpen) return;
+    log(`📊 ${updatedEvents.length} economic events updated — refreshing drawer payload`);
+    setEconomicCalendarUpdatedEvent({ updatedEvents, allEvents });
+    setTimeout(() => setEconomicCalendarUpdatedEvent(null), 1000);
   });
-
-
-  // Add a notification (call this when you want to show a new notification)
-  const addNotification = (event: EconomicEvent) => {
-    // Play notification sound
-    playNotificationSound().catch(error => {
-      logger.warn('Failed to play notification sound:', error);
-    });
-
-    setNotifications((prev) => {
-      // If we already have 3 notifications, mark the oldest one for removal
-      if (prev.length >= 3) {
-        const oldestNotification = prev[0];
-        setRemovingNotifications(prevRemoving => {
-          const newSet = new Set(prevRemoving);
-          newSet.add(oldestNotification.id);
-          return newSet;
-        });
-        // Remove the oldest notification after animation delay
-        setTimeout(() => {
-          setNotifications(current => current.filter(n => n.id !== oldestNotification.id));
-          setRemovingNotifications(current => {
-            const newSet = new Set(current);
-            newSet.delete(oldestNotification.id);
-            return newSet;
-          });
-        }, 300);
-      }
-      return [...prev, event];
-    });
-  };
-
-  // Close notification handler
-  const handleCloseNotification = (id: string) => {
-    setRemovingNotifications(prev => {
-      const newSet = new Set(prev);
-      newSet.add(id);
-      return newSet;
-    });
-    setTimeout(() => {
-      setNotifications((prev) => prev.filter(n => n.id !== id));
-      setRemovingNotifications(current => {
-        const newSet = new Set(current);
-        newSet.delete(id);
-        return newSet;
-      });
-    }, 300);
-  };
-
 
 
   // Calendar edit handler
@@ -1133,10 +853,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     setIsCalendarEditSubmitting(true);
     try {
       await onUpdateCalendarProperty(calendarId, (cal) => ({ ...cal, ...formData }));
-      // Update userCalendars state to reflect name change in breadcrumb dropdown
-      setUserCalendars(prev => prev.map(cal =>
-        cal.id === calendarId ? { ...cal, name: formData.name } : cal
-      ));
       setIsCalendarEditOpen(false);
       showSnackbar('Calendar updated successfully', 'success');
     } catch (error) {
@@ -1146,17 +862,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
       setIsCalendarEditSubmitting(false);
     }
   };
-
-  // All calendars-list panel/drawer action state + handlers (edit/duplicate/
-  // link/delete/restore/permanent-delete) live here. See useCalendarPanelActions.
-  const panelActions = useCalendarPanelActions({
-    userId: calendar?.user_id,
-    loadUserCalendars,
-    showSnackbar,
-    onUpdateCalendar,
-    onDuplicateCalendar,
-    onDeleteCalendar,
-  });
 
   // Generic panel/drawer toggle — reused by Notes, Events, Pinned, Filter, Tags
   const togglePanel = useCallback((
@@ -1179,11 +884,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     () => togglePanel('economic-calendar', setIsEconomicCalendarOpen),
     [togglePanel]
   );
-
-  // AI Chat toggle handler
-  const handleToggleAIChat = useCallback(() => {
-    setIsAIChatOpen(true);
-  }, []);
 
   // Scroll detection for floating month navigation with throttling
   // Listens on the main content container (not window) since content
@@ -1266,14 +966,22 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
   }, [filteredTrades, selectedTags, totalPnL]);
 
 
-  // Fetch cumulative PnL before the viewed month for accurate start-of-month value
-  // Always uses unfiltered data (tag filtering is a view concern, not an account value concern)
-  const [pnlBeforeMonth, setPnlBeforeMonth] = useState<number>(0);
+  // Fetch cumulative PnL before the viewed month for accurate start-of-month value.
+  // Always uses unfiltered data (tag filtering is a view concern, not an account value concern).
+  // Past-month results are cached at module scope (`pnlBeforeMonthCache`) so a
+  // route remount doesn't refetch for months that don't change.
+  const [pnlBeforeMonth, setPnlBeforeMonth] = useState<number>(() => {
+    if (!calendarId) return 0;
+    const monthKey = format(startOfMonth(currentDate), 'yyyy-MM');
+    return pnlBeforeMonthCache.get(`${calendarId}|${monthKey}`) ?? 0;
+  });
   const [isPnlLoading, setIsPnlLoading] = useState(false);
   useEffect(() => {
     if (!calendarId) return;
     let cancelled = false;
     const monthStart = startOfMonth(currentDate);
+    const monthKey = format(monthStart, 'yyyy-MM');
+    const cacheKey = `${calendarId}|${monthKey}`;
     const now = new Date();
     const isCurrentRealMonth = currentDate.getFullYear() === now.getFullYear()
       && currentDate.getMonth() === now.getMonth();
@@ -1283,14 +991,26 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
       const monthPnL = trades
         .filter(t => new Date(t.trade_date) >= monthStart)
         .reduce((sum, t) => sum + t.amount, 0);
-      setPnlBeforeMonth(totalPnL - monthPnL);
+      const value = totalPnL - monthPnL;
+      setPnlBeforeMonth(value);
+      pnlBeforeMonthCache.set(cacheKey, value);
       setIsPnlLoading(false);
     } else {
-      // For past months, query DB (always unfiltered)
-      setIsPnlLoading(true);
+      // Past month: hydrate from cache instantly if present, then revalidate.
+      const cached = pnlBeforeMonthCache.get(cacheKey);
+      if (cached !== undefined) {
+        setPnlBeforeMonth(cached);
+        setIsPnlLoading(false);
+      } else {
+        setIsPnlLoading(true);
+      }
       calendarService.getCumulativePnlBeforeDate(calendarId, monthStart)
         .then(val => {
-          if (!cancelled) { setPnlBeforeMonth(val); setIsPnlLoading(false); }
+          if (!cancelled) {
+            setPnlBeforeMonth(val);
+            pnlBeforeMonthCache.set(cacheKey, val);
+            setIsPnlLoading(false);
+          }
         })
         .catch(() => {
           if (!cancelled) { setPnlBeforeMonth(0); setIsPnlLoading(false); }
@@ -1386,10 +1106,15 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     notesService.getWeekNoteKeys(calendarId).then(setWeekNoteKeys);
   }, [calendarId, currentDate]);
 
-  // Load game plan notes for day indicators and instant viewing
+  // Load game plan notes for day indicators and instant viewing.
+  // Cached at module scope (`gamePlanNotesCache`) so navigating Home →
+  // Performance → Home doesn't lose the day indicators while the fetch runs.
   useEffect(() => {
     if (!calendarId) return;
-    notesService.getGamePlanNotesByDay(calendarId).then(setGamePlanNotes);
+    notesService.getGamePlanNotesByDay(calendarId).then((next) => {
+      setGamePlanNotes(next);
+      gamePlanNotesCache.set(calendarId, next);
+    });
   }, [calendarId]);
 
   const clearDaySelection = () => {
@@ -1410,61 +1135,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
   const handleTodayClick = () => {
     clearDaySelection();
     setCurrentDate(new Date());
-  };
-
-
-  // Handle single trade deletion
-  const handleDeleteClick = (tradeId: string) => {
-    setTradesToDelete([tradeId]);
-    setIsDeleteDialogOpen(true);
-    setDeleteError(null);
-  };
-
-  // Handle multiple trade deletion
-  const handleDeleteMultipleTrades = (tradeIds: string[]) => {
-    setTradesToDelete(tradeIds);
-    setIsDeleteDialogOpen(true);
-    setDeleteError(null);
-  };
-
-  const handleConfirmDelete = async () => {
-    if (tradesToDelete.length === 0) return;
-
-    setIsDeleteDialogOpen(false);
-    setDeleteError(null);
-
-    // Add all trades to deleting list immediately for UI feedback
-    setDeletingTradeIds(prev => [...prev, ...tradesToDelete]);
-
-    try {
-      // Delete trades using the hook handler
-      await handleDeleteTrades(tradesToDelete);
-
-      // Show success message
-      const successMessage = tradesToDelete.length === 1
-        ? 'Trade deleted successfully.'
-        : `Successfully deleted ${formatCount(tradesToDelete.length)} trades.`;
-
-      showSnackbar(successMessage, 'success');
-    } catch (error) {
-      logger.error('Error deleting trades:', error);
-      const errorMessage = tradesToDelete.length === 1
-        ? 'Failed to delete trade. Please try again.'
-        : `Failed to delete some trades. Please try again.`;
-
-      setDeleteError(errorMessage);
-      showSnackbar(errorMessage, 'error');
-    } finally {
-      // Remove all trades from deleting list
-      setDeletingTradeIds(prev => prev.filter(id => !tradesToDelete.includes(id)));
-      setTradesToDelete([]);
-    }
-  };
-
-  const handleCancelDelete = () => {
-    setIsDeleteDialogOpen(false);
-    setTradesToDelete([]);
-    setDeleteError(null);
   };
 
 
@@ -1518,13 +1188,15 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     // When weekly target is set, always show DayDialog first (shows progress section)
     // When no weekly target, go directly to add trade form for empty days
     if (trades.length === 0 && !weeklyTarget) {
-      setNewTrade(createNewTradeData);
-      setShowAddForm({ open: true, trade_date: trade_date, showDayDialogWhenDone: true });
-    }
-    else {
+      globalTradeOps.openAddDialog({
+        trade_date,
+        showDayDialogWhenDone: true,
+        onAfterCancel: () => setSelectedDate(trade_date),
+      });
+    } else {
       setSelectedDate(trade_date);
     }
-  }, [isReadOnly, tradesByDay, isLoadingTrades, isDynamicRiskToggled, handleToggleDynamicRisk, weeklyTarget, isLgUp, pushPanel, setPanelOpen]);
+  }, [isReadOnly, tradesByDay, isLoadingTrades, isDynamicRiskToggled, handleToggleDynamicRisk, weeklyTarget, isLgUp, pushPanel, setPanelOpen, globalTradeOps]);
 
   const handleDayHeaderClick = useCallback((day: DayAbbreviation) => {
     if (isReadOnly || !calendarId) return;
@@ -1569,89 +1241,29 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     setSnackbarOpen(false);
   };
 
-  // Retry failed deletion
-  const retryDeletion = async () => {
-    if (deleteError && tradesToDelete.length > 0) {
-      setDeleteError(null);
-      await handleConfirmDelete();
-    }
-  };
-
-  // Gallery mode handlers
-  const openGalleryMode = (trades: Trade[], initialTradeId?: string, title?: string, fetchYear?: number) => {
-    setGalleryMode({
-      open: true,
-      trades,
-      initialTradeId,
-      title,
-      aiOnlyMode: false,
-      fetchYear
-    });
-  };
-
-  // Open gallery in AI-only mode (hides Trade tab, shows only Assistant)
-  const openGalleryModeAI = (trades: Trade[], tradeId: string, title?: string) => {
-    setGalleryMode({
-      open: true,
-      trades,
-      initialTradeId: tradeId,
-      title,
-      aiOnlyMode: true
-    });
-  };
-
-  const closeGalleryMode = () => {
-    setGalleryMode({
-      open: false,
-      trades: [],
-      initialTradeId: undefined,
-      title: undefined,
-      aiOnlyMode: false,
-      fetchYear: undefined
-    });
-  };
-
-  // Handler for editing a trade - used across multiple components
-  const handleEditTrade = useCallback((trade: Trade) => {
-    setNewTrade(() => (createEditTradeData(trade)));
-    setShowAddForm({
-      open: true,
-      trade_date: new Date(trade.trade_date),
-      editTrade: trade,
-      createTempTrade: false,
-      showDayDialogWhenDone: false
-    });
-  }, []);
-
-  // Create a unified tradeOperations object for all trade-related operations
   const tradeOperations: TradeOperationsProps = useMemo(() => ({
-    onUpdateTradeProperty: isReadOnly ? undefined : handleUpdateTradeProperty,
-    onEditTrade: isReadOnly ? undefined : handleEditTrade,
-    onDeleteTrade: isReadOnly ? undefined : handleDeleteClick,
-    onDeleteMultipleTrades: isReadOnly ? undefined : handleDeleteMultipleTrades,
-    onZoomImage: setZoomedImage,
-    onOpenGalleryMode: openGalleryMode,
-    onOpenAIChat: isReadOnly ? undefined : (trade) => openGalleryModeAI(trades, trade.id, trade.name),
+    onUpdateTradeProperty: isReadOnly ? undefined : globalTradeOps.onUpdateTradeProperty,
+    onEditTrade: isReadOnly ? undefined : globalTradeOps.onEditTrade,
+    onDeleteTrade: isReadOnly ? undefined : globalTradeOps.onDeleteTrade,
+    onDeleteMultipleTrades: isReadOnly ? undefined : globalTradeOps.onDeleteMultipleTrades,
+    onZoomImage: tradeViewer.openImageZoom,
+    onOpenGalleryMode: (trades, initialTradeId, title, fetchYear) =>
+      tradeViewer.openGallery({ trades, initialTradeId, title, fetchYear }),
+    onOpenAIChat: isReadOnly ? undefined : (trade) => globalAIChat.openWithTrade(trade),
     onUpdateCalendarProperty: isReadOnly ? undefined : onUpdateCalendarProperty,
     isTradeUpdating,
-    deletingTradeIds,
+    deletingTradeIds: globalTradeOps.deletingTradeIds ?? [],
     calendarId: calendarId || undefined,
     calendar,
     isReadOnly,
     economicFilter: (_calendarId) => calendar?.economic_calendar_filters || DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS
   }), [
     isReadOnly,
-    handleUpdateTradeProperty,
-    handleEditTrade,
-    handleDeleteClick,
-    handleDeleteMultipleTrades,
-    setZoomedImage,
-    openGalleryMode,
-    openGalleryModeAI,
-    trades,
+    globalTradeOps,
+    tradeViewer,
+    globalAIChat,
     onUpdateCalendarProperty,
     isTradeUpdating,
-    deletingTradeIds,
     calendarId,
     calendar
   ]);
@@ -1672,14 +1284,14 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
             title: 'Economic Calendar',
             icon: <EventIcon fontSize="small" />,
             component: (
-              <EconomicCalendarPanel
+              <EconomicEventsView
                 calendar={calendar!}
-                payload={economicCalendarUpdatedEvent}
                 isReadOnly={isReadOnly}
+                onUpdateCalendarProperty={onUpdateCalendarProperty}
                 tradeOperations={tradeOperations}
-                showHeader={false}
-                enabled={isPanelOpen}
+                enabled={isPanelOpen && currentView.id === 'economic-calendar'}
                 initialDate={ecView.initialDate}
+                variant="compact"
               />
             ),
           };
@@ -1689,14 +1301,14 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
             title: 'Notes',
             icon: <NotesIcon fontSize="small" />,
             component: (
-              <NotesContent
+              <CalendarNotesPanel
                 calendarId={calendarId}
                 isReadOnly={isReadOnly}
                 isActive={
                   isPanelOpen && currentView.id === 'notes'
                 }
                 availableTradeTags={allTags}
-                pinnedEvents={calendar?.pinned_events}
+                pinnedEvents={userPinnedEvents}
               />
             ),
           };
@@ -1714,9 +1326,11 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
                 selectedTags={selectedTags}
                 onTagsChange={handleTagsChange}
                 onTradeClick={(trade) => {
-                  openGalleryMode(
-                    trades, trade.id, 'Search Results'
-                  );
+                  tradeViewer.openGallery({
+                    trades,
+                    initialTradeId: trade.id,
+                    title: 'Search Results',
+                  });
                 }}
               />
             ),
@@ -1733,7 +1347,11 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
                   isPanelOpen && currentView.id === 'pinned'
                 }
                 onTradeClick={(trade, allTrades, title) => {
-                  openGalleryMode(allTrades, trade.id, title);
+                  tradeViewer.openGallery({
+                    trades: allTrades,
+                    initialTradeId: trade.id,
+                    title,
+                  });
                 }}
               />
             ),
@@ -1758,12 +1376,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
                 }
               />
             ),
-          };
-        case 'faq':
-          return {
-            title: 'FAQs',
-            icon: <HelpOutlineIcon fontSize="small" />,
-            component: <FAQContent />,
           };
         case 'ai-analysis': {
           const aiView = view as AIAnalysisView;
@@ -1806,45 +1418,20 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
                 currentDate={currentDate}
                 monthlyTarget={monthly_target}
                 calendarId={calendarId}
-                scoreSettings={scoreSettings}
                 calendar={calendar}
                 pnlBeforeMonth={pnlBeforeMonth}
                 isPnlLoading={isPnlLoading}
-                onDeleteTrade={handleDeleteClick}
-                onOpenGalleryMode={openGalleryMode}
+                onDeleteTrade={globalTradeOps.onDeleteTrade}
+                onOpenGalleryMode={(trades, initialTradeId, title) =>
+                  tradeViewer.openGallery({ trades, initialTradeId, title })
+                }
                 onUpdateTradeProperty={handleUpdateTradeProperty}
                 onUpdateCalendarProperty={onUpdateCalendarProperty}
-                onEditTrade={handleEditTrade}
+                onEditTrade={globalTradeOps.onEditTrade}
                 economicFilter={(_calendarId) =>
                   calendar?.economic_calendar_filters ||
                   DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS
                 }
-              />
-            ),
-          };
-        }
-        case 'calendars-list': {
-          const isTrash = (view as { isTrash?: boolean }).isTrash;
-          return {
-            title: isTrash ? 'Trash' : 'All Calendars',
-            icon: isTrash
-              ? <TrashIcon fontSize="small" />
-              : <CalendarIcon fontSize="small" />,
-            component: (
-              <CalendarsListContent
-                isActive={
-                  isPanelOpen && currentView.id === 'calendars-list'
-                }
-                initialTab={isTrash ? 1 : 0}
-                activeCalendarId={calendarId}
-                onCalendarClick={handleSelectCalendar}
-                onEditCalendar={onUpdateCalendar ? panelActions.setEditTarget : undefined}
-                onDuplicateCalendar={onDuplicateCalendar ? panelActions.setDuplicateTarget : undefined}
-                onLinkCalendar={panelActions.setLinkTarget}
-                onDeleteCalendar={onDeleteCalendar ? panelActions.setDeleteTarget : undefined}
-                onUpdateCalendarProperty={onUpdateCalendarProperty}
-                onRestoreCalendar={panelActions.restoreCalendar}
-                onPermanentDeleteCalendar={panelActions.permanentDeleteCalendar}
               />
             ),
           };
@@ -1872,21 +1459,14 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
                 }}
                 showAddForm={
                   isReadOnly ? () => {} : (trade) => {
-                    if (
-                      trade !== null &&
-                      trade !== undefined
-                    ) {
-                      setNewTrade(
-                        () => createEditTradeData(trade)
-                      );
+                    if (trade !== null && trade !== undefined) {
+                      globalTradeOps.onEditTrade?.(trade);
+                    } else {
+                      globalTradeOps.openAddDialog({
+                        trade_date: dayView.date,
+                        showDayDialogWhenDone: false,
+                      });
                     }
-                    setShowAddForm({
-                      open: true,
-                      trade_date: dayView.date,
-                      editTrade: trade,
-                      createTempTrade: trade === null,
-                      showDayDialogWhenDone: false,
-                    });
                   }
                 }
                 tradeOperations={tradeOperations}
@@ -1926,13 +1506,10 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
       calendar, economicCalendarUpdatedEvent, isReadOnly,
       tradeOperations, isPanelOpen, currentView, calendarId,
       allTags, selectedTags, handleTagsChange, trades,
-      openGalleryMode, openGalleryModeAI, handleTagUpdated,
+      tradeViewer, handleTagUpdated,
       requiredTagGroups, onUpdateCalendarProperty,
       getTradesForDate, weeklyStatsMap, accountBalance,
-      pushPanel, replacePanel, setNewTrade, setShowAddForm,
-      handleSelectCalendar,
-      onUpdateCalendar, onDuplicateCalendar, onDeleteCalendar,
-      panelActions,
+      pushPanel, replacePanel, globalTradeOps,
     ]
   );
 
@@ -1960,10 +1537,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
      handleDismissReminder, isReadOnly]
   );
 
-  const isFAQActive = isLgUp
-    ? isPanelOpen && currentView.id === 'faq'
-    : isFAQDrawerOpen;
-
   const isStatsActive = isLgUp
     ? isPanelOpen && currentView.id === 'stats'
     : isStatsDrawerOpen;
@@ -1985,7 +1558,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
 
   const handleHeaderExport = (fileFormat: 'xlsx' | 'csv') => {
     if (trades.length === 0) return;
-    exportTrades(trades, accountBalance, fileFormat);
+    void exportTrades(trades, accountBalance, fileFormat);
     setMoreMenuAnchor(null);
   };
 
@@ -2016,10 +1589,10 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
       <Tooltip title="FAQs">
         <IconButton
           size="small"
-          onClick={() => togglePanel('faq', setIsFAQDrawerOpen)}
+          onClick={() => openGlobalPanel?.({ id: 'faq' })}
           sx={{
-            color: isFAQActive ? 'primary.main' : 'text.secondary',
-            '&:hover': { color: isFAQActive ? 'primary.main' : 'text.primary' },
+            color: 'text.secondary',
+            '&:hover': { color: 'text.primary' },
           }}
         >
           <HelpOutlineIcon fontSize="small" />
@@ -2153,11 +1726,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
       )}
 
       {/* Header bar */}
-      <CalendarSelectorBar
-        active={activeSelectorItem}
-        recent={recentCalendarItems}
-        onViewAll={handleViewAllCalendars}
-        onSelect={handleSelectCalendar}
+      <PageActionBar
         inlineActions={
           <Button
             size="small"
@@ -2173,12 +1742,8 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
               borderRadius: 1,
               minWidth: 0,
               color: isStatsActive ? 'primary.main' : 'text.secondary',
-              borderColor: isStatsActive
-                ? 'primary.main'
-                : (theme: Theme) => theme.palette.divider,
-              bgcolor: isStatsActive
-                ? (theme: Theme) => alpha(theme.palette.primary.main, 0.08)
-                : 'transparent',
+              borderColor: isStatsActive ? 'primary.main' : (theme: Theme) => theme.palette.divider,
+              bgcolor: isStatsActive ? (theme: Theme) => alpha(theme.palette.primary.main, 0.08) : 'transparent',
               '&:hover': {
                 borderColor: isStatsActive ? 'primary.dark' : 'text.primary',
                 bgcolor: isStatsActive
@@ -2687,73 +2252,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
 
       </Box>{/* end main content container */}
 
-      {/* Orion FAB — sticky to bottom-right of the left content area.
-          Shifts inward automatically when the economic calendar panel opens
-          because this element is bounded by the flex: 1 left Box. */}
-      {!isReadOnly && (
-        <Box
-          sx={{
-            position: 'sticky',
-            bottom: { xs: 16, sm: 24 },
-            display: 'flex',
-            justifyContent: 'flex-end',
-            pr: { xs: 2, sm: 3 },
-            pointerEvents: 'none',
-            zIndex: 50,
-          }}
-        >
-          <Tooltip title="Orion" placement="left">
-            <Fab
-              aria-label="open ai chat"
-              onClick={handleToggleAIChat}
-              color="secondary"
-              size="medium"
-              sx={{
-                pointerEvents: 'auto',
-                width: { xs: 48, sm: 56 },
-                height: { xs: 48, sm: 56 },
-                '&:hover': { transform: 'scale(1.08)' },
-                transition: 'transform 0.2s ease',
-                // When there's an unread briefing, pulse a soft ring around
-                // the fab. Uses box-shadow so it doesn't affect layout and
-                // doesn't fight the hover scale transform on the fab itself.
-                ...((taskUnreadCount ?? 0) > 0 && {
-                  animation: 'orionFabPulse 1.8s ease-out infinite',
-                  '@keyframes orionFabPulse': {
-                    '0%': {
-                      boxShadow: `0 0 0 0 ${alpha(theme.palette.secondary.main, 0.55)}`,
-                    },
-                    '70%': {
-                      boxShadow: `0 0 0 14px ${alpha(theme.palette.secondary.main, 0)}`,
-                    },
-                    '100%': {
-                      boxShadow: `0 0 0 0 ${alpha(theme.palette.secondary.main, 0)}`,
-                    },
-                  },
-                }),
-              }}
-            >
-              <Badge
-                variant="dot"
-                color="error"
-                invisible={taskUnreadCount === 0}
-                sx={{
-                  '& .MuiBadge-badge': {
-                    top: 4,
-                    right: 4,
-                    width: 10,
-                    height: 10,
-                    borderRadius: '50%',
-                  },
-                }}
-              >
-                <AIIcon />
-              </Badge>
-            </Fab>
-          </Tooltip>
-        </Box>
-      )}
-
       </Box>{/* end left side content */}
 
       {/* Side Panel — lg+ only, replaces inline economic calendar */}
@@ -2785,22 +2283,36 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
 
         {!isLgUp && (
           <DayDialog
-            open={!!selectedDate && !showAddForm?.open}
+            open={!!selectedDate && !globalTradeOps.formDialog.open}
             onClose={() => {
               setSelectedDate(null);
             }}
             showAddForm={isReadOnly ? () => { } : (trade) => {
-              if (trade !== null) {
-                setNewTrade(() => (createEditTradeData(trade!!)));
+              if (trade !== null && trade !== undefined) {
+                globalTradeOps.onEditTrade?.(trade);
+              } else {
+                globalTradeOps.openAddDialog({
+                  trade_date: selectedDate!!,
+                  showDayDialogWhenDone: true,
+                });
               }
-              setShowAddForm({ open: true, trade_date: selectedDate!!, editTrade: trade, createTempTrade: trade === null, showDayDialogWhenDone: true });
             }}
             date={selectedDate || new Date()}
             trades={selectedDate ? tradesForSelectedDay : []}
             onDateChange={handleDayChange}
             account_balance={accountBalance}
             tradeOperations={tradeOperations}
-            onOpenAIChatMode={isReadOnly ? undefined : openGalleryModeAI}
+            onOpenAIChatMode={
+              isReadOnly
+                ? undefined
+                : (trades, tradeId, title) =>
+                  tradeViewer.openGallery({
+                    trades,
+                    initialTradeId: tradeId,
+                    title,
+                    aiOnlyMode: true,
+                  })
+            }
             weekTrades={selectedDate
               ? weeklyStatsMap.get(format(startOfWeek(selectedDate, { weekStartsOn: 0 }), 'yyyy-MM-dd'))?.weekTrades
               : undefined
@@ -2808,54 +2320,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
           />
         )}
 
-
-        {!isReadOnly && (
-          <TradeFormDialog
-            open={(!!showAddForm?.trade_date && showAddForm?.open) || false}
-            onClose={() => {
-              setSelectedDate(null);
-              setShowAddForm(null);
-              if (newTrade != null && newTrade.pending_images) {
-                // Release object URLs to avoid memory leaks
-                newTrade.pending_images.forEach(image => {
-                  URL.revokeObjectURL(image.preview);
-                });
-                setNewTrade(null);
-              }
-            }}
-            onCancel={() => {
-              if (showAddForm?.showDayDialogWhenDone) {
-                setSelectedDate(null);
-                setSelectedDate(showAddForm?.trade_date!!); // show the day dialog
-              }
-              setShowAddForm(null);
-            }}
-            showForm={{ open: showAddForm?.open || false, editTrade: showAddForm?.editTrade || null, createTempTrade: showAddForm?.createTempTrade || false }}
-            trade_date={showAddForm?.trade_date || new Date()}
-            onAddTrade={handleAddTrade}
-            newMainTrade={newTrade}
-            setNewMainTrade={prev => setNewTrade(prev(newTrade!!))}
-            onTagUpdated={handleTagUpdated}
-            onUpdateTradeProperty={handleUpdateTradeProperty}
-            onDeleteTrades={handleDeleteTrades}
-            setZoomedImage={setZoomedImage}
-            account_balance={accountBalance}
-            onAccountBalanceChange={handleAccountBalanceChange}
-            calendar={calendar}
-            tags={allTags}
-            dynamicRiskSettings={dynamicRiskSettings}
-            requiredTagGroups={requiredTagGroups}
-            onOpenGalleryMode={openGalleryMode}
-          />
-        )}
-
-
-        {/* Image Zoom Dialog */}
-        {zoomedImages && <ImageZoomDialog
-          open={!!zoomedImages}
-          onClose={() => setZoomedImagesState(null)}
-          imageProp={zoomedImages}
-        />}
 
         <SelectDateDialog
           open={isMonthSelectorOpen}
@@ -2866,7 +2330,9 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
           monthlyTarget={monthly_target}
           yearlyTarget={yearlyTarget}
           yearStats={calendar?.year_stats || {}}
-          onOpenGalleryMode={openGalleryMode}
+          onOpenGalleryMode={(trades, initialTradeId, title, fetchYear) =>
+            tradeViewer.openGallery({ trades, initialTradeId, title, fetchYear })
+          }
         />
 
 
@@ -2888,37 +2354,9 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
           />
         )}
 
-        {/* Snackbar for notifications */}
-        <TagManagementDialog
-          open={isTagManagementDialogOpen}
-          onClose={() => setIsTagManagementDialogOpen(false)}
-          allTags={allTags}
-          calendarId={calendarId!!}
-          onTagUpdated={handleTagUpdated}
-          requiredTagGroups={requiredTagGroups}
-          onUpdateCalendarProperty={onUpdateCalendarProperty}
-        />
-
-        {/* Confirmation Delete Dialog */}
-        <ConfirmationDialog
-          open={isDeleteDialogOpen}
-          title={tradesToDelete.length === 1 ? "Delete Trade" : `Delete ${formatCount(tradesToDelete.length)} Trades`}
-          message={
-            tradesToDelete.length === 1
-              ? "Are you sure you want to delete this trade? This action cannot be undone."
-              : `Are you sure you want to delete ${formatCount(tradesToDelete.length)} trades? This action cannot be undone.`
-          }
-          confirmText="Delete"
-          cancelText="Cancel"
-          onConfirm={handleConfirmDelete}
-          onCancel={handleCancelDelete}
-          confirmColor="error"
-          isSubmitting={deletingTradeIds.some(id => tradesToDelete.includes(id))}
-        />
-
         <Snackbar
           open={snackbarOpen}
-          autoHideDuration={snackbarSeverity === 'success' ? 3000 : deleteError ? 6000 : 4000}
+          autoHideDuration={snackbarSeverity === 'success' ? 3000 : 4000}
           onClose={handleSnackbarClose}
           anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
           sx={{ zIndex: Z_INDEX.SNACKBAR }}
@@ -2928,21 +2366,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
             severity={snackbarSeverity}
             variant="filled"
             sx={{ width: '100%' }}
-            action={
-              deleteError && tradesToDelete.length > 0 ? (
-                <Button
-                  color="inherit"
-                  size="small"
-                  onClick={() => {
-                    handleSnackbarClose();
-                    retryDeletion();
-                  }}
-                  sx={{ color: 'inherit' }}
-                >
-                  Retry
-                </Button>
-              ) : undefined
-            }
           >
             {snackbarMessage}
           </Alert>
@@ -2963,7 +2386,11 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
             onTradeClick={(trade) => {
               // Close search drawer and open the trade in gallery mode
               setIsSearchDrawerOpen(false);
-              openGalleryMode(trades, trade.id, "Search Results");
+              tradeViewer.openGallery({
+                trades,
+                initialTradeId: trade.id,
+                title: 'Search Results',
+              });
             }}
           />
         )}
@@ -2977,29 +2404,15 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
             onTradeClick={(trade, allTrades, title) => {
               // Close drawer and open the trade in gallery mode
               setPinnedTradesDrawerOpen(false);
-              openGalleryMode(allTrades, trade.id, title);
+              tradeViewer.openGallery({
+                trades: allTrades,
+                initialTradeId: trade.id,
+                title,
+              });
             }}
             tradeOperations={tradeOperations}
           />
         )}
-
-        {/* Trade Gallery Dialog */}
-        <TradeGalleryDialog
-          open={galleryMode.open}
-          onClose={closeGalleryMode}
-          trades={galleryMode.trades}
-          initialTradeId={galleryMode.initialTradeId}
-          setZoomedImage={setZoomedImage}
-          title={galleryMode.title}
-          calendarId={calendarId}
-          calendar={calendar}
-          aiOnlyMode={galleryMode.aiOnlyMode}
-          isReadOnly={isReadOnly}
-          fetchYear={galleryMode.fetchYear}
-          tradeOperations={tradeOperations}
-        />
-
-
 
         {/* Calendar Edit Dialog */}
         <CalendarFormDialog
@@ -3013,86 +2426,65 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
           submitButtonText="Save"
         />
 
-        {/* Header Import Trades Dialog */}
-        <ImportMappingDialog
-          open={showImportDialog}
-          onClose={() => {
-            setShowImportDialog(false);
-            setImportFile(null);
-          }}
-          onImport={handleHeaderImportComplete}
-          file={importFile}
-        />
-
-        {/* Panel-action dialogs (for OTHER calendars from the calendars-list panel) */}
-        <CalendarManagementDialogs
-          actions={panelActions}
-          userCalendars={userCalendars}
-        />
+        {/* Header Import Trades Dialog — lazy chunk; only mount when opening. */}
+        {showImportDialog && (
+          <React.Suspense fallback={null}>
+            <ImportMappingDialog
+              open={showImportDialog}
+              onClose={() => {
+                setShowImportDialog(false);
+                setImportFile(null);
+              }}
+              onImport={handleHeaderImportComplete}
+              file={importFile}
+            />
+          </React.Suspense>
+        )}
 
       {/* Economic Calendar Drawer — only rendered on <lg (panel handles it on lg+) */}
       {!isLgUp && (
-        <EconomicCalendarDrawer
+        <UnifiedDrawer
           open={isEconomicCalendarOpen}
           onClose={() => setIsEconomicCalendarOpen(false)}
-          calendar={calendar!}
-          payload={economicCalendarUpdatedEvent}
-          isReadOnly={isReadOnly}
-          tradeOperations={tradeOperations}
-          enabled={isEconomicCalendarOpen}
-        />
+          title="Economic Calendar"
+          icon={<EventIcon />}
+          width={{ xs: '100%', sm: 450 }}
+          keepMounted
+          contentSx={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
+        >
+          <EconomicEventsView
+            calendar={calendar!}
+            isReadOnly={isReadOnly}
+            onUpdateCalendarProperty={onUpdateCalendarProperty}
+            tradeOperations={tradeOperations}
+            enabled={isEconomicCalendarOpen}
+            variant="compact"
+          />
+        </UnifiedDrawer>
       )}
 
-      {/* AI Chat Drawer */}
-      <AIChatDrawer
-        open={isAIChatOpen}
-        onClose={() => setIsAIChatOpen(false)}
-        trades={trades}
-        calendar={calendar!}
-        isReadOnly={isReadOnly}
-        tradeOperations={tradeOperations}
-        aiTasks={aiTasks}
-        pendingDeepLink={aiChatDeepLink}
-        onDeepLinkConsumed={() => setAiChatDeepLink(null)}
-        requestActiveTab={aiChatRequestedTab}
-        onTabRequestConsumed={() => setAiChatRequestedTab(null)}
-      />
+      {/* AI Chat Drawer is mounted once at App level via GlobalAIChat —
+          this page opens it through `globalAIChat.open()`. */}
 
       {/* Notes Drawer — <lg only */}
       {!isLgUp && (
-        <NotesDrawer
+        <UnifiedDrawer
           open={isNotesDrawerOpen}
           onClose={() => setIsNotesDrawerOpen(false)}
-          calendarId={calendarId}
-          isReadOnly={isReadOnly}
-          availableTradeTags={allTags}
-          pinnedEvents={calendar.pinned_events}
-        />
-      )}
-
-      {/* FAQ Drawer — <lg only (lg+ uses SidePanel) */}
-      {!isLgUp && (
-        <FAQDrawer
-          open={isFAQDrawerOpen}
-          onClose={() => setIsFAQDrawerOpen(false)}
-        />
-      )}
-
-      {/* Calendars List Drawer — <lg only (lg+ uses SidePanel) */}
-      {!isLgUp && (
-        <CalendarsListDrawer
-          open={isCalendarsListDrawerOpen}
-          onClose={() => setIsCalendarsListDrawerOpen(false)}
-          activeCalendarId={calendarId}
-          onCalendarClick={handleSelectCalendar}
-          onEditCalendar={onUpdateCalendar ? panelActions.setEditTarget : undefined}
-          onDuplicateCalendar={onDuplicateCalendar ? panelActions.setDuplicateTarget : undefined}
-          onLinkCalendar={panelActions.setLinkTarget}
-          onDeleteCalendar={onDeleteCalendar ? panelActions.setDeleteTarget : undefined}
-          onUpdateCalendarProperty={onUpdateCalendarProperty}
-          onRestoreCalendar={panelActions.restoreCalendar}
-          onPermanentDeleteCalendar={panelActions.permanentDeleteCalendar}
-        />
+          title="Notes"
+          icon={<NotesIcon />}
+          width={{ xs: '100%', sm: 450 }}
+          keepMounted
+          contentSx={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
+        >
+          <CalendarNotesPanel
+            calendarId={calendarId}
+            isActive={isNotesDrawerOpen}
+            isReadOnly={isReadOnly}
+            availableTradeTags={allTags}
+            pinnedEvents={userPinnedEvents}
+          />
+        </UnifiedDrawer>
       )}
 
       {/* Stats Drawer — <lg only (lg+ uses SidePanel) */}
@@ -3116,15 +2508,16 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
           currentDate={currentDate}
           monthlyTarget={monthly_target}
           calendarId={calendarId}
-          scoreSettings={scoreSettings}
           calendar={calendar}
           pnlBeforeMonth={pnlBeforeMonth}
           isPnlLoading={isPnlLoading}
-          onDeleteTrade={handleDeleteClick}
-          onOpenGalleryMode={openGalleryMode}
+          onDeleteTrade={globalTradeOps.onDeleteTrade}
+          onOpenGalleryMode={(trades, initialTradeId, title) =>
+            tradeViewer.openGallery({ trades, initialTradeId, title })
+          }
           onUpdateTradeProperty={handleUpdateTradeProperty}
           onUpdateCalendarProperty={onUpdateCalendarProperty}
-          onEditTrade={handleEditTrade}
+          onEditTrade={globalTradeOps.onEditTrade}
           economicFilter={(_calendarId) =>
             calendar?.economic_calendar_filters || DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS
           }
@@ -3141,7 +2534,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
           weekKey={weekNoteDialog.weekKey}
           availableTradeTags={allTags}
           calendarNotes={calendar.notes}
-          pinnedEvents={calendar.pinned_events}
+          pinnedEvents={userPinnedEvents}
           onSave={(savedNote, isCreated) => {
             if (isCreated && savedNote.week_key) {
               setWeekNoteKeys(prev => {
@@ -3201,7 +2594,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
           gamePlanDay={gamePlanDialog.day}
           availableTradeTags={allTags}
           calendarNotes={calendar.notes}
-          pinnedEvents={calendar.pinned_events}
+          pinnedEvents={userPinnedEvents}
           onSave={() => {
             setGamePlanDialog(null);
             if (calendarId) {
@@ -3213,38 +2606,16 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
         />
       )}
 
-      {/* Notification stack container (bottom left, global) */}
-      <Box
-        sx={{
-          position: 'fixed',
-          bottom: { xs: 16, sm: 24 },
-          left: { xs: 8, sm: 12 },
-          right: { xs: 8, sm: 'auto' },
-          zIndex: 1400,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: { xs: 1.5, sm: 2 },
-          pointerEvents: 'none',
-          maxWidth: { xs: 'calc(100% - 16px)', sm: '400px' }
-        }}
-      >
-        {notifications.map(event => (
-          <EconomicEventNotification
-            key={event.id}
-            event={event}
-            onClose={() => handleCloseNotification(event.id)}
-            autoHideDuration={30000}
-            isRemoving={removingNotifications.has(event.id)}
-          />
-        ))}
-      </Box>
     </Box>
   );
 };
 
 export const TradeCalendar: FC<TradeCalendarProps> = (props) => {
   return (
-    <SidePanelProvider defaultView={{ id: 'economic-calendar' }}>
+    <SidePanelProvider
+      defaultView={{ id: 'economic-calendar' }}
+      defaultOpen={false}
+    >
       <TradeCalendarInner {...props} />
     </SidePanelProvider>
   );

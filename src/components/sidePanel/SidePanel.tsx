@@ -12,6 +12,8 @@ interface ViewConfig {
   stickyContent?: React.ReactNode;
 }
 
+const PANEL_WIDTH = 'clamp(360px, 36vw, 580px)';
+
 interface SidePanelProps {
   /**
    * Maps the current view to a title, icon, and rendered component.
@@ -29,7 +31,7 @@ const SidePanel: React.FC<SidePanelProps> = ({ renderView }) => {
   return (
     <Box
       sx={{
-        width: isOpen ? 'clamp(300px, 25vw, 420px)' : 0,
+        width: isOpen ? PANEL_WIDTH : 0,
         overflow: 'hidden',
         transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
         flexShrink: 0,
@@ -45,7 +47,7 @@ const SidePanel: React.FC<SidePanelProps> = ({ renderView }) => {
             display: 'flex',
             flexDirection: 'column',
             height: '100%',
-            minWidth: 'clamp(300px, 25vw, 420px)',
+            minWidth: PANEL_WIDTH,
             overflow: 'hidden',
             bgcolor: theme.palette.mode === 'dark'
               ? alpha(theme.palette.background.paper, 0.4)

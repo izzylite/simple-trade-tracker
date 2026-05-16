@@ -53,11 +53,12 @@ import RichTextEditor from './common/RichTextEditor';
 import EconomicEventListItem from './economicCalendar/EconomicEventListItem';
 import { economicCalendarService } from '../services/economicCalendarService';
 import { EconomicEvent, ImpactLevel, Currency } from '../types/economicCalendar';
-import { DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS, EconomicCalendarFilterSettings } from './economicCalendar/EconomicCalendarDrawer';
+import { DEFAULT_FILTER_SETTINGS as DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS, EconomicCalendarFilterSettings } from '../hooks/useEconomicCalendarFilters';
 import { logger } from '../utils/logger';
 import { formatCount } from '../utils/formatters';
 import { tradeEconomicEventService } from '../services/tradeEconomicEventService';
 import { useEventPinning } from '../hooks/useEventPinning';
+import { useUserPinnedEvents } from '../contexts/UserPinnedEventsContext';
 import ShareButton from './sharing/ShareButton';
 import { useRealtimeSubscription } from '../hooks/useRealtimeSubscription';
 import { isToday } from 'date-fns';
@@ -172,15 +173,13 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
   const [isPinning, setIsPinning] = useState(false);
   const [loadingImages, setLoadingImages] = useState<{ [key: string]: boolean }>({});
 
-  // Use the reusable event pinning hook
+  // Use the reusable event pinning hook (now backed by user-level storage)
   const {
     pinningEventId,
     handlePinEvent,
     handleUnpinEvent
-  } = useEventPinning({
-    calendar,
-    onUpdateCalendarProperty
-  });
+  } = useEventPinning();
+  const { pins: userPinnedEvents } = useUserPinnedEvents();
   const [showTagGroups, setShowTagGroups] = useState(() => {
     // Load from localStorage, default to false if not found
     const saved = localStorage.getItem('tradeDetail_showTagGroups');
@@ -350,7 +349,8 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
 
   // Function to fetch game plan notes for the trade's date
   const fetchGamePlanNotes = async (): Promise<Note[]> => {
-    if (!trade.trade_date || !calendarId) return [];
+    const effectiveCalendarId = calendarId || trade.calendar_id;
+    if (!trade.trade_date || !effectiveCalendarId) return [];
 
     try {
       setLoadingGamePlan(true);
@@ -360,8 +360,8 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
 
       // Fetch both weekly and one-time reminders in parallel
       const [weeklyNotes, dateNotes] = await Promise.all([
-        getReminderNotesForDay(calendarId, dayAbbr),
-        getReminderNotesForDate(calendarId, tradeDate)
+        getReminderNotesForDay(effectiveCalendarId, dayAbbr),
+        getReminderNotesForDate(effectiveCalendarId, tradeDate)
       ]);
 
       // Exclude notes that remind every day — those aren't
@@ -695,7 +695,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                 }}>
                   Properties
                 </Typography>
-                {calendarId && (
+                {(calendarId || trade.calendar_id) && (
                   <Button
                     size="small"
                     startIcon={loadingGamePlan
@@ -1492,7 +1492,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                                       px={0}
                                       py={0}
                                       event={event}
-                                      pinnedEvents={calendar?.pinned_events || []}
+                                      pinnedEvents={userPinnedEvents}
                                       onPinEvent={handlePinEvent}
                                       onUnpinEvent={handleUnpinEvent}
                                       isPinning={pinningEventId === event.id}

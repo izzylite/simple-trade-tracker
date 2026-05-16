@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo, Suspense, lazy } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useParams, useLocation, useNavigate } from 'react-router-dom';
-import { ThemeProvider, CssBaseline, Box } from '@mui/material';
+import { ThemeProvider, CssBaseline, Box, Snackbar, Alert } from '@mui/material';
 import { createTheme } from '@mui/material/styles';
 import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -9,6 +9,7 @@ import { AuthProvider } from './contexts/SupabaseAuthContext';
 import { useAuthState, AuthStateProvider } from './contexts/AuthStateContext';
 import { TradeSyncProvider } from './contexts/TradeSyncContext';
 import { NotificationsProvider } from './contexts/NotificationsContext';
+import { UserPinnedEventsProvider } from './contexts/UserPinnedEventsContext';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import * as calendarService from './services/calendarService';
 import { createAppTheme } from './theme';
@@ -22,8 +23,25 @@ import AppLoadingProgress from './components/AppLoadingProgress';
 
 import AppHeader from './components/common/AppHeader';
 import AppLayout from './components/layout/AppLayout';
-import CalendarFormDialog, { CalendarFormData } from './components/CalendarFormDialog';
+import type { CalendarFormData } from './components/CalendarFormDialog';
 import CalendarLockedOverlay from './components/calendars/CalendarLockedOverlay';
+import CalendarManagementDialogs from './components/calendars/CalendarManagementDialogs';
+import { useCalendarPanelActions } from './hooks/useCalendarPanelActions';
+import { SelectedCalendarProvider, useSelectedCalendar } from './contexts/SelectedCalendarContext';
+import {
+  CalendarsListPanelProvider,
+  CalendarsListPanelActions,
+} from './contexts/CalendarsListPanelContext';
+import { SidePanelProvider, useSidePanel } from './contexts/SidePanelContext';
+import type { SidePanelView } from './contexts/SidePanelContext';
+import { TradeUIProvider } from './contexts/TradeUIContext';
+import { TradesProvider } from './contexts/TradesContext';
+import { AIChatProvider } from './contexts/AIChatContext';
+import { TradeViewerProvider } from './contexts/TradeViewerContext';
+import { TradeOperationsProvider } from './contexts/TradeOperationsContext';
+import { EventNotificationsProvider } from './contexts/EventNotificationsContext';
+import { PanelMutexProvider, usePanelMutexSlot } from './contexts/PanelMutexContext';
+import { useCalendarsListPanel } from './contexts/CalendarsListPanelContext';
 
 // Lazy load page components from pages directory
 const LandingPage = lazy(() => import('./pages/LandingPage'));
@@ -38,18 +56,27 @@ const AuthCallback = lazy(() => import('./pages/AuthCallbackPage'));
 const PasswordResetPage = lazy(() => import('./pages/PasswordResetPage'));
 const CommunityPage = lazy(() => import('./pages/CommunityPage'));
 const PerformancePage = lazy(() => import('./pages/PerformancePage'));
-const AssistantPage = lazy(() => import('./pages/AssistantPage'));
 const NotesPage = lazy(() => import('./pages/NotesPage'));
+const EconomicEventsPage = lazy(() => import('./pages/EconomicEventsPage'));
 // const SupabaseAuthTest = lazy(() => import('./components/auth/SupabaseAuthTest')); // Commented out - for testing only
+
+// Global app-level surfaces — lazy so AI chat (markdown/draft-js), trade
+// viewer dialogs, etc. don't block first paint. Wrapped in <Suspense
+// fallback={null}> at the mount site; fallback is null because these are
+// invisible until the user interacts (no UI to skeleton).
+// CalendarFormDialog only mounts when user clicks Create. Eager import drags
+// MUI Dialog + form components into main bundle.
+const CalendarFormDialog = lazy(() => import('./components/CalendarFormDialog'));
+
+const GlobalAIChat = lazy(() => import('./components/aiChat/GlobalAIChat'));
+const GlobalAIChatFab = lazy(() => import('./components/aiChat/GlobalAIChatFab'));
+const GlobalTradeViewer = lazy(() => import('./components/trades/GlobalTradeViewer'));
+const GlobalTradeOperations = lazy(() => import('./components/trades/GlobalTradeOperations'));
+const GlobalEventNotifications = lazy(() => import('./components/notifications/GlobalEventNotifications'));
 
 
 // Loading component for Suspense
 const LoadingFallback = () => <AppLoadingProgress />;
-
-// Persists the last calendar the user opened so the / resolver can route
-// them back to it across sessions. CalendarRoute writes; HomeRouteResolver
-// reads.
-const LAST_ACTIVE_CALENDAR_KEY = 'last_active_calendar_id';
 
 function AppContent() {
   // Initialize theme from localStorage or system preference
@@ -61,16 +88,28 @@ function AppContent() {
   const [isLoadingTrades, setIsLoadingTrades] = useState<boolean>(false);
   const [loadingAction, setLoadingAction] = useState<'loading' | 'importing' | 'exporting'>('loading');
 
-  const { user } = useAuthState();
+  const { user, isAuthLoading } = useAuthState();
   const location = useLocation();
   const navigate = useNavigate();
-  const isLandingPage = !user && location.pathname === '/';
+  // Treat root as landing only after auth resolves. Otherwise the very
+  // first paint on cold load (before supabase returns getSession) shows
+  // the landing page for one frame even when the user is signed in.
+  const isLandingPage = !isAuthLoading && !user && location.pathname === '/';
 
   // Global Create Calendar dialog — triggered from side nav "+ New", lock
   // overlays, and any future entry point. Lifted to App.tsx so a single
   // dialog instance serves every route.
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isCreatingCalendar, setIsCreatingCalendar] = useState(false);
+
+  // Simple feedback snackbar used by the calendars-list panel actions.
+  const [snackbar, setSnackbar] = useState<{
+    message: string;
+    severity: 'success' | 'error';
+  } | null>(null);
+  const showSnackbar = (message: string, severity: 'success' | 'error') => {
+    setSnackbar({ message, severity });
+  };
 
   const openCreateCalendarDialog = () => setIsCreateDialogOpen(true);
 
@@ -184,21 +223,35 @@ function AppContent() {
   };
 
   const handleUpdateCalendar = async (id: string, updates: Partial<Calendar>) => {
+    // Optimistic SWR mutate — UI reflects instantly. Every `useCalendars`
+    // consumer (PerformancePage, HeaderCalendarSelector, CalendarListDialog,
+    // etc.) and the local-state sync useEffect picks this up.
+    refreshCalendars(
+      (prev) =>
+        (prev ?? [])
+          .map((cal) => (cal.id === id ? { ...cal, ...updates, updated_at: new Date() } : cal))
+          .sort(
+            (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+          ),
+      { revalidate: false },
+    );
     try {
       const updatedCalendar = await calendarService.updateCalendar(id, updates);
-      setCalendars(prev => {
-        const updated = prev.map(cal =>
-          cal.id === id
-            ? { ...cal, ...updatedCalendar, updated_at: new Date() }
-            : cal
-        );
-        // Re-sort by updated_at descending to match database order
-        return updated.sort((a, b) =>
-          new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-        );
-      });
+      // Reconcile with server-truth (server-side timestamps, defaults, etc.)
+      // without a network revalidate — we already have the canonical row.
+      refreshCalendars(
+        (prev) =>
+          (prev ?? [])
+            .map((cal) => (cal.id === id ? { ...cal, ...updatedCalendar } : cal))
+            .sort(
+              (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+            ),
+        { revalidate: false },
+      );
     } catch (error) {
       console.error('Error updating calendar:', error);
+      // Roll back optimistic update by revalidating from server.
+      refreshCalendars();
     }
   };
 
@@ -214,6 +267,43 @@ function AppContent() {
       setLoadingAction(loadingAction);
     }
   }
+
+  // Calendars-list drawer actions (edit/duplicate/link/delete/restore/permanent-
+  // delete + their dialog targets). Wired against App-level CRUD handlers so
+  // any route that opens the drawer gets the same management surface.
+  const panelActions = useCalendarPanelActions({
+    userId: user?.uid,
+    loadUserCalendars: async () => {
+      await refreshCalendars();
+    },
+    showSnackbar,
+    onUpdateCalendar: handleUpdateCalendar,
+    onDuplicateCalendar: handleDuplicateCalendar,
+    onDeleteCalendar: handleDeleteCalendar,
+  });
+
+  // Actions for the global calendars-list panel (inline at lg+, drawer <lg).
+  // The provider owns open/close state — AppLayout consumes it for rendering
+  // and HeaderCalendarSelector for opening from the dropdown footer.
+  const calendarsListActions = useMemo<CalendarsListPanelActions>(
+    () => ({
+      onCalendarClick: (id: string) => navigate(`/calendar/${id}`),
+      onEditCalendar: panelActions.setEditTarget,
+      onDuplicateCalendar: panelActions.setDuplicateTarget,
+      onLinkCalendar: panelActions.setLinkTarget,
+      onDeleteCalendar: panelActions.setDeleteTarget,
+      onUpdateCalendarProperty: async (id, updateCallback) => {
+        const target = calendars.find((c) => c.id === id);
+        if (!target) return undefined;
+        const updated = updateCallback(target);
+        await handleUpdateCalendar(id, updated);
+        return updated;
+      },
+      onRestoreCalendar: panelActions.restoreCalendar,
+      onPermanentDeleteCalendar: panelActions.permanentDeleteCalendar,
+    }),
+    [navigate, panelActions, calendars]
+  );
 
   const toggleColorMode = () => {
     setMode(prevMode => {
@@ -233,6 +323,27 @@ function AppContent() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
+      <SelectedCalendarProvider>
+      <CalendarsListPanelProvider actions={calendarsListActions}>
+      <TradesProvider calendars={calendars} setLoading={setLoading}>
+      <TradeOperationsProvider>
+      <EventNotificationsProvider>
+      <TradeUIProvider>
+      <TradeViewerProvider>
+      <AIChatProvider>
+      <SidePanelProvider defaultView={{ id: 'faq' }} defaultOpen={false}>
+      <PanelMutexProvider>
+      <GlobalSidePanelMutexBridge />
+      <CalendarsListMutexBridge />
+      {user && (
+        <Suspense fallback={null}>
+          <GlobalAIChat />
+          <GlobalAIChatFab />
+          <GlobalTradeViewer />
+          <GlobalTradeOperations />
+          <GlobalEventNotifications />
+        </Suspense>
+      )}
       <Box sx={{ display: 'flex', minHeight: '100vh' }}>
         {/* App Header — hidden on landing page (has its own nav) */}
         {!isLandingPage && (
@@ -246,10 +357,15 @@ function AppContent() {
         <Box
           sx={{
             flexGrow: 1,
-            minHeight: '100vh',
+            // Landing scrolls (it has its own long-form content). Every other
+            // route is locked to the viewport — each page owns its own scroll
+            // container so the app shell never scrolls behind it.
+            height: isLandingPage ? 'auto' : '100vh',
+            minHeight: isLandingPage ? '100vh' : undefined,
+            overflow: isLandingPage ? 'visible' : 'hidden',
             bgcolor: isLandingPage ? '#000' : 'custom.pageBackground',
             position: 'relative',
-            pb: isLandingPage ? 0 : 4,
+            pb: isLandingPage ? 0 : 0,
             pt: isLandingPage ? 0 : 8, // Add top padding to account for fixed AppBar
             transition: theme.transitions.create(['margin', 'width'], {
               duration: theme.transitions.duration.shorter,
@@ -260,12 +376,17 @@ function AppContent() {
             isLoading={isLoadingTrades}
             action={loadingAction}
           />
+          {isAuthLoading ? (
+            <LoadingFallback />
+          ) : (
           <Routes>
-            <Route path="/about" element={<AboutPage />} />
             {/* Auth-gated routes share a persistent AppLayout via a layout
                 route — AppLayout (and its SideNav) stay mounted across
-                navigation between Home / Performance / Assistant / Notes,
-                preventing the shell from blanking on each click. */}
+                navigation between Home / Performance / Notes,
+                preventing the shell from blanking on each click. About lives
+                inside this layout so its side-nav slot can show the active
+                state; for signed-out visitors it falls back to a public
+                route below that renders without the shell. */}
             {user ? (
               <Route
                 element={<AppLayout onNewCalendar={openCreateCalendarDialog} />}
@@ -276,6 +397,7 @@ function AppContent() {
                     <HomeRouteResolver
                       calendars={calendars}
                       isLoadingCalendars={isLoadingCalendars}
+                      hasFetchedCalendars={swrCalendars !== undefined}
                       onCreateCalendar={openCreateCalendarDialog}
                     />
                   }
@@ -289,12 +411,10 @@ function AppContent() {
                     >
                       <CalendarRoute
                         calendars={calendars}
+                        hasFetchedCalendars={swrCalendars !== undefined}
                         onToggleTheme={toggleColorMode}
                         mode={mode}
                         setLoading={setLoading}
-                        onDuplicateCalendar={handleDuplicateCalendar}
-                        onDeleteCalendar={handleDeleteCalendar}
-                        onUpdateCalendar={handleUpdateCalendar}
                       />
                     </ProtectedRoute>
                   }
@@ -314,17 +434,6 @@ function AppContent() {
                   }
                 />
                 <Route
-                  path="/assistant"
-                  element={
-                    <ProtectedRoute
-                      title="Chat with Orion"
-                      subtitle="Sign in to use the assistant"
-                    >
-                      <AssistantPage />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
                   path="/notes"
                   element={
                     <ProtectedRoute
@@ -335,9 +444,24 @@ function AppContent() {
                     </ProtectedRoute>
                   }
                 />
+                <Route
+                  path="/events"
+                  element={
+                    <ProtectedRoute
+                      title="View Economic Events"
+                      subtitle="Sign in to view the economic events calendar"
+                    >
+                      <EconomicEventsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route path="/about" element={<AboutPage />} />
               </Route>
             ) : (
-              <Route path="/" element={<LandingPage />} />
+              <>
+                <Route path="/" element={<LandingPage />} />
+                <Route path="/about" element={<AboutPage />} />
+              </>
             )}
             <Route
               path="/shared/:shareId"
@@ -381,25 +505,83 @@ function AppContent() {
 
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          )}
         </Box>
       </Box>
 
-      {/* Global Create Calendar dialog — opened by side nav "+ New" and any
-          calendar lock overlay. Single instance shared across routes. */}
+      {/* Calendars-list edit/duplicate/link/delete dialogs — driven by
+          useCalendarPanelActions targets. Render once at App level so they
+          work from the inline panel and the mobile drawer alike. */}
       {user && (
-        <CalendarFormDialog
-          open={isCreateDialogOpen}
-          onClose={() => setIsCreateDialogOpen(false)}
-          onSubmit={handleCreateCalendarSubmit}
-          isSubmitting={isCreatingCalendar}
-          mode="create"
-          title="Create Calendar"
-          submitButtonText="Create"
+        <CalendarManagementDialogs
+          actions={panelActions}
+          userCalendars={calendars}
         />
       )}
+      </PanelMutexProvider>
+      </SidePanelProvider>
+      </AIChatProvider>
+      </TradeViewerProvider>
+      </TradeUIProvider>
+      </EventNotificationsProvider>
+      </TradeOperationsProvider>
+      </TradesProvider>
+      </CalendarsListPanelProvider>
+      </SelectedCalendarProvider>
+
+      {/* Global Create Calendar dialog — opened by side nav "+ New" and any
+          calendar lock overlay. Lazy-loaded; only mounts once user opens it. */}
+      {user && isCreateDialogOpen && (
+        <Suspense fallback={null}>
+          <CalendarFormDialog
+            open={isCreateDialogOpen}
+            onClose={() => setIsCreateDialogOpen(false)}
+            onSubmit={handleCreateCalendarSubmit}
+            isSubmitting={isCreatingCalendar}
+            mode="create"
+            title="Create Calendar"
+            submitButtonText="Create"
+          />
+        </Suspense>
+      )}
+
+      <Snackbar
+        open={Boolean(snackbar)}
+        autoHideDuration={3000}
+        onClose={() => setSnackbar(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        {snackbar ? (
+          <Alert
+            severity={snackbar.severity}
+            variant="filled"
+            onClose={() => setSnackbar(null)}
+            sx={{ width: '100%' }}
+          >
+            {snackbar.message}
+          </Alert>
+        ) : undefined}
+      </Snackbar>
     </ThemeProvider>
   );
 }
+
+// Mutex bridges — small headless components mounted inside the provider
+// stack so each panel surface registers a (id, close) slot with the mutex.
+// When any slot signals open, the mutex closes every other slot.
+
+const GlobalSidePanelMutexBridge: React.FC = () => {
+  const { isOpen, setOpen } = useSidePanel();
+  const close = useCallback(() => setOpen(false), [setOpen]);
+  usePanelMutexSlot('global-side-panel', isOpen, close);
+  return null;
+};
+
+const CalendarsListMutexBridge: React.FC = () => {
+  const { open, closePanel } = useCalendarsListPanel();
+  usePanelMutexSlot('calendars-list', open, closePanel);
+  return null;
+};
 
 // Scrolls to top when route changes
 const ScrollToTop: React.FC = () => {
@@ -415,6 +597,12 @@ const ScrollToTop: React.FC = () => {
 interface HomeRouteResolverProps {
   calendars: Calendar[];
   isLoadingCalendars: boolean;
+  /** True only after SWR has returned a defined value (even an empty
+   *  array). Distinguishes "still fetching / awaiting first response"
+   *  from "fetched, no calendars exist". Without this, the lock overlay
+   *  flashes on every cold load between local state defaulting to [] and
+   *  the SWR result being mirrored into it. */
+  hasFetchedCalendars: boolean;
   onCreateCalendar: () => void;
 }
 
@@ -431,17 +619,19 @@ interface HomeRouteResolverProps {
 const HomeRouteResolver: React.FC<HomeRouteResolverProps> = ({
   calendars,
   isLoadingCalendars,
+  hasFetchedCalendars,
   onCreateCalendar,
 }) => {
+  const { calendarId: storedCalendarId } = useSelectedCalendar();
   const activeCalendars = useMemo(
     () => calendars.filter((c) => !c.deleted_at),
     [calendars]
   );
 
-  // Wait until calendars actually arrive before deciding. Without this we'd
-  // briefly render the lock overlay (or wrong-calendar redirect) on every
-  // cold load.
-  if (isLoadingCalendars && activeCalendars.length === 0) {
+  // Wait until SWR has returned. Otherwise the local `calendars` state
+  // (which starts as []) makes us briefly render the lock overlay before
+  // the real fetch result lands.
+  if (!hasFetchedCalendars || isLoadingCalendars) {
     return <LoadingFallback />;
   }
 
@@ -450,20 +640,15 @@ const HomeRouteResolver: React.FC<HomeRouteResolverProps> = ({
       <Box sx={{ position: 'relative', minHeight: 'calc(100vh - 64px)' }}>
         <CalendarLockedOverlay
           onCreateCalendar={onCreateCalendar}
-          subtitle="Create a calendar to start tracking trades. The Home, Performance and Assistant sections unlock once one exists."
+          subtitle="Create a calendar to start tracking trades. The Home, Performance and Notes sections unlock once one exists."
         />
       </Box>
     );
   }
 
   let targetId: string | undefined;
-  try {
-    const stored = localStorage.getItem(LAST_ACTIVE_CALENDAR_KEY) || '';
-    if (stored && activeCalendars.some((c) => c.id === stored)) {
-      targetId = stored;
-    }
-  } catch {
-    // ignore disabled storage
+  if (storedCalendarId && activeCalendars.some((c) => c.id === storedCalendarId)) {
+    targetId = storedCalendarId;
   }
 
   if (!targetId) {
@@ -480,18 +665,20 @@ function App() {
   return (
     <AuthProvider>
       <AuthStateProvider>
-        <NotificationsProvider>
-          <TradeSyncProvider>
-            <LocalizationProvider dateAdapter={AdapterDateFns}>
-              <Router>
-                <ScrollToTop />
-                <Suspense fallback={<LoadingFallback />}>
-                  <AppContent />
-                </Suspense>
-              </Router>
-            </LocalizationProvider>
-          </TradeSyncProvider>
-        </NotificationsProvider>
+        <UserPinnedEventsProvider>
+          <NotificationsProvider>
+            <TradeSyncProvider>
+              <LocalizationProvider dateAdapter={AdapterDateFns}>
+                <Router>
+                  <ScrollToTop />
+                  <Suspense fallback={<LoadingFallback />}>
+                    <AppContent />
+                  </Suspense>
+                </Router>
+              </LocalizationProvider>
+            </TradeSyncProvider>
+          </NotificationsProvider>
+        </UserPinnedEventsProvider>
       </AuthStateProvider>
     </AuthProvider>
   );
@@ -499,22 +686,22 @@ function App() {
 
 interface CalendarRouteProps {
   calendars: Calendar[];
+  /** True only after SWR returned (defined value). Without this, the
+   *  initial render with calendars=[] redirects to "/" → flashes the
+   *  HomeRouteResolver loading state and (in the past) lock overlay
+   *  before SWR resolves and lets us actually find the calendar. */
+  hasFetchedCalendars: boolean;
   onToggleTheme: () => void;
   mode: 'light' | 'dark';
   setLoading: (loading: boolean, loadingAction?: "loading" | "importing" | "exporting") => void;
-  onDuplicateCalendar?: (sourceCalendarId: string, newName: string, includeContent?: boolean) => Promise<void> | void;
-  onDeleteCalendar?: (id: string) => Promise<void> | void;
-  onUpdateCalendar?: (id: string, updates: Partial<Calendar>) => Promise<void> | void;
 }
 
 const CalendarRoute: React.FC<CalendarRouteProps> = ({
   calendars,
+  hasFetchedCalendars,
   onToggleTheme,
   mode,
   setLoading,
-  onDuplicateCalendar,
-  onDeleteCalendar,
-  onUpdateCalendar,
 }) => {
   const { calendarId } = useParams<{ calendarId: string }>();
   const calendar = calendars.find((c: Calendar) => c.id === calendarId);
@@ -524,17 +711,34 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
     window.scrollTo({ top: 0, behavior: 'auto' });
   }, [calendarId]);
 
-  // Remember the last calendar the user actually opened so the / resolver
-  // can route them back here on subsequent visits.
+  // Sync URL → global calendar context so other pages (Performance, Notes)
+  // and the AppHeader selector all reflect the calendar the user is viewing.
+  // The context provider persists to localStorage internally.
+  const { setCalendarId } = useSelectedCalendar();
   useEffect(() => {
-    if (calendar?.id) {
-      try {
-        localStorage.setItem(LAST_ACTIVE_CALENDAR_KEY, calendar.id);
-      } catch {
-        // ignore storage failures
-      }
-    }
-  }, [calendar?.id]);
+    if (calendar?.id) setCalendarId(calendar.id);
+  }, [calendar?.id, setCalendarId]);
+
+  // Dispatch to the app-level SidePanelProvider — CalendarRoute lives outside
+  // TradeCalendarPage's local provider, so `useSidePanel()` here resolves to
+  // the global one. Page-level panels migrated to the global registry open
+  // through this callback.
+  const { replacePanel, setOpen: setSidePanelOpen } = useSidePanel();
+  const openGlobalPanel = useCallback(
+    (view: SidePanelView) => {
+      replacePanel(view);
+      setSidePanelOpen(true);
+    },
+    [replacePanel, setSidePanelOpen]
+  );
+
+  // Wait for SWR to actually return before deciding the calendar is gone.
+  // Without this, the very first render (calendars=[]) redirects to "/" on
+  // cold reload, which then bounces back here once SWR resolves — a visible
+  // flash of HomeRouteResolver (and previously the lock overlay) between.
+  if (!hasFetchedCalendars) {
+    return <LoadingFallback />;
+  }
 
   if (!calendar) {
     // Active calendar is gone (deleted, soft-trashed, or URL points to a
@@ -560,9 +764,7 @@ const CalendarRoute: React.FC<CalendarRouteProps> = ({
       setLoading={setLoading}
       onToggleTheme={onToggleTheme}
       mode={mode}
-      onDuplicateCalendar={onDuplicateCalendar}
-      onDeleteCalendar={onDeleteCalendar}
-      onUpdateCalendar={onUpdateCalendar}
+      openGlobalPanel={openGlobalPanel}
     />
   );
 };

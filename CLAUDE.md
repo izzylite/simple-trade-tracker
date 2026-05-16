@@ -6,6 +6,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 JournoTrades is a React-based trading journal application that allows traders to track their trades, analyze performance, and manage trading calendars. The project uses Supabase, TypeScript, Material-UI, and includes Supabase edge functions for backend operations.
 
+## Five Core Pillars
+
+The platform is built around five core features. All design, architecture, and product decisions should reinforce one or more of these pillars:
+
+1. **Calendar** — Where users log their trades. Primary entry point for trade journaling.
+2. **Performance** — Where users analyze their trades and find patterns across time, symbols, and strategies.
+3. **Economic Events** — Where users check and monitor macro/micro economic events that impact markets.
+4. **Notes** — Where users create and manage their trading notes, journals, and observations.
+5. **AI Assistant (Orion)** — A powerful assistant that helps users navigate the market, surface insights, and act across the other four pillars.
+
 
 ## Core Development Philosophy
 

@@ -245,6 +245,56 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
   }
 
   /**
+   * Fetch trades that have a specific economic event across all of a user's
+   * calendars. Cross-calendar variant of `fetchTradesByEvent` — used by the
+   * user-scoped Events page where there is no single calendar context.
+   * @param userId - User ID to scope the query to (cuts across all calendars)
+   * @param cleanedEventName - Normalized event name (from cleanEventNameForPinning)
+   * @param currency - Event currency (e.g., 'USD', 'EUR')
+   * @param impact - Event impact level ('High', 'Medium', 'Low')
+   * @returns Array of trades across all the user's calendars with a matching event
+   */
+  async fetchUserTradesByEvent(
+    userId: string,
+    cleanedEventName: string,
+    currency: string,
+    impact: string,
+    session?: string
+  ): Promise<Trade[]> {
+    try {
+      const normalizedName = cleanedEventName.toLowerCase();
+
+      let query = supabase
+        .from('trades')
+        .select('*')
+        .eq('user_id', userId)
+        .not('economic_events', 'is', null)
+        .filter('economic_events', 'cs', JSON.stringify([{
+          cleaned_name: normalizedName,
+          currency,
+          impact
+        }]));
+
+      if (session) {
+        query = query.eq('session', session);
+      }
+
+      const { data, error } = await query
+        .order('trade_date', { ascending: false });
+
+      if (error) {
+        logger.error('Error fetching user trades by event:', error);
+        return [];
+      }
+
+      return data ? data.map(item => transformSupabaseTrade(item)) : [];
+    } catch (error) {
+      logger.error('Error fetching user trades by event:', error);
+      return [];
+    }
+  }
+
+  /**
    * Fetch trade counts for multiple economic events using parallel server-side queries
    * Uses PostgreSQL JSONB containment operator (@>) for efficient database-side filtering
    * Runs all count queries in parallel for optimal performance

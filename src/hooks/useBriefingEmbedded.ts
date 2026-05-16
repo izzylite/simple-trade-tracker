@@ -43,6 +43,31 @@ export interface UseBriefingEmbeddedResult {
   loading: boolean;
 }
 
+/**
+ * Module-level cache, keyed by the same sorted-ID composite key the effect
+ * uses for its in-flight guard. Survives hook unmount, so collapsing/re-
+ * expanding (or remounting due to a route hop) doesn't refetch the same
+ * trades/events/notes.
+ */
+type BriefingCacheEntry = {
+  trades?: Record<string, Trade>;
+  events?: Record<string, EconomicEvent>;
+  notes?: Record<string, Note>;
+};
+const briefingEmbeddedCache = new Map<string, BriefingCacheEntry>();
+
+function buildBriefingKey(
+  tradeIds: string[],
+  eventIds: string[],
+  noteIds: string[]
+): string {
+  return [
+    tradeIds.slice().sort().join(','),
+    eventIds.slice().sort().join(','),
+    noteIds.slice().sort().join(','),
+  ].join('|');
+}
+
 export function useBriefingEmbedded(
   html: string,
   enabled: boolean
@@ -56,11 +81,20 @@ export function useBriefingEmbedded(
     [html]
   );
 
-  const [embeddedTrades, setEmbeddedTrades] = useState<Record<string, Trade>>();
-  const [embeddedEvents, setEmbeddedEvents] = useState<Record<string, EconomicEvent>>();
-  const [embeddedNotes, setEmbeddedNotes] = useState<Record<string, Note>>();
+  const initialKey = buildBriefingKey(tradeIds, eventIds, noteIds);
+  const initialCached = briefingEmbeddedCache.get(initialKey);
+
+  const [embeddedTrades, setEmbeddedTrades] = useState<Record<string, Trade> | undefined>(
+    initialCached?.trades
+  );
+  const [embeddedEvents, setEmbeddedEvents] = useState<Record<string, EconomicEvent> | undefined>(
+    initialCached?.events
+  );
+  const [embeddedNotes, setEmbeddedNotes] = useState<Record<string, Note> | undefined>(
+    initialCached?.notes
+  );
   const [loading, setLoading] = useState(false);
-  const fetchedKeyRef = useRef<string | null>(null);
+  const fetchedKeyRef = useRef<string | null>(initialCached ? initialKey : null);
 
   useEffect(() => {
     if (!enabled) return;
@@ -75,15 +109,15 @@ export function useBriefingEmbedded(
     // resolves; setting it pre-fetch races with StrictMode's mount→unmount→
     // remount cycle (first run sets the key + cancels its own promise, second
     // run sees the matching key and skips entirely → state never updates).
-    const key = [
-      tradeIds.slice().sort().join(','),
-      eventIds.slice().sort().join(','),
-      noteIds.slice().sort().join(','),
-    ].join('|');
+    const key = buildBriefingKey(tradeIds, eventIds, noteIds);
     if (fetchedKeyRef.current === key) return;
 
     let cancelled = false;
-    setLoading(true);
+    // Silent revalidate when we already have cached data — only show shimmer
+    // when there's nothing to display yet.
+    if (!briefingEmbeddedCache.has(key)) {
+      setLoading(true);
+    }
 
     const tradeRepo = getTradeRepository();
 
@@ -126,15 +160,23 @@ export function useBriefingEmbedded(
     Promise.all([tradesP, eventsP, notesP])
       .then(([tradeEntries, eventEntries, noteEntries]) => {
         if (cancelled) return;
-        if (tradeIds.length > 0) {
-          setEmbeddedTrades(Object.fromEntries(tradeEntries.filter(Boolean) as Array<readonly [string, Trade]>));
-        }
-        if (eventIds.length > 0) {
-          setEmbeddedEvents(Object.fromEntries(eventEntries.filter(Boolean) as Array<readonly [string, EconomicEvent]>));
-        }
-        if (noteIds.length > 0) {
-          setEmbeddedNotes(Object.fromEntries(noteEntries.filter(Boolean) as Array<readonly [string, Note]>));
-        }
+        const tradesMap = tradeIds.length > 0
+          ? Object.fromEntries(tradeEntries.filter(Boolean) as Array<readonly [string, Trade]>)
+          : undefined;
+        const eventsMap = eventIds.length > 0
+          ? Object.fromEntries(eventEntries.filter(Boolean) as Array<readonly [string, EconomicEvent]>)
+          : undefined;
+        const notesMap = noteIds.length > 0
+          ? Object.fromEntries(noteEntries.filter(Boolean) as Array<readonly [string, Note]>)
+          : undefined;
+        if (tradesMap) setEmbeddedTrades(tradesMap);
+        if (eventsMap) setEmbeddedEvents(eventsMap);
+        if (notesMap) setEmbeddedNotes(notesMap);
+        briefingEmbeddedCache.set(key, {
+          trades: tradesMap,
+          events: eventsMap,
+          notes: notesMap,
+        });
         fetchedKeyRef.current = key;
       })
       .finally(() => {

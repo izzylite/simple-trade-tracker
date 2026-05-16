@@ -21,20 +21,43 @@ interface UseReminderNotesResult {
   removeNote: (noteId: string) => void;
 }
 
-export function useReminderNotes(calendarId: string): UseReminderNotesResult {
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+/**
+ * Module-level cache for reminder notes, keyed by `${calendarId}|${dayAbbr}`.
+ * Survives hook unmount so navigating Home → Performance → Home doesn't
+ * trigger a refetch + flicker. Realtime postgres_changes subscription mutates
+ * the cached array in place via updateNote/removeNote, keeping it fresh.
+ */
+const reminderNotesCache = new Map<string, Note[]>();
 
+function makeReminderCacheKey(calendarId: string, dayAbbr: DayAbbreviation) {
+  return `${calendarId}|${dayAbbr}`;
+}
+
+export function useReminderNotes(calendarId: string): UseReminderNotesResult {
   const currentDayAbbr = format(new Date(), 'EEE') as DayAbbreviation;
   const fullDayName = format(new Date(), 'EEEE');
 
+  // Hydrate from module cache on first render so cards show instantly on
+  // remount. Background revalidate runs after.
+  const [notes, setNotes] = useState<Note[]>(
+    () => reminderNotesCache.get(makeReminderCacheKey(calendarId, currentDayAbbr)) ?? []
+  );
+  const [isLoading, setIsLoading] = useState(
+    () => !reminderNotesCache.has(makeReminderCacheKey(calendarId, currentDayAbbr))
+  );
+
   const loadReminderNotes = useCallback(async () => {
-    setIsLoading(true);
+    const cacheKey = makeReminderCacheKey(calendarId, currentDayAbbr);
+    // Only show shimmer when we have nothing to display yet.
+    if (!reminderNotesCache.has(cacheKey)) {
+      setIsLoading(true);
+    }
     try {
       const fetchedNotes = await getReminderNotesForDay(
         calendarId, currentDayAbbr
       );
       setNotes(fetchedNotes);
+      reminderNotesCache.set(cacheKey, fetchedNotes);
     } catch (error) {
       logger.error('Error loading reminder notes:', error);
       setNotes([]);
@@ -100,11 +123,18 @@ export function useReminderNotes(calendarId: string): UseReminderNotesResult {
             return;
           }
 
+          const cacheKey = makeReminderCacheKey(
+            calendarIdRef.current,
+            currentDayAbbr,
+          );
+
           if (eventType === 'INSERT' && newNote) {
             if (isReminderForTodayRef.current(newNote)) {
               setNotes((prev) => {
                 if (prev.some((n) => n.id === newNote.id)) return prev;
-                return [newNote, ...prev];
+                const next = [newNote, ...prev];
+                reminderNotesCache.set(cacheKey, next);
+                return next;
               });
             }
           } else if (eventType === 'UPDATE' && newNote) {
@@ -116,22 +146,29 @@ export function useReminderNotes(calendarId: string): UseReminderNotesResult {
             if (isRelevant) {
               setNotes((prev) => {
                 const idx = prev.findIndex((n) => n.id === newNote.id);
+                let next: Note[];
                 if (idx >= 0) {
-                  const updated = [...prev];
-                  updated[idx] = newNote;
-                  return updated;
+                  next = [...prev];
+                  next[idx] = newNote;
+                } else {
+                  next = [newNote, ...prev];
                 }
-                return [newNote, ...prev];
+                reminderNotesCache.set(cacheKey, next);
+                return next;
               });
             } else if (wasRelevant && !isRelevant) {
-              setNotes((prev) =>
-                prev.filter((n) => n.id !== newNote.id)
-              );
+              setNotes((prev) => {
+                const next = prev.filter((n) => n.id !== newNote.id);
+                reminderNotesCache.set(cacheKey, next);
+                return next;
+              });
             }
           } else if (eventType === 'DELETE' && oldNote) {
-            setNotes((prev) =>
-              prev.filter((n) => n.id !== oldNote.id)
-            );
+            setNotes((prev) => {
+              const next = prev.filter((n) => n.id !== oldNote.id);
+              reminderNotesCache.set(cacheKey, next);
+              return next;
+            });
           }
         }
       )
@@ -148,18 +185,27 @@ export function useReminderNotes(calendarId: string): UseReminderNotesResult {
   const updateNote = useCallback((updatedNote: Note) => {
     setNotes((prev) => {
       const index = prev.findIndex((n) => n.id === updatedNote.id);
-      if (index >= 0) {
-        const updated = [...prev];
-        updated[index] = updatedNote;
-        return updated;
-      }
-      return prev;
+      if (index < 0) return prev;
+      const updated = [...prev];
+      updated[index] = updatedNote;
+      reminderNotesCache.set(
+        makeReminderCacheKey(calendarId, currentDayAbbr),
+        updated,
+      );
+      return updated;
     });
-  }, []);
+  }, [calendarId, currentDayAbbr]);
 
   const removeNote = useCallback((noteId: string) => {
-    setNotes((prev) => prev.filter((n) => n.id !== noteId));
-  }, []);
+    setNotes((prev) => {
+      const filtered = prev.filter((n) => n.id !== noteId);
+      reminderNotesCache.set(
+        makeReminderCacheKey(calendarId, currentDayAbbr),
+        filtered,
+      );
+      return filtered;
+    });
+  }, [calendarId, currentDayAbbr]);
 
   return {
     notes,

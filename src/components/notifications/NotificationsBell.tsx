@@ -9,8 +9,7 @@ import {
   isReminderFiredPayload,
 } from '../../types/notification';
 import NotificationsPopover from './NotificationsPopover';
-
-const LAST_ACTIVE_CALENDAR_KEY = 'last_active_calendar_id';
+import { SELECTED_CALENDAR_STORAGE_KEY } from '../../contexts/SelectedCalendarContext';
 
 const NotificationsBell: React.FC = () => {
   const theme = useTheme();
@@ -46,12 +45,12 @@ const NotificationsBell: React.FC = () => {
       }
 
       if (isOrionTaskResultPayload(n)) {
-        // Tasks live in the AIChatDrawer's Tasks tab, hosted by calendar
-        // routes. Drop the user on their last-active calendar with a
-        // ?openTasks=1 hint; the calendar page consumes it on mount.
+        // Tasks live in the global AIChatDrawer's Tasks tab. Drop the user
+        // on their last-active calendar with a ?openTasks=1 hint; GlobalAIChat
+        // consumes it on mount and opens the drawer on the Tasks tab.
         let lastCalendarId: string | null = null;
         try {
-          lastCalendarId = localStorage.getItem(LAST_ACTIVE_CALENDAR_KEY);
+          lastCalendarId = localStorage.getItem(SELECTED_CALENDAR_STORAGE_KEY);
         } catch {
           // localStorage disabled — fall through to /assistant as a last resort
         }

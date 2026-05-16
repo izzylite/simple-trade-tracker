@@ -9,8 +9,6 @@ import {
   Button,
   Divider,
   ButtonBase,
-  IconButton,
-  Tooltip,
   alpha,
   useTheme,
 } from '@mui/material';
@@ -20,6 +18,7 @@ import {
   TrendingUp as TrendingUpIcon,
   TrendingDown as TrendingDownIcon,
 } from '@mui/icons-material';
+
 export interface CalendarSelectorItem {
   id: string;
   name: string;
@@ -34,24 +33,11 @@ interface CalendarSelectorBarProps {
   active: CalendarSelectorItem;
   /** Recent (and active) calendars rendered in the dropdown. Cap at 3 + the active one. */
   recent: CalendarSelectorItem[];
-  /** Click on "View all" — opens the calendars-list panel/drawer. */
-  onViewAll?: () => void;
   /** Selecting an item from the dropdown. */
   onSelect: (id: string) => void;
-  /** Right-aligned content (edit, share, FAQ buttons, etc.) */
-  rightContent?: React.ReactNode;
-  /** Inline content rendered immediately to the right of the trigger.
-   *  Use this for actions that read as part of the calendar context (Stats,
-   *  share-link toggles, etc.). Use `rightContent` for page-level chrome. */
-  inlineActions?: React.ReactNode;
-  /** Optional small icon buttons rendered between trigger and rightContent. */
-  buttons?: Array<{
-    key: string;
-    icon: React.ReactNode;
-    onClick: () => void;
-    tooltip?: string;
-    disabled?: boolean;
-  }>;
+  /** Optional "View all" link in the dropdown footer — opens the full
+   *  CalendarsList drawer at the app level. Hidden when omitted. */
+  onViewAll?: () => void;
 }
 
 const formatPnl = (pnl: number | undefined): string => {
@@ -64,23 +50,15 @@ const formatPnl = (pnl: number | undefined): string => {
 };
 
 /**
- * Header bar that replaces the old Breadcrumbs strip on TradeCalendarPage.
- * The active calendar name (with hero avatar + chevron) is the trigger;
- * clicking it opens a recent-calendars menu with a "View all" link to the
- * full panel/drawer. Selected item carries a left accent bar via ::before
- * (no side-stripe border — see DESIGN.md "The One Purple Rule").
- *
- * Right side hosts page-level actions (edit, share, FAQ) plus optional
- * inline icon buttons.
+ * Calendar selector trigger + recent-calendars dropdown. Renders inline with
+ * no outer bar chrome so it can be embedded in the AppHeader's Toolbar
+ * without a competing border/background.
  */
 const CalendarSelectorBar: React.FC<CalendarSelectorBarProps> = ({
   active,
   recent,
-  onViewAll,
   onSelect,
-  rightContent,
-  inlineActions,
-  buttons,
+  onViewAll,
 }) => {
   const theme = useTheme();
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
@@ -103,123 +81,70 @@ const CalendarSelectorBar: React.FC<CalendarSelectorBarProps> = ({
     onViewAll?.();
   };
 
-  const safeButtons = (buttons || []).slice(0, 5);
-
   return (
-    <Box
-      sx={{
-        px: { xs: 2, sm: 3 },
-        py: 1.25,
-        bgcolor: 'background.paper',
-        borderBottom: `1px solid ${theme.palette.divider}`,
-        position: 'relative',
-        zIndex: 1,
-      }}
-    >
-      <Box
+    <>
+      <ButtonBase
+        onClick={handleOpen}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        focusRipple
         sx={{
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 2,
-          minHeight: 40,
+          gap: 1.25,
+          pl: 0.5,
+          pr: 1,
+          py: 0.5,
+          borderRadius: 1,
+          transition: 'background 150ms cubic-bezier(0.4, 0, 0.2, 1)',
+          '&:hover': {
+            bgcolor: theme.palette.action.hover,
+          },
+          '&:focus-visible': {
+            outline: 'none',
+            boxShadow: `0 0 0 3px ${alpha(theme.palette.primary.main, 0.25)}`,
+          },
         }}
       >
-        {/* Trigger */}
-        <ButtonBase
-          onClick={handleOpen}
-          aria-haspopup="menu"
-          aria-expanded={open}
-          focusRipple
+        <Avatar
+          src={active.hero_image_url || undefined}
+          variant="circular"
           sx={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1.25,
-            pl: 0.5,
-            pr: 1,
-            py: 0.5,
-            borderRadius: 1,
-            transition: 'background 150ms cubic-bezier(0.4, 0, 0.2, 1)',
-            '&:hover': {
-              bgcolor: alpha(theme.palette.action.hover, 1),
-            },
-            '&:focus-visible': {
-              outline: 'none',
-              boxShadow: `0 0 0 3px ${alpha(theme.palette.primary.main, 0.25)}`,
-            },
+            width: 28,
+            height: 28,
+            bgcolor: alpha(theme.palette.primary.main, 0.18),
+            '& img': { objectFit: 'cover' },
           }}
         >
-          <Avatar
-            src={active.hero_image_url || undefined}
-            variant="rounded"
-            sx={{
-              width: 32,
-              height: 32,
-              bgcolor: alpha(theme.palette.primary.main, 0.18),
-              '& img': { objectFit: 'cover' },
-            }}
-          >
-            <CalendarIcon
-              sx={{ fontSize: 16, color: theme.palette.primary.main }}
-            />
-          </Avatar>
-
-          <Typography
-            sx={{
-              fontSize: '1rem',
-              fontWeight: 600,
-              letterSpacing: '-0.015em',
-              maxWidth: { xs: 180, sm: 320 },
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              color: 'text.primary',
-            }}
-          >
-            {active.name}
-          </Typography>
-
-          <ChevronDownIcon
-            sx={{
-              fontSize: 18,
-              color: 'text.secondary',
-              transition: 'transform 150ms cubic-bezier(0.4, 0, 0.2, 1)',
-              transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
-            }}
+          <CalendarIcon
+            sx={{ fontSize: 14, color: theme.palette.primary.main }}
           />
-        </ButtonBase>
+        </Avatar>
 
-        {/* Inline actions next to the trigger */}
-        {inlineActions && (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mr: 'auto', ml: 1 }}>
-            {inlineActions}
-          </Box>
-        )}
+        <Typography
+          sx={{
+            fontSize: '0.9375rem',
+            fontWeight: 600,
+            letterSpacing: '-0.015em',
+            maxWidth: { xs: 140, sm: 240 },
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            color: 'text.primary',
+          }}
+        >
+          {active.name}
+        </Typography>
 
-        {/* Right actions */}
-        {(safeButtons.length > 0 || rightContent) && (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
-            {safeButtons.map((btn) => (
-              <Tooltip key={btn.key} title={btn.tooltip || ''}>
-                <span>
-                  <IconButton
-                    size="small"
-                    onClick={btn.onClick}
-                    disabled={btn.disabled}
-                    sx={{
-                      color: 'text.secondary',
-                      '&:hover': { color: 'text.primary' },
-                    }}
-                  >
-                    {btn.icon}
-                  </IconButton>
-                </span>
-              </Tooltip>
-            ))}
-            {rightContent}
-          </Box>
-        )}
-      </Box>
+        <ChevronDownIcon
+          sx={{
+            fontSize: 18,
+            color: 'text.secondary',
+            transition: 'transform 150ms cubic-bezier(0.4, 0, 0.2, 1)',
+            transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
+          }}
+        />
+      </ButtonBase>
 
       <Menu
         anchorEl={anchorEl}
@@ -233,7 +158,6 @@ const CalendarSelectorBar: React.FC<CalendarSelectorBarProps> = ({
               maxWidth: 380,
               maxHeight: 420,
               borderRadius: 1.5,
-              border: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
               boxShadow:
                 theme.palette.mode === 'dark'
                   ? '0 4px 16px rgba(0,0,0,0.4)'
@@ -244,15 +168,7 @@ const CalendarSelectorBar: React.FC<CalendarSelectorBarProps> = ({
         transformOrigin={{ horizontal: 'left', vertical: 'top' }}
         anchorOrigin={{ horizontal: 'left', vertical: 'bottom' }}
       >
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            px: 2,
-            py: 1.25,
-          }}
-        >
+        <Box sx={{ px: 2, py: 1.25 }}>
           <Typography
             variant="overline"
             sx={{
@@ -265,24 +181,6 @@ const CalendarSelectorBar: React.FC<CalendarSelectorBarProps> = ({
           >
             Calendars
           </Typography>
-          {onViewAll && (
-            <Button
-              size="small"
-              variant="text"
-              onClick={handleViewAll}
-              sx={{
-                textTransform: 'none',
-                fontSize: '0.75rem',
-                fontWeight: 600,
-                minWidth: 0,
-                px: 1,
-                py: 0.25,
-                color: 'primary.main',
-              }}
-            >
-              View all
-            </Button>
-          )}
         </Box>
 
         <Divider sx={{ my: 0 }} />
@@ -310,20 +208,8 @@ const CalendarSelectorBar: React.FC<CalendarSelectorBarProps> = ({
                   '&:hover': {
                     bgcolor: isActive
                       ? alpha(theme.palette.primary.main, 0.16)
-                      : alpha(theme.palette.action.hover, 1),
+                      : theme.palette.action.hover,
                   },
-                  '&::before': isActive
-                    ? {
-                        content: '""',
-                        position: 'absolute',
-                        left: 0,
-                        top: 8,
-                        bottom: 8,
-                        width: 3,
-                        borderRadius: '0 2px 2px 0',
-                        bgcolor: 'primary.main',
-                      }
-                    : undefined,
                 }}
               >
                 <Stack
@@ -334,7 +220,7 @@ const CalendarSelectorBar: React.FC<CalendarSelectorBarProps> = ({
                 >
                   <Avatar
                     src={item.hero_image_url || undefined}
-                    variant="rounded"
+                    variant="circular"
                     sx={{
                       width: 28,
                       height: 28,
@@ -409,8 +295,33 @@ const CalendarSelectorBar: React.FC<CalendarSelectorBarProps> = ({
             );
           })}
         </Box>
+
+        {onViewAll && (
+          <>
+            <Divider sx={{ my: 0 }} />
+            <Box sx={{ px: 1.25, py: 0.5 }}>
+              <Button
+                fullWidth
+                size="small"
+                variant="text"
+                onClick={handleViewAll}
+                sx={{
+                  textTransform: 'none',
+                  fontSize: '0.8125rem',
+                  fontWeight: 600,
+                  py: 0.75,
+                  borderRadius: 1,
+                  color: 'primary.main',
+                  justifyContent: 'center',
+                }}
+              >
+                View all calendars
+              </Button>
+            </Box>
+          </>
+        )}
       </Menu>
-    </Box>
+    </>
   );
 };
 

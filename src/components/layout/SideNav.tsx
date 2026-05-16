@@ -1,10 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   Box,
   Drawer,
   ButtonBase,
   Typography,
-  Divider,
   Tooltip,
   Stack,
   alpha,
@@ -13,39 +12,46 @@ import {
 } from '@mui/material';
 import {
   Home as HomeIcon,
-  ShowChart as PerformanceIcon,
-  SmartToy as AssistantIcon,
+  BarChart as PerformanceIcon,
   Notes as NotesIcon,
-  AddCircleOutline as AddIcon,
+  EventNote as EventsIcon,
+  Add as AddIcon,
+  InfoOutlined as AboutIcon,
 } from '@mui/icons-material';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { SELECTED_CALENDAR_STORAGE_KEY } from '../../contexts/SelectedCalendarContext';
+import { preloadRoute } from '../../utils/routePreload';
+import { useAuth } from '../../contexts/SupabaseAuthContext';
+import { useCalendars } from '../../hooks/useCalendars';
+import type { Calendar } from '../../types/dualWrite';
 
-export const SIDE_NAV_WIDTH = 84;
+export const SIDE_NAV_WIDTH = 92;
 const APP_HEADER_HEIGHT = 64;
-const LAST_ACTIVE_CALENDAR_KEY = 'last_active_calendar_id';
+const TILE_SIZE = 44;
 
 /**
- * Resolve the destination for the Home nav item. CalendarRoute writes
- * last_active_calendar_id whenever the user opens a calendar, so we can
- * usually navigate straight there and avoid the "/ -> resolver -> Navigate"
- * hop, which briefly unmounts TradeCalendarPage. If nothing is stored yet
- * (or storage is disabled) fall back to "/" — the resolver picks the right
- * calendar from there.
+ * Resolve the Home destination. Fast-path to /calendar/<id> when the stored
+ * id still maps to a non-deleted calendar — skips the "/ -> resolver -> Navigate"
+ * hop that briefly unmounts TradeCalendarPage. Falls back to "/" when the
+ * stored id is missing, deleted, or calendars haven't loaded yet, so the
+ * HomeRouteResolver can pick the correct target.
  */
-const resolveHomePath = (): string => {
+const resolveHomePath = (calendars: Calendar[] | null | undefined): string => {
+  if (!calendars || calendars.length === 0) return '/';
+  let stored: string | null = null;
   try {
-    const stored = localStorage.getItem(LAST_ACTIVE_CALENDAR_KEY);
-    if (stored) return `/calendar/${stored}`;
+    stored = localStorage.getItem(SELECTED_CALENDAR_STORAGE_KEY);
   } catch {
-    // ignore
+    return '/';
   }
-  return '/';
+  if (!stored) return '/';
+  const exists = calendars.some((c) => c.id === stored && !c.deleted_at);
+  return exists ? `/calendar/${stored}` : '/';
 };
 
 interface NavItem {
   label: string;
-  /** Static path, OR a function evaluated at click time (used by Home). */
-  path: string | (() => string);
+  path: string;
   icon: React.ReactNode;
   /**
    * Match function — when provided, used instead of strict `path === pathname`.
@@ -54,20 +60,17 @@ interface NavItem {
   match?: (pathname: string) => boolean;
 }
 
-const NAV_ITEMS: NavItem[] = [
-  {
-    label: 'Home',
-    path: resolveHomePath,
-    icon: <HomeIcon />,
-    match: (p) => p === '/' || p.startsWith('/calendar/') || p === '/dashboard',
-  },
-  { label: 'Performance', path: '/performance', icon: <PerformanceIcon /> },
-  { label: 'Assistant', path: '/assistant', icon: <AssistantIcon /> },
-  { label: 'Notes', path: '/notes', icon: <NotesIcon /> },
+/**
+ * Utility-tier items live at the bottom of the rail under a hairline divider.
+ * Calendar is canonical (Design Principle 4) — utility surfaces sit visibly
+ * but visually demoted so the primary NAV_ITEMS keep their weight.
+ */
+const UTILITY_ITEMS: NavItem[] = [
+  { label: 'About', path: '/about', icon: <AboutIcon /> },
 ];
 
 interface SideNavProps {
-  /** Triggered by the bottom "+ New Calendar" button. Phase 7 wires this up. */
+  /** Triggered by the top "Create" button. */
   onNewCalendar?: () => void;
   /** Mobile drawer open state — only used when <lg. */
   mobileOpen: boolean;
@@ -75,6 +78,12 @@ interface SideNavProps {
   onMobileClose: () => void;
 }
 
+/**
+ * Vertical icon-rail. Each item is rendered as a rounded icon-tile stacked
+ * over a small label. The active route fills its tile with the brand violet
+ * (One Purple Rule from DESIGN.md — the only saturated colour the rail uses).
+ * "Create" lives at the top so the primary action is the first thing seen.
+ */
 const SideNav: React.FC<SideNavProps> = ({
   onNewCalendar,
   mobileOpen,
@@ -84,14 +93,29 @@ const SideNav: React.FC<SideNavProps> = ({
   const navigate = useNavigate();
   const location = useLocation();
   const isLgUp = useMediaQuery(theme.breakpoints.up('lg'));
+  const { user } = useAuth();
+  const { calendars } = useCalendars(user?.uid);
 
-  const resolvePath = (item: NavItem) =>
-    typeof item.path === 'function' ? item.path() : item.path;
+  const navItems: NavItem[] = useMemo(
+    () => [
+      {
+        label: 'Home',
+        path: resolveHomePath(calendars),
+        icon: <HomeIcon />,
+        match: (p) =>
+          p === '/' || p.startsWith('/calendar/') || p === '/dashboard',
+      },
+      { label: 'Stats', path: '/performance', icon: <PerformanceIcon /> },
+      { label: 'Notes', path: '/notes', icon: <NotesIcon /> },
+      { label: 'Events', path: '/events', icon: <EventsIcon /> },
+    ],
+    [calendars]
+  );
 
   const isActive = (item: NavItem) =>
     item.match
       ? item.match(location.pathname)
-      : location.pathname === resolvePath(item);
+      : location.pathname === item.path;
 
   const handleNavigate = (path: string) => {
     navigate(path);
@@ -103,52 +127,110 @@ const SideNav: React.FC<SideNavProps> = ({
     if (!isLgUp) onMobileClose();
   };
 
+  /**
+   * Three visual variants:
+   *  - 'nav'    → tile fills with violet when active, slate hover otherwise
+   *  - 'create' → always-on primary CTA. Tile carries a soft violet background
+   *               so it reads as the page's first action without competing
+   *               with an active route's solid pill.
+   */
   const renderItem = (
     label: string,
     icon: React.ReactNode,
     onClick: () => void,
-    options?: { active?: boolean; disabled?: boolean; tooltip?: string }
+    options?: {
+      active?: boolean;
+      disabled?: boolean;
+      tooltip?: string;
+      variant?: 'nav' | 'create';
+      /** Route path to preload on hover/focus. Warms the lazy chunk so the
+       *  click resolves from cache instead of fetching the bundle live. */
+      preloadPath?: string;
+    }
   ) => {
     const active = options?.active ?? false;
     const disabled = options?.disabled ?? false;
+    const variant = options?.variant ?? 'nav';
+    const isCreate = variant === 'create';
+    const preload = options?.preloadPath
+      ? () => preloadRoute(options.preloadPath!)
+      : undefined;
+
+    // Tile colours
+    const tileBg = isCreate
+      ? alpha(theme.palette.primary.main, 0.12)
+      : active
+        ? theme.palette.primary.main
+        : 'transparent';
+    const tileHoverBg = isCreate
+      ? alpha(theme.palette.primary.main, 0.18)
+      : active
+        ? theme.palette.primary.dark
+        : theme.palette.action.hover;
+    const iconColor = isCreate
+      ? theme.palette.primary.main
+      : active
+        ? theme.palette.primary.contrastText
+        : theme.palette.text.secondary;
+    const labelColor = active && !isCreate
+      ? theme.palette.primary.main
+      : theme.palette.text.primary;
+
     const button = (
       <ButtonBase
         onClick={disabled ? undefined : onClick}
+        onMouseEnter={preload}
+        onFocus={preload}
+        onTouchStart={preload}
         disabled={disabled}
         focusRipple
+        aria-current={active ? 'page' : undefined}
+        aria-label={label}
         sx={{
           width: '100%',
-          py: 1,
-          px: 0.5,
-          borderRadius: 1.5,
+          py: 0.75,
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          gap: 0.5,
-          transition: 'all 0.15s',
-          color: active ? 'primary.main' : 'text.secondary',
-          bgcolor: active
-            ? alpha(theme.palette.primary.main, 0.12)
-            : 'transparent',
-          opacity: disabled ? 0.5 : 1,
-          '&:hover': disabled
-            ? undefined
-            : {
-                bgcolor: active
-                  ? alpha(theme.palette.primary.main, 0.16)
-                  : alpha(theme.palette.action.hover, 1),
-                color: active ? 'primary.main' : 'text.primary',
-              },
-          '& svg': { fontSize: 22 },
+          gap: 0.625,
+          opacity: disabled ? 0.4 : 1,
+          borderRadius: 1.5,
+          transition:
+            'background 180ms cubic-bezier(0.22, 1, 0.36, 1), transform 180ms cubic-bezier(0.22, 1, 0.36, 1)',
+          '& .nav-tile': {
+            width: TILE_SIZE,
+            height: TILE_SIZE,
+            borderRadius: 2,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            bgcolor: tileBg,
+            color: iconColor,
+            transition:
+              'background 180ms cubic-bezier(0.22, 1, 0.36, 1), color 180ms cubic-bezier(0.22, 1, 0.36, 1)',
+            '& svg': { fontSize: 22 },
+          },
+          '&:hover:not(:disabled) .nav-tile': {
+            bgcolor: tileHoverBg,
+            color: isCreate ? theme.palette.primary.dark : iconColor,
+          },
+          '&:active:not(:disabled) .nav-tile': {
+            transform: 'scale(0.96)',
+          },
+          '&:focus-visible .nav-tile': {
+            boxShadow: `0 0 0 2px ${theme.palette.background.paper}, 0 0 0 4px ${alpha(theme.palette.primary.main, 0.45)}`,
+          },
         }}
       >
-        {icon}
+        <Box className="nav-tile">{icon}</Box>
         <Typography
           sx={{
             fontSize: '0.6875rem',
-            fontWeight: active ? 600 : 500,
+            fontWeight: active || isCreate ? 600 : 500,
             lineHeight: 1.1,
+            color: labelColor,
             textAlign: 'center',
+            letterSpacing: '-0.005em',
             maxWidth: '100%',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
@@ -181,30 +263,60 @@ const SideNav: React.FC<SideNavProps> = ({
         borderRight: `1px solid ${theme.palette.divider}`,
       }}
     >
-      <Stack spacing={0.25} sx={{ flex: 1, py: 1.5, px: 1 }}>
-        {NAV_ITEMS.map((item) =>
-          renderItem(
-            item.label,
-            item.icon,
-            () => handleNavigate(resolvePath(item)),
-            { active: isActive(item) }
-          )
-        )}
-      </Stack>
-
-      <Divider />
-
-      <Box sx={{ p: 1 }}>
+      {/* Create — always-visible primary action at the top of the rail. */}
+      <Box sx={{ pt: 1.5, pb: 1, px: 1 }}>
         {renderItem(
-          'New',
+          'Create',
           <AddIcon />,
           handleNewCalendar,
           {
+            variant: 'create',
             disabled: !onNewCalendar,
             tooltip: onNewCalendar ? '' : 'Coming soon',
           }
         )}
       </Box>
+
+      {/* Hairline separator between the CTA and the route list. Pure-pixel
+          divider rather than a heavy bar so the rail stays calm. */}
+      <Box
+        sx={{
+          mx: 2,
+          height: '1px',
+          bgcolor: theme.palette.divider,
+        }}
+      />
+
+      <Stack spacing={0.25} sx={{ flex: 1, py: 1, px: 1 }}>
+        {navItems.map((item) =>
+          renderItem(
+            item.label,
+            item.icon,
+            () => handleNavigate(item.path),
+            { active: isActive(item), preloadPath: item.path }
+          )
+        )}
+      </Stack>
+
+      {/* Utility tier — hairline divider above marks the demotion in
+          hierarchy without adding chrome. */}
+      <Box
+        sx={{
+          mx: 2,
+          height: '1px',
+          bgcolor: theme.palette.divider,
+        }}
+      />
+      <Stack spacing={0.25} sx={{ py: 1, px: 1, pb: 1.5 }}>
+        {UTILITY_ITEMS.map((item) =>
+          renderItem(
+            item.label,
+            item.icon,
+            () => handleNavigate(item.path),
+            { active: isActive(item), preloadPath: item.path }
+          )
+        )}
+      </Stack>
     </Box>
   );
 
@@ -239,6 +351,11 @@ const SideNav: React.FC<SideNavProps> = ({
         '& .MuiDrawer-paper': {
           width: SIDE_NAV_WIDTH,
           boxSizing: 'border-box',
+          top: APP_HEADER_HEIGHT,
+          height: `calc(100% - ${APP_HEADER_HEIGHT}px)`,
+        },
+        '& .MuiBackdrop-root': {
+          top: APP_HEADER_HEIGHT,
         },
       }}
     >

@@ -24,6 +24,31 @@ import {
 } from "../utils/dynamicRiskUtils";
 import { supabase } from "../config/supabase";
 import { useTradeSyncContextOptional } from "../contexts/TradeSyncContext";
+
+/**
+ * Module-level trade cache, keyed by calendar id. Survives hook unmount so
+ * navigating between routes (Home → Performance → Home) reuses already-loaded
+ * months instead of refetching them. Real-time subscriptions + Supabase
+ * triggers keep entries fresh while the user is on a calendar; on the rare
+ * remount the user sees instant data and a background revalidate.
+ */
+const MAX_CACHE_SIZE = 12;
+type CalendarCacheBucket = {
+  entries: Map<string, Map<string, Trade>>;
+  order: string[];
+};
+const globalCalendarCaches = new Map<string, CalendarCacheBucket>();
+
+function getCacheBucket(calendarId: string | undefined): CalendarCacheBucket {
+  const key = calendarId ?? "__no_calendar__";
+  let bucket = globalCalendarCaches.get(key);
+  if (!bucket) {
+    bucket = { entries: new Map(), order: [] };
+    globalCalendarCaches.set(key, bucket);
+  }
+  return bucket;
+}
+
 export interface UseCalendarTradesOptions {
   /**
    * Calendar ID to fetch trades for
@@ -65,11 +90,12 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
     new Set(),
   );
 
-  // Cache for loaded trades to avoid redundant database queries
-  // Key format: "month:YYYY-MM" or "range:START_ISO-END_ISO"
-  const [tradesCache] = useState<Map<string, Map<string, Trade>>>(new Map());
-  const cacheAccessOrderRef = useRef<string[]>([]); // Track LRU order
-  const MAX_CACHE_SIZE = 12; // Store up to 12 different month/range loads
+  // Cache for loaded trades to avoid redundant database queries.
+  // Backed by `globalCalendarCaches` at module scope so the cache survives
+  // hook unmount (e.g. navigating from /calendar → /performance → /calendar).
+  // Key format inside `entries`: "month:YYYY-MM" or "range:START_ISO-END_ISO"
+  const cacheBucket = useMemo(() => getCacheBucket(calendarId), [calendarId]);
+  const tradesCache = cacheBucket.entries;
 
   // Pagination state for server-side pagination
   // Removed pagination state - we now load complete date ranges instead of pages
@@ -121,7 +147,7 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
     const cached = tradesCache.get(cacheKey);
     if (cached) {
       // Update LRU order - move this key to end (most recently used)
-      const orderArray = cacheAccessOrderRef.current;
+      const orderArray = cacheBucket.order;
       const index = orderArray.indexOf(cacheKey);
       if (index > -1) {
         orderArray.splice(index, 1);
@@ -132,14 +158,14 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
     }
     logger.log(`📦 Cache MISS for ${cacheKey}`);
     return null;
-  }, [tradesCache]);
+  }, [tradesCache, cacheBucket]);
 
   const setCachedTrades = useCallback((cacheKey: string, trades: Map<string, Trade>) => {
     // Add to cache
     tradesCache.set(cacheKey, new Map(trades)); // Store a copy
 
     // Update LRU order
-    const orderArray = cacheAccessOrderRef.current;
+    const orderArray = cacheBucket.order;
     const index = orderArray.indexOf(cacheKey);
     if (index > -1) {
       orderArray.splice(index, 1);
@@ -156,13 +182,13 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
     }
 
     logger.log(`📦 Cache SET ${cacheKey} (${trades.size} trades, total cached: ${tradesCache.size})`);
-  }, [tradesCache, MAX_CACHE_SIZE]);
+  }, [tradesCache, cacheBucket]);
 
   const clearTradesCache = useCallback(() => {
     tradesCache.clear();
-    cacheAccessOrderRef.current = [];
+    cacheBucket.order.length = 0;
     logger.log('📦 Cache CLEARED');
-  }, [tradesCache]);
+  }, [tradesCache, cacheBucket]);
 
   /**
    * Update a specific trade in all relevant cache entries
@@ -278,18 +304,17 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
   }, [selectedCalendar]);
 
   /**
-   * Cleanup on unmount or calendar change
-   * Note: Initial trades loading is handled by TradeCalendarPage via loadVisibleRangeTrades()
+   * Cleanup on unmount or calendar change.
+   * Trade cache is intentionally NOT cleared here — it lives in
+   * `globalCalendarCaches` so navigating away and back reuses already-loaded
+   * months instead of refetching them. Realtime + Supabase triggers keep
+   * entries fresh while the user is on the calendar.
    */
   useEffect(() => {
-    // Cleanup on unmount or when calendar changes
     return () => {
-      // Cleanup debounce timeout on unmount
       if (calendarUpdateTimeoutRef.current) {
         clearTimeout(calendarUpdateTimeoutRef.current);
       }
-      // Clear trades cache when calendar changes or component unmounts
-      clearTradesCache();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calendarId]);
@@ -504,21 +529,14 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
         // Broadcast delete to other components (e.g., PerformanceCharts)
         deletedTrades.forEach((trade) => tradeSync?.broadcastTradeDelete(trade));
 
-        setNotification({
-          message: `Deleted ${tradeIds.length} trade(s)`,
-          type: "success",
-        });
+        // Success/error snackbars for delete come from
+        // TradeOperationsContext (GlobalTradeOperations renders the
+        // retry-capable snackbar). Don't emit a duplicate here.
         // Real-time subscription will handle the update
       } catch (err) {
         // Revert optimistic update on error
         setTradesMap(previousMap);
         logger.error("Error deleting trades:", err);
-        setNotification({
-          message: err instanceof Error
-            ? err.message
-            : "Failed to delete trades",
-          type: "error",
-        });
         throw err;
       } finally {
         setUpdatingTradeIds((prev) => {
@@ -877,45 +895,6 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
     }
   }, [calendar, calendarId]);
 
-  // Handler for clearing month trades
-  const handleClearMonthTrades = useCallback(
-    async (month: number, year: number) => {
-      if (!calendar) {
-        throw new Error(`Calendar with ID ${calendarId} not found`);
-      }
-      try {
-        const tradesToDelete: Trade[] = [];
-
-        // O(n) single pass to identify trades to delete
-        setTradesMap((prev) => {
-          const next = new Map<string, Trade>();
-          prev.forEach((trade, id) => {
-            const tradeDate = new Date(trade.trade_date);
-            if (
-              tradeDate.getFullYear() === year && tradeDate.getMonth() === month
-            ) {
-              tradesToDelete.push(trade);
-            } else {
-              next.set(id, trade);
-            }
-          });
-          return next;
-        });
-
-        await calendarService.getTradeRepository().bulkDelete(tradesToDelete);
-
-        // Remove deleted trades from cache
-        tradesToDelete.forEach((trade) => removeTradeFromCache(trade.id));
-
-        // Stats are automatically recalculated by Supabase triggers after clearMonthTrades
-        // No need to manually calculate or update stats
-      } catch (error) {
-        logger.error("Error clearing month trades:", error);
-      }
-    },
-    [calendar, calendarId, removeTradeFromCache],
-  );
-
   /**
    * Handler for updating calendar properties
    */
@@ -1266,7 +1245,6 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
     handleToggleDynamicRisk,
     handleImportTrades,
     handleAccountBalanceChange,
-    handleClearMonthTrades,
     handleUpdateCalendarProperty,
     notification,
     clearNotification,

@@ -11,7 +11,7 @@
  * cheap and avoids stale-title bugs after rename.
  */
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Box, Stack, Typography, useTheme } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import AlarmIcon from '@mui/icons-material/Alarm';
@@ -19,12 +19,57 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import {
   getReminders,
   cancelReminder,
+  cancelReminderBatch,
   type Reminder,
 } from '../../services/remindersService';
 import { useRealtimeSubscription } from '../../hooks/useRealtimeSubscription';
 import { logger } from '../../utils/logger';
 import ReminderListItem from './ReminderListItem';
+import ReminderBatchListItem from './ReminderBatchListItem';
 import EconomicEventShimmer from '../economicCalendar/EconomicEventShimmer';
+
+/**
+ * Solo: one card per reminder (batch_id null OR batch with only one pending
+ * sibling left). Batch: one card per batch_id with ≥2 pending siblings, sorted
+ * earliest-fire-first internally.
+ */
+type ReminderEntry =
+  | { kind: 'solo'; reminder: Reminder }
+  | { kind: 'batch'; batchId: string; reminders: Reminder[] };
+
+function groupReminders(rows: Reminder[]): ReminderEntry[] {
+  const byBatch = new Map<string, Reminder[]>();
+  const solos: Reminder[] = [];
+  for (const r of rows) {
+    if (r.batch_id) {
+      const arr = byBatch.get(r.batch_id) ?? [];
+      arr.push(r);
+      byBatch.set(r.batch_id, arr);
+    } else {
+      solos.push(r);
+    }
+  }
+
+  const entries: ReminderEntry[] = solos.map((r) => ({ kind: 'solo', reminder: r }));
+  for (const [batchId, arr] of Array.from(byBatch.entries())) {
+    arr.sort((a, b) => new Date(a.trigger_at).getTime() - new Date(b.trigger_at).getTime());
+    // A "batch" with one row left has no grouping value — render as solo so
+    // the user can still cancel it individually with the same UI affordance.
+    if (arr.length === 1) {
+      entries.push({ kind: 'solo', reminder: arr[0] });
+    } else {
+      entries.push({ kind: 'batch', batchId, reminders: arr });
+    }
+  }
+
+  // Order all entries by their next-fire time so the list stays chronological.
+  entries.sort((a, b) => {
+    const at = a.kind === 'solo' ? a.reminder.trigger_at : a.reminders[0].trigger_at;
+    const bt = b.kind === 'solo' ? b.reminder.trigger_at : b.reminders[0].trigger_at;
+    return new Date(at).getTime() - new Date(bt).getTime();
+  });
+  return entries;
+}
 
 interface RemindersPanelProps {
   onNavigateToConversation: (conversationId: string) => void;
@@ -113,6 +158,24 @@ const RemindersPanel: React.FC<RemindersPanelProps> = ({
     [refetch],
   );
 
+  const handleCancelBatch = useCallback(
+    async (batchId: string) => {
+      // Optimistic: drop every row sharing this batch_id. The realtime
+      // subscription will refetch and reconcile if the server cancelled fewer
+      // (e.g. one already transitioned to firing mid-click).
+      setReminders((prev) => prev.filter((r) => r.batch_id !== batchId));
+      try {
+        await cancelReminderBatch(batchId);
+      } catch (err) {
+        logger.error('Failed to cancel reminder batch; refetching:', err);
+        void refetch();
+      }
+    },
+    [refetch],
+  );
+
+  const entries = useMemo(() => groupReminders(reminders), [reminders]);
+
   if (loading) {
     return <EconomicEventShimmer count={10} />;
   }
@@ -158,14 +221,24 @@ const RemindersPanel: React.FC<RemindersPanelProps> = ({
 
   return (
     <Stack spacing={0.5} p={1}>
-      {reminders.map((r) => (
-        <ReminderListItem
-          key={r.id}
-          reminder={r}
-          onCancel={handleCancel}
-          onClick={(rem) => onNavigateToConversation(rem.conversation_id)}
-        />
-      ))}
+      {entries.map((entry) =>
+        entry.kind === 'solo' ? (
+          <ReminderListItem
+            key={entry.reminder.id}
+            reminder={entry.reminder}
+            onCancel={handleCancel}
+            onClick={(rem) => onNavigateToConversation(rem.conversation_id)}
+          />
+        ) : (
+          <ReminderBatchListItem
+            key={entry.batchId}
+            batchId={entry.batchId}
+            reminders={entry.reminders}
+            onCancelBatch={handleCancelBatch}
+            onClick={onNavigateToConversation}
+          />
+        ),
+      )}
     </Stack>
   );
 };

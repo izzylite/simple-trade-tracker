@@ -25,6 +25,15 @@ interface UseCalendarsOptions {
    * @default true
    */
   revalidateOnFocus?: boolean;
+
+  /**
+   * Window in ms during which duplicate fetches are coalesced. Calendars
+   * rarely change between focus events; bump high to avoid hammering the
+   * API on every tab switch. Mutations call `mutate()` directly so writes
+   * are not delayed by this dedup.
+   * @default 60000
+   */
+  dedupingInterval?: number;
 }
 
 /**
@@ -37,6 +46,7 @@ export function useCalendars(
   const {
     refreshInterval = 0,
     revalidateOnFocus = true,
+    dedupingInterval = 60_000,
   } = options;
 
   const { data, error, isLoading, mutate } = useSWR(
@@ -52,8 +62,8 @@ export function useCalendars(
     {
       // Automatically refetch when tab regains focus (solves Chrome freezing)
       revalidateOnFocus,
-      // Prevent duplicate requests within 2 seconds
-      dedupingInterval: 2000,
+      // Coalesce duplicate fetches across consumers + focus events.
+      dedupingInterval,
       // Optional: auto-refresh interval
       refreshInterval,
       // Don't retry on error (let user manually refresh)
@@ -84,6 +94,7 @@ export function useTrashCalendars(
   const {
     refreshInterval = 0,
     revalidateOnFocus = true,
+    dedupingInterval = 60_000,
   } = options;
 
   const { data, error, isLoading, mutate } = useSWR(
@@ -97,7 +108,7 @@ export function useTrashCalendars(
     },
     {
       revalidateOnFocus,
-      dedupingInterval: 2000,
+      dedupingInterval,
       refreshInterval,
       shouldRetryOnError: false,
       keepPreviousData: true,

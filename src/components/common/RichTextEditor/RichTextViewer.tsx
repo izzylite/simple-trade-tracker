@@ -17,16 +17,26 @@ import { TEXT_COLORS, BACKGROUND_COLORS } from './constants/colors';
 interface RichTextViewerProps {
   content: string;
   minHeight?: number | string;
+  /**
+   * Optional handler for shared-trade link clicks. When omitted,
+   * LinkComponent falls back to navigating to /shared/{id}. Provide this
+   * to intercept clicks and show an inline preview (e.g. TradeGalleryDialog).
+   */
+  onSharedTradeClick?: (shareId: string, tradeId: string) => void;
 }
 
 const RichTextViewer: React.FC<RichTextViewerProps> = ({
   content,
   minHeight = 100,
+  onSharedTradeClick,
 }) => {
   const theme = useTheme();
 
   // Create decorator for links/entities
-  const decorator = useMemo(() => createDecorator(), []);
+  const decorator = useMemo(
+    () => createDecorator(undefined, undefined, undefined, undefined, undefined, onSharedTradeClick),
+    [onSharedTradeClick]
+  );
 
   // Create editor state from content
   const editorState = useMemo(() => {
@@ -46,6 +56,17 @@ const RichTextViewer: React.FC<RichTextViewerProps> = ({
       };
     }
     return null;
+  };
+
+  // Wrap blockStyleFn to tag header blocks with a per-key anchor class so
+  // outlines can scroll into view via `.note-anchor-${blockKey}` selector.
+  const anchoredBlockStyleFn = (block: any): string => {
+    const base = blockStyleFn(block);
+    const type = block.getType();
+    if (type === 'header-one' || type === 'header-two' || type === 'header-three') {
+      return `${base} note-anchor-${block.getKey()}`.trim();
+    }
+    return base;
   };
 
   return (
@@ -118,7 +139,7 @@ const RichTextViewer: React.FC<RichTextViewerProps> = ({
         onChange={() => {}} // No-op for read-only
         readOnly={true}
         customStyleMap={styleMap}
-        blockStyleFn={blockStyleFn}
+        blockStyleFn={anchoredBlockStyleFn}
         blockRendererFn={blockRendererFn}
       />
     </Box>

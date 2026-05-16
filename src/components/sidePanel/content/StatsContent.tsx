@@ -2,9 +2,10 @@ import React from 'react';
 import { Box, Stack } from '@mui/material';
 import AccountStats from '../../AccountStats';
 import MonthlyStats from '../../MonthlyStats';
+import PerformanceCharts from '../../PerformanceCharts';
 import { Trade, Calendar } from '../../../types/dualWrite';
 import { DynamicRiskSettings } from '../../../utils/dynamicRiskUtils';
-import { EconomicCalendarFilterSettings } from '../../economicCalendar/EconomicCalendarDrawer';
+import { EconomicCalendarFilterSettings } from '../../../hooks/useEconomicCalendarFilters';
 import { scrollbarStyles } from '../../../styles/scrollbarStyles';
 import { useTheme } from '@mui/material/styles';
 
@@ -25,15 +26,12 @@ export interface StatsContentProps {
   currentDate?: Date;
   monthlyTarget?: number;
   calendarId?: string;
-  scoreSettings?: import('../../../types/score').ScoreSettings;
   calendar?: Calendar;
   pnlBeforeMonth?: number;
   isPnlLoading?: boolean;
 
   // Handlers
-  onImportTrades?: (trades: Partial<Trade>[]) => Promise<void>;
   onDeleteTrade?: (id: string) => void;
-  onClearMonthTrades?: (month: number, year: number) => void;
   onOpenGalleryMode?: (
     trades: Trade[],
     initialTradeId?: string,
@@ -49,10 +47,6 @@ export interface StatsContentProps {
   ) => Promise<Calendar | undefined>;
   onEditTrade?: (trade: Trade) => void;
   economicFilter?: (calendarId: string) => EconomicCalendarFilterSettings;
-
-  // Performance dialog passthrough (kept open from outside)
-  openPerformanceDialog?: boolean;
-  onPerformanceDialogClose?: () => void;
 }
 
 /**
@@ -75,20 +69,15 @@ const StatsContent: React.FC<StatsContentProps> = ({
   currentDate,
   monthlyTarget,
   calendarId,
-  scoreSettings,
   calendar,
   pnlBeforeMonth,
   isPnlLoading,
-  onImportTrades,
   onDeleteTrade,
-  onClearMonthTrades,
   onOpenGalleryMode,
   onUpdateTradeProperty,
   onUpdateCalendarProperty,
   onEditTrade,
   economicFilter,
-  openPerformanceDialog,
-  onPerformanceDialogClose,
 }) => {
   const theme = useTheme();
   return (
@@ -118,15 +107,12 @@ const StatsContent: React.FC<StatsContentProps> = ({
           <MonthlyStats
             trades={filteredTrades}
             accountBalance={balance}
-            onImportTrades={onImportTrades}
             onDeleteTrade={onDeleteTrade}
             currentDate={currentDate}
             monthlyTarget={monthlyTarget}
-            onClearMonthTrades={onClearMonthTrades}
             isReadOnly={isReadOnly}
             onOpenGalleryMode={onOpenGalleryMode}
             calendarId={calendarId}
-            scoreSettings={scoreSettings}
             dynamicRiskSettings={dynamicRiskSettings}
             onUpdateTradeProperty={onUpdateTradeProperty}
             onUpdateCalendarProperty={onUpdateCalendarProperty}
@@ -136,8 +122,27 @@ const StatsContent: React.FC<StatsContentProps> = ({
             pnlBeforeMonth={pnlBeforeMonth}
             isPnlLoading={isPnlLoading}
             calendar={calendar}
-            openPerformanceDialog={openPerformanceDialog}
-            onPerformanceDialogClose={onPerformanceDialogClose}
+          />
+        )}
+
+        {calendarId && (
+          <PerformanceCharts
+            calendarId={calendarId}
+            selectedDate={currentDate}
+            accountBalance={balance}
+            maxDailyDrawdown={maxDailyDrawdown}
+            monthlyTarget={monthlyTarget}
+            calendar={calendar}
+            dynamicRiskSettings={dynamicRiskSettings}
+            onEditTrade={onEditTrade}
+            onDeleteTrade={onDeleteTrade}
+            onUpdateTradeProperty={onUpdateTradeProperty}
+            onUpdateCalendarProperty={onUpdateCalendarProperty}
+            economicFilter={economicFilter}
+            onOpenGalleryMode={onOpenGalleryMode}
+            isReadOnly={isReadOnly}
+            tabSize="small"
+            basicOnly
           />
         )}
       </Stack>

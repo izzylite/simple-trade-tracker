@@ -30,18 +30,45 @@ const TOOL_LABELS: Record<string, string> = {
   scrape_url: 'Reading article',
   analyze_image: 'Analyzing chart',
   generate_chart: 'Generating chart',
-  get_crypto_price: 'Checking crypto price',
-  get_forex_price: 'Checking forex price',
-  create_note: 'Creating note',
-  update_note: 'Updating note',
-  delete_note: 'Deleting note',
-  search_notes: 'Searching notes',
+  get_market_data: 'Fetching market data',
   update_memory: 'Updating memory',
-  get_tag_definition: 'Looking up tag',
-  save_tag_definition: 'Saving tag definition',
+  apply_rule_change: 'Updating memory',
   get_recent_orion_briefings: 'Reading briefings',
-  search_conversations: 'Searching conversations',
-  get_conversation: 'Loading conversation',
+  // Merged action-dispatched tools — generic fallbacks
+  manage_note: 'Working with notes',
+  manage_event: 'Episodic memory',
+  manage_tag: 'Working with tags',
+  recall_conversations: 'Searching conversations',
+  manage_reminder: 'Working with reminders',
+  // Merged tools — per-action labels (resolved via `${name}:${action}`)
+  'manage_note:create': 'Creating note',
+  'manage_note:update': 'Updating note',
+  'manage_note:delete': 'Deleting note',
+  'manage_note:search': 'Searching notes',
+  'manage_event:record': 'Logging event',
+  'manage_event:recall': 'Recalling events',
+  'manage_tag:get': 'Looking up tag',
+  'manage_tag:save': 'Saving tag definition',
+  'recall_conversations:search': 'Searching conversations',
+  'recall_conversations:get': 'Loading conversation',
+  'manage_reminder:set': 'Setting reminder',
+  'manage_reminder:list': 'Checking reminders',
+  'manage_reminder:cancel': 'Cancelling reminder',
+  'manage_reminder:edit': 'Editing reminder',
+  code_execution: 'Running code',
+  'get_market_data:quote': 'Checking market price',
+  'get_market_data:history': 'Pulling historical candles',
+  'get_market_data:indicator': 'Computing indicator',
+  'get_market_data:search': 'Searching symbols',
+};
+
+const labelForToolCall = (name: string, args?: unknown): string => {
+  const action =
+    args && typeof args === 'object' && typeof (args as Record<string, unknown>).action === 'string'
+      ? (args as Record<string, unknown>).action as string
+      : undefined;
+  if (action && TOOL_LABELS[`${name}:${action}`]) return TOOL_LABELS[`${name}:${action}`];
+  return TOOL_LABELS[name] || name;
 };
 
 export interface UseAIChatOptions {
@@ -196,8 +223,35 @@ export function useAIChat({
   // metadata.triggered_by='reminder:...' to avoid fighting the optimistic
   // streaming UI on normal chat sends (where client and server use different
   // message ids).
+  //
+  // Backfill: on (re)subscribe we also fetch the conversation row once and
+  // merge any reminder messages we missed. Without this, fires that happen
+  // while the chat panel is closed never reach local state — the UI shows
+  // stale messages from the conversations-list cache until next full mount.
   useEffect(() => {
     if (!currentConversationId) return;
+
+    const mergeReminderMessages = (incoming: unknown): void => {
+      const arr = Array.isArray(incoming) ? incoming : [];
+      const reminderMsgs = arr.filter(
+        (m: any) =>
+          m && typeof m === 'object' &&
+          typeof m.metadata?.triggered_by === 'string' &&
+          m.metadata.triggered_by.startsWith('reminder:')
+      );
+      if (reminderMsgs.length === 0) return;
+      setMessages(prev => {
+        const have = new Set(prev.map(m => m.id));
+        const toAppend = reminderMsgs.filter((m: any) => !have.has(m.id));
+        if (toAppend.length === 0) return prev;
+        // Convert stored timestamps (ISO strings) back to Date for the UI.
+        const normalized = toAppend.map((m: any) => ({
+          ...m,
+          timestamp: m.timestamp ? new Date(m.timestamp) : new Date(),
+        }));
+        return [...prev, ...normalized];
+      });
+    };
 
     const channel = supabase
       .channel(`ai-convo-realtime-${currentConversationId}`)
@@ -210,35 +264,24 @@ export function useAIChat({
           filter: `id=eq.${currentConversationId}`,
         },
         (payload: any) => {
-          const incoming = Array.isArray(payload?.new?.messages)
-            ? payload.new.messages
-            : [];
-          const reminderMsgs = incoming.filter(
-            (m: any) =>
-              m && typeof m === 'object' &&
-              typeof m.metadata?.triggered_by === 'string' &&
-              m.metadata.triggered_by.startsWith('reminder:')
-          );
-          if (reminderMsgs.length === 0) return;
-          setMessages(prev => {
-            const have = new Set(prev.map(m => m.id));
-            const toAppend = reminderMsgs.filter((m: any) => !have.has(m.id));
-            if (toAppend.length === 0) return prev;
-            // Convert stored timestamps (ISO strings) back to Date for the UI.
-            const normalized = toAppend.map((m: any) => ({
-              ...m,
-              timestamp: m.timestamp ? new Date(m.timestamp) : new Date(),
-            }));
-            return [...prev, ...normalized];
-          });
+          mergeReminderMessages(payload?.new?.messages);
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        // SUBSCRIBED fires on first subscribe AND every reconnect — backfill
+        // each time so any reminder fires that landed during a disconnect
+        // (or while the panel was closed) get adopted on reopen/reconnect.
+        if (status !== 'SUBSCRIBED') return;
+        void conversationRepo.findById(currentConversationId).then((convo) => {
+          if (!convo) return;
+          mergeReminderMessages(convo.messages);
+        });
+      });
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [currentConversationId]);
+  }, [currentConversationId, conversationRepo]);
 
   /**
    * Load conversations - either trade-specific or calendar-level
@@ -538,7 +581,18 @@ export function useAIChat({
           timestamp: new Date(),
           status: 'sent'
         };
-        const updatedMessages = [...baseHistory, userMessage];
+        // Preserve reminder-fired messages from the discarded tail — they're
+        // independent events (cron-triggered, not turn-tree replies) and
+        // shouldn't disappear when the user edits an earlier message.
+        // Mirrors the server-side preservation in conversationStore.ts.
+        const preservedFires = messages
+          .slice(messageIndex)
+          .filter((m) =>
+            typeof (m as { metadata?: { triggered_by?: string } }).metadata
+              ?.triggered_by === 'string' &&
+            (m as { metadata: { triggered_by: string } }).metadata.triggered_by.startsWith('reminder:')
+          );
+        const updatedMessages = [...baseHistory, userMessage, ...preservedFires];
         setMessages(updatedMessages);
       }
       setEditingMessageId(null);
@@ -591,6 +645,8 @@ export function useAIChat({
       let embeddedNotes: any | undefined;
       let toolCallsInProgress: string[] = [];
       const toolCallHistory: Array<{ name: string; label: string }> = [];
+      const toolLabelByName = new Map<string, string>();
+      const labelOf = (name: string) => toolLabelByName.get(name) || TOOL_LABELS[name] || name;
 
       // Title hint is only meaningful on the very first send of a new
       // conversation (the backend's upsert uses `ignoreDuplicates: true`,
@@ -697,10 +753,12 @@ export function useAIChat({
           case 'tool_call': {
             const name = event.data.name as string;
             logger.log(`Tool called: ${name}`);
+            const label = labelForToolCall(name, event.data.args);
+            toolLabelByName.set(name, label);
             toolCallsInProgress.push(name);
-            toolCallHistory.push({ name, label: TOOL_LABELS[name] || name });
+            toolCallHistory.push({ name, label });
             setToolExecutionStatus(
-              toolCallsInProgress.map(t => TOOL_LABELS[t] || t).join(', ')
+              toolCallsInProgress.map(labelOf).join(', ')
             );
             break;
           }
@@ -710,7 +768,7 @@ export function useAIChat({
             toolCallsInProgress = toolCallsInProgress.filter(t => t !== event.data.name);
             setToolExecutionStatus(
               toolCallsInProgress.length > 0
-                ? toolCallsInProgress.map(t => TOOL_LABELS[t] || t).join(', ')
+                ? toolCallsInProgress.map(labelOf).join(', ')
                 : ''
             );
             break;

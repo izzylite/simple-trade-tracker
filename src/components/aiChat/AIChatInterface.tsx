@@ -28,7 +28,12 @@ import {
 import ChatMessage from './ChatMessage';
 import ReminderSeparator from './ReminderSeparator';
 import CrossSessionReminderCard from '../notifications/CrossSessionReminderCard';
+import CrossSessionReminderBatchCard from '../notifications/CrossSessionReminderBatchCard';
 import { useNotificationsOptional } from '../../contexts/NotificationsContext';
+import {
+  AppNotification,
+  isReminderFiredPayload,
+} from '../../types/notification';
 import AIChatMentionInput from './AIChatMentionInput';
 import type { AIChatMentionInputHandle, SystemCommand } from './AIChatMentionInput';
 import { ChatMessage as ChatMessageType, AttachedImage } from '../../types/aiChat';
@@ -185,6 +190,49 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
         : [],
     [notificationsCtx, currentConversationId]
   );
+
+  // Collapse sibling fires (same batchId) into a single grouped card. A batch
+  // with only one surviving notification renders as a solo card so the UI is
+  // identical to a never-batched reminder. Ordering is preserved by the most
+  // recent fire's position in the source list (desc by created_at).
+  type CrossSessionEntry =
+    | { kind: 'solo'; notification: AppNotification }
+    | { kind: 'batch'; batchId: string; notifications: AppNotification[] };
+  const groupedCrossSessionCards = useMemo<CrossSessionEntry[]>(() => {
+    const byBatch = new Map<string, AppNotification[]>();
+    const order: Array<{ key: string; isBatch: boolean }> = [];
+    const solos = new Map<string, AppNotification>();
+
+    for (const n of crossSessionCards) {
+      const batchId = isReminderFiredPayload(n) ? n.payload.batchId ?? null : null;
+      if (batchId) {
+        if (!byBatch.has(batchId)) {
+          byBatch.set(batchId, []);
+          order.push({ key: batchId, isBatch: true });
+        }
+        byBatch.get(batchId)!.push(n);
+      } else {
+        solos.set(n.id, n);
+        order.push({ key: n.id, isBatch: false });
+      }
+    }
+
+    const entries: CrossSessionEntry[] = [];
+    for (const { key, isBatch } of order) {
+      if (isBatch) {
+        const arr = byBatch.get(key)!;
+        if (arr.length === 1) {
+          entries.push({ kind: 'solo', notification: arr[0] });
+        } else {
+          entries.push({ kind: 'batch', batchId: key, notifications: arr });
+        }
+      } else {
+        const n = solos.get(key);
+        if (n) entries.push({ kind: 'solo', notification: n });
+      }
+    }
+    return entries;
+  }, [crossSessionCards]);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
   // Tracks which scrollToMessageId we already highlighted so a later
   // realtime message arrival doesn't re-fire the scroll/highlight on the
@@ -598,9 +646,19 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
             the chronologically-most-recent end. Each card represents a
             reminder that fired in a DIFFERENT conversation while the user
             was here. UI-only — Orion never sees these. */}
-        {crossSessionCards.map((n) => (
-          <CrossSessionReminderCard key={n.id} notification={n} />
-        ))}
+        {groupedCrossSessionCards.map((entry) =>
+          entry.kind === 'solo' ? (
+            <CrossSessionReminderCard
+              key={entry.notification.id}
+              notification={entry.notification}
+            />
+          ) : (
+            <CrossSessionReminderBatchCard
+              key={entry.batchId}
+              notifications={entry.notifications}
+            />
+          ),
+        )}
 
         {/* Question Templates - Only show when no conversation started */}
         {shouldShowTemplates && (

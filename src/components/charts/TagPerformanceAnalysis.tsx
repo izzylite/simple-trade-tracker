@@ -21,7 +21,7 @@ import { performanceCalculationService } from '../../services/performanceCalcula
 interface TagPerformanceAnalysisProps { 
   trades: Trade[];
   selectedDate: Date;
-  timePeriod: 'month' | 'year' | 'all';
+  timePeriod: 'month' | 'quarter' | 'ytd' | 'year' | 'all';
   allTags: string[];
   primaryTags: string[];
   secondaryTags: string[];

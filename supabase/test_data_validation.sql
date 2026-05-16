@@ -42,7 +42,6 @@ BEGIN
         tags,
         note,
         days_notes,
-        score_settings,
         economic_calendar_filters,
         pinned_events
     ) VALUES (
@@ -59,7 +58,6 @@ BEGIN
         ARRAY['Scalping', 'London', 'EUR/USD', 'High Impact'],
         'This is a test calendar for schema validation',
         '{"2025-08-13": "Test day note", "2025-08-14": "Another test note"}',
-        '{"weights": {"consistency": 40, "riskManagement": 25, "performance": 20, "discipline": 15}}',
         '{"currencies": ["USD", "EUR", "GBP"], "impacts": ["High", "Medium"], "viewType": "day"}',
         '[{"name": "Non-Farm Payrolls", "flagCode": "us", "impact": "High", "currency": "USD"}]'
     ) RETURNING id INTO test_calendar_id;
@@ -326,9 +324,8 @@ ORDER BY t.trade_date;
 SELECT 
     name,
     tags,
-    days_notes->>'2025-08-13' as test_day_note,
-    score_settings->'weights'->>'consistency' as consistency_weight
-FROM calendars 
+    days_notes->>'2025-08-13' as test_day_note
+FROM calendars
 WHERE name = 'Test Trading Calendar';
 
 -- Test constraints (this should work)

@@ -60,11 +60,47 @@ export interface UseNotesResult {
   loadingMore: boolean;
   hasMore: boolean;
   total: number;
+  /**
+   * True once an initial fetch cycle has settled (success, error, or
+   * cache-hit silent revalidate). Lets pages gate full-page loaders
+   * without watching fragile loading-state transitions.
+   */
+  hasLoaded: boolean;
   loadNotes: (reset?: boolean) => Promise<void>;
   loadMore: () => void;
   updateNote: (noteId: string, updates: Partial<Note>) => void;
   removeNote: (noteId: string) => void;
   addNote: (note: Note) => void;
+}
+
+/**
+ * Module-level cache for notes lists, keyed by the same filter combination
+ * that triggers a refetch. Survives unmount so re-opening the notes panel
+ * (or remounting via route nav) hydrates instantly.
+ */
+type NotesCacheEntry = {
+  notes: Note[];
+  hasMore: boolean;
+  total: number;
+  offset: number;
+};
+const notesCache = new Map<string, NotesCacheEntry>();
+function makeNotesKey(
+  userId: string | undefined,
+  calendarId: string | undefined,
+  activeTab: 'all' | 'pinned' | 'archived',
+  selectedCalendarFilter: string,
+  creatorFilter: 'assistant' | 'me',
+  searchQuery: string | null | undefined,
+): string {
+  return [
+    userId ?? '',
+    calendarId ?? '',
+    activeTab,
+    selectedCalendarFilter,
+    creatorFilter,
+    (searchQuery ?? '').trim(),
+  ].join('|');
 }
 
 /**
@@ -82,14 +118,34 @@ export function useNotes(options: UseNotesOptions): UseNotesResult {
     notesPerPage = 20,
   } = options;
 
-  const [notes, setNotes] = useState<Note[]>([]);
+  // Hydrate from module cache on first render — re-opening the panel or
+  // remounting via route nav reuses the previously-loaded list instantly.
+  const initialKey = makeNotesKey(
+    userId,
+    calendarId,
+    activeTab,
+    selectedCalendarFilter,
+    creatorFilter,
+    searchQuery,
+  );
+  const initialCache = notesCache.get(initialKey);
+
+  const [notes, setNotes] = useState<Note[]>(initialCache?.notes ?? []);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(false);
-  const [total, setTotal] = useState(0);
+  const [hasMore, setHasMore] = useState(initialCache?.hasMore ?? false);
+  const [total, setTotal] = useState(initialCache?.total ?? 0);
+  // Cache hit on mount counts as already-loaded — no need to gate UI again.
+  const [hasLoaded, setHasLoaded] = useState<boolean>(!!initialCache);
 
   // Use ref for offset to avoid it being in dependency array
-  const offsetRef = useRef(0);
+  const offsetRef = useRef(initialCache?.offset ?? 0);
+  // Mirror of `notes` so loadMore (which has wide deps) can read the current
+  // list without forcing loadNotes to depend on every notes mutation.
+  const notesRef = useRef<Note[]>(notes);
+  useEffect(() => {
+    notesRef.current = notes;
+  }, [notes]);
 
   // Track if we've loaded notes for the current open session
   const hasLoadedRef = useRef(false);
@@ -107,7 +163,18 @@ export function useNotes(options: UseNotesOptions): UseNotesResult {
       if (!userId) return;
       try {
         if (reset) {
-          setLoading(true);
+          // Silent revalidate when cache already populated for this combo.
+          const revalidateKey = makeNotesKey(
+            userId,
+            calendarId,
+            activeTab,
+            selectedCalendarFilter,
+            creatorFilter,
+            searchQuery,
+          );
+          if (!notesCache.has(revalidateKey)) {
+            setLoading(true);
+          }
           offsetRef.current = 0;
         } else {
           setLoadingMore(true);
@@ -155,22 +222,48 @@ export function useNotes(options: UseNotesOptions): UseNotesResult {
           result = await notesService.queryUserNotes(userId, queryOptions);
         }
 
-        // Update state
+        // Update state + module cache
+        let nextNotes: Note[];
         if (reset) {
-          setNotes(result.notes);
+          nextNotes = result.notes;
           offsetRef.current = result.notes.length;
+          setNotes(nextNotes);
         } else {
-          setNotes((prev) => [...prev, ...result.notes]);
+          // Dedupe by id — realtime INSERT may have prepended a row the
+          // server now also returns at this offset, and any merge must
+          // never produce duplicate ids in the visible list.
+          const existing = new Set(notesRef.current.map((n) => n.id));
+          const incoming = result.notes.filter((n) => !existing.has(n.id));
+          nextNotes = [...notesRef.current, ...incoming];
+          // Advance offset by what the server returned (its page cursor),
+          // not by what we kept after dedupe.
           offsetRef.current += result.notes.length;
+          setNotes(nextNotes);
         }
         setHasMore(result.hasMore);
         setTotal(result.total);
+
+        const writeKey = makeNotesKey(
+          userId,
+          calendarId,
+          activeTab,
+          selectedCalendarFilter,
+          creatorFilter,
+          searchQuery,
+        );
+        notesCache.set(writeKey, {
+          notes: nextNotes,
+          hasMore: result.hasMore,
+          total: result.total,
+          offset: offsetRef.current,
+        });
       } catch (error) {
         logger.error('Error loading notes:', error);
         setNotes([]);
       } finally {
         setLoading(false);
         setLoadingMore(false);
+        setHasLoaded(true);
       }
     },
     [
@@ -243,24 +336,75 @@ export function useNotes(options: UseNotesOptions): UseNotesResult {
     loadNotes(false);
   }, [loadNotes]);
 
+  const writeListToCache = useCallback(
+    (list: Note[]) => {
+      const key = makeNotesKey(
+        userId,
+        calendarId,
+        activeTab,
+        selectedCalendarFilter,
+        creatorFilter,
+        searchQuery,
+      );
+      const existing = notesCache.get(key);
+      notesCache.set(key, {
+        notes: list,
+        hasMore: existing?.hasMore ?? hasMore,
+        total: existing?.total ?? total,
+        offset: existing?.offset ?? offsetRef.current,
+      });
+    },
+    [userId, calendarId, activeTab, selectedCalendarFilter, creatorFilter, searchQuery, hasMore, total],
+  );
+
   const updateNote = useCallback((noteId: string, updates: Partial<Note>) => {
-    setNotes((prev) =>
-      prev.map((n) => (n.id === noteId ? { ...n, ...updates } : n))
-    );
-  }, []);
+    setNotes((prev) => {
+      const next = prev.map((n) => (n.id === noteId ? { ...n, ...updates } : n));
+      writeListToCache(next);
+      return next;
+    });
+  }, [writeListToCache]);
 
   const removeNote = useCallback((noteId: string) => {
-    setNotes((prev) => prev.filter((n) => n.id !== noteId));
-  }, []);
+    setNotes((prev) => {
+      const next = prev.filter((n) => n.id !== noteId);
+      writeListToCache(next);
+      return next;
+    });
+  }, [writeListToCache]);
 
   const addNote = useCallback((note: Note) => {
-    setNotes((prev) => [note, ...prev]);
-  }, []);
+    setNotes((prev) => {
+      const next = [note, ...prev];
+      writeListToCache(next);
+      return next;
+    });
+  }, [writeListToCache]);
 
   // Real-time updates via postgres_changes
   const channelIdRef = useRef(
     `notes-drawer-pg-${Math.random().toString(36).slice(2, 8)}`
   );
+
+  // Subscription opens once per userId, but the INSERT predicate needs the
+  // current filters. Refs let the handler read live values without forcing
+  // resubscribe on every filter change.
+  const filterRef = useRef({
+    calendarId,
+    activeTab,
+    selectedCalendarFilter,
+    creatorFilter,
+    searchQuery,
+  });
+  useEffect(() => {
+    filterRef.current = {
+      calendarId,
+      activeTab,
+      selectedCalendarFilter,
+      creatorFilter,
+      searchQuery,
+    };
+  }, [calendarId, activeTab, selectedCalendarFilter, creatorFilter, searchQuery]);
 
   useEffect(() => {
     if (!userId) return;
@@ -286,10 +430,48 @@ export function useNotes(options: UseNotesOptions): UseNotesResult {
             });
           } else if (eventType === 'DELETE' && oldNote?.id) {
             setNotes((prev) => prev.filter((n) => n.id !== oldNote.id));
+            setTotal((t) => Math.max(0, t - 1));
+          } else if (eventType === 'INSERT' && newNote) {
+            // Reject inserts that don't match the current view's filters.
+            // Skip during active search — the next debounce will refetch.
+            const f = filterRef.current;
+            if (newNote.user_id !== userId) return;
+            if (f.searchQuery && f.searchQuery.trim() !== '') return;
+
+            // Creator
+            if (f.creatorFilter === 'me' && newNote.by_assistant) return;
+            if (f.creatorFilter === 'assistant' && !newNote.by_assistant) return;
+
+            // Tab (lifecycle)
+            if (f.activeTab === 'pinned' && !newNote.is_pinned) return;
+            if (f.activeTab === 'archived' && !newNote.is_archived) return;
+            if (f.activeTab === 'all' && newNote.is_archived) return;
+
+            // Calendar scope: explicit calendarId prop wins; else picker
+            // dropdown ('all' = no scope, '' or specific = scope to id).
+            const effectiveCalId =
+              f.calendarId ||
+              (f.selectedCalendarFilter && f.selectedCalendarFilter !== 'all'
+                ? f.selectedCalendarFilter
+                : undefined);
+            if (effectiveCalId && newNote.calendar_id !== effectiveCalId) return;
+
+            let accepted = false;
+            setNotes((prev) => {
+              if (prev.some((n) => n.id === newNote.id)) return prev;
+              accepted = true;
+              return [newNote, ...prev];
+            });
+            if (accepted) {
+              // The new row now occupies position 0 on the server. Bump
+              // offsetRef so the next loadMore skips it; otherwise the
+              // same row comes back at offset N and produces a dup
+              // (caught by the loadNotes dedupe, but wastes a row of
+              // pagination).
+              offsetRef.current += 1;
+              setTotal((t) => t + 1);
+            }
           }
-          // INSERT: skip — complex filters make it hard to know
-          // if the new note belongs in the current view.
-          // The user will see it on next open/filter change.
         }
       )
       .subscribe((status: string) => {
@@ -307,6 +489,7 @@ export function useNotes(options: UseNotesOptions): UseNotesResult {
     loadingMore,
     hasMore,
     total,
+    hasLoaded,
     loadNotes,
     loadMore,
     updateNote,

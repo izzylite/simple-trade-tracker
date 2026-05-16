@@ -24,7 +24,8 @@ import { calculateCumulativePnLToDateAsync } from '../../../utils/dynamicRiskUti
 import { TradeOperationsProps } from '../../../types/tradeOperations';
 import { TradeRepository } from '../../../services/repository/repositories/TradeRepository';
 import { logger } from '../../../utils/logger';
-import EconomicCalendarDrawer from '../../economicCalendar/EconomicCalendarDrawer';
+import EconomicEventsView from '../../economicCalendar/EconomicEventsView';
+import UnifiedDrawer from '../../common/UnifiedDrawer';
 
 export interface DayTradesContentProps {
   date: Date;
@@ -274,14 +275,25 @@ const DayTradesContent: React.FC<DayTradesContentProps> = ({
       </Box>}
 
       {calendar && !onOpenEvents && (
-        <EconomicCalendarDrawer
+        <UnifiedDrawer
           open={eventsDrawerOpen}
           onClose={() => setEventsDrawerOpen(false)}
-          calendar={calendar}
-          tradeOperations={tradeOperations}
-          isReadOnly={isReadOnly}
-          initialDate={date}
-        />
+          title="Economic Calendar"
+          icon={<EventIcon />}
+          width={{ xs: '100%', sm: 450 }}
+          keepMounted
+          contentSx={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
+        >
+          <EconomicEventsView
+            calendar={calendar}
+            isReadOnly={isReadOnly}
+            onUpdateCalendarProperty={tradeOperations.onUpdateCalendarProperty}
+            tradeOperations={tradeOperations}
+            enabled={eventsDrawerOpen}
+            initialDate={date}
+            variant="compact"
+          />
+        </UnifiedDrawer>
       )}
     </Box>
   );

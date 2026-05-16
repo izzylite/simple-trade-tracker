@@ -13,6 +13,7 @@ import NotesBottomSheet from './NotesBottomSheet';
 import { Z_INDEX } from '../../styles/zIndex';
 import { Note } from '../../types/note';
 import { Calendar } from '../../types/calendar';
+import { useUserPinnedEvents } from '../../contexts/UserPinnedEventsContext';
 
 interface StackedNotesWidgetProps {
   calendarId: string;
@@ -27,6 +28,7 @@ const StackedNotesWidget: React.FC<StackedNotesWidgetProps> = ({
   calendarId, filterIds, calendar,
 }) => {
   const { notes: allNotes, isLoading, fullDayName, updateNote, removeNote } = useReminderNotes(calendarId);
+  const { pins: userPinnedEvents } = useUserPinnedEvents();
   const notes = filterIds
     ? allNotes.filter(n => filterIds.has(n.id))
     : allNotes;
@@ -131,7 +133,7 @@ const StackedNotesWidget: React.FC<StackedNotesWidgetProps> = ({
         onNoteSaved={handleNoteSaved}
         onNoteDeleted={handleNoteDeleted}
         availableTradeTags={calendar?.tags}
-        pinnedEvents={calendar?.pinned_events}
+        pinnedEvents={userPinnedEvents}
       />
     </>
   );

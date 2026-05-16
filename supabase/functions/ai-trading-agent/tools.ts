@@ -7,16 +7,18 @@ import { log } from "../_shared/supabase.ts";
 import { fetchSerperScrape } from "../_shared/serperScrape.ts";
 import { scrapeArticle } from "../_shared/scrapeProvider.ts";
 import { tavilySearchNews, tavilySearchBreaking } from "../_shared/tavily.ts";
-import { getMarketPrice } from "../_shared/prices.ts";
+import { getMarketPrice, fetchYahooTimeSeries } from "../_shared/prices.ts";
+import {
+  fetchIndicator,
+  fetchSymbolSearch,
+  fetchTimeSeries,
+  formatCandleLine,
+  type Candle,
+  type CandleInterval,
+  type IndicatorName,
+} from "../_shared/twelvedata.ts";
 import {
   SLASH_COMMAND_TAG,
-  GAME_PLAN_TAG,
-  LESSON_LEARNED_TAG,
-  RISK_MANAGEMENT_TAG,
-  PSYCHOLOGY_TAG,
-  GENERAL_TAG,
-  STRATEGY_TAG,
-  INSIGHT_TAG,
   AGENT_MEMORY_TAG,
 } from "../_shared/noteTags.ts";
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -122,34 +124,77 @@ export const scrapeUrlTool: GeminiFunctionDeclaration = {
 };
 
 /**
- * Universal market price tool — Yahoo Finance (intraday) as primary, with
- * internal fallbacks to CoinGecko and Frankfurter. Covers all asset classes.
+ * Universal market data tool — action-dispatched. Replaces the former
+ * get_market_price + get_market_history pair so Orion has a single mental
+ * bucket ("market data") with sub-actions, matching the manage_* pattern.
+ *
+ * action="quote"     — current price + day stats (Twelve Data intraday primary,
+ *                      Yahoo fallback, Frankfurter forex EOD last resort).
+ * action="history"   — historical OHLC candles via Twelve Data /time_series
+ *                      with Yahoo fallback for indices/futures/bonds/DXY.
+ * action="indicator" — RSI/MACD/ATR/BBANDS/EMA/SMA/VWAP via Twelve Data
+ *                      per-indicator endpoints. Free-tier coverage:
+ *                      forex/US-stocks/crypto. VWAP is intraday-only.
+ * action="search"    — fuzzy name-to-ticker resolution via /symbol_search.
+ *
+ * Future actions reserved: "earnings" (earnings calendar).
  */
-export const getMarketPriceTool: GeminiFunctionDeclaration = {
-  name: "get_market_price",
+export const getMarketDataTool: GeminiFunctionDeclaration = {
+  name: "get_market_data",
   description:
-    `Get intraday price data for any instrument — forex, indices, commodities, crypto, bonds, or stocks. Returns: price, day change %, day high/low, previous close, and data source.
-
-The tool automatically falls back to alternative providers internally if the primary source is unavailable. When fallback data is returned, the response will include a note indicating the source and freshness (e.g. "end-of-day reference rate" for forex fallback) — respect that in your wording (don't say "currently trading at" for end-of-day data).
-
-COMMON SYMBOLS (Yahoo Finance format):
-  Forex: EURUSD=X, GBPUSD=X, USDJPY=X, USDCHF=X, USDCAD=X, AUDUSD=X, NZDUSD=X, EURGBP=X, EURJPY=X, GBPJPY=X, DX-Y.NYB (Dollar Index)
-  Indices: ^GSPC (S&P 500), ^IXIC (Nasdaq), ^DJI (Dow), ^VIX, ^FTSE, ^GDAXI (DAX), ^N225 (Nikkei), ^HSI (Hang Seng)
-  Commodities: GC=F (Gold), SI=F (Silver), CL=F (WTI Oil), BZ=F (Brent), NG=F (Natural Gas), HG=F (Copper)
-  Crypto: BTC-USD, ETH-USD, SOL-USD, XRP-USD, ADA-USD, DOGE-USD
-  Bonds: ^TNX (10Y Yield), ^FVX (5Y), ^TYX (30Y), TLT (20Y+ ETF)
-  Stocks: AAPL, MSFT, NVDA, GOOGL, META, AMZN, TSLA, JPM
-  ETFs: SPY, QQQ, IWM`,
+    `Universal market data. Pick ONE \`action\`: "quote" (current price + day stats), "history" (OHLC candles for past dates / today's shape), "indicator" (RSI/MACD/ATR/BBANDS/EMA/SMA/VWAP), "search" (resolve company name → ticker). See TIER 4 MARKET DATA REFERENCE in the system prompt for the symbol catalog, indicator defaults, asset-class coverage caveats, and chart rules. Tool dispatcher validates per-action required params server-side.`,
   parameters: {
     type: "object",
     properties: {
+      action: {
+        type: "string",
+        enum: ["quote", "history", "indicator", "search"],
+        description: "Sub-action. Default to 'quote' when no past-time / indicator / name-lookup intent.",
+      },
       symbol: {
         type: "string",
-        description:
-          'Yahoo Finance symbol. Examples: "EURUSD=X", "^GSPC", "GC=F", "BTC-USD", "AAPL"',
+        description: 'Catalog symbol (e.g. "EURUSD=X", "^GSPC", "GC=F", "BTC-USD", "AAPL"). Required for quote/history/indicator.',
+      },
+      indicator: {
+        type: "string",
+        enum: ["RSI", "MACD", "ATR", "BBANDS", "EMA", "SMA", "VWAP"],
+        description: "Required for action='indicator'. Ignored otherwise.",
+      },
+      period: {
+        type: "integer",
+        description: "action='indicator' lookback. Defaults per indicator (RSI/ATR 14, BBANDS/EMA/SMA 20, VWAP 9). MACD ignores. Override when user names one.",
+      },
+      query: {
+        type: "string",
+        description: "action='search'. Free-text company / asset name.",
+      },
+      interval: {
+        type: "string",
+        enum: ["1min", "5min", "15min", "30min", "1h", "2h", "4h", "1day", "1week", "1month"],
+        description: "REQUIRED for history + indicator. Pick coarsest that answers. Indices/futures/bonds/DXY: no 2h/4h. VWAP: intraday only.",
+      },
+      outputsize: {
+        type: "integer",
+        description: "history: 1–200 candles. indicator: 1–20 (default 1). Ignored if start_date+end_date set.",
+      },
+      start_date: {
+        type: "string",
+        description: 'action="history" window start. "YYYY-MM-DD" or "YYYY-MM-DD HH:mm:ss". Pair with end_date.',
+      },
+      end_date: {
+        type: "string",
+        description: 'action="history" window end. Pair with start_date.',
+      },
+      include_chart: {
+        type: "boolean",
+        description: 'action="history". Attach candlestick chart below reply. Default false. Off for plain numeric lookups.',
+      },
+      chart_only: {
+        type: "boolean",
+        description: 'action="history". Skip OHLC dump, return chart only. Implies a chart. Use for "show me the chart" requests.',
       },
     },
-    required: ["symbol"],
+    required: ["action"],
   },
 };
 
@@ -197,97 +242,12 @@ export const generateChartTool: GeminiFunctionDeclaration = {
 };
 
 /**
- * Create note tool definition
- */
-export const createNoteTool: GeminiFunctionDeclaration = {
-  name: "create_note",
-  description: `Create a new note for the user in their trading calendar.
-
-USE CASES:
-- Save trading strategies, insights, lessons learned, or game plans for the user
-- Save a reusable prompt as a ${SLASH_COMMAND_TAG} note (see "Slash Commands" in system prompt) — title becomes the / autocomplete name, content becomes the instruction
-
-⚠️ CANNOT create ${AGENT_MEMORY_TAG} notes - use update_memory tool instead (it auto-creates if needed).
-
-Content should be in plain text format. User ID and Calendar ID are automatically provided from context.`,
-  parameters: {
-    type: "object",
-    properties: {
-      title: {
-        type: "string",
-        description: "Note title (concise and descriptive)",
-      },
-      content: {
-        type: "string",
-        description:
-          "Note content in plain text format. Use clear paragraphs and line breaks for readability. Do not use HTML tags.",
-      },
-      tags: {
-        type: "array",
-        items: { type: "string" },
-        description:
-          `Categorize the note. Available: "${STRATEGY_TAG}", "${GAME_PLAN_TAG}", "${INSIGHT_TAG}", "${LESSON_LEARNED_TAG}", "${RISK_MANAGEMENT_TAG}", "${PSYCHOLOGY_TAG}", "${GENERAL_TAG}", "${SLASH_COMMAND_TAG}" (reusable / commands — see system prompt). Use "${AGENT_MEMORY_TAG}" ONLY for AI memory notes.`,
-      },
-      reminder_type: {
-        type: "string",
-        enum: ["none", "once", "weekly"],
-        description:
-          'Reminder type: "none" (no reminder), "once" (specific date), or "weekly" (recurring days)',
-      },
-      reminder_date: {
-        type: "string",
-        description:
-          'ISO date string (YYYY-MM-DD) for one-time reminders. Only used when reminder_type is "once".',
-      },
-      reminder_days: {
-        type: "array",
-        items: {
-          type: "string",
-          enum: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
-        },
-        description:
-          'Array of day abbreviations for weekly reminders. Only used when reminder_type is "weekly". Example: ["Mon", "Wed", "Fri"]',
-      },
-      color: {
-        type: "string",
-        description:
-          "Optional background color name. Available: 'red', 'pink', 'purple', 'deepPurple', 'indigo', 'blue', 'lightBlue', 'cyan', 'teal', 'green', 'lightGreen', 'lime', 'yellow', 'amber', 'orange', 'deepOrange', 'brown', 'grey', 'blueGrey'. If not provided, a random color will be assigned.",
-      },
-    },
-    required: ["title", "content"],
-  },
-};
-
-/**
  * Update memory tool definition - dedicated tool for memory management with merge logic
  */
 export const updateMemoryTool: GeminiFunctionDeclaration = {
   name: "update_memory",
   description:
-    `Mutate your persistent memory with one of four ops:
-
-- ADD (default): append new bullets to a section. The server dedups against existing bullets — provide ONLY new information.
-- UPDATE: replace ONE existing bullet with refined text. Use when a fact changed but the topic is the same (e.g. user changed daily stop from $200 to $150 and the old "$200 stop" bullet is now wrong).
-- REMOVE: delete ONE existing bullet that is no longer true (e.g. user no longer trades a session they used to avoid).
-- REPLACE_SECTION: replace the entire ACTIVE_FOCUS section in one shot. Only valid for ACTIVE_FOCUS — other sections must use ADD/UPDATE/REMOVE.
-
-UPDATE and REMOVE identify the target via fuzzy text matching (Jaccard ≥ 0.85). If multiple bullets match or none match, the call is rejected — you'll receive the section's current contents to retry with a more specific target_text.
-
-SECTIONS:
-- TRADER_PROFILE — style, risk tolerance, baseline preferences
-- PERFORMANCE_PATTERNS — setups/sessions that work, with win rates + evidence
-- STRATEGY_PREFERENCES — user-stated rules, entry criteria, risk management
-- PSYCHOLOGICAL_PATTERNS — emotional triggers, tilt patterns, behavioral biases
-- LESSONS_LEARNED — errors to avoid, corrections, communication preferences
-- ACTIVE_FOCUS — current goals (this is the only section that supports REPLACE_SECTION)
-
-FORMAT each insight as: "[Pattern/Rule]: [Evidence] [Confidence: High/Med/Low] [YYYY-MM]"
-
-EXAMPLES:
-ADD:    op="ADD",    section="PERFORMANCE_PATTERNS", new_insights=["London scalps: 72% wr on 15 trades [High] [2026-04]"]
-UPDATE: op="UPDATE", section="STRATEGY_PREFERENCES", target_text="Daily stop $200", new_text="Daily stop $150 [High] [2026-04]"
-REMOVE: op="REMOVE", section="STRATEGY_PREFERENCES", target_text="Avoids Asian session"
-REPLACE_SECTION: op="REPLACE_SECTION", section="ACTIVE_FOCUS", new_insights=["Improve B+ execution discipline"]`,
+    `Mutate persistent memory. op=ADD (default) appends bullets; UPDATE replaces one bullet via target_text+new_text; REMOVE deletes one via target_text; REPLACE_SECTION rewrites entire ACTIVE_FOCUS section. UPDATE/REMOVE need Jaccard ≥0.85 against an existing bullet. For rule-change / decision / correction triggers use apply_rule_change instead (atomic pairing). See TIER 3 in the system prompt for sections, format, and op routing.`,
   parameters: {
     type: "object",
     properties: {
@@ -341,34 +301,7 @@ REPLACE_SECTION: op="REPLACE_SECTION", section="ACTIVE_FOCUS", new_insights=["Im
 export const applyRuleChangeTool: GeminiFunctionDeclaration = {
   name: "apply_rule_change",
   description:
-    `ATOMIC PAIRING: logs an episodic event AND mutates core memory in a SINGLE call. Use this whenever the user changes a rule, makes a decision, or corrects something — INSTEAD OF calling record_event + update_memory separately.
-
-WHEN TO CALL:
-- User states they CHANGED, DECIDED, CORRECTED, TIGHTENED, LOOSENED, SWITCHED, or PIVOTED something.
-- User says "I've decided", "I'm changing", "from now on", "going forward", "actually", "you're wrong", "no it's", "let's change".
-- These triggers previously routed to record_event — now route to apply_rule_change so the stable memory state stays in sync with the event log.
-
-WHEN NOT TO CALL (use record_event alone instead):
-- You observed a pattern from data (no rule change) → record_event(pattern_observed)
-- A strategy was discussed but no rule change was decided → record_event(strategy_discussion)
-- You're extracting bullets from a note → update_memory(op=ADD)
-
-MEMORY OP CHOICE:
-- memory_op=UPDATE — for CHANGED facts: replace one bullet (provide target_text + new_text)
-- memory_op=REMOVE — for REVERSED preferences: delete one bullet (provide target_text)
-- memory_op=ADD — for genuinely-NEW rules with no existing bullet to update (provide new_insights)
-
-If memory_op rejection happens (no match / multi-match), the event is still logged; retry the memory leg only by calling update_memory directly with a sharper target_text.
-
-Example — user says "I'm tightening my max leverage from 2% to 1.5%":
-  apply_rule_change(
-    event_type="rule_changed",
-    summary="User tightened max leverage from 2% to 1.5%",
-    memory_op="UPDATE",
-    memory_section="STRATEGY_PREFERENCES",
-    target_text="Leverage Min 0.5% Max 2%",
-    new_text="Leverage: Min 0.5%, Max 1.5% [High] [2026-04]"
-  )`,
+    `ATOMIC PAIRING: logs episodic event AND mutates core memory in ONE call. Use for every user-stated rule change / decision / correction (trigger phrases + worked example in TIER 3 R1 of the system prompt). memory_op=UPDATE for changed facts (target_text+new_text), REMOVE for reversed preferences (target_text), ADD for genuinely-new rules (new_insights). If memory leg rejects (no match / multi-match), event still logs — retry memory via update_memory with sharper target_text.`,
   parameters: {
     type: "object",
     properties: {
@@ -415,422 +348,41 @@ Example — user says "I'm tightening my max leverage from 2% to 1.5%":
 };
 
 /**
- * Record an episodic event — time-stamped fact about *what happened*
- * (separate from update_memory, which captures *what is true now*).
- *
- * Backed by the agent_memory_events table. Capped at 50 writes per
- * (user, calendar) per day to prevent runaway prompts from spamming
- * the log.
- */
-export const recordEventTool: GeminiFunctionDeclaration = {
-  name: "record_event",
-  description:
-    `Append a time-stamped event to the episodic log. Use this to capture *what happened* during a session — corrections, rule changes, observed patterns, decisions — separately from update_memory which captures the trader's stable profile.
-
-WHEN TO CALL:
-- The user corrected something you said: event_type="user_correction"
-- The user changed a rule (stop, size, session, setup): event_type="rule_changed"
-- A pattern was discovered (e.g. losing streaks after 2 wins): event_type="pattern_observed"
-- A specific trading decision was discussed and agreed: event_type="decision_made"
-- A strategy was discussed in detail: event_type="strategy_discussion"
-
-WHEN NOT TO CALL:
-- Casual chitchat, simple data lookups, or routine acknowledgements
-- Anything the user wouldn't expect you to "remember happened on a specific day"
-
-FORMAT summary as ONE past-tense sentence in third person, max 500 chars:
-- Good: "User changed daily stop from $200 to $150 due to recent drawdown"
-- Bad: "I should remember that the user's stop is now $150" (first person, future-facing)
-- Bad: "Stop change" (too terse)
-
-Limit: 50 events per day per (user, calendar). Excess calls return a "log full" notice — do NOT retry on this turn.`,
-  parameters: {
-    type: "object",
-    properties: {
-      event_type: {
-        type: "string",
-        enum: [
-          "pattern_observed",
-          "user_correction",
-          "strategy_discussion",
-          "decision_made",
-          "rule_changed",
-        ],
-        description: "What kind of event to log.",
-      },
-      summary: {
-        type: "string",
-        description:
-          "Single past-tense sentence describing the event (max 500 chars).",
-      },
-      tags: {
-        type: "array",
-        items: { type: "string" },
-        description:
-          "Optional tags for later recall (e.g. ['risk', 'london-session']).",
-      },
-      metadata: {
-        type: "object",
-        description:
-          "Optional structured context: trade_ids, source_note_id, confidence, etc.",
-      },
-    },
-    required: ["event_type", "summary"],
-  },
-};
-
-/**
- * Recall episodic events — answers "have we discussed X / what changed
- * last week / when did we decide Y" without scraping chat history.
- *
- * Backed by agent_memory_events. At least one filter is required to
- * avoid full-table paginates — unfiltered recall is almost never what
- * the agent actually wants.
- */
-export const recallEventsTool: GeminiFunctionDeclaration = {
-  name: "recall_events",
-  description:
-    `Query the episodic event log to answer questions about *what happened* across past sessions. Prefer this over search_chat_history for "have we discussed X", "last time we talked about Y", "what changed recently" — events are structured and timestamped, chat history is fuzzy.
-
-REQUIRES at least one filter (event_types, tags, since, or query). Unfiltered calls are rejected.
-
-FILTERS (combine freely):
-- event_types: limit to specific kinds (rule_changed, user_correction, etc.)
-- tags: events tagged with ALL of these (intersection)
-- since: ISO timestamp — only events on/after this date
-- query: substring match on the event summary (case-insensitive)
-
-Returns at most 10 events by default (50 max), most recent first.
-
-EXAMPLES:
-- "What rules has the user changed in the last month?" → since=<30d ago>, event_types=['rule_changed']
-- "Have we discussed FOMC before?" → query='FOMC'
-- "Recent corrections about position sizing" → query='position', event_types=['user_correction']`,
-  parameters: {
-    type: "object",
-    properties: {
-      event_types: {
-        type: "array",
-        items: {
-          type: "string",
-          enum: [
-            "pattern_observed",
-            "user_correction",
-            "strategy_discussion",
-            "decision_made",
-            "rule_changed",
-          ],
-        },
-        description: "Filter to these event types only.",
-      },
-      tags: {
-        type: "array",
-        items: { type: "string" },
-        description: "Match events containing ALL of these tags.",
-      },
-      since: {
-        type: "string",
-        description: "ISO timestamp — only return events on/after this date.",
-      },
-      query: {
-        type: "string",
-        description: "Case-insensitive substring match on summary text.",
-      },
-      limit: {
-        type: "number",
-        description: "Max events to return (1..50, default 10).",
-      },
-    },
-  },
-};
-
-/**
- * Update note tool definition
- */
-export const updateNoteTool: GeminiFunctionDeclaration = {
-  name: "update_note",
-  description:
-    `Update an existing note. By default you can only update AI-created notes (by_assistant=true). EXCEPTION: notes tagged "${SLASH_COMMAND_TAG}" are user-owned but you may still update them on user request (e.g. "change my Daily Review slash command to also flag oversized losses").
-
-⚠️ CANNOT update ${AGENT_MEMORY_TAG} notes - use update_memory tool instead for memory management.
-
-CONTENT EDITING — choose ONE approach:
-
-A) INCREMENTAL EDITS (REQUIRED for ${SLASH_COMMAND_TAG} when user says "also", "add", "change X to Y", "remove X", etc.)
-   1. Read the note's current text first (via search_notes or recent context).
-   2. Set content_mode + the matching field(s):
-      - "append": needs content_text (added on a new line at the end).
-      - "replace": needs content_old_text (exact, unique substring) and content_text.
-      - "remove": needs content_old_text (exact, unique substring).
-   The server REJECTS with current content echoed back if content_old_text is missing or not unique. Re-read and retry — do not guess.
-
-B) FULL REWRITE — use ONLY when the user explicitly asks to rewrite from scratch.
-   Set "content" to the entire new note. For ${SLASH_COMMAND_TAG} notes you MUST also set replace_full_content=true to confirm the destructive overwrite, otherwise the call is rejected.
-
-Note: incremental edits do not work on rich-text (Draft.js JSON) notes — those require full overwrite.
-
-USE CASES:
-- Tweak a strategy / insight → content_mode: "append" or "replace"
-- Add/modify/remove tags or reminders → tags / reminder_* params
-- Edit a saved ${SLASH_COMMAND_TAG} (user's reusable / prompt) → incremental edits, NOT full rewrite`,
-  parameters: {
-    type: "object",
-    properties: {
-      note_id: {
-        type: "string",
-        description: "ID of the note to update",
-      },
-      title: {
-        type: "string",
-        description: "New title (optional - only include if changing)",
-      },
-      content: {
-        type: "string",
-        description:
-          "FULL REPLACEMENT of the note's content. Destructive — wipes existing text. Prefer content_mode for partial edits. SLASH_COMMAND notes additionally require replace_full_content=true. Plain text, no HTML.",
-      },
-      content_mode: {
-        type: "string",
-        enum: ["append", "replace", "remove"],
-        description:
-          "Incremental content edit. Mutually exclusive with the 'content' param. Not allowed on rich-text (Draft.js JSON) notes.",
-      },
-      content_text: {
-        type: "string",
-        description:
-          "New text. Required for content_mode='append' (added at end on a new line) or 'replace' (replaces content_old_text). Plain text, no HTML.",
-      },
-      content_old_text: {
-        type: "string",
-        description:
-          "Exact, unique substring of the current note to find. Required for content_mode='replace' or 'remove'. Whitespace-sensitive — must match the note verbatim. Read the note first.",
-      },
-      replace_full_content: {
-        type: "boolean",
-        description:
-          "Required confirmation when overwriting a SLASH_COMMAND note via the full 'content' param. Prevents accidental destructive rewrites of user automations. Set true only when the user explicitly asked to rewrite the entire command.",
-      },
-      tags: {
-        type: "array",
-        items: { type: "string" },
-        description:
-          `Updated tags (optional). Available: "${STRATEGY_TAG}", "${GAME_PLAN_TAG}", "${INSIGHT_TAG}", "${LESSON_LEARNED_TAG}", "${RISK_MANAGEMENT_TAG}", "${PSYCHOLOGY_TAG}", "${GENERAL_TAG}", "${SLASH_COMMAND_TAG}", "${AGENT_MEMORY_TAG}".`,
-      },
-      reminder_type: {
-        type: "string",
-        enum: ["none", "once", "weekly"],
-        description:
-          'Reminder type: "none" (no reminder), "once" (specific date), or "weekly" (recurring days). Use "none" to remove reminders.',
-      },
-      reminder_date: {
-        type: "string",
-        description:
-          'ISO date string (YYYY-MM-DD) for one-time reminders. Only used when reminder_type is "once".',
-      },
-      reminder_days: {
-        type: "array",
-        items: {
-          type: "string",
-          enum: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
-        },
-        description:
-          'Array of day abbreviations for weekly reminders. Only used when reminder_type is "weekly". Example: ["Mon", "Wed", "Fri"]',
-      },
-    },
-    required: ["note_id"],
-  },
-};
-
-/**
- * Delete note tool definition
- */
-export const deleteNoteTool: GeminiFunctionDeclaration = {
-  name: "delete_note",
-  description:
-    `Delete an existing note. By default you can only delete AI-created notes (by_assistant=true). EXCEPTION: notes tagged "${SLASH_COMMAND_TAG}" are user-owned but you may delete them on explicit user request (e.g. "remove my Quick Review slash command"). Use this to remove outdated or incorrect notes.`,
-  parameters: {
-    type: "object",
-    properties: {
-      note_id: {
-        type: "string",
-        description: "ID of the note to delete",
-      },
-    },
-    required: ["note_id"],
-  },
-};
-
-/**
- * Search notes tool definition
- */
-export const searchNotesTool: GeminiFunctionDeclaration = {
-  name: "search_notes",
-  description: `Search and retrieve notes from the user's trading calendar.
-
-CRITICAL: At the START of EVERY session, search with tags: ["${AGENT_MEMORY_TAG}"] to retrieve your persistent memory about this trader.
-
-AVAILABLE TAGS (use these to filter by category):
-- "${STRATEGY_TAG}" - Trading strategies and methodologies
-- "${GAME_PLAN_TAG}" - Daily/weekly trading plans and preparation
-- "${INSIGHT_TAG}" - Market observations and realizations
-- "${LESSON_LEARNED_TAG}" - Post-trade reflections and mistakes to avoid
-- "${RISK_MANAGEMENT_TAG}" - Position sizing, stop loss rules, risk parameters
-- "${PSYCHOLOGY_TAG}" - Trading mindset, emotions, mental frameworks
-- "${GENERAL_TAG}" - Miscellaneous notes
-- "${SLASH_COMMAND_TAG}" - User-saved reusable prompts triggered via "/" in chat (see system prompt)
-- "${AGENT_MEMORY_TAG}" - AI persistent memory (retrieve at session start)
-
-SMART QUERYING EXAMPLES:
-- Analyze user's risk approach: tags: ["${RISK_MANAGEMENT_TAG}"]
-- Review strategies before trading: tags: ["${STRATEGY_TAG}"]
-- Understand daily preparation: tags: ["${GAME_PLAN_TAG}"]
-- Learn from past mistakes: tags: ["${LESSON_LEARNED_TAG}"]
-- List user's saved slash commands (e.g. "what slash commands do I have?"): tags: ["${SLASH_COMMAND_TAG}"]
-- Combine with search_query for precision: tags: ["${STRATEGY_TAG}"], search_query: "scalping"
-
-EMBEDDED IMAGES:
-- Notes may contain embedded images (diagrams, charts, frameworks)
-- Results show: [Embedded images: url1, url2] when images exist
-- Use analyze_image tool on these URLs for visual context
-- Especially valuable for: strategy diagrams, setup examples, risk frameworks
-
-Returns both user-created and AI-created notes. User ID and Calendar ID are automatically provided from context.`,
-  parameters: {
-    type: "object",
-    properties: {
-      search_query: {
-        type: "string",
-        description:
-          "Optional text search to filter notes by title or content. Combine with tags for precision.",
-      },
-      tags: {
-        type: "array",
-        items: { type: "string" },
-        description:
-          `Filter by category. Available: "${STRATEGY_TAG}", "${GAME_PLAN_TAG}", "${INSIGHT_TAG}", "${LESSON_LEARNED_TAG}", "${RISK_MANAGEMENT_TAG}", "${PSYCHOLOGY_TAG}", "${GENERAL_TAG}", "${SLASH_COMMAND_TAG}", "${AGENT_MEMORY_TAG}". Notes must have ALL specified tags.`,
-      },
-      include_archived: {
-        type: "boolean",
-        description: "Whether to include archived notes. Default is false.",
-      },
-    },
-    required: [],
-  },
-};
-
-/**
  * Get recent Orion task briefings tool definition
  */
 export const getRecentOrionBriefingsTool: GeminiFunctionDeclaration = {
   name: "get_recent_orion_briefings",
-  description: `Retrieve recent Orion task briefings (Market Research, Daily Analysis, Weekly Review, Monthly Rollup) that Orion (You) has already sent this user.
-
-Use this whenever the user references a briefing or alert you sent — whether past or just-delivered. Trigger signals:
-- Backward refs: "what did you say about…", "your last alert", "summarize your briefings this week"
-- Forward refs: "new briefing is out", "the latest briefing", "this briefing", "the alert you just sent"
-- Implicit refs: user cites an event/claim as being "in the briefing" or "from your alert" without quoting it in full
-
-When the user references a briefing AND asks a market/trading question, call this FIRST (before search_web) so you know what the briefing actually said — do not assume its contents from the user's paraphrase.
-
-Do NOT use this for general market questions with no briefing reference; use search_web for those.
-
-Results include: title, significance (low/medium/high), task type, plain-text body, timestamp, and the source URLs Orion saw when generating the briefing. If the user asks for deeper context on a past briefing, call scrape_url on those source URLs to read the full articles. User ID is automatically provided from context.`,
+  description: `Retrieve Orion task briefings already sent to this user (market_research / daily_analysis / weekly_review / monthly_rollup). Call this whenever the user references a briefing or alert you sent (past, just-delivered, or implicit). When the user references a briefing AND asks a market question, call this FIRST — do not paraphrase the briefing from the user's wording. Results include title, significance, task type, plain-text body, timestamp, source URLs. Chain scrape_url on source URLs for deeper context. See TIER 4 BRIEFING ALIASES in the system prompt for the instrument alias table.`,
   parameters: {
     type: "object",
     properties: {
       task_type: {
         type: "string",
-        description:
-          'Optional filter by task type. Use when the user asks about a specific type, e.g. "what did you tell me in the weekly review".',
         enum: ["market_research", "daily_analysis", "weekly_review", "monthly_rollup"],
+        description: "Optional filter by briefing type.",
       },
       instrument: {
         type: "string",
-        description:
-          'Optional filter — only applies to market_research briefings. ' +
-          'Daily/weekly/monthly briefings lack instrument metadata and are ' +
-          'silently excluded when this is set, so do NOT use this with ' +
-          'task_type="daily_analysis"/"weekly_review"/"monthly_rollup".\n\n' +
-          'Pass ANY of:\n' +
-          '- A 3-letter currency code: "EUR", "USD", "GBP", "JPY"… → broad match across every briefing exposed to that currency.\n' +
-          '- A natural instrument name: "DXY", "gold", "EUR/USD", "Bitcoin", "S&P 500" → narrow match to that specific instrument.\n' +
-          '- A Yahoo Finance symbol: "DX-Y.NYB", "GC=F", "EURUSD=X", "BTC-USD" → exact symbol match.\n' +
-          '- An informal alias: "yen"→JPY, "pound"/"sterling"→GBP, "euro"→EUR, "dollar"/"buck"→USD, "swissie"→CHF, "loonie"→CAD, "aussie"→AUD, "kiwi"→NZD, "spx"/"es"→S&P 500, "nq"/"ndx"→Nasdaq, "ym"→Dow, "rty"→Russell, "cable"→GBP/USD, "10y"/"2y"/"30y"→US Treasury yields.\n\n' +
-          'The tool routes the input internally — currency-broad vs instrument-specific is automatic. Use the form the user actually said. Match is case-insensitive.',
+        description: 'Optional. Only applies to market_research (daily/weekly/monthly lack instrument metadata). Accepts: 3-letter currency code, natural name ("gold", "EUR/USD"), catalog symbol, or alias (see TIER 4 BRIEFING ALIASES). Case-insensitive.',
       },
       since_hours: {
         type: "number",
-        description:
-          "Optional: only return briefings from the last N hours. E.g. 2 for the past 2 hours, 24 for today. Default is 72 (past 3 days). Ignored when since_date is provided.",
+        description: "Past N hours. Default 72. Ignored when since_date is set.",
       },
       since_date: {
         type: "string",
-        description:
-          'Optional ISO date string (YYYY-MM-DD). Return briefings on or after this date. Use when the user references a specific historical date, e.g. "Monday two weeks ago". Takes precedence over since_hours when provided.',
+        description: 'ISO date "YYYY-MM-DD". Briefings on/after this date. Overrides since_hours.',
       },
       until_date: {
         type: "string",
-        description:
-          'Optional ISO date string (YYYY-MM-DD). Return briefings strictly before this date. Pair with since_date to target a single day, e.g. since_date:"2026-04-20", until_date:"2026-04-21".',
+        description: 'ISO date "YYYY-MM-DD". Briefings strictly before. Pair with since_date for single-day window.',
       },
       limit: {
         type: "number",
-        description: "Max briefings to return. Default 10, max 30.",
+        description: "Max results. Default 10, max 30.",
       },
     },
     required: [],
-  },
-};
-
-/**
- * Search past conversations tool definition (Tier 1)
- */
-export const searchConversationsTool: GeminiFunctionDeclaration = {
-  name: "search_conversations",
-  description: `Search the user's past chat conversations with you by keyword. Returns lightweight metadata (title + snippet + timestamp), NOT full message bodies. Use get_conversation(id) afterwards if a result looks relevant.
-
-ONLY USE WHEN the user explicitly references a past chat — phrases like "last time", "yesterday we discussed", "you told me before", "our previous conversation", "remember when I asked about...". Do NOT use on every turn to pad context; ${AGENT_MEMORY_TAG} (via search_notes with tags:["${AGENT_MEMORY_TAG}"]) is the primary long-term memory.
-
-Returns: [{ id, title, message_count, created_at, updated_at, snippet }]. The snippet is the first ~200 chars of the most recent message in each conversation.`,
-  parameters: {
-    type: "object",
-    properties: {
-      query: {
-        type: "string",
-        description:
-          "Search term to match against conversation titles and message content. Use the subject the user referenced (e.g. 'Powell', 'risk management', 'EURUSD strategy').",
-      },
-      since_days: {
-        type: "number",
-        description:
-          "Optional: only return conversations updated in the last N days. Default 30.",
-      },
-      limit: {
-        type: "number",
-        description: "Max conversations to return. Default 5, max 10.",
-      },
-    },
-    required: ["query"],
-  },
-};
-
-/**
- * Fetch a specific conversation's full transcript tool definition (Tier 2)
- */
-export const getConversationTool: GeminiFunctionDeclaration = {
-  name: "get_conversation",
-  description: `Fetch the full message transcript of a specific past conversation by id. Call this ONLY after search_conversations has identified a relevant conversation — do not guess conversation ids.
-
-Each conversation is capped at 50 messages so the transcript is bounded (roughly 5-12k tokens). The returned transcript is formatted as "user: ..." / "orion: ..." turns with timestamps.`,
-  parameters: {
-    type: "object",
-    properties: {
-      conversation_id: {
-        type: "string",
-        description: "The id of the conversation to fetch (from search_conversations results).",
-      },
-    },
-    required: ["conversation_id"],
   },
 };
 
@@ -866,61 +418,181 @@ export const analyzeImageTool: GeminiFunctionDeclaration = {
 };
 
 /**
- * Get tag definition tool - look up user-defined meanings for custom tags
+ * ============================================================================
+ * MERGED (ACTION-DISPATCHED) TOOL DEFINITIONS
+ *
+ * These collapse former CRUD clusters into single declarations to keep the
+ * Gemini function registry small (fewer declarations = better tool selection
+ * + lower fixed prompt cost). Each carries a required `action` enum; the
+ * executor re-dispatches to the original per-action handler.
+ * ============================================================================
  */
-export const getTagDefinitionTool: GeminiFunctionDeclaration = {
-  name: "get_tag_definition",
-  description: `Look up the user's definition for a custom trading tag.
 
-USE WHEN: You encounter a tag you don't understand (e.g., "Confluence:3x Displacement", "Setup:ICT OTE", "Risk:A++ Setup").
-
-WORKFLOW:
-1. If tag meaning is unclear, call this tool to get user's definition
-2. If no definition exists, you may SUGGEST a definition based on context
-3. ALWAYS ask user permission before saving a new definition
-4. Present your suggested definition and ask: "Would you like me to save this definition for future reference?"
-
-Returns the user's explanation of what this tag means to them, or null if no definition exists.`,
+/** manage_note — replaces create_note / update_note / delete_note / search_notes */
+export const manageNoteTool: GeminiFunctionDeclaration = {
+  name: "manage_note",
+  description:
+    `CRUD on user's trading-calendar notes. action="search" (search_query and/or tags; at session start search tags:["${AGENT_MEMORY_TAG}"] to load memory), "create" (title + content plain-text; optional tags + reminder), "update" (note_id; incremental via content_mode or full via content; AI-created notes + ${SLASH_COMMAND_TAG} notes only), "delete" (note_id; same scope as update). ⚠️ ${AGENT_MEMORY_TAG} notes are NOT writeable here — use update_memory. See TIER 4 SCHEMA_REFERENCE for the available tag list.`,
   parameters: {
     type: "object",
     properties: {
-      tag_name: {
+      action: {
+        type: "string",
+        enum: ["search", "create", "update", "delete"],
+        description: "Which note operation to perform.",
+      },
+      note_id: { type: "string", description: "Target note id (update/delete)." },
+      title: { type: "string", description: "Note title (create; optional on update)." },
+      content: {
         type: "string",
         description:
-          "The exact tag name to look up (e.g., 'Confluence:3x Displacement')",
+          "Plain-text note body, no HTML. On create: required. On update: FULL replacement (destructive) — prefer content_mode for partial edits.",
+      },
+      content_mode: {
+        type: "string",
+        enum: ["append", "replace", "remove"],
+        description: "Incremental update mode. Mutually exclusive with `content`. Not allowed on rich-text (Draft.js) notes.",
+      },
+      content_text: { type: "string", description: "New text for content_mode append/replace." },
+      content_old_text: { type: "string", description: "Exact unique substring to find, for content_mode replace/remove." },
+      replace_full_content: { type: "boolean", description: "Confirmation flag required to overwrite a SLASH_COMMAND note via `content`." },
+      search_query: { type: "string", description: "Text filter for action=search." },
+      include_archived: { type: "boolean", description: "Include archived notes in search (default false)." },
+      tags: {
+        type: "array",
+        items: { type: "string" },
+        description: `Tags to filter by (search) or set (create/update). Notes must have ALL given tags when searching.`,
+      },
+      reminder_type: {
+        type: "string",
+        enum: ["none", "once", "weekly"],
+        description: '"none" / "once" (uses reminder_date) / "weekly" (uses reminder_days). Use "none" on update to clear.',
+      },
+      reminder_date: { type: "string", description: 'ISO date (YYYY-MM-DD) for reminder_type="once".' },
+      reminder_days: {
+        type: "array",
+        items: { type: "string", enum: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] },
+        description: 'Day abbreviations for reminder_type="weekly", e.g. ["Mon","Wed","Fri"].',
       },
     },
-    required: ["tag_name"],
+    required: ["action"],
   },
 };
 
-/**
- * Save tag definition tool - save a definition with user permission
- */
-export const saveTagDefinitionTool: GeminiFunctionDeclaration = {
-  name: "save_tag_definition",
+/** manage_event — replaces record_event / recall_events (episodic log) */
+export const manageEventTool: GeminiFunctionDeclaration = {
+  name: "manage_event",
   description:
-    `Save or update a definition for a trading tag. IMPORTANT: Only use this AFTER getting explicit user permission.
-
-WORKFLOW:
-1. First suggest a definition to the user
-2. Wait for user confirmation
-3. Only then call this tool to save
-
-Never call this tool without user consent.`,
+    `Episodic event log — time-stamped facts about what happened (distinct from update_memory's stable profile). action="record" appends (event_type + ≤500-char past-tense summary; for rule changes / corrections / decisions prefer apply_rule_change instead — only use record here for pattern_observed / strategy_discussion). action="recall" queries — REQUIRES ≥1 filter (event_types | tags | since | query). Empty recall IS the answer; do not fall back to other tools. See TIER 3 Episodic Memory for trigger table.`,
   parameters: {
     type: "object",
     properties: {
-      tag_name: {
+      action: { type: "string", enum: ["record", "recall"], description: "Write a new event or query existing ones." },
+      event_type: {
         type: "string",
-        description: "The exact tag name to define",
+        enum: ["pattern_observed", "user_correction", "strategy_discussion", "decision_made", "rule_changed"],
+        description: "Kind of event (action=record).",
       },
-      definition: {
-        type: "string",
-        description: "The definition/meaning of the tag",
+      summary: { type: "string", description: "Past-tense single sentence, ≤500 chars (action=record)." },
+      metadata: { type: "object", description: "Optional structured context (trade_ids, source_note_id, confidence…) — action=record." },
+      event_types: {
+        type: "array",
+        items: { type: "string", enum: ["pattern_observed", "user_correction", "strategy_discussion", "decision_made", "rule_changed"] },
+        description: "Filter recall to these event types.",
       },
+      since: { type: "string", description: "ISO timestamp — recall events on/after this (action=recall)." },
+      query: { type: "string", description: "Case-insensitive substring match on summary (action=recall)." },
+      tags: {
+        type: "array",
+        items: { type: "string" },
+        description: "record: tags to attach. recall: match events containing ALL these tags.",
+      },
+      limit: { type: "number", description: "Max events to return for action=recall (1..50, default 10)." },
     },
-    required: ["tag_name", "definition"],
+    required: ["action"],
+  },
+};
+
+/** manage_tag — replaces get_tag_definition / save_tag_definition */
+export const manageTagTool: GeminiFunctionDeclaration = {
+  name: "manage_tag",
+  description:
+    `Look up or save the user's definition for a custom trading tag (e.g. "Confluence:3x Displacement", "Setup:ICT OTE"). Pick ONE \`action\`:
+
+- action="get" — fetch the user's explanation of what \`tag_name\` means, or null if undefined. Call this when you hit a tag you don't understand.
+- action="save" — store/overwrite a definition. Needs \`tag_name\` + \`definition\`. ⚠️ ONLY after the user gives explicit permission — suggest a definition, wait for confirmation, then save.`,
+  parameters: {
+    type: "object",
+    properties: {
+      action: { type: "string", enum: ["get", "save"], description: "Look up or save a tag definition." },
+      tag_name: { type: "string", description: "Exact tag name." },
+      definition: { type: "string", description: "Meaning of the tag (action=save only)." },
+    },
+    required: ["action", "tag_name"],
+  },
+};
+
+/** recall_conversations — replaces search_conversations / get_conversation */
+export const recallConversationsTool: GeminiFunctionDeclaration = {
+  name: "recall_conversations",
+  description:
+    `Search past chat conversations with this user, or fetch one's full transcript. Pick ONE \`action\`:
+
+- action="search" — keyword search over conversation titles + message content. Needs \`query\`. Optional \`since_days\` (default 30), \`limit\` (default 5, max 10). Returns lightweight metadata: [{ id, title, message_count, created_at, updated_at, snippet }] — NOT full bodies.
+- action="get" — fetch the full transcript of one conversation. Needs \`conversation_id\` (from a prior search — do NOT guess ids). Capped at 50 messages; formatted as "user:" / "orion:" turns with timestamps.
+
+ONLY use when the user explicitly references a past chat ("last time", "yesterday we discussed", "you told me before", "show me what we said about X"). For structured "what happened / when did" questions, prefer manage_event(action="recall") — faster and more precise. ${AGENT_MEMORY_TAG} notes (manage_note search) remain the primary long-term memory.`,
+  parameters: {
+    type: "object",
+    properties: {
+      action: { type: "string", enum: ["search", "get"], description: "Search conversations or fetch one transcript." },
+      query: { type: "string", description: "Search term against titles + message content (action=search)." },
+      since_days: { type: "number", description: "Only conversations updated in the last N days (action=search, default 30)." },
+      limit: { type: "number", description: "Max conversations to return (action=search, default 5, max 10)." },
+      conversation_id: { type: "string", description: "Conversation id from a search result (action=get)." },
+    },
+    required: ["action"],
+  },
+};
+
+/** manage_reminder — replaces set_reminder / list_reminders / cancel_reminder */
+export const manageReminderTool: GeminiFunctionDeclaration = {
+  name: "manage_reminder",
+  description:
+    `Schedule, list, or cancel future Orion turns in this conversation. Pick ONE \`action\`:
+
+- action="set" — schedule one OR many reminders in a single call. Pass \`reminders\` as an array (1–12 items). Each item: \`{trigger_at, instructions, description?}\`. \`trigger_at\` is an ISO timestamp — resolve it FIRST (econ events via execute_sql on economic_events; relative times computed from now). For econ release reminders, trigger_at = event_time_utc + 20s buffer so actuals land before fire. \`instructions\` is what Orion should do at fire time. Use the batch shape to set polling loops in one turn ("monitor EURUSD every 5min for 30min" → 6 items at +5/+10/+15/+20/+25/+30) or to set several event reminders at once. Only when the user EXPLICITLY asks ("remind me", "set a reminder", "schedule", "monitor every X for Y"). Confirm the schedule to the user. Casual self-talk ("I should remember to…") → ASK first. Result has \`created[]\` + \`failed[]\` — partial success is normal. Surface what got scheduled AND each failed item's reason; DO NOT silently retry failed items. When >1 reminder is inserted, the result also carries a server-assigned \`batch_id\` that groups every row in this call — REMEMBER it (it surfaces again at fire time and is the key to cancelling the whole loop later). USER-FACING VOCAB: NEVER speak the batch_id, the word "batch", or "batch id" to the user. The batch_id is internal infrastructure — describe the schedule naturally ("I'll check every 5 minutes for the next 30 minutes" / "scheduled 3 reminders before the events you mentioned"). Showing the UUID leaks tooling.
+- action="list" — show the user's pending reminders across all conversations. No other params. Empty result means none — say so directly, don't double-check.
+- action="cancel" — pass EITHER \`id\` (cancel one reminder) OR \`batch_id\` (cancel every pending sibling in the same batch atomically). NEVER pass both. Use \`batch_id\` when the user wants to stop a loop / multi-event batch ("cancel that monitoring", "stop the every-5min checks") so unrelated reminders in the same conversation are not touched. Use \`id\` only when the user names a single specific reminder. Ambiguity rule: if user phrasing is vague ("cancel that", "never mind that one") AND the candidate reminder has a non-null batch_id with pending siblings, ASK first ("cancel just this fire or the whole schedule?") — do not guess. Call action="list" first if disambiguation is needed. USER-FACING VOCAB: describe the cancellation naturally ("cancelled the monitoring" / "ended the schedule" / "stopped the price watch"); NEVER say "batch", "batch_id", or speak the UUID.
+- action="edit" — modify PENDING reminders. Two modes (mutually exclusive):
+  * single: pass \`id\` + any of \`trigger_at\` / \`instructions\` / \`description\`. Reschedules / rewrites one row. Use when user asks to push or reword a specific reminder, OR when YOU (Orion) want to refine a single fire's instructions at fire time based on what you've observed.
+  * batch: pass \`batch_id\` + \`shift_minutes\` (positive or negative, shifts every pending sibling) and/or \`instructions\` (replaces instructions on every pending sibling). Use to tighten/loosen a polling loop ("tighten next 3 checks from 5min to 1min" → shift the remaining triggers earlier) or to push the whole loop past upcoming news.
+  Autonomy contract: you MAY edit pending reminders WITHOUT asking the user first when you notice something mid-schedule (during a fire OR between fires) that justifies adapting — volatility spike → tighten interval, macro release moved → shift, news landed early → push remaining checks. You MUST announce the change AND the reason in your reply ("Spotted absorption at 1.1708 — tightening the next 3 checks to 1-minute intervals"). Silent edits = goal drift, forbidden. Same USER-FACING VOCAB rule applies: NEVER speak the batch_id; describe the schedule naturally. Firing/fired/cancelled rows are untouchable; only pending rows update. Editable fields are whitelisted (trigger_at, instructions, description, shift_minutes) — status, ownership, and batch_id itself are immutable.`,
+  parameters: {
+    type: "object",
+    properties: {
+      action: { type: "string", enum: ["set", "list", "cancel", "edit"], description: "Schedule, list, cancel, or edit a reminder." },
+      reminders: {
+        type: "array",
+        description: "Reminders to schedule (action=set). 1–12 items. Single reminder is still a 1-element array.",
+        items: {
+          type: "object",
+          properties: {
+            trigger_at: { type: "string", description: "ISO timestamp when this reminder fires (future, within 1 year)." },
+            instructions: { type: "string", description: "What Orion should do when this reminder fires (1–1000 chars)." },
+            description: { type: "string", description: "Optional short label (<=200 chars)." },
+          },
+          required: ["trigger_at", "instructions"],
+        },
+      },
+      id: { type: "string", description: "Reminder id (action=cancel or action=edit single mode). Mutually exclusive with batch_id." },
+      batch_id: { type: "string", description: "Batch id (action=cancel atomic batch cancel, or action=edit batch mode). Mutually exclusive with id." },
+      trigger_at: { type: "string", description: "New ISO timestamp (action=edit single mode ONLY — rejected if combined with batch_id; use shift_minutes for batch edits)." },
+      instructions: { type: "string", description: "New instructions text 1-1000 chars (action=edit, single or batch mode)." },
+      description: { type: "string", description: "New short label <=200 chars (action=edit single mode ONLY — per-row, rejected if combined with batch_id)." },
+      shift_minutes: { type: "number", description: "Minutes to add to every pending sibling's trigger_at (action=edit batch mode ONLY — rejected if combined with id). Negative tightens (earlier), positive loosens/pushes (later). Validated to keep all rows within (now, now+1y)." },
+    },
+    required: ["action"],
   },
 };
 
@@ -1109,52 +781,6 @@ export async function scrapeUrl(
 }
 
 /**
- * Get cryptocurrency price using CoinGecko API
- */
-export async function getCryptoPrice(coinId: string): Promise<string> {
-  try {
-    // Normalize coin ID to lowercase
-    coinId = coinId.toLowerCase().trim();
-
-    const url =
-      `https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=usd&include_24hr_change=true&include_24hr_vol=true&include_market_cap=true`;
-
-    const response = await fetch(url);
-
-    if (!response.ok) {
-      return `Failed to fetch crypto price: ${response.status}`;
-    }
-
-    const data = await response.json();
-
-    if (!data[coinId]) {
-      return `Cryptocurrency '${coinId}' not found. Try common names like: bitcoin, ethereum, solana, cardano, ripple, dogecoin`;
-    }
-
-    const coin = data[coinId];
-    const priceChange = coin.usd_24h_change || 0;
-    const changeSymbol = priceChange >= 0 ? "📈" : "📉";
-
-    let result = `${coinId.toUpperCase()} Market Data:\n\n`;
-    result += `💰 Price: $${
-      coin.usd.toLocaleString("en-US", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      })
-    }\n`;
-    result += `${changeSymbol} 24h Change: ${priceChange.toFixed(2)}%\n`;
-    result += `📊 24h Volume: $${(coin.usd_24h_vol / 1e6).toFixed(2)}M\n`;
-    result += `🏦 Market Cap: $${(coin.usd_market_cap / 1e9).toFixed(2)}B\n`;
-
-    return result;
-  } catch (error) {
-    return `Crypto price error: ${
-      error instanceof Error ? error.message : "Unknown"
-    }`;
-  }
-}
-
-/**
  * Get forex exchange rate using Frankfurter API
  */
 export async function getForexPrice(
@@ -1199,12 +825,12 @@ export async function getForexPrice(
 
 /**
  * Universal price lookup with fallback chain:
- *   1. Yahoo Finance (intraday, all asset classes) via shared cache
- *   2. CoinGecko (crypto only, near-realtime)
- *   3. Frankfurter/ECB (forex only, end-of-day)
+ *   1. Twelve Data (intraday — forex, US stocks, crypto) via shared cache
+ *   2. Yahoo Finance (intraday — all asset classes, incl. indices/futures/bonds)
+ *   3. Frankfurter/ECB (forex only, end-of-day reference rate — last resort)
  *
- * Each fallback tags its `source` so Gemini knows the data freshness and
- * adjusts language accordingly ("intraday" vs "end-of-day reference rate").
+ * Each result carries a freshness label so the model adjusts language
+ * ("live intraday" vs "end-of-day reference rate").
  */
 export async function executeGetMarketPrice(
   symbol: string,
@@ -1213,7 +839,7 @@ export async function executeGetMarketPrice(
   const trimmed = symbol.trim();
   if (!trimmed) return "Symbol is required.";
 
-  // --- Primary: Yahoo via shared cache ---
+  // --- Primary: Twelve Data → Yahoo fallback (chosen inside getMarketPrice) ---
   if (supabase) {
     const snap = await getMarketPrice(supabase, trimmed);
     if (snap) {
@@ -1225,7 +851,7 @@ export async function executeGetMarketPrice(
       });
       return [
         `${snap.displayName} (${snap.symbol})`,
-        `Source: Yahoo Finance (intraday)`,
+        `Freshness: live intraday`,
         ``,
         `Price: ${priceStr} ${snap.currency}`,
         `Day change: ${arrow} ${snap.percentChange.toFixed(2)}%`,
@@ -1235,31 +861,9 @@ export async function executeGetMarketPrice(
     }
   }
 
-  log(`Yahoo miss for ${trimmed}, trying fallbacks`, "info");
+  log(`Primary price miss for ${trimmed}, trying forex EOD fallback`, "info");
 
-  // --- Fallback: CoinGecko for crypto symbols (BTC-USD → bitcoin) ---
-  if (trimmed.endsWith("-USD")) {
-    const coinMap: Record<string, string> = {
-      "BTC-USD": "bitcoin",
-      "ETH-USD": "ethereum",
-      "SOL-USD": "solana",
-      "XRP-USD": "ripple",
-      "ADA-USD": "cardano",
-      "DOGE-USD": "dogecoin",
-      "BNB-USD": "binancecoin",
-      "AVAX-USD": "avalanche-2",
-      "LINK-USD": "chainlink",
-      "LTC-USD": "litecoin",
-    };
-    const coinId = coinMap[trimmed] ??
-      trimmed.replace(/-USD$/, "").toLowerCase();
-    const result = await getCryptoPrice(coinId);
-    if (!result.startsWith("Crypto price error") && !result.startsWith("Failed")) {
-      return `${result}\nSource: CoinGecko (near-realtime, ~60s delay)`;
-    }
-  }
-
-  // --- Fallback: Frankfurter for forex symbols (EURUSD=X → EUR/USD) ---
+  // --- Last resort: Frankfurter/ECB for forex symbols (EURUSD=X → EUR/USD) ---
   if (trimmed.endsWith("=X") && trimmed.length >= 8) {
     const pair = trimmed.replace("=X", "");
     const base = pair.substring(0, 3);
@@ -1269,7 +873,7 @@ export async function executeGetMarketPrice(
       if (!result.startsWith("Forex rate error") && !result.startsWith("Failed")) {
         return (
           result +
-          "\n⚠️ Source: Frankfurter/ECB (end-of-day reference rate — NOT intraday). " +
+          "\n⚠️ Freshness: end-of-day reference rate (NOT intraday). " +
           "This is the last published daily rate, not a live quote. " +
           "Do NOT present this as a current or real-time price."
         );
@@ -1277,7 +881,462 @@ export async function executeGetMarketPrice(
     }
   }
 
-  return `Could not fetch price for "${trimmed}". Yahoo, CoinGecko, and Frankfurter all failed or the symbol is unrecognized.`;
+  return `Could not fetch price for "${trimmed}". All data sources failed or the symbol is unrecognized.`;
+}
+
+/**
+ * Historical OHLC executor — Yahoo-format symbol → Twelve Data /time_series.
+ * Returns compact lines, oldest→newest, capped per call.
+ *
+ * Two caps: the text path is bounded by MAX_CANDLES (each OHLC line ≈ 28
+ * tokens, so 200 ≈ 5.6k tokens). chart_only has no text dump, so the only
+ * constraint is a renderable/POST-able chart — MAX_CHART_CANDLES is much
+ * higher (a full day of 5-min bars ≈ 288, a week ≈ 2000).
+ */
+const MAX_CANDLES = 200;
+const MAX_CHART_CANDLES = 2000;
+
+const VALID_INTERVALS: readonly CandleInterval[] = [
+  "1min", "5min", "15min", "30min",
+  "1h", "2h", "4h", "1day", "1week", "1month",
+] as const;
+
+function isCandleInterval(v: string): v is CandleInterval {
+  return (VALID_INTERVALS as readonly string[]).includes(v);
+}
+
+const INTERVAL_MINUTES: Record<CandleInterval, number> = {
+  "1min": 1, "5min": 5, "15min": 15, "30min": 30,
+  "1h": 60, "2h": 120, "4h": 240,
+  "1day": 1440, "1week": 10080, "1month": 43200,
+};
+
+// When a window is too granular, point Orion at the next sensible step up.
+const SUGGEST_COARSER: Record<CandleInterval, CandleInterval> = {
+  "1min": "30min", "5min": "1h", "15min": "1h", "30min": "4h",
+  "1h": "4h", "2h": "1day", "4h": "1day",
+  "1day": "1week", "1week": "1month", "1month": "1month",
+};
+
+/**
+ * Conservative estimate of how many candles a [start, end] window spans at the
+ * given interval. Treats the market as 24/7 (overestimates for equities — that's
+ * the safe direction, we'd rather nudge than flood). Returns null if the dates
+ * don't parse or the window is empty/inverted.
+ */
+function estimateWindowBars(
+  interval: CandleInterval,
+  startDate: string,
+  endDate: string,
+): number | null {
+  const parse = (d: string) =>
+    Date.parse(d.includes(" ") ? d.replace(" ", "T") : d);
+  const start = parse(startDate);
+  const end = parse(endDate);
+  if (Number.isNaN(start) || Number.isNaN(end) || end <= start) return null;
+  return Math.ceil((end - start) / 60000 / INTERVAL_MINUTES[interval]);
+}
+
+// Minimum candles before we bother rendering a chart — fewer than 3 is just
+// numbers, no shape to read.
+const CHART_MIN_CANDLES = 3;
+
+/**
+ * Render an OHLC candlestick via QuickChart `/chart/create`, return the short
+ * URL. Failures (network, rate limit, plugin error) return null silently so
+ * the data text response still ships.
+ */
+async function buildHistoryChartUrl(
+  symbol: string,
+  interval: string,
+  candles: Candle[],
+): Promise<string | null> {
+  if (candles.length < CHART_MIN_CANDLES) return null;
+
+  // Symbol pretty-print for the title (Orion never sees this).
+  let label = symbol;
+  if (/^[A-Z]{6}=X$/.test(symbol)) {
+    label = `${symbol.slice(0, 3)}/${symbol.slice(3, 6)}`;
+  } else if (/^[A-Z0-9]+-(USD|USDT|EUR)$/.test(symbol)) {
+    label = symbol.replace("-", "/");
+  }
+
+  // Convert "YYYY-MM-DD" or "YYYY-MM-DD HH:mm:ss" (UTC) → unix ms.
+  const points: Array<
+    { x: number; o: number; h: number; l: number; c: number }
+  > = [];
+  for (const cdl of candles) {
+    const iso = cdl.datetime.includes(" ")
+      ? `${cdl.datetime.replace(" ", "T")}Z`
+      : `${cdl.datetime}T00:00:00Z`;
+    const x = Date.parse(iso);
+    if (Number.isNaN(x)) continue;
+    points.push({ x, o: cdl.open, h: cdl.high, l: cdl.low, c: cdl.close });
+  }
+  if (points.length < CHART_MIN_CANDLES) return null;
+
+  // TradingView-style palette: mint up, dark navy down, light grey canvas.
+  const spec = {
+    type: "candlestick",
+    data: {
+      datasets: [{
+        label: `${label} ${interval}`,
+        data: points,
+        color: { up: "#26A69A", down: "#2A2E39", unchanged: "#26A69A" },
+        borderColor: { up: "#26A69A", down: "#2A2E39", unchanged: "#26A69A" },
+      }],
+    },
+    options: {
+      plugins: {
+        legend: { display: false },
+        title: {
+          display: true,
+          text: `${label} ${interval}`,
+          color: "#2A2E39",
+        },
+      },
+      scales: {
+        x: {
+          type: "time",
+          grid: { color: "rgba(42,46,57,0.08)" },
+          ticks: { color: "#2A2E39" },
+        },
+        y: {
+          position: "right",
+          grid: { color: "rgba(42,46,57,0.08)" },
+          ticks: { color: "#2A2E39" },
+        },
+      },
+    },
+  };
+
+  const body = {
+    version: "4",
+    backgroundColor: "#D1D4DC",
+    width: 1100,
+    height: 500,
+    format: "png",
+    chart: spec,
+  };
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 6000);
+  try {
+    const res = await fetch("https://quickchart.io/chart/create", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      log(`QuickChart create HTTP ${res.status} for ${symbol}`, "warn");
+      return null;
+    }
+    const j = (await res.json()) as { success?: boolean; url?: string };
+    if (!j.success || !j.url) return null;
+    return j.url;
+  } catch (err) {
+    log(`QuickChart create exception for ${symbol}`, "warn", err);
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+export async function executeGetMarketHistory(args: {
+  symbol: string;
+  interval: string;
+  outputsize?: number;
+  start_date?: string;
+  end_date?: string;
+  chart_only?: boolean;
+  include_chart?: boolean;
+}): Promise<string> {
+  const symbol = (args.symbol || "").trim();
+  if (!symbol) return "Symbol is required.";
+
+  const interval = (args.interval || "").trim();
+  if (!isCandleInterval(interval)) {
+    return `Invalid interval "${interval}". Valid: ${VALID_INTERVALS.join(", ")}.`;
+  }
+
+  // Range: prefer explicit start/end; else outputsize; else 30.
+  const hasWindow = !!(args.start_date && args.end_date);
+
+  // chart_only renders an image with no OHLC text dump → the token budget
+  // doesn't apply, so allow far more bars (a full day of 5-min ≈ 288).
+  const candleCap = args.chart_only ? MAX_CHART_CANDLES : MAX_CANDLES;
+
+  // Reject windows that would blow past the cap BEFORE spending an API credit —
+  // nudge Orion to a coarser interval instead of silently truncating.
+  if (hasWindow) {
+    const est = estimateWindowBars(interval, args.start_date!, args.end_date!);
+    if (est !== null && est > candleCap) {
+      const coarser = SUGGEST_COARSER[interval];
+      return (
+        `That window at ${interval} is roughly ${est} candles — over the ` +
+        `${candleCap}-candle limit. Use a coarser interval (try ${coarser}) ` +
+        `or narrow the window.`
+      );
+    }
+  }
+
+  const wantSize = Math.min(args.outputsize ?? 30, candleCap);
+  const outputsize = hasWindow ? undefined : wantSize;
+
+  // Unix [period1, period2] window — needed for the Yahoo fallback. For
+  // outputsize mode we pad the lookback 3× to absorb weekends/holidays, then
+  // slice down after fetching.
+  const nowSec = Math.floor(Date.now() / 1000);
+  const parseSec = (d: string): number => {
+    const ms = Date.parse(d.includes(" ") ? d.replace(" ", "T") : d);
+    return Number.isNaN(ms) ? NaN : Math.floor(ms / 1000);
+  };
+  const period2 = hasWindow ? parseSec(args.end_date!) : nowSec;
+  const period1 = hasWindow
+    ? parseSec(args.start_date!)
+    : nowSec - wantSize * 3 * INTERVAL_MINUTES[interval] * 60;
+
+  // Primary: Twelve Data (forex / US stocks / crypto). Newest→oldest order.
+  let candles: Candle[] | null = await fetchTimeSeries(symbol, {
+    interval,
+    outputsize,
+    startDate: args.start_date,
+    endDate: args.end_date,
+  });
+  let chronological = false; // Twelve Data is newest→oldest
+
+  // Fallback: Yahoo (DXY, indices, futures, bonds — everything Twelve can't do).
+  // Yahoo returns oldest→newest.
+  if (candles === null && !Number.isNaN(period1) && !Number.isNaN(period2)) {
+    candles = await fetchYahooTimeSeries(symbol, { interval, period1, period2 });
+    chronological = true;
+  }
+
+  if (candles === null) {
+    if (interval === "2h" || interval === "4h") {
+      return (
+        `Could not fetch ${interval} history for "${symbol}". The ${interval} ` +
+        `granularity isn't available for this instrument — use 1h or 1day.`
+      );
+    }
+    return (
+      `Could not fetch history for "${symbol}". The symbol may be unrecognized ` +
+      `or the data source is unavailable. Try action="quote" for the current value.`
+    );
+  }
+  if (candles.length === 0) {
+    const win =
+      hasWindow ? `${args.start_date} → ${args.end_date}` : "requested window";
+    return (
+      `No data for ${symbol} at ${interval} over ${win}. ` +
+      `Likely the market was closed (weekend, holiday, pre-market) or the ` +
+      `window is older than the intraday history limit. Try the nearest open ` +
+      `trading day, or a coarser interval (1day goes back decades).`
+    );
+  }
+
+  // Normalize to oldest→newest, then cap. For outputsize mode keep the last
+  // `wantSize`; for window mode keep the last `candleCap`.
+  const asc = chronological ? [...candles] : [...candles].reverse();
+  const keep = hasWindow ? candleCap : wantSize;
+  const ordered = asc.slice(-keep);
+  const truncatedNote =
+    asc.length > ordered.length
+      ? `\n(showing last ${ordered.length} of ${asc.length} candles)`
+      : "";
+
+  // Render a chart only when asked: chart_only mode always wants one;
+  // include_chart=true is the opt-in for the data+chart case. Skip the
+  // QuickChart round-trip otherwise. (< CHART_MIN_CANDLES never renders.)
+  const wantChart = args.chart_only || args.include_chart;
+  const chartUrl = wantChart
+    ? await buildHistoryChartUrl(symbol, interval, ordered)
+    : null;
+
+  // chart_only mode: skip the OHLC text dump entirely, return just the chart
+  // URL. Saves ~1.5k tokens of context when the user only wants the picture.
+  if (args.chart_only) {
+    if (!chartUrl) {
+      if (ordered.length < CHART_MIN_CANDLES) {
+        return (
+          `Only ${ordered.length} candle(s) in the window — too few to render ` +
+          `a chart. Widen the window or set chart_only=false to see the data.`
+        );
+      }
+      return (
+        `Chart render failed for ${symbol} ${interval}. ` +
+        `Retry, or set chart_only=false to get the OHLC data instead.`
+      );
+    }
+    return `${symbol} ${interval} — ${ordered.length} candles\nChart: ${chartUrl}`;
+  }
+
+  const header = `${symbol} ${interval} — ${ordered.length} candles:`;
+  const lines = ordered.map((c) => `  ${formatCandleLine(c)}`).join("\n");
+  const chartLine = chartUrl ? `\nChart: ${chartUrl}` : "";
+  return `${header}\n${lines}${truncatedNote}${chartLine}`;
+}
+
+// ============================================================================
+// get_market_data action="indicator" — RSI / MACD / ATR / BBANDS / EMA / SMA / VWAP
+// ============================================================================
+
+const VALID_INDICATORS: ReadonlySet<IndicatorName> = new Set([
+  "RSI",
+  "MACD",
+  "ATR",
+  "BBANDS",
+  "EMA",
+  "SMA",
+  "VWAP",
+]);
+
+const INDICATOR_DEFAULT_PERIOD: Record<IndicatorName, number> = {
+  RSI: 14,
+  ATR: 14,
+  BBANDS: 20,
+  EMA: 20,  // 20-period default — user names 50/200 when they want trend filter
+  SMA: 20,  // same as EMA — period is the meaningful axis (20/50/200)
+  VWAP: 9,  // TD /vwap default — moving VWAP over the last 9 bars
+  MACD: 0,  // unused — MACD uses fast/slow/signal internally
+};
+
+function formatIndicatorLine(
+  indicator: IndicatorName,
+  datetime: string,
+  values: Record<string, number>,
+): string {
+  // Format precision: indicators on percent/oscillator scale (RSI/MACD hist)
+  // get 2dp; price-scale (ATR, BBands) gets 4dp.
+  const dp2 = (n: number) => (Number.isFinite(n) ? n.toFixed(2) : "n/a");
+  const dp4 = (n: number) => (Number.isFinite(n) ? n.toFixed(4) : "n/a");
+  switch (indicator) {
+    case "RSI":
+      return `${datetime}: RSI ${dp2(values.value)}`;
+    case "ATR":
+      return `${datetime}: ATR ${dp4(values.value)}`;
+    case "EMA":
+      return `${datetime}: EMA ${dp4(values.value)}`;
+    case "SMA":
+      return `${datetime}: SMA ${dp4(values.value)}`;
+    case "VWAP":
+      return `${datetime}: VWAP ${dp4(values.value)}`;
+    case "MACD":
+      return (
+        `${datetime}: MACD ${dp4(values.macd)} ` +
+        `signal ${dp4(values.signal)} hist ${dp4(values.hist)}`
+      );
+    case "BBANDS":
+      return (
+        `${datetime}: BB upper ${dp4(values.upper)} ` +
+        `mid ${dp4(values.middle)} lower ${dp4(values.lower)}`
+      );
+  }
+}
+
+export async function executeGetIndicator(args: {
+  symbol: string;
+  indicator: string;
+  interval: string;
+  period?: number;
+  outputsize?: number;
+}): Promise<string> {
+  const symbol = (args.symbol || "").trim();
+  if (!symbol) return "Symbol is required.";
+
+  const indicator = (args.indicator || "").trim().toUpperCase() as IndicatorName;
+  if (!VALID_INDICATORS.has(indicator)) {
+    return (
+      `Invalid indicator "${args.indicator}". ` +
+      `Valid: ${Array.from(VALID_INDICATORS).join(", ")}.`
+    );
+  }
+
+  const interval = (args.interval || "").trim();
+  if (!isCandleInterval(interval)) {
+    return `Invalid interval "${interval}". Valid: ${VALID_INTERVALS.join(", ")}.`;
+  }
+
+  // Default to 1 point — just the latest reading is usually what's asked.
+  // Cap at 20 to keep token cost bounded (a 20-point RSI series is plenty
+  // for "show me the trend").
+  const outputsize = Math.max(
+    1,
+    Math.min(20, Number.isFinite(args.outputsize) ? Number(args.outputsize) : 1),
+  );
+
+  const period = Number.isFinite(args.period)
+    ? Number(args.period)
+    : INDICATOR_DEFAULT_PERIOD[indicator];
+
+  const points = await fetchIndicator(symbol, indicator, {
+    interval: interval as CandleInterval,
+    period: period > 0 ? period : undefined,
+    outputsize,
+  });
+
+  if (points === null) {
+    return (
+      `Could not fetch ${indicator} for "${symbol}". ` +
+      `Coverage on free tier is forex / US stocks / crypto only — indices ` +
+      `(^GSPC…), futures (GC=F…), bonds (^TNX…), and DXY (DX-Y.NYB) aren't ` +
+      `supported here. For those, fetch action="history" candles instead and ` +
+      `reason about levels manually.`
+    );
+  }
+  if (points.length === 0) {
+    return (
+      `No ${indicator} data for "${symbol}" at ${interval}. ` +
+      `Likely the market was closed or the interval has no recent bars.`
+    );
+  }
+
+  // Oldest → newest in the rendered output (matches history convention).
+  const asc = [...points].reverse();
+  const periodLabel =
+    indicator === "MACD" ? "fast=12 slow=26 signal=9" : `period ${period}`;
+  const header =
+    `${symbol} ${indicator} (${periodLabel}, ${interval}) — ` +
+    `${asc.length} point${asc.length === 1 ? "" : "s"}:`;
+  const lines = asc
+    .map((p) => `  ${formatIndicatorLine(indicator, p.datetime, p.values)}`)
+    .join("\n");
+  return `${header}\n${lines}`;
+}
+
+// ============================================================================
+// get_market_data action="search" — symbol fuzzy resolution
+// ============================================================================
+
+export async function executeSymbolSearch(args: {
+  query: string;
+}): Promise<string> {
+  const q = (args.query || "").trim();
+  if (!q) return "Query is required for action=\"search\".";
+
+  const matches = await fetchSymbolSearch(q, 10);
+  if (matches === null) {
+    return (
+      `Symbol search failed for "${q}". The data source may be unavailable — ` +
+      `retry shortly, or pass the catalog symbol directly if you know it.`
+    );
+  }
+  if (matches.length === 0) {
+    return `No symbols matched "${q}". Try a different spelling or use the catalog form (e.g. "AAPL", "EURUSD=X").`;
+  }
+
+  // Cap formatted output at 8 even though we requested 10 — keeps reply
+  // compact; Orion almost always wants the top 1-3.
+  const top = matches.slice(0, 8);
+  const lines = top
+    .map((m) => {
+      const tail = [m.exchange, m.country, m.type].filter(Boolean).join(", ");
+      const name = m.instrumentName ? ` — ${m.instrumentName}` : "";
+      return `  ${m.symbol}${name}${tail ? ` (${tail})` : ""}`;
+    })
+    .join("\n");
+  return `Matches for "${q}" (top ${top.length}):\n${lines}`;
 }
 
 /**
@@ -1987,7 +2046,7 @@ export async function getRecentOrionBriefings(
           return (
             `Unknown instrument "${instrument}". Pass either a currency code ` +
             `(${validCurrencies}) for broad matching, a natural name ` +
-            `("DXY", "gold", "EUR/USD", "Bitcoin"), or a Yahoo symbol ` +
+            `("DXY", "gold", "EUR/USD", "Bitcoin"), or a catalog symbol ` +
             `("DX-Y.NYB", "GC=F", "EURUSD=X"). Examples: ${sample}.`
           );
         }
@@ -2457,111 +2516,180 @@ ${taskInstruction}`;
 // REMINDERS TOOLS
 // ============================================================
 
-export const setReminderTool: GeminiFunctionDeclaration = {
-  name: "set_reminder",
-  description:
-    "Schedule a future Orion turn that will fire at a specific time in this same conversation. " +
-    "Use when the user asks 'remind me when X happens' or 'check on Y at time Z'. " +
-    "At fire time, Orion runs a fresh turn with the stored instructions, full conversation history, " +
-    "and tool access — exactly as if the user had asked the question themselves at that moment. " +
-    "The response posts as an assistant message into this conversation, marked with a small 'Reminder' label. " +
-    "ALWAYS resolve the trigger time first — for an economic release, query the economic_events table " +
-    "via execute_sql (SELECT event_date, time_utc FROM economic_events WHERE event_name ILIKE '%X%' AND event_date >= CURRENT_DATE ORDER BY event_date LIMIT 1). " +
-    "For 'in N hours/days', compute trigger_at relative to current time. Confirm the resolved trigger time back to the user. " +
-    "Returns JSON: {success: true, id, trigger_at, description} on success, or {success: false, error_code, error} on failure. " +
-    "Possible error_codes: past_trigger_at (trigger is now or earlier), too_far_future (>1 year out), " +
-    "reminder_limit_reached (user has 50 pending — ask them to cancel one first), invalid_args, db_error. " +
-    "Use list_reminders to see existing ones, cancel_reminder to remove one.",
-  parameters: {
-    type: "object",
-    properties: {
-      trigger_at: {
-        type: "string",
-        description:
-          "ISO 8601 UTC timestamp when the reminder should fire. Must be in the future and within 1 year.",
-      },
-      instructions: {
-        type: "string",
-        description:
-          "What Orion should do at fire time, written as a prompt — e.g. 'Look up the latest jobless claims " +
-          "release and summarize the result vs forecast'. 1-1000 chars.",
-      },
-      description: {
-        type: "string",
-        description:
-          "Short user-facing label shown in the reminders panel — e.g. 'Jobless claims report'. <=200 chars.",
-      },
-    },
-    required: ["trigger_at", "instructions", "description"],
-  },
-};
+type SetReminderItemErrorCode =
+  | "past_trigger_at"
+  | "too_far_future"
+  | "reminder_limit_reached"
+  | "invalid_args"
+  | "db_error";
 
-interface SetReminderResult {
-  success: boolean;
-  id?: string;
+type SetReminderBatchErrorCode =
+  | "no_user_context"
+  | "no_conversation_context"
+  | "invalid_args"
+  | "batch_too_large"
+  | "db_error";
+
+interface SetReminderItemSuccess {
+  index: number;
+  id: string;
+  trigger_at: string;
+  description?: string;
+}
+
+interface SetReminderItemFailure {
+  index: number;
   trigger_at?: string;
   description?: string;
+  error_code: SetReminderItemErrorCode;
+  error: string;
+}
+
+interface SetReminderBatchResult {
+  success: boolean;
+  /** Present and shared across all rows when >1 row inserted, else null/omitted. */
+  batch_id?: string | null;
+  created: SetReminderItemSuccess[];
+  failed: SetReminderItemFailure[];
+  error_code?: SetReminderBatchErrorCode;
   error?: string;
-  error_code?:
-    | "past_trigger_at"
-    | "too_far_future"
-    | "reminder_limit_reached"
-    | "invalid_args"
-    | "no_user_context"
-    | "no_conversation_context"
-    | "db_error";
+}
+
+const REMINDER_PENDING_CAP = 50;
+const REMINDER_BATCH_CAP = 12;
+const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
+
+interface RawReminderInput {
+  trigger_at?: unknown;
+  instructions?: unknown;
+  description?: unknown;
+}
+
+interface ValidatedReminder {
+  index: number;
+  trigger_iso: string;
+  instructions: string;
+  description: string;
+}
+
+function validateReminderItem(
+  raw: RawReminderInput,
+  index: number,
+  now: number,
+): ValidatedReminder | SetReminderItemFailure {
+  const triggerAt = typeof raw.trigger_at === "string" ? raw.trigger_at : "";
+  const instructions = typeof raw.instructions === "string" ? raw.instructions : "";
+  const description = typeof raw.description === "string" ? raw.description : "";
+
+  const trigger = new Date(triggerAt);
+  if (!triggerAt || Number.isNaN(trigger.getTime())) {
+    return {
+      index,
+      trigger_at: triggerAt || undefined,
+      error_code: "invalid_args",
+      error: "trigger_at not parseable",
+    };
+  }
+  if (trigger.getTime() <= now) {
+    return {
+      index,
+      trigger_at: triggerAt,
+      error_code: "past_trigger_at",
+      error: "trigger_at must be in the future",
+    };
+  }
+  if (trigger.getTime() > now + ONE_YEAR_MS) {
+    return {
+      index,
+      trigger_at: triggerAt,
+      error_code: "too_far_future",
+      error: "trigger_at must be within 1 year",
+    };
+  }
+  if (instructions.length < 1 || instructions.length > 1000) {
+    return {
+      index,
+      trigger_at: triggerAt,
+      error_code: "invalid_args",
+      error: "instructions must be 1-1000 chars",
+    };
+  }
+  if (description.length > 200) {
+    return {
+      index,
+      trigger_at: triggerAt,
+      error_code: "invalid_args",
+      error: "description must be <=200 chars",
+    };
+  }
+  return {
+    index,
+    trigger_iso: trigger.toISOString(),
+    instructions,
+    description,
+  };
 }
 
 async function executeSetReminder(
-  triggerAt: string,
-  instructions: string,
-  description: string,
+  reminders: unknown,
   context: ToolContext,
   supabase: SupabaseClient | undefined,
 ): Promise<string> {
-  const result: SetReminderResult = await (async () => {
+  const result: SetReminderBatchResult = await (async () => {
     if (!supabase) {
-      return { success: false, error_code: "db_error" as const, error: "no supabase client" };
+      return { success: false, created: [], failed: [], error_code: "db_error" as const, error: "no supabase client" };
     }
     const userId = context.userId ?? "";
     if (!userId) {
-      return { success: false, error_code: "no_user_context" as const, error: "no user id" };
+      return { success: false, created: [], failed: [], error_code: "no_user_context" as const, error: "no user id" };
     }
     const conversationId = context.conversationId ?? "";
     if (!conversationId) {
-      return { success: false, error_code: "no_conversation_context" as const, error: "no conversation id" };
+      return { success: false, created: [], failed: [], error_code: "no_conversation_context" as const, error: "no conversation id" };
     }
 
-    const trigger = new Date(triggerAt);
-    if (Number.isNaN(trigger.getTime())) {
-      return { success: false, error_code: "invalid_args" as const, error: "trigger_at not parseable" };
+    if (!Array.isArray(reminders)) {
+      return {
+        success: false,
+        created: [],
+        failed: [],
+        error_code: "invalid_args" as const,
+        error: "reminders must be an array of {trigger_at, instructions, description?}",
+      };
     }
+    if (reminders.length === 0) {
+      return {
+        success: false,
+        created: [],
+        failed: [],
+        error_code: "invalid_args" as const,
+        error: "reminders array is empty",
+      };
+    }
+    if (reminders.length > REMINDER_BATCH_CAP) {
+      return {
+        success: false,
+        created: [],
+        failed: [],
+        error_code: "batch_too_large" as const,
+        error: `max ${REMINDER_BATCH_CAP} reminders per call (got ${reminders.length})`,
+      };
+    }
+
+    // Per-item validation. Failed items don't abort the batch.
     const now = Date.now();
-    if (trigger.getTime() <= now) {
-      return { success: false, error_code: "past_trigger_at" as const, error: "trigger_at must be in the future" };
+    const valid: ValidatedReminder[] = [];
+    const failed: SetReminderItemFailure[] = [];
+    for (let i = 0; i < reminders.length; i++) {
+      const checked = validateReminderItem(reminders[i] as RawReminderInput, i, now);
+      if ("error_code" in checked) {
+        failed.push(checked);
+      } else {
+        valid.push(checked);
+      }
     }
-    if (trigger.getTime() > now + 365 * 24 * 60 * 60 * 1000) {
-      return { success: false, error_code: "too_far_future" as const, error: "trigger_at must be within 1 year" };
-    }
-
-    if (instructions.length < 1 || instructions.length > 1000) {
-      return { success: false, error_code: "invalid_args" as const, error: "instructions must be 1-1000 chars" };
-    }
-    if (description.length > 200) {
-      return { success: false, error_code: "invalid_args" as const, error: "description must be <=200 chars" };
-    }
-
-    // Per-user pending cap (50). Cheap query — partial index covers it.
-    const { count, error: countErr } = await supabase
-      .from("reminders")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", userId)
-      .eq("status", "pending");
-    if (countErr) {
-      return { success: false, error_code: "db_error" as const, error: countErr.message };
-    }
-    if ((count ?? 0) >= 50) {
-      return { success: false, error_code: "reminder_limit_reached" as const, error: "max 50 pending reminders" };
+    if (valid.length === 0) {
+      return { success: false, created: [], failed };
     }
 
     // Verify the conversation actually belongs to this user. The conversation
@@ -2569,61 +2697,104 @@ async function executeSetReminder(
     // could plant a reminder targeting another user's conversation, and it
     // would be visible in the victim's realtime sub. ai-trading-agent's
     // reminder mode also rejects on owner mismatch at fire time, but blocking
-    // at write time keeps phantom rows out of the DB entirely.
+    // at write time keeps phantom rows out of the DB entirely. One check per
+    // batch — owner doesn't change mid-call.
     const { data: convoOwner, error: ownerErr } = await supabase
       .from("ai_conversations")
       .select("user_id")
       .eq("id", conversationId)
       .maybeSingle();
     if (ownerErr) {
-      return { success: false, error_code: "db_error" as const, error: ownerErr.message };
+      return { success: false, created: [], failed, error_code: "db_error" as const, error: ownerErr.message };
     }
     if (!convoOwner || convoOwner.user_id !== userId) {
       return {
         success: false,
+        created: [],
+        failed,
         error_code: "no_conversation_context" as const,
         error: "conversation not found or not owned by user",
       };
     }
 
+    // Per-user pending cap (50). Compute remaining slots and trim batch.
+    const { count, error: countErr } = await supabase
+      .from("reminders")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("status", "pending");
+    if (countErr) {
+      return { success: false, created: [], failed, error_code: "db_error" as const, error: countErr.message };
+    }
+    const pending = count ?? 0;
+    const remainingSlots = Math.max(0, REMINDER_PENDING_CAP - pending);
+    if (remainingSlots === 0) {
+      for (const v of valid) {
+        failed.push({
+          index: v.index,
+          trigger_at: v.trigger_iso,
+          description: v.description || undefined,
+          error_code: "reminder_limit_reached",
+          error: `max ${REMINDER_PENDING_CAP} pending reminders`,
+        });
+      }
+      return { success: false, created: [], failed };
+    }
+    const toInsert = valid.slice(0, remainingSlots);
+    for (const v of valid.slice(remainingSlots)) {
+      failed.push({
+        index: v.index,
+        trigger_at: v.trigger_iso,
+        description: v.description || undefined,
+        error_code: "reminder_limit_reached",
+        error: `max ${REMINDER_PENDING_CAP} pending reminders`,
+      });
+    }
+
+    // Server-assigned batch_id when this call inserts >1 row. Solo inserts
+    // stay batch_id=NULL so fire-time sibling logic knows to skip the group
+    // hint. Generated here (not by the model) — no hallucination risk.
+    const batchId = toInsert.length > 1 ? crypto.randomUUID() : null;
+
+    // Bulk insert. Postgres preserves row order for VALUES lists, so the
+    // returned rows match toInsert positionally.
+    const rows = toInsert.map((v) => ({
+      user_id: userId,
+      conversation_id: conversationId,
+      trigger_at: v.trigger_iso,
+      instructions: v.instructions,
+      description: v.description,
+      batch_id: batchId,
+    }));
     const { data, error } = await supabase
       .from("reminders")
-      .insert({
-        user_id: userId,
-        conversation_id: conversationId,
-        trigger_at: trigger.toISOString(),
-        instructions,
-        description,
-      })
-      .select("id, trigger_at, description")
-      .single();
+      .insert(rows)
+      .select("id, trigger_at, description");
 
     if (error) {
-      return { success: false, error_code: "db_error" as const, error: error.message };
+      for (const v of toInsert) {
+        failed.push({
+          index: v.index,
+          trigger_at: v.trigger_iso,
+          description: v.description || undefined,
+          error_code: "db_error",
+          error: error.message,
+        });
+      }
+      return { success: false, created: [], failed, error_code: "db_error" as const, error: error.message };
     }
-    return {
-      success: true,
-      id: data.id,
-      trigger_at: data.trigger_at,
-      description: data.description,
-    };
+
+    const created: SetReminderItemSuccess[] = (data ?? []).map((row, i) => ({
+      index: toInsert[i].index,
+      id: row.id,
+      trigger_at: row.trigger_at,
+      description: row.description ?? undefined,
+    }));
+    return { success: created.length > 0, batch_id: batchId, created, failed };
   })();
 
   return JSON.stringify(result);
 }
-
-export const listRemindersTool: GeminiFunctionDeclaration = {
-  name: "list_reminders",
-  description:
-    "List all of the user's pending reminders across all their conversations. " +
-    "Use when the user asks 'what reminders do I have?' or before cancelling so you can disambiguate. " +
-    "Returns JSON: {success: true, reminders: [{id, description, trigger_at, instructions, conversation_id, conversation_title}, ...]}. " +
-    "An empty array means the user has no pending reminders — say so directly; do NOT call other tools to double-check.",
-  parameters: {
-    type: "object",
-    properties: {},
-  },
-};
 
 interface ListRemindersRow {
   id: string;
@@ -2632,6 +2803,7 @@ interface ListRemindersRow {
   instructions: string;
   conversation_id: string;
   conversation_title: string;
+  batch_id: string | null;
 }
 
 async function executeListReminders(
@@ -2654,6 +2826,7 @@ async function executeListReminders(
       trigger_at,
       instructions,
       conversation_id,
+      batch_id,
       ai_conversations!inner(title)
     `)
     .eq("user_id", userId)
@@ -2675,32 +2848,16 @@ async function executeListReminders(
       instructions: r.instructions,
       conversation_id: r.conversation_id,
       conversation_title: title ?? "(untitled)",
+      batch_id: r.batch_id ?? null,
     };
   });
 
   return JSON.stringify({ success: true, reminders: rows });
 }
 
-export const cancelReminderTool: GeminiFunctionDeclaration = {
-  name: "cancel_reminder",
-  description:
-    "Cancel a pending reminder by id. Call list_reminders first if you need to disambiguate. " +
-    "Returns JSON: {success: true, id} on success, or {success: false, error_code, error} on failure. " +
-    "Possible error_codes: not_found (no reminder with that id for this user), not_pending (already fired/cancelled), invalid_args.",
-  parameters: {
-    type: "object",
-    properties: {
-      id: {
-        type: "string",
-        description: "The reminder id to cancel (UUID).",
-      },
-    },
-    required: ["id"],
-  },
-};
-
 async function executeCancelReminder(
   id: string,
+  batchId: string,
   context: ToolContext,
   supabase: SupabaseClient | undefined,
 ): Promise<string> {
@@ -2711,17 +2868,50 @@ async function executeCancelReminder(
   if (!userId) {
     return JSON.stringify({ success: false, error: "no user id" });
   }
-  if (!id || typeof id !== "string") {
+  const hasId = typeof id === "string" && id.length > 0;
+  const hasBatchId = typeof batchId === "string" && batchId.length > 0;
+  if (hasId === hasBatchId) {
     return JSON.stringify({
       success: false,
       error_code: "invalid_args",
-      error: "id required",
+      error: hasId
+        ? "pass exactly one of {id, batch_id}, not both"
+        : "id or batch_id required",
     });
   }
 
-  // Conditional update: only flips pending -> cancelled.
-  // Match user_id for defense-in-depth even though the service-role client
-  // bypasses RLS — keeps cross-user cancels impossible regardless of caller.
+  // Conditional update: only flips pending -> cancelled. user_id match is
+  // defense-in-depth (service-role bypasses RLS).
+  if (hasBatchId) {
+    // Batch cancel: every pending row in the batch. Returns the cancelled
+    // ids so the LLM can confirm the count to the user.
+    const { data, error } = await supabase
+      .from("reminders")
+      .update({ status: "cancelled" })
+      .eq("batch_id", batchId)
+      .eq("user_id", userId)
+      .eq("status", "pending")
+      .select("id");
+    if (error) {
+      return JSON.stringify({ success: false, error: error.message });
+    }
+    const cancelledIds = (data ?? []).map((r: { id: string }) => r.id);
+    if (cancelledIds.length === 0) {
+      return JSON.stringify({
+        success: false,
+        error_code: "not_found",
+        error: "no pending reminders matched batch_id",
+      });
+    }
+    return JSON.stringify({
+      success: true,
+      batch_id: batchId,
+      cancelled_ids: cancelledIds,
+      cancelled_count: cancelledIds.length,
+    });
+  }
+
+  // Single-id cancel (original path).
   const { data, error } = await supabase
     .from("reminders")
     .update({ status: "cancelled" })
@@ -2758,6 +2948,276 @@ async function executeCancelReminder(
   return JSON.stringify({ success: true, id });
 }
 
+interface EditReminderRow {
+  id: string;
+  trigger_at: string;
+  instructions: string;
+  description: string | null;
+}
+
+interface EditReminderResult {
+  success: boolean;
+  updated: EditReminderRow[];
+  error_code?:
+    | "invalid_args"
+    | "not_found"
+    | "not_pending"
+    | "no_user_context"
+    | "past_trigger_at"
+    | "too_far_future"
+    | "db_error";
+  error?: string;
+}
+
+/**
+ * Edit pending reminders. Two modes (mutually exclusive):
+ *   - single: \`id\` + any of {trigger_at, instructions, description}
+ *   - batch:  \`batch_id\` + any of {shift_minutes, instructions}
+ *
+ * Pending-only — firing/fired/cancelled rows are untouchable. Whitelist of
+ * editable fields prevents the model from rewriting ownership/status/batch_id.
+ */
+async function executeEditReminder(
+  args: Record<string, unknown>,
+  context: ToolContext,
+  supabase: SupabaseClient | undefined,
+): Promise<string> {
+  const result: EditReminderResult = await (async () => {
+    if (!supabase) {
+      return { success: false, updated: [], error_code: "db_error" as const, error: "no supabase client" };
+    }
+    const userId = context.userId ?? "";
+    if (!userId) {
+      return { success: false, updated: [], error_code: "no_user_context" as const, error: "no user id" };
+    }
+
+    const id = typeof args.id === "string" ? args.id : "";
+    const batchId = typeof args.batch_id === "string" ? args.batch_id : "";
+    const hasId = id.length > 0;
+    const hasBatchId = batchId.length > 0;
+    if (hasId === hasBatchId) {
+      return {
+        success: false,
+        updated: [],
+        error_code: "invalid_args" as const,
+        error: hasId ? "pass exactly one of {id, batch_id}, not both" : "id or batch_id required",
+      };
+    }
+
+    const triggerAt = typeof args.trigger_at === "string" ? args.trigger_at : undefined;
+    const instructions = typeof args.instructions === "string" ? args.instructions : undefined;
+    const description = typeof args.description === "string" ? args.description : undefined;
+    const shiftMinutes = typeof args.shift_minutes === "number" ? args.shift_minutes : undefined;
+
+    // Mode-specific field validation: single can use trigger_at, batch can use shift_minutes.
+    if (hasId && shiftMinutes !== undefined) {
+      return {
+        success: false,
+        updated: [],
+        error_code: "invalid_args" as const,
+        error: "shift_minutes is for batch_id mode only; use trigger_at for single edits",
+      };
+    }
+    if (hasBatchId && triggerAt !== undefined) {
+      return {
+        success: false,
+        updated: [],
+        error_code: "invalid_args" as const,
+        error: "trigger_at is for single (id) mode only; use shift_minutes for batch edits",
+      };
+    }
+    if (hasBatchId && description !== undefined) {
+      return {
+        success: false,
+        updated: [],
+        error_code: "invalid_args" as const,
+        error: "description is per-row; not editable in batch mode",
+      };
+    }
+
+    const anyField =
+      triggerAt !== undefined ||
+      instructions !== undefined ||
+      description !== undefined ||
+      shiftMinutes !== undefined;
+    if (!anyField) {
+      return {
+        success: false,
+        updated: [],
+        error_code: "invalid_args" as const,
+        error: "at least one editable field required",
+      };
+    }
+
+    // Field-level validation (shared).
+    const now = Date.now();
+    if (instructions !== undefined && (instructions.length < 1 || instructions.length > 1000)) {
+      return {
+        success: false,
+        updated: [],
+        error_code: "invalid_args" as const,
+        error: "instructions must be 1-1000 chars",
+      };
+    }
+    if (description !== undefined && description.length > 200) {
+      return {
+        success: false,
+        updated: [],
+        error_code: "invalid_args" as const,
+        error: "description must be <=200 chars",
+      };
+    }
+    if (triggerAt !== undefined) {
+      const t = new Date(triggerAt);
+      if (Number.isNaN(t.getTime())) {
+        return { success: false, updated: [], error_code: "invalid_args" as const, error: "trigger_at not parseable" };
+      }
+      if (t.getTime() <= now) {
+        return { success: false, updated: [], error_code: "past_trigger_at" as const, error: "trigger_at must be in the future" };
+      }
+      if (t.getTime() > now + ONE_YEAR_MS) {
+        return { success: false, updated: [], error_code: "too_far_future" as const, error: "trigger_at must be within 1 year" };
+      }
+    }
+    if (shiftMinutes !== undefined) {
+      if (!Number.isFinite(shiftMinutes) || Math.abs(shiftMinutes) > 60 * 24 * 365) {
+        return {
+          success: false,
+          updated: [],
+          error_code: "invalid_args" as const,
+          error: "shift_minutes must be finite and |shift| <= 1 year",
+        };
+      }
+    }
+
+    // ===== Single-row edit (id) =====
+    if (hasId) {
+      const patch: Record<string, unknown> = {};
+      if (triggerAt !== undefined) patch.trigger_at = new Date(triggerAt).toISOString();
+      if (instructions !== undefined) patch.instructions = instructions;
+      if (description !== undefined) patch.description = description;
+
+      const { data, error } = await supabase
+        .from("reminders")
+        .update(patch)
+        .eq("id", id)
+        .eq("user_id", userId)
+        .eq("status", "pending")
+        .select("id, trigger_at, instructions, description")
+        .maybeSingle();
+      if (error) {
+        return { success: false, updated: [], error_code: "db_error" as const, error: error.message };
+      }
+      if (!data) {
+        const { data: existing } = await supabase
+          .from("reminders")
+          .select("id, status")
+          .eq("id", id)
+          .eq("user_id", userId)
+          .maybeSingle();
+        if (!existing) {
+          return { success: false, updated: [], error_code: "not_found" as const, error: "reminder not found" };
+        }
+        return {
+          success: false,
+          updated: [],
+          error_code: "not_pending" as const,
+          error: `reminder is ${existing.status}, not pending`,
+        };
+      }
+      return { success: true, updated: [data as EditReminderRow] };
+    }
+
+    // ===== Batch edit (batch_id) =====
+    // Instructions-only change: single UPDATE on batch_id.
+    if (shiftMinutes === undefined && instructions !== undefined) {
+      const { data, error } = await supabase
+        .from("reminders")
+        .update({ instructions })
+        .eq("batch_id", batchId)
+        .eq("user_id", userId)
+        .eq("status", "pending")
+        .select("id, trigger_at, instructions, description");
+      if (error) {
+        return { success: false, updated: [], error_code: "db_error" as const, error: error.message };
+      }
+      if (!data || data.length === 0) {
+        return { success: false, updated: [], error_code: "not_found" as const, error: "no pending reminders matched batch_id" };
+      }
+      return { success: true, updated: data as EditReminderRow[] };
+    }
+
+    // Shift mode (with optional instructions update). Fetch pending siblings,
+    // compute per-row new trigger_at, validate, then parallel UPDATEs. Bounded
+    // by REMINDER_BATCH_CAP (12) so fan-out is small.
+    const { data: pending, error: fetchErr } = await supabase
+      .from("reminders")
+      .select("id, trigger_at")
+      .eq("batch_id", batchId)
+      .eq("user_id", userId)
+      .eq("status", "pending");
+    if (fetchErr) {
+      return { success: false, updated: [], error_code: "db_error" as const, error: fetchErr.message };
+    }
+    if (!pending || pending.length === 0) {
+      return { success: false, updated: [], error_code: "not_found" as const, error: "no pending reminders matched batch_id" };
+    }
+
+    const shiftMs = (shiftMinutes ?? 0) * 60 * 1000;
+    type ShiftPlan = { id: string; new_trigger_iso: string };
+    const planned: ShiftPlan[] = [];
+    for (const row of pending) {
+      const newMs = new Date(row.trigger_at as string).getTime() + shiftMs;
+      if (newMs <= now) {
+        return {
+          success: false,
+          updated: [],
+          error_code: "past_trigger_at" as const,
+          error: `shift would put reminder ${row.id} in the past`,
+        };
+      }
+      if (newMs > now + ONE_YEAR_MS) {
+        return {
+          success: false,
+          updated: [],
+          error_code: "too_far_future" as const,
+          error: `shift would put reminder ${row.id} beyond 1 year`,
+        };
+      }
+      planned.push({ id: row.id as string, new_trigger_iso: new Date(newMs).toISOString() });
+    }
+
+    const updates = await Promise.all(
+      planned.map((p) => {
+        const patch: Record<string, unknown> = { trigger_at: p.new_trigger_iso };
+        if (instructions !== undefined) patch.instructions = instructions;
+        return supabase
+          .from("reminders")
+          .update(patch)
+          .eq("id", p.id)
+          .eq("user_id", userId)
+          .eq("status", "pending")
+          .select("id, trigger_at, instructions, description")
+          .maybeSingle();
+      }),
+    );
+
+    const updated: EditReminderRow[] = [];
+    for (const u of updates) {
+      if (u.error) {
+        return { success: false, updated, error_code: "db_error" as const, error: u.error.message };
+      }
+      if (u.data) updated.push(u.data as EditReminderRow);
+    }
+    if (updated.length === 0) {
+      return { success: false, updated: [], error_code: "not_pending" as const, error: "no rows matched after shift (likely raced with fire)" };
+    }
+    return { success: true, updated };
+  })();
+
+  return JSON.stringify(result);
+}
+
 /**
  * ============================================================================
  * TOOL EXECUTOR
@@ -2789,9 +3249,104 @@ export async function executeCustomTool(
         return await scrapeUrl(url, supabase);
       }
 
-      case "get_market_price": {
+      case "get_market_data": {
+        const action = typeof args.action === "string" ? args.action : "";
         const sym = typeof args.symbol === "string" ? args.symbol : "";
-        return await executeGetMarketPrice(sym, supabase);
+        if (action === "quote") {
+          if (!sym) {
+            return `get_market_data action="quote" requires \`symbol\` (catalog format, e.g. "EURUSD=X", "AAPL").`;
+          }
+          return await executeGetMarketPrice(sym, supabase);
+        }
+        if (action === "history") {
+          // Surface missing required fields before delegating — the downstream
+          // "Invalid interval ''" error is less actionable than these hints.
+          if (!sym) {
+            return `get_market_data action="history" requires \`symbol\` (catalog format).`;
+          }
+          const interval =
+            typeof args.interval === "string" ? args.interval.trim() : "";
+          if (!interval) {
+            return (
+              `get_market_data action="history" requires \`interval\`. ` +
+              `Common choices: "1day" for daily candles ("yesterday's range"), ` +
+              `"1h" for intraday context, "5min" for sub-hour detail. ` +
+              `Pick the coarsest that answers the question and retry.`
+            );
+          }
+          return await executeGetMarketHistory({
+            symbol: sym,
+            interval,
+            outputsize:
+              typeof args.outputsize === "number" ? args.outputsize : undefined,
+            start_date:
+              typeof args.start_date === "string" ? args.start_date : undefined,
+            end_date:
+              typeof args.end_date === "string" ? args.end_date : undefined,
+            chart_only: args.chart_only === true,
+            include_chart: args.include_chart === true,
+          });
+        }
+        if (action === "indicator") {
+          if (!sym) {
+            return `get_market_data action="indicator" requires \`symbol\` (catalog format).`;
+          }
+          const indicator =
+            typeof args.indicator === "string" ? args.indicator : "";
+          if (!indicator) {
+            return (
+              `get_market_data action="indicator" requires \`indicator\`. ` +
+              `Valid: RSI, MACD, ATR, BBANDS.`
+            );
+          }
+          const interval =
+            typeof args.interval === "string" ? args.interval.trim() : "";
+          if (!interval) {
+            return (
+              `get_market_data action="indicator" requires \`interval\`. ` +
+              `Common choices: "1day" for daily readings, "1h" for intraday momentum.`
+            );
+          }
+          // VWAP is intraday-only by convention — a 1day/1week/1month VWAP
+          // collapses to single-bar values that aren't useful. Reject early
+          // with a clear retry hint instead of returning a useless number.
+          if (
+            indicator.toUpperCase() === "VWAP" &&
+            (interval === "1day" || interval === "1week" || interval === "1month")
+          ) {
+            return (
+              `VWAP is intraday-only — daily/weekly/monthly aggregation ` +
+              `returns single-bar values that aren't useful for the "fair ` +
+              `value" reading traders watch. Retry with an intraday interval ` +
+              `("15min" for "where's VWAP right now", "5min" for finer ` +
+              `detail, "1h" for session-shape).`
+            );
+          }
+          return await executeGetIndicator({
+            symbol: sym,
+            indicator,
+            interval,
+            period:
+              typeof args.period === "number" ? args.period : undefined,
+            outputsize:
+              typeof args.outputsize === "number" ? args.outputsize : undefined,
+          });
+        }
+        if (action === "search") {
+          const query = typeof args.query === "string" ? args.query : "";
+          if (!query) {
+            return (
+              `get_market_data action="search" requires \`query\` ` +
+              `(free-text company or asset name, e.g. "Tesla", "Apple").`
+            );
+          }
+          return await executeSymbolSearch({ query });
+        }
+        return (
+          `get_market_data: invalid action "${action}". Valid: ` +
+          `"quote" (current price), "history" (OHLC candles), ` +
+          `"indicator" (RSI/MACD/ATR/BBANDS), "search" (name→ticker).`
+        );
       }
 
       case "generate_chart": {
@@ -3136,10 +3691,7 @@ export async function executeCustomTool(
       }
 
       case "set_reminder": {
-        const triggerAt = typeof args.trigger_at === "string" ? args.trigger_at : "";
-        const instructions = typeof args.instructions === "string" ? args.instructions : "";
-        const description = typeof args.description === "string" ? args.description : "";
-        return await executeSetReminder(triggerAt, instructions, description, context, supabase);
+        return await executeSetReminder(args.reminders, context, supabase);
       }
 
       case "list_reminders": {
@@ -3148,7 +3700,99 @@ export async function executeCustomTool(
 
       case "cancel_reminder": {
         const id = typeof args.id === "string" ? args.id : "";
-        return await executeCancelReminder(id, context, supabase);
+        const batchId = typeof args.batch_id === "string" ? args.batch_id : "";
+        return await executeCancelReminder(id, batchId, context, supabase);
+      }
+
+      case "edit_reminder": {
+        return await executeEditReminder(args, context, supabase);
+      }
+
+      // -- Merged action-dispatched tools: re-dispatch to the per-action
+      //    handler above. Param names are kept identical so args pass through
+      //    untouched.
+      case "manage_note": {
+        const action = typeof args.action === "string" ? args.action : "";
+        const target: Record<string, string> = {
+          search: "search_notes",
+          create: "create_note",
+          update: "update_note",
+          delete: "delete_note",
+        };
+        const t = target[action];
+        if (!t) {
+          return JSON.stringify({
+            success: false,
+            error: `manage_note: unknown action "${action}". Use search|create|update|delete.`,
+          });
+        }
+        return await executeCustomTool(t, args, context, supabase);
+      }
+
+      case "manage_event": {
+        const action = typeof args.action === "string" ? args.action : "";
+        const target: Record<string, string> = {
+          record: "record_event",
+          recall: "recall_events",
+        };
+        const t = target[action];
+        if (!t) {
+          return JSON.stringify({
+            success: false,
+            error: `manage_event: unknown action "${action}". Use record|recall.`,
+          });
+        }
+        return await executeCustomTool(t, args, context, supabase);
+      }
+
+      case "manage_tag": {
+        const action = typeof args.action === "string" ? args.action : "";
+        const target: Record<string, string> = {
+          get: "get_tag_definition",
+          save: "save_tag_definition",
+        };
+        const t = target[action];
+        if (!t) {
+          return JSON.stringify({
+            success: false,
+            error: `manage_tag: unknown action "${action}". Use get|save.`,
+          });
+        }
+        return await executeCustomTool(t, args, context, supabase);
+      }
+
+      case "recall_conversations": {
+        const action = typeof args.action === "string" ? args.action : "";
+        const target: Record<string, string> = {
+          search: "search_conversations",
+          get: "get_conversation",
+        };
+        const t = target[action];
+        if (!t) {
+          return JSON.stringify({
+            success: false,
+            error: `recall_conversations: unknown action "${action}". Use search|get.`,
+          });
+        }
+        return await executeCustomTool(t, args, context, supabase);
+      }
+
+      case "manage_reminder": {
+        const action = typeof args.action === "string" ? args.action : "";
+        const target: Record<string, string> = {
+          set: "set_reminder",
+          list: "list_reminders",
+          cancel: "cancel_reminder",
+          edit: "edit_reminder",
+        };
+        const t = target[action];
+        if (!t) {
+          return JSON.stringify({
+            success: false,
+            error: `manage_reminder: unknown action "${action}". Use set|list|cancel|edit.`,
+          });
+        }
+        return await executeCustomTool(t, args, context, supabase);
       }
 
       default:
@@ -3168,25 +3812,18 @@ export function getAllCustomTools(): GeminiFunctionDeclaration[] {
   return [
     searchWebTool,
     scrapeUrlTool,
-    getMarketPriceTool,
+    getMarketDataTool,
     generateChartTool,
-    createNoteTool,
-    updateNoteTool,
-    deleteNoteTool,
-    searchNotesTool,
-    getRecentOrionBriefingsTool,
-    searchConversationsTool,
-    getConversationTool,
     analyzeImageTool,
-    getTagDefinitionTool,
-    saveTagDefinitionTool,
+    getRecentOrionBriefingsTool,
     updateMemoryTool,
     applyRuleChangeTool,
-    recordEventTool,
-    recallEventsTool,
-    setReminderTool,
-    listRemindersTool,
-    cancelReminderTool,
+    // Merged action-dispatched tools (replace the former CRUD clusters).
+    manageNoteTool,
+    manageEventTool,
+    manageTagTool,
+    recallConversationsTool,
+    manageReminderTool,
   ];
 }
 

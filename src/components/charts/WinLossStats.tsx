@@ -31,9 +31,11 @@ interface WinLossStatsProps {
   };
   trades: Trade[];
   onTradeClick?: (tradeId: string) => void;
+  /** When true, stack Winners/Losers cards vertically (for narrow panels). */
+  compact?: boolean;
 }
 
-const WinLossStats: React.FC<WinLossStatsProps> = ({ winLossStats, trades, onTradeClick }) => {
+const WinLossStats: React.FC<WinLossStatsProps> = ({ winLossStats, trades, onTradeClick, compact = false }) => {
   const theme = useTheme();
 
   // Find the best win (trade with highest amount)
@@ -56,7 +58,7 @@ const WinLossStats: React.FC<WinLossStatsProps> = ({ winLossStats, trades, onTra
     <Box>
       {/* Winners and Losers Section */}
       {(winLossStats.winners.total > 0 || winLossStats.losers.total > 0) && (
-        <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+        <Box sx={{ display: 'flex', flexDirection: compact ? 'column' : 'row', gap: 2, mb: 3 }}>
           {/* Winners Card */}
           <Paper sx={{ 
             flex: 1, 

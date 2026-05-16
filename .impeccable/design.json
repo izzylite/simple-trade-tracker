@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-05-07T00:00:00.000Z",
+  "generatedAt": "2026-05-07T12:00:00.000Z",
   "title": "Design System: JournoTrades",
   "extensions": {
     "colorMeta": {
@@ -28,6 +28,11 @@
         "role": "primary",
         "displayName": "Violet Deep",
         "canonical": "oklch(40% 0.20 290)"
+      },
+      "violet-hover": {
+        "role": "primary",
+        "displayName": "Violet Hover",
+        "canonical": "oklch(45% 0.22 290)"
       },
       "win-green-dark": {
         "role": "tertiary",
@@ -112,9 +117,9 @@
       "name": "Primary Button",
       "kind": "button",
       "refersTo": "button-primary",
-      "description": "Primary call-to-action. Trader Violet fill, white text, 8 px corners.",
+      "description": "Primary call-to-action. Trader Violet fill, white text, 8 px corners. Hover uses Violet Hover (#6d28d9), not Violet Deep.",
       "html": "<button class=\"ds-btn-primary\">Create Calendar</button>",
-      "css": ".ds-btn-primary { background: #7c3aed; color: #ffffff; padding: 8px 20px; border: none; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-weight: 600; font-size: 0.875rem; line-height: 1.55; letter-spacing: 0; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.3); transition: background 150ms cubic-bezier(0.4,0,0.2,1), box-shadow 150ms cubic-bezier(0.4,0,0.2,1); } .ds-btn-primary:hover { background: #5b21b6; box-shadow: 0 2px 8px rgba(0,0,0,0.3); } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(124,58,237,0.25); }"
+      "css": ".ds-btn-primary { background: #7c3aed; color: #ffffff; padding: 8px 20px; border: none; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-weight: 600; font-size: 0.875rem; line-height: 1.55; letter-spacing: 0; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.3); transition: background 150ms cubic-bezier(0.4,0,0.2,1), box-shadow 150ms cubic-bezier(0.4,0,0.2,1); } .ds-btn-primary:hover { background: #6d28d9; box-shadow: 0 2px 8px rgba(0,0,0,0.3); } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(124,58,237,0.25); }"
     },
     {
       "name": "Outlined Button",
@@ -127,10 +132,18 @@
     {
       "name": "Side-Nav Item",
       "kind": "nav",
-      "refersTo": "side-nav-item",
-      "description": "Vertical icon-rail item: 22 px icon over an 11 px uppercase label.",
-      "html": "<button class=\"ds-nav-item ds-nav-item--active\" aria-current=\"page\"><svg viewBox=\"0 0 24 24\" width=\"22\" height=\"22\" fill=\"currentColor\"><path d=\"M12 3l9 8h-3v9h-4v-6h-4v6H6v-9H3z\"/></svg><span>HOME</span></button>",
-      "css": ".ds-nav-item { width: 100%; padding: 8px 4px; border: 0; background: transparent; color: #94a3b8; border-radius: 8px; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; transition: color 150ms cubic-bezier(0.4,0,0.2,1), background 150ms cubic-bezier(0.4,0,0.2,1); } .ds-nav-item:hover { background: rgba(255,255,255,0.04); color: #f1f5f9; } .ds-nav-item--active { background: rgba(124,58,237,0.12); color: #7c3aed; } .ds-nav-item span { font-family: 'DM Sans', sans-serif; font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; line-height: 1.1; }"
+      "refersTo": "side-nav-tile",
+      "description": "Vertical icon-rail item: 44 px tile (16 px corners) with a 22 px icon, captioned by an 11 px uppercase label below. Active route fills the tile with solid Trader Violet; the rail is narrow (92 px) so the violet remains a small percentage of the page.",
+      "html": "<button class=\"ds-nav-item ds-nav-item--active\" aria-current=\"page\"><span class=\"ds-nav-item__tile\"><svg viewBox=\"0 0 24 24\" width=\"22\" height=\"22\" fill=\"currentColor\"><path d=\"M12 3l9 8h-3v9h-4v-6h-4v6H6v-9H3z\"/></svg></span><span class=\"ds-nav-item__label\">HOME</span></button>",
+      "css": ".ds-nav-item { width: 100%; padding: 6px 4px; border: 0; background: transparent; display: flex; flex-direction: column; align-items: center; gap: 5px; cursor: pointer; border-radius: 12px; transition: background 180ms cubic-bezier(0.22, 1, 0.36, 1), transform 180ms cubic-bezier(0.22, 1, 0.36, 1); } .ds-nav-item__tile { width: 44px; height: 44px; border-radius: 16px; display: flex; align-items: center; justify-content: center; background: transparent; color: #94a3b8; transition: background 180ms cubic-bezier(0.22, 1, 0.36, 1), color 180ms cubic-bezier(0.22, 1, 0.36, 1); } .ds-nav-item:hover .ds-nav-item__tile { background: rgba(255,255,255,0.04); color: #f1f5f9; } .ds-nav-item:active .ds-nav-item__tile { transform: scale(0.96); } .ds-nav-item--active .ds-nav-item__tile { background: #7c3aed; color: #ffffff; } .ds-nav-item--active:hover .ds-nav-item__tile { background: #5b21b6; color: #ffffff; } .ds-nav-item:focus-visible .ds-nav-item__tile { box-shadow: 0 0 0 2px #131313, 0 0 0 4px rgba(124,58,237,0.45); } .ds-nav-item__label { font-family: 'DM Sans', sans-serif; font-size: 0.6875rem; font-weight: 500; letter-spacing: -0.005em; line-height: 1.1; color: #f1f5f9; text-align: center; } .ds-nav-item--active .ds-nav-item__label { color: #7c3aed; font-weight: 600; }"
+    },
+    {
+      "name": "Side-Nav Create Tile",
+      "kind": "nav",
+      "refersTo": "side-nav-tile-create",
+      "description": "Always-on primary-action tile at the top of the rail. Trader Violet at 12% alpha, icon in Trader Violet, label in text.primary. Hover lifts to 18% alpha. Sits above a 1 px hairline divider that separates it from the route stack.",
+      "html": "<button class=\"ds-nav-create\"><span class=\"ds-nav-create__tile\"><svg viewBox=\"0 0 24 24\" width=\"22\" height=\"22\" fill=\"currentColor\"><path d=\"M12 5v14M5 12h14\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"/></svg></span><span class=\"ds-nav-create__label\">CREATE</span></button>",
+      "css": ".ds-nav-create { width: 100%; padding: 6px 4px; border: 0; background: transparent; display: flex; flex-direction: column; align-items: center; gap: 5px; cursor: pointer; border-radius: 12px; } .ds-nav-create__tile { width: 44px; height: 44px; border-radius: 16px; display: flex; align-items: center; justify-content: center; background: rgba(124,58,237,0.12); color: #7c3aed; transition: background 180ms cubic-bezier(0.22, 1, 0.36, 1), color 180ms cubic-bezier(0.22, 1, 0.36, 1); } .ds-nav-create:hover .ds-nav-create__tile { background: rgba(124,58,237,0.18); color: #5b21b6; } .ds-nav-create__label { font-family: 'DM Sans', sans-serif; font-size: 0.6875rem; font-weight: 600; letter-spacing: -0.005em; line-height: 1.1; color: #f1f5f9; text-align: center; }"
     },
     {
       "name": "Card",
@@ -144,9 +157,17 @@
       "name": "Calendar Dropdown Item",
       "kind": "custom",
       "refersTo": "calendar-dropdown-item",
-      "description": "Recent-calendar entry inside the Home dropdown. Selected state uses a left accent bar via ::before, not a side border.",
+      "description": "Recent-calendar entry inside the Home dropdown. Selected state uses a 12% alpha violet tint on the full row — no ::before accent bar (the older 3 px accent was removed; the tint alone reads cleanly at this size).",
       "html": "<div class=\"ds-cal-item ds-cal-item--selected\"><div class=\"ds-cal-item__avatar\">SD</div><div class=\"ds-cal-item__meta\"><div class=\"ds-cal-item__name\">Strategy Dataset</div><div class=\"ds-cal-item__sub\">476 trades</div></div><div class=\"ds-cal-item__pnl\">+$6,814,311.00</div></div>",
-      "css": ".ds-cal-item { position: relative; display: grid; grid-template-columns: 32px 1fr auto; gap: 12px; align-items: center; padding: 8px 12px; border-radius: 8px; cursor: pointer; background: transparent; transition: background 150ms cubic-bezier(0.4,0,0.2,1); } .ds-cal-item:hover { background: rgba(255,255,255,0.04); } .ds-cal-item--selected { background: rgba(124,58,237,0.12); } .ds-cal-item--selected::before { content: ''; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 0 2px 2px 0; background: #7c3aed; } .ds-cal-item__avatar { width: 32px; height: 32px; border-radius: 6px; background: rgba(124,58,237,0.18); color: #a78bfa; display: flex; align-items: center; justify-content: center; font-family: 'DM Sans', sans-serif; font-size: 0.75rem; font-weight: 700; } .ds-cal-item__name { font-family: 'DM Sans', sans-serif; font-size: 0.875rem; font-weight: 500; color: #f1f5f9; } .ds-cal-item__sub { font-family: 'DM Sans', sans-serif; font-size: 0.6875rem; color: #94a3b8; } .ds-cal-item__pnl { font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 0.8125rem; color: #22c55e; font-feature-settings: 'tnum' on, 'lnum' on; }"
+      "css": ".ds-cal-item { position: relative; display: grid; grid-template-columns: 32px 1fr auto; gap: 12px; align-items: center; padding: 8px 16px; margin: 2px 6px; border-radius: 8px; cursor: pointer; background: transparent; transition: background 150ms cubic-bezier(0.4,0,0.2,1); } .ds-cal-item:hover { background: rgba(255,255,255,0.04); } .ds-cal-item--selected { background: rgba(124,58,237,0.12); } .ds-cal-item--selected:hover { background: rgba(124,58,237,0.16); } .ds-cal-item__avatar { width: 28px; height: 28px; border-radius: 6px; background: rgba(124,58,237,0.12); color: #7c3aed; display: flex; align-items: center; justify-content: center; font-family: 'DM Sans', sans-serif; font-size: 0.75rem; font-weight: 700; } .ds-cal-item__name { font-family: 'DM Sans', sans-serif; font-size: 0.875rem; font-weight: 500; color: #f1f5f9; line-height: 1.3; } .ds-cal-item--selected .ds-cal-item__name { font-weight: 600; } .ds-cal-item__sub { font-family: 'DM Sans', sans-serif; font-size: 0.6875rem; color: #94a3b8; letter-spacing: 0.02em; margin-top: 2px; } .ds-cal-item__pnl { font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 0.8125rem; color: #22c55e; font-feature-settings: 'tnum' on, 'lnum' on; }"
+    },
+    {
+      "name": "Calendar Lock Card",
+      "kind": "custom",
+      "refersTo": "calendar-lock-card",
+      "description": "Empty-state card shown when a calendar-bound page (Home, Performance) has no calendar yet. 24 px corners, 64 px violet-tinted icon panel, pill CTA. Backdrop is 4 px blur over 85% alpha background.",
+      "html": "<div class=\"ds-lock-backdrop\"><div class=\"ds-lock-card\"><div class=\"ds-lock-icon\"><svg viewBox=\"0 0 24 24\" width=\"36\" height=\"36\" fill=\"#7c3aed\"><path d=\"M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 11h4v-2h-4V7h-2v4H7v2h4v4h2v-4z\"/></svg></div><h2 class=\"ds-lock-title\">Create your first calendar</h2><p class=\"ds-lock-body\">Calendars are where you log and analyse trades. You'll need at least one before this section unlocks.</p><button class=\"ds-lock-cta\">Create Calendar</button></div></div>",
+      "css": ".ds-lock-backdrop { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 0 24px; background: rgba(8,8,8,0.85); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); } .ds-lock-card { max-width: 440px; width: 100%; text-align: center; padding: 40px; border-radius: 24px; background: #131313; border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 6px 16px rgba(0,0,0,0.45); } .ds-lock-icon { width: 64px; height: 64px; border-radius: 16px; margin: 0 auto 20px; background: rgba(124,58,237,0.12); display: flex; align-items: center; justify-content: center; } .ds-lock-title { font-family: 'DM Sans', sans-serif; font-size: 1.125rem; font-weight: 700; line-height: 1.4; color: #f1f5f9; margin: 0 0 8px; } .ds-lock-body { font-family: 'DM Sans', sans-serif; font-size: 0.875rem; line-height: 1.55; color: #94a3b8; margin: 0 0 24px; } .ds-lock-cta { display: inline-flex; align-items: center; gap: 8px; padding: 8px 24px; background: #7c3aed; color: #ffffff; font-family: 'DM Sans', sans-serif; font-weight: 600; font-size: 0.875rem; border: none; border-radius: 999px; cursor: pointer; transition: background 150ms cubic-bezier(0.4,0,0.2,1); } .ds-lock-cta:hover { background: #6d28d9; }"
     },
     {
       "name": "Tag Chip",
@@ -176,32 +197,35 @@
       "Motion is calm and exponential, defaulting to instant under reduced-motion."
     ],
     "rules": [
-      { "name": "The One Purple Rule", "body": "Trader Violet appears at most on ~10% of any screen surface. If a redesign starts to need violet on multiple structural surfaces, the layout is wrong, not the color.", "section": "colors" },
+      { "name": "The One Purple Rule", "body": "Trader Violet appears at most on ~10% of any screen surface. The active side-nav tile is the rare full-saturation exception — it works because the rail itself is narrow, so the violet remains a small percentage of the page. If a redesign starts to need violet on multiple structural surfaces, the layout is wrong, not the color.", "section": "colors" },
       { "name": "The Win/Loss Triple-Encoding Rule", "body": "Profit and loss are never expressed by color alone. The pair (color + glyph + sign) is mandatory. No green text without an up-arrow and +. No red text without a down-arrow and -.", "section": "colors" },
       { "name": "The Pure-Pixel Rule", "body": "Pure white is permitted only on the light-mode paper surface. Page backdrop, all neutrals, and any tinted area must be off-white to keep the system from looking sterile.", "section": "colors" },
+      { "name": "The Single-Hover-Hex Rule", "body": "Primary-CTA hover is Violet Hover (#6d28d9), not Violet Deep. Only the MuiButton.containedPrimary override carries that hex. Any other hover surface that wants a darker violet (toggle borders, side-nav active hover) uses primary.dark (Violet Deep). Don't introduce a third violet hover hex.", "section": "colors" },
       { "name": "The Tabular-Number Rule", "body": "Any cell, list, or readout that renders a count, percent, or currency must use font-feature-settings: 'tnum' on, 'lnum' on. Proportional figures in P&L tables are forbidden.", "section": "typography" },
       { "name": "The Single-Display Rule", "body": "A page may have one Display-size headline at most. Multiple display sizes flatten the hierarchy back into noise.", "section": "typography" },
-      { "name": "The No-Glass Rule", "body": "No backdrop-filter: blur decoration on cards, navs, or panels. The single permitted use is the lock-overlay backdrop and the calendar-switching spinner overlay.", "section": "elevation" },
+      { "name": "The No-Glass Rule", "body": "No backdrop-filter: blur decoration on cards, navs, or panels. The single permitted use is the calendar-lock-overlay backdrop and the calendar-switching spinner overlay.", "section": "elevation" },
       { "name": "The Hover Lift Rule", "body": "Cards may translate at most -2 px on hover, paired with the next shadow step up. No scale transforms, no rotation, no shadow expansion beyond one tier.", "section": "elevation" }
     ],
     "dos": [
       "Do lead with numbers. Tabular figures, calm labels, generous space around totals.",
-      "Do keep Trader Violet rare. One element on a screen is usually enough.",
+      "Do keep Trader Violet rare. One element on a screen is usually enough; the active side-nav tile usually IS that element.",
       "Do pair every win/loss color with both an arrow icon and the sign character.",
       "Do vary spacing for rhythm: page-level sections at 32–48 px apart, related elements at 8–16 px.",
       "Do write copy in trader voice. \"476 trades, +$6,814,311.00\", not \"Your amazing trading journey\".",
-      "Do keep AppHeader and SideNav mounted across navigation; loading states render below the chrome."
+      "Do keep AppHeader and SideNav mounted across navigation; loading states render below the chrome.",
+      "Do use primary.dark (Violet Deep) for any 'darker violet' need other than primary-button hover; reserve Violet Hover (#6d28d9) for that one override."
     ],
     "donts": [
-      "Don't use generic SaaS purple gradients. Trader Violet is solid; it never gradients into pink, blue, or itself.",
+      "Don't use generic SaaS purple gradients. Trader Violet is solid; it never gradients into pink, blue, or itself. (Two legacy linear-gradient decorations in ImagePickerDialog and ImageUploadDialog are violations awaiting cleanup, not a precedent.)",
       "Don't clip text in a gradient with background-clip: text. Solid color, weight or size for emphasis.",
       "Don't chase Bloomberg terminal density. Information without rhythm is noise.",
       "Don't add Robinhood-style gamification: no confetti on green trades, no balloons, no celebration sounds, no oversized streak counters.",
       "Don't mimic MetaTrader or legacy broker chrome: no skeuomorphic panels, no beveled buttons, no tiny system fonts, no gray-on-gray.",
       "Don't wrap the entire interface in cards. Cards are an affordance, not a container reflex.",
-      "Don't use a border-left greater than 1 px as a colored accent stripe. The selected calendar item's 3 px accent bar uses ::before, not a side border.",
-      "Don't introduce glassmorphism (frosted blurs) as decoration. Reserve backdrop-filter for the lock and switch overlays.",
-      "Don't use #000 or #fff anywhere except the documented light-mode paper. Off-black #080808 and tinted paper are the system's true neutrals."
+      "Don't use a border-left greater than 1 px as a colored accent stripe on cards, list items, or alerts. The calendar-dropdown selected item used to carry a 3 px ::before accent bar; it was removed in favor of a 12% alpha tint and that pattern should not come back.",
+      "Don't introduce glassmorphism (frosted blurs) as decoration. Reserve backdrop-filter for the calendar-lock backdrop and the calendar-switching spinner overlay.",
+      "Don't use #000 or #fff anywhere except the documented light-mode paper. Off-black #080808 and tinted paper are the system's true neutrals.",
+      "Don't introduce new violet hex values. The palette has four (primary, soft, deep, hover) and that's the budget."
     ]
   }
 }

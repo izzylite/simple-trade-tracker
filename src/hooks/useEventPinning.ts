@@ -1,16 +1,21 @@
 /**
  * useEventPinning Hook
- * Reusable hook for pinning/unpinning economic events to a calendar
+ *
+ * Back-compat wrapper around `useUserPinnedEvents`. Pinning moved from
+ * per-calendar to per-user, so the `calendar` and `onUpdateCalendarProperty`
+ * options are now ignored — kept on the type signature so existing call
+ * sites compile while they are migrated to the new context directly.
  */
 
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import { Calendar } from '../types/calendar';
 import { EconomicEvent } from '../types/economicCalendar';
-import { cleanEventNameForPinning, isEventPinned } from '../utils/eventNameUtils';
-import { logger } from '../utils/logger';
+import { useUserPinnedEvents } from '../contexts/UserPinnedEventsContext';
 
 interface UseEventPinningOptions {
+  /** @deprecated Pinning is user-level — this prop is ignored. */
   calendar?: Calendar;
+  /** @deprecated Pinning is user-level — this prop is ignored. */
   onUpdateCalendarProperty?: (
     calendarId: string,
     updateFn: (calendar: Calendar) => Calendar
@@ -24,87 +29,30 @@ interface UseEventPinningResult {
   isEventCurrentlyPinned: (event: EconomicEvent) => boolean;
 }
 
-export function useEventPinning({
-  calendar,
-  onUpdateCalendarProperty
-}: UseEventPinningOptions): UseEventPinningResult {
-  const [pinningEventId, setPinningEventId] = useState<string | null>(null);
+export function useEventPinning(
+  _options: UseEventPinningOptions = {}
+): UseEventPinningResult {
+  const { pins, pinningEventId, pin, unpin } = useUserPinnedEvents();
 
-  const handlePinEvent = useCallback(async (event: EconomicEvent) => {
-    if (!calendar?.id || !onUpdateCalendarProperty) {
-      logger.warn('Cannot pin event: calendar or onUpdateCalendarProperty not available');
-      return;
-    }
-
-    try {
-      setPinningEventId(event.id);
-      await onUpdateCalendarProperty(calendar.id, (cal: Calendar) => {
-        const currentPinnedEvents = cal.pinned_events || [];
-        const cleanedEventName = cleanEventNameForPinning(event.event_name);
-
-        // Check if already pinned to prevent duplicates
-        if (isEventPinned(event, currentPinnedEvents)) {
-          logger.log(`Event already pinned: ${event.event_name}`);
-          return cal;
-        }
-
-        return {
-          ...cal,
-          pinned_events: [...currentPinnedEvents, {
-            event: cleanedEventName,
-            event_id: event.id,
-            notes: '',
-            impact: event.impact,
-            currency: event.currency,
-            flag_url: event.flag_url,
-            country: event.country
-          }]
-        };
-      });
-      logger.log(`📌 Successfully pinned event: ${event.event_name} (ID: ${event.id})`);
-    } catch (error) {
-      logger.error('Error pinning event:', error);
-    } finally {
-      setPinningEventId(null);
-    }
-  }, [calendar?.id, onUpdateCalendarProperty]);
-
-  const handleUnpinEvent = useCallback(async (event: EconomicEvent) => {
-    if (!calendar?.id || !onUpdateCalendarProperty) {
-      logger.warn('Cannot unpin event: calendar or onUpdateCalendarProperty not available');
-      return;
-    }
-
-    try {
-      setPinningEventId(event.id);
-      await onUpdateCalendarProperty(calendar.id, (cal: Calendar) => {
-        const currentPinnedEvents = cal.pinned_events || [];
-        return {
-          ...cal,
-          pinned_events: currentPinnedEvents.filter(pinnedEvent =>
-            pinnedEvent.event_id
-              ? pinnedEvent.event_id !== event.id
-              : pinnedEvent.event.toLowerCase() !==
-                  cleanEventNameForPinning(event.event_name).toLowerCase()
-          )
-        };
-      });
-      logger.log(`📌 Successfully unpinned event: ${event.event_name} (ID: ${event.id})`);
-    } catch (error) {
-      logger.error('Error unpinning event:', error);
-    } finally {
-      setPinningEventId(null);
-    }
-  }, [calendar?.id, onUpdateCalendarProperty]);
-
-  const isEventCurrentlyPinned = useCallback((event: EconomicEvent): boolean => {
-    return isEventPinned(event, calendar?.pinned_events || []);
-  }, [calendar?.pinned_events]);
+  const isEventCurrentlyPinned = useCallback(
+    (event: EconomicEvent): boolean => {
+      // Inlined to avoid pulling isEventPinned import here; the context
+      // already exposes an `isPinned` callback, but its identity changes on
+      // every render. Recomputing against `pins` keeps the comparison stable.
+      const cleaned = event.event_name.trim().toLowerCase();
+      return pins.some((p) =>
+        p.event_id
+          ? p.event_id === event.id
+          : p.event.toLowerCase() === cleaned
+      );
+    },
+    [pins]
+  );
 
   return {
     pinningEventId,
-    handlePinEvent,
-    handleUnpinEvent,
-    isEventCurrentlyPinned
+    handlePinEvent: pin,
+    handleUnpinEvent: unpin,
+    isEventCurrentlyPinned,
   };
 }

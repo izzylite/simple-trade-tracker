@@ -1,0 +1,516 @@
+<!doctype html>
+<html data-theme="dark"><head>
+<meta charset="utf-8">
+<title>JournoTrades — Redesigned screens</title>
+<link rel="stylesheet" href="../../colors_and_type.css">
+<style>
+  :root { --bg:#080808; --bg-alt:#0a0a0a; --bg-paper:#101013; --rule:rgba(255,255,255,0.14); --hair:rgba(255,255,255,0.08); --violet:#7c3aed; --violet-deep:#6d28d9; --violet-soft:rgba(124,58,237,0.16); --win:#22c55e; --loss:#ef4444; --fg:#f1f5f9; --fg-mute:rgba(255,255,255,0.62); --fg-low:rgba(255,255,255,0.38); }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font-family: 'DM Sans', sans-serif; -webkit-font-smoothing: antialiased; }
+  .tnum { font-feature-settings: 'tnum' on, 'lnum' on; }
+  .eyebrow { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--violet); }
+
+  /* Tabs */
+  .tabs { position: sticky; top: 0; z-index: 50; background: rgba(8,8,8,0.85); backdrop-filter: blur(20px) saturate(160%); border-bottom: 1px solid var(--hair); padding: 14px 24px; display: flex; gap: 6px; align-items: center; }
+  .tabs .word { font-weight: 700; margin-right: 16px; letter-spacing: -0.01em; display:flex; align-items:center; gap:10px; }
+  .tabs .word::before { content:""; width:8px; height:8px; border-radius:2px; background: var(--violet); box-shadow: 0 0 12px rgba(124,58,237,0.7); }
+  .tabs button { background: transparent; border: 0; color: var(--fg-mute); font-family: inherit; font-weight: 600; font-size: 0.85rem; padding: 8px 14px; border-radius: 8px; cursor: pointer; transition: color 150ms, background 150ms; }
+  .tabs button:hover { color: var(--fg); }
+  .tabs button.active { background: var(--violet); color: var(--fg); }
+
+  .screen { display: none; padding: 32px; min-height: calc(100vh - 60px); }
+  .screen.active { display: block; }
+
+  /* ────────────────────────────────────────
+     SHARED — page layout for the app
+     ──────────────────────────────────────── */
+  .page { max-width: 980px; margin: 0 auto; }
+  .page-head { display: flex; align-items: end; justify-content: space-between; margin-bottom: 24px; gap: 16px; flex-wrap: wrap; }
+  .page-head h1 { font-weight: 800; font-size: 1.85rem; letter-spacing: -0.025em; margin: 6px 0 0; }
+  .page-head p { color: var(--fg-mute); font-size: 0.92rem; margin: 4px 0 0; }
+  .filter-pill { display: inline-flex; gap: 4px; padding: 4px; border-radius: 10px; border: 1px solid var(--hair); background: var(--bg-alt); }
+  .filter-pill button { background: transparent; border: 0; color: var(--fg-mute); font-weight: 600; font-size: 0.8rem; padding: 7px 13px; border-radius: 7px; cursor: pointer; font-family: inherit; transition: color 150ms, background 150ms; }
+  .filter-pill button:hover { color: var(--fg); }
+  .filter-pill button.active { background: var(--violet); color: var(--fg); }
+
+  /* ────────────────────────────────────────
+     ECONOMIC EVENTS PANEL (full page)
+     ──────────────────────────────────────── */
+  .ev-grid { display: grid; grid-template-columns: 220px 1fr; gap: 32px; }
+  @media (max-width: 760px) { .ev-grid { grid-template-columns: 1fr; } }
+  .day-rail { display: flex; flex-direction: column; gap: 4px; }
+  .day-rail .day { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; cursor: pointer; transition: background 150ms; }
+  .day-rail .day:hover { background: rgba(255,255,255,0.03); }
+  .day-rail .day.active { background: var(--violet-soft); }
+  .day-rail .day .num { font-size: 1.4rem; font-weight: 700; letter-spacing: -0.025em; min-width: 36px; text-align: center; font-feature-settings: 'tnum' on; }
+  .day-rail .day.active .num { color: var(--violet); }
+  .day-rail .day .meta { font-size: 0.72rem; color: var(--fg-low); font-weight: 500; }
+  .day-rail .day .meta strong { color: var(--fg); font-weight: 700; display: block; font-size: 0.8rem; }
+  .day-rail .day .dot { margin-left: auto; width: 6px; height: 6px; border-radius: 50%; background: var(--loss); opacity: 0.8; }
+  .day-rail .day .dot.med { background: #f59e0b; }
+  .day-rail .day .dot.low { background: var(--win); }
+  .day-rail .day.weekend { opacity: 0.45; }
+
+  /* The event list — matches the landing-page component */
+  .ev-list { background: var(--bg-alt); border: 1px solid var(--hair); border-radius: 16px; overflow: hidden; }
+  .ev-list .head { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid var(--hair); }
+  .ev-list .head .mark { width: 26px; height: 26px; border-radius: 8px; background: var(--violet-soft); display: flex; align-items: center; justify-content: center; color: var(--violet); font-size: 14px; font-weight: 700; }
+  .ev-list .head .ttl { font-weight: 600; font-size: 0.95rem; }
+  .ev-list .head .sub { font-size: 0.75rem; color: var(--fg-low); margin-left: auto; font-feature-settings: 'tnum' on; }
+  .ev-row { position: relative; display: grid; grid-template-columns: 64px 1fr auto auto; gap: 14px; align-items: center; padding: 14px 18px; border-top: 1px solid var(--hair); transition: background 180ms; cursor: pointer; }
+  .ev-row:first-of-type { border-top: 0; }
+  .ev-row:hover { background: rgba(124,58,237,0.04); }
+  .ev-row .time { font-feature-settings: 'tnum' on; font-size: 0.78rem; color: var(--fg-low); font-weight: 600; }
+  .ev-row .body .name { font-weight: 600; font-size: 0.92rem; letter-spacing: -0.01em; }
+  .ev-row .body .meta { font-size: 0.74rem; color: var(--fg-low); margin-top: 3px; font-feature-settings: 'tnum' on; }
+  .ev-row .imp { display: inline-flex; gap: 3px; }
+  .ev-row .imp i { width: 6px; height: 12px; border-radius: 1.5px; background: rgba(255,255,255,0.12); }
+  .ev-row.high .imp i { background: var(--loss); }
+  .ev-row.med .imp i:nth-child(-n+2) { background: #f59e0b; }
+  .ev-row.low .imp i:nth-child(1) { background: var(--win); }
+  .ev-row.now { background: var(--violet-soft); }
+  .ev-row.now::before { content:""; position: absolute; left: 6px; top: 50%; transform: translateY(-50%); width:6px; height:6px; border-radius:50%; background: var(--violet); box-shadow: 0 0 8px rgba(124,58,237,0.8); animation: pulse 2.4s ease-in-out infinite; }
+  .ev-row .pin { color: var(--fg-low); font-size: 14px; padding: 4px 6px; border-radius: 6px; transition: color 150ms, background 150ms; }
+  .ev-row .pin:hover { color: var(--violet); background: rgba(255,255,255,0.04); }
+  .ev-row .pin.on { color: var(--violet); }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+  /* ────────────────────────────────────────
+     ECONOMIC EVENTS — bottom-sheet (mobile / drawer)
+     ──────────────────────────────────────── */
+  .sheet-wrap { display: grid; grid-template-columns: 1fr 380px; gap: 32px; align-items: start; }
+  @media (max-width: 880px) { .sheet-wrap { grid-template-columns: 1fr; } }
+  .ev-sheet { background: var(--bg-paper); border: 1px solid var(--hair); border-radius: 20px 20px 0 0; box-shadow: 0 -30px 60px -28px rgba(0,0,0,0.7); position: sticky; top: 100px; overflow: hidden; }
+  .ev-sheet .grab { width: 36px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.18); margin: 12px auto 6px; }
+  .ev-sheet .ttl { padding: 6px 18px 14px; display: flex; align-items: baseline; justify-content: space-between; }
+  .ev-sheet .ttl .t { font-weight: 700; font-size: 1.05rem; letter-spacing: -0.015em; }
+  .ev-sheet .ttl .x { color: var(--fg-low); font-size: 14px; cursor: pointer; padding: 4px 8px; border-radius: 6px; }
+  .ev-sheet .ttl .x:hover { color: var(--fg); background: rgba(255,255,255,0.04); }
+
+  /* ────────────────────────────────────────
+     NOTES PAGE — list + editor
+     ──────────────────────────────────────── */
+  .notes-grid { display: grid; grid-template-columns: 280px 1fr; gap: 24px; align-items: start; }
+  @media (max-width: 880px) { .notes-grid { grid-template-columns: 1fr; } }
+  .notes-list { background: var(--bg-alt); border: 1px solid var(--hair); border-radius: 16px; overflow: hidden; }
+  .notes-list .ll-head { padding: 14px 16px; border-bottom: 1px solid var(--hair); display: flex; align-items: center; justify-content: space-between; }
+  .notes-list .ll-head .t { font-weight: 700; font-size: 0.95rem; letter-spacing: -0.01em; }
+  .notes-list .ll-head .add { width: 26px; height: 26px; border-radius: 8px; background: var(--violet); color: var(--fg); border: 0; cursor: pointer; font-size: 16px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; transition: background 150ms; }
+  .notes-list .ll-head .add:hover { background: var(--violet-deep); }
+  .notes-list .search { padding: 10px 14px; border-bottom: 1px solid var(--hair); }
+  .notes-list .search input { width: 100%; background: rgba(255,255,255,0.03); border: 1px solid var(--hair); color: var(--fg); border-radius: 8px; padding: 8px 12px; font-family: inherit; font-size: 0.85rem; outline: none; transition: border-color 150ms, box-shadow 150ms; }
+  .notes-list .search input:focus { border-color: var(--violet); box-shadow: 0 0 0 3px var(--violet-soft); }
+  .nl-item { padding: 12px 16px; border-top: 1px solid var(--hair); cursor: pointer; transition: background 150ms; display: flex; flex-direction: column; gap: 4px; }
+  .nl-item:hover { background: rgba(255,255,255,0.02); }
+  .nl-item.active { background: var(--violet-soft); }
+  .nl-item .row1 { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .nl-item .row1 .d { font-weight: 700; font-size: 0.85rem; letter-spacing: -0.01em; font-feature-settings: 'tnum' on; }
+  .nl-item .row1 .tag { font-size: 0.65rem; padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,0.05); color: var(--fg-mute); font-weight: 600; }
+  .nl-item .row1 .tag.plan { background: var(--violet-soft); color: #c4b5fd; }
+  .nl-item .row1 .tag.review { background: rgba(34,197,94,0.16); color: var(--win); }
+  .nl-item .row1 .tag.idea { background: rgba(245,158,11,0.16); color: #f59e0b; }
+  .nl-item .preview { font-size: 0.78rem; color: var(--fg-low); line-height: 1.45; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+
+  /* The note editor card — matches landing component */
+  .note-card { background: var(--bg-alt); border: 1px solid var(--hair); border-radius: 16px; overflow: hidden; }
+  .note-card .head { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid var(--hair); }
+  .note-card .head .date { font-weight: 600; font-size: 0.95rem; }
+  .note-card .head .tag { margin-left: auto; font-size: 0.7rem; padding: 4px 10px; border-radius: 999px; background: var(--violet-soft); color: #c4b5fd; border: 1px solid rgba(124,58,237,0.32); font-weight: 500; }
+  .note-card .body { padding: 22px 26px 26px; font-size: 0.95rem; line-height: 1.75; color: var(--fg-mute); min-height: 360px; }
+  .note-card .body h4 { color: var(--fg); font-weight: 700; font-size: 1rem; margin: 22px 0 10px; letter-spacing: -0.01em; }
+  .note-card .body h4:first-child { margin-top: 0; }
+  .note-card .body ul { margin: 0; padding-left: 20px; }
+  .note-card .body li { margin-bottom: 6px; }
+  .note-card .body .hi { background: rgba(124,58,237,0.18); color: #ede9fe; padding: 0 4px; border-radius: 3px; }
+  .note-card .body .ref { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: 6px; background: rgba(34,197,94,0.12); color: var(--win); font-size: 0.82rem; font-weight: 600; margin: 0 2px; font-feature-settings: 'tnum' on; cursor: pointer; transition: background 150ms; }
+  .note-card .body .ref:hover { background: rgba(34,197,94,0.2); }
+  .note-card .body .ref::before { content:"↗"; font-size: 0.72rem; }
+  .note-card .toolbar { display: flex; gap: 4px; padding: 10px 18px; border-top: 1px solid var(--hair); color: var(--fg-low); font-size: 0.85rem; }
+  .note-card .toolbar .btn { padding: 4px 8px; border-radius: 6px; cursor: pointer; transition: background 150ms, color 150ms; min-width: 22px; text-align: center; }
+  .note-card .toolbar .btn:hover { background: rgba(255,255,255,0.04); color: var(--fg); }
+  .note-card .toolbar .sep { width: 1px; background: var(--hair); margin: 4px 6px; }
+
+  /* ────────────────────────────────────────
+     ASSISTANT — full page chat
+     ──────────────────────────────────────── */
+  .ai-page { max-width: 720px; margin: 0 auto; }
+  .ai-thread { display: flex; flex-direction: column; gap: 16px; padding-bottom: 120px; }
+  .ai-msg { display: flex; gap: 12px; }
+  .ai-msg .av { width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; }
+  .ai-msg.user .av { background: rgba(255,255,255,0.06); color: var(--fg); }
+  .ai-msg.bot .av { background: var(--violet-soft); color: var(--violet); }
+  .ai-msg .bub { max-width: 600px; }
+  .ai-msg .bub .meta { font-size: 0.72rem; color: var(--fg-low); font-weight: 600; margin-bottom: 6px; }
+  .ai-msg.user .bub .text { background: rgba(255,255,255,0.04); border: 1px solid var(--hair); padding: 12px 16px; border-radius: 12px; font-size: 0.94rem; line-height: 1.6; }
+  .ai-msg.bot .bub .text { background: var(--violet-soft); border: 1px solid rgba(124,58,237,0.3); color: #ede9fe; padding: 14px 18px; border-radius: 12px; font-size: 0.94rem; line-height: 1.7; }
+  .cite-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+  .cite { background: rgba(0,0,0,0.25); border: 1px solid rgba(124,58,237,0.22); border-radius: 10px; padding: 10px 12px; cursor: pointer; transition: border-color 150ms, background 150ms; }
+  .cite:hover { border-color: rgba(124,58,237,0.5); background: rgba(0,0,0,0.4); }
+  .cite .d { font-size: 0.74rem; color: #c4b5fd; font-weight: 600; font-feature-settings: 'tnum' on; }
+  .cite .v { font-weight: 700; font-size: 0.92rem; margin-top: 2px; font-feature-settings: 'tnum' on; }
+  .cite .v.win { color: var(--win); } .cite .v.loss { color: var(--loss); }
+  .cite .why { font-size: 0.72rem; color: rgba(237,233,254,0.7); margin-top: 4px; }
+
+  /* AI composer (page) */
+  .ai-composer { position: sticky; bottom: 0; padding: 16px 0 24px; background: linear-gradient(to top, var(--bg) 70%, transparent); }
+  .ai-composer .box { background: var(--bg-alt); border: 1px solid var(--hair); border-radius: 14px; padding: 12px 14px; display: flex; gap: 10px; align-items: flex-end; transition: border-color 150ms, box-shadow 150ms; }
+  .ai-composer .box:focus-within { border-color: var(--violet); box-shadow: 0 0 0 3px var(--violet-soft); }
+  .ai-composer textarea { flex: 1; background: transparent; border: 0; outline: none; color: var(--fg); font-family: inherit; font-size: 0.95rem; line-height: 1.55; resize: none; min-height: 24px; max-height: 160px; padding: 4px 0; }
+  .ai-composer textarea::placeholder { color: var(--fg-low); }
+  .ai-composer .send { background: var(--violet); color: var(--fg); border: 0; width: 34px; height: 34px; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: background 150ms; }
+  .ai-composer .send:hover { background: var(--violet-deep); }
+  .ai-suggest { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .ai-suggest button { background: rgba(255,255,255,0.03); border: 1px solid var(--hair); color: var(--fg-mute); font-family: inherit; font-size: 0.8rem; font-weight: 500; padding: 7px 12px; border-radius: 999px; cursor: pointer; transition: color 150ms, border-color 150ms, background 150ms; }
+  .ai-suggest button:hover { color: var(--fg); border-color: rgba(124,58,237,0.4); background: rgba(124,58,237,0.06); }
+
+  /* ────────────────────────────────────────
+     ASSISTANT — bottom sheet (drawer)
+     ──────────────────────────────────────── */
+  .stage { position: relative; min-height: 600px; background: radial-gradient(circle at 30% 20%, rgba(124,58,237,0.06), transparent 60%); border: 1px solid var(--hair); border-radius: 16px; padding: 20px; overflow: hidden; }
+  .stage .stage-label { position: absolute; top: 12px; left: 16px; font-size: 0.7rem; color: var(--fg-low); font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; }
+  .stage .ghost-bg { position: absolute; inset: 60px 20px 280px; background:
+    repeating-linear-gradient(transparent 0 24px, rgba(255,255,255,0.025) 24px 25px),
+    repeating-linear-gradient(90deg, transparent 0 24px, rgba(255,255,255,0.025) 24px 25px);
+    border-radius: 12px; opacity: 0.5; }
+  .ai-sheet { position: absolute; left: 24px; right: 24px; bottom: 24px; background: var(--bg-paper); border: 1px solid var(--hair); border-radius: 18px; box-shadow: 0 -30px 60px -28px rgba(0,0,0,0.7); overflow: hidden; max-width: 560px; margin: 0 auto; }
+  .ai-sheet .grab { width: 36px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.18); margin: 10px auto 4px; }
+  .ai-sheet .head { display: flex; align-items: center; gap: 10px; padding: 8px 16px 12px; border-bottom: 1px solid var(--hair); }
+  .ai-sheet .head .mark { width: 26px; height: 26px; border-radius: 8px; background: var(--violet-soft); color: var(--violet); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; }
+  .ai-sheet .head .t { font-weight: 700; font-size: 0.95rem; }
+  .ai-sheet .head .ctx { margin-left: auto; font-size: 0.72rem; color: var(--fg-low); padding: 4px 10px; border-radius: 999px; border: 1px solid var(--hair); font-feature-settings: 'tnum' on; }
+  .ai-sheet .body { padding: 14px 16px; max-height: 280px; overflow-y: auto; }
+  .ai-sheet .body .ai-msg + .ai-msg { margin-top: 12px; }
+  .ai-sheet .composer { padding: 10px 14px 14px; border-top: 1px solid var(--hair); }
+  .ai-sheet .composer .box { background: rgba(255,255,255,0.03); border: 1px solid var(--hair); border-radius: 10px; padding: 8px 10px; display: flex; gap: 8px; align-items: center; }
+  .ai-sheet .composer .box:focus-within { border-color: var(--violet); box-shadow: 0 0 0 3px var(--violet-soft); }
+  .ai-sheet .composer input { flex: 1; background: transparent; border: 0; outline: none; color: var(--fg); font-family: inherit; font-size: 0.88rem; }
+  .ai-sheet .composer input::placeholder { color: var(--fg-low); }
+  .ai-sheet .composer .send { background: var(--violet); color: var(--fg); border: 0; width: 28px; height: 28px; border-radius: 6px; cursor: pointer; }
+
+</style>
+</head>
+<body>
+
+<nav class="tabs">
+  <span class="word">JournoTrades</span>
+  <button data-screen="events" class="active">Economic Events</button>
+  <button data-screen="events-sheet">Events sheet</button>
+  <button data-screen="notes">Notes</button>
+  <button data-screen="ai">Assistant</button>
+  <button data-screen="ai-sheet">Ask Orion sheet</button>
+</nav>
+
+<!-- ─────────── ECONOMIC EVENTS ─────────── -->
+<section class="screen active" id="events">
+  <div class="page">
+    <div class="page-head">
+      <div>
+        <div class="eyebrow">Economic Events</div>
+        <h1>This week</h1>
+        <p>Pinned to your timezone · 3 high-impact events ahead</p>
+      </div>
+      <div class="filter-pill">
+        <button>All</button>
+        <button class="active">High</button>
+        <button>Med</button>
+        <button>Low</button>
+      </div>
+    </div>
+
+    <div class="ev-grid">
+      <aside class="day-rail">
+        <div class="day"><div class="num">5</div><div class="meta"><strong>Mon</strong>2 events</div><div class="dot med"></div></div>
+        <div class="day"><div class="num">6</div><div class="meta"><strong>Tue</strong>1 event</div><div class="dot low"></div></div>
+        <div class="day active"><div class="num">7</div><div class="meta"><strong>Wed</strong>5 events</div><div class="dot"></div></div>
+        <div class="day"><div class="num">8</div><div class="meta"><strong>Thu</strong>3 events</div><div class="dot med"></div></div>
+        <div class="day"><div class="num">9</div><div class="meta"><strong>Fri</strong>4 events</div><div class="dot"></div></div>
+        <div class="day weekend"><div class="num">10</div><div class="meta"><strong>Sat</strong>—</div></div>
+        <div class="day weekend"><div class="num">11</div><div class="meta"><strong>Sun</strong>—</div></div>
+      </aside>
+
+      <div class="ev-list">
+        <div class="head">
+          <div class="mark">⚑</div>
+          <div class="ttl">Wed, May 7</div>
+          <div class="sub">3 high-impact</div>
+        </div>
+        <div class="ev-row low">
+          <div class="time">06:30</div>
+          <div class="body"><div class="name">Trade Balance · 🇨🇭</div><div class="meta">Forecast 3.8B · Prior 4.7B</div></div>
+          <div class="imp"><i></i><i></i><i></i></div>
+          <div class="pin" title="Pin to calendar">⚑</div>
+        </div>
+        <div class="ev-row med">
+          <div class="time">08:30</div>
+          <div class="body"><div class="name">Initial Jobless Claims · 🇺🇸</div><div class="meta">Forecast 220K · Prior 215K</div></div>
+          <div class="imp"><i></i><i></i><i></i></div>
+          <div class="pin">⚑</div>
+        </div>
+        <div class="ev-row high now">
+          <div class="time">10:00</div>
+          <div class="body"><div class="name">FOMC Rate Decision · 🇺🇸</div><div class="meta">Forecast 4.50% · Prior 4.50% · ES tag: avoid</div></div>
+          <div class="imp"><i></i><i></i><i></i></div>
+          <div class="pin on">⚑</div>
+        </div>
+        <div class="ev-row high">
+          <div class="time">10:30</div>
+          <div class="body"><div class="name">Fed Press Conference · Powell</div><div class="meta">Live tape · Vol expected</div></div>
+          <div class="imp"><i></i><i></i><i></i></div>
+          <div class="pin">⚑</div>
+        </div>
+        <div class="ev-row high">
+          <div class="time">14:00</div>
+          <div class="body"><div class="name">Crude Oil Inventories · 🇺🇸</div><div class="meta">Forecast −2.1M · Prior +0.8M</div></div>
+          <div class="imp"><i></i><i></i><i></i></div>
+          <div class="pin">⚑</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────── EVENTS BOTTOM SHEET ─────────── -->
+<section class="screen" id="events-sheet">
+  <div class="page">
+    <div class="page-head"><div><div class="eyebrow">Events · Bottom sheet</div><h1>Calendar with Events drawer</h1><p>The drawer pins next to the day grid; the same component scales down to mobile bottom-sheet.</p></div></div>
+    <div class="sheet-wrap">
+      <div class="stage" style="min-height:520px">
+        <div class="stage-label">Calendar context</div>
+        <div class="ghost-bg" style="inset: 60px 20px 60px"></div>
+      </div>
+      <div class="ev-sheet">
+        <div class="grab"></div>
+        <div class="ttl"><span class="t">Wed, May 7 · Events</span><span class="x">✕</span></div>
+        <div class="ev-row high now">
+          <div class="time">10:00</div>
+          <div class="body"><div class="name">FOMC Rate Decision</div><div class="meta">4.50% · ES tag: avoid</div></div>
+          <div class="imp"><i></i><i></i><i></i></div>
+        </div>
+        <div class="ev-row high">
+          <div class="time">10:30</div>
+          <div class="body"><div class="name">Powell press conf.</div><div class="meta">Live tape</div></div>
+          <div class="imp"><i></i><i></i><i></i></div>
+        </div>
+        <div class="ev-row med">
+          <div class="time">08:30</div>
+          <div class="body"><div class="name">Jobless Claims</div><div class="meta">Forecast 220K</div></div>
+          <div class="imp"><i></i><i></i><i></i></div>
+        </div>
+        <div class="ev-row low">
+          <div class="time">06:30</div>
+          <div class="body"><div class="name">CH Trade Balance</div><div class="meta">Forecast 3.8B</div></div>
+          <div class="imp"><i></i><i></i><i></i></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────── NOTES PAGE ─────────── -->
+<section class="screen" id="notes">
+  <div class="page">
+    <div class="page-head">
+      <div>
+        <div class="eyebrow">Notes</div>
+        <h1>Pre-market &amp; review journal</h1>
+        <p>Linked to Strategy 1A · Eval · 12 entries this month</p>
+      </div>
+      <div class="filter-pill">
+        <button class="active">All</button>
+        <button>Plans</button>
+        <button>Reviews</button>
+        <button>Ideas</button>
+      </div>
+    </div>
+
+    <div class="notes-grid">
+      <aside class="notes-list">
+        <div class="ll-head"><div class="t">Notes</div><button class="add" title="New note">＋</button></div>
+        <div class="search"><input placeholder="Search notes…"></div>
+        <div class="nl-item active"><div class="row1"><div class="d">Mon, May 5</div><div class="tag plan">Plan</div></div><div class="preview">Holding a bullish bias above 5,820. Failure of yesterday's swing low invalidates. Wait for opening drive.</div></div>
+        <div class="nl-item"><div class="row1"><div class="d">Fri, May 2</div><div class="tag review">Review</div></div><div class="preview">Two A+ setups, one taken. The other was the right call to skip — chop. Need to tighten stops on Fridays.</div></div>
+        <div class="nl-item"><div class="row1"><div class="d">Thu, May 1</div><div class="tag review">Review</div></div><div class="preview">Best day this month. Sized correctly on the third entry. Still over-traded after the close.</div></div>
+        <div class="nl-item"><div class="row1"><div class="d">Wed, Apr 30</div><div class="tag idea">Idea</div></div><div class="preview">VWAP-reclaim into prior-day high seems to fire on Wednesdays. Tag and watch for a month.</div></div>
+        <div class="nl-item"><div class="row1"><div class="d">Mon, Apr 28</div><div class="tag plan">Plan</div></div><div class="preview">FOMC week. Plan: avoid Wednesday 9:50–10:30. Backtest shows −0.6R average inside that window.</div></div>
+      </aside>
+
+      <div class="note-card">
+        <div class="head">
+          <div class="date tnum">Mon, May 5 · Pre-market</div>
+          <div class="tag">Plan</div>
+        </div>
+        <div class="body">
+          <h4>Bias</h4>
+          <p>Holding a <span class="hi">bullish bias above 5,820</span>. Failure of yesterday's swing low invalidates. Wait for opening drive — no scalps in the first 5.</p>
+          <h4>Setups I'm hunting</h4>
+          <ul>
+            <li>Opening-range breakout above 5,832 with retest</li>
+            <li>VWAP reclaim after first hour</li>
+            <li>No fade trades into FOMC at 10:00</li>
+          </ul>
+          <h4>Yesterday's takeaway</h4>
+          <p>Linked: <span class="ref">May 4 · +$890</span> · The C-grade entry after my A+ paid off but it was lucky. Don't size up on those.</p>
+        </div>
+        <div class="toolbar">
+          <span class="btn" style="font-weight:700">B</span>
+          <span class="btn" style="font-style:italic">I</span>
+          <span class="btn" style="text-decoration:underline">U</span>
+          <span class="sep"></span>
+          <span class="btn">H1</span>
+          <span class="btn">H2</span>
+          <span class="sep"></span>
+          <span class="btn">•</span>
+          <span class="btn">1.</span>
+          <span class="sep"></span>
+          <span class="btn">⌘ Link trade</span>
+          <span class="btn">📎</span>
+          <span style="margin-left:auto;font-size:0.72rem">Saved · just now</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────── ASSISTANT (full page) ─────────── -->
+<section class="screen" id="ai">
+  <div class="ai-page">
+    <div class="page-head">
+      <div>
+        <div class="eyebrow">Assistant</div>
+        <h1>Orion</h1>
+        <p>Reading: Strategy 1A · Eval · 476 trades · last 90 days</p>
+      </div>
+    </div>
+
+    <div class="ai-thread">
+      <div class="ai-msg user">
+        <div class="av">RT</div>
+        <div class="bub"><div class="meta">You · 9:42 AM</div><div class="text">What's been killing my Tuesdays?</div></div>
+      </div>
+      <div class="ai-msg bot">
+        <div class="av">✦</div>
+        <div class="bub">
+          <div class="meta">Orion · just now</div>
+          <div class="text">
+            On Tuesdays you've been overtrading after the first loss. <span style="background:rgba(124,58,237,0.28);padding:0 4px;border-radius:3px">7 of your last 10 Tuesdays</span> included a revenge entry tagged <strong>FOMO</strong>, average <strong>−$210</strong> each. Win rate on Tuesday A+ setups is still 68%; the bleed is the C-grade entries after a stop-out.
+            <div class="cite-grid">
+              <div class="cite"><div class="d tnum">Tue · Apr 22</div><div class="v loss tnum">−$340</div><div class="why">FOMO · revenge · C-grade</div></div>
+              <div class="cite"><div class="d tnum">Tue · Apr 15</div><div class="v loss tnum">−$220</div><div class="why">FOMO · 2nd entry</div></div>
+              <div class="cite"><div class="d tnum">Tue · Apr 8</div><div class="v loss tnum">−$180</div><div class="why">FOMO · revenge</div></div>
+              <div class="cite"><div class="d tnum">Tue · Apr 1</div><div class="v loss tnum">−$95</div><div class="why">C-grade · post-stop</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="ai-msg user">
+        <div class="av">RT</div>
+        <div class="bub"><div class="meta">You · just now</div><div class="text">Show me the Tuesdays I didn't revenge-trade.</div></div>
+      </div>
+    </div>
+
+    <div class="ai-composer">
+      <div class="box">
+        <textarea placeholder="Ask Orion about a tag, a week, or a single trade…"></textarea>
+        <button class="send"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      </div>
+      <div class="ai-suggest">
+        <button>Compare May vs April</button>
+        <button>Explain my best week</button>
+        <button>What's my worst tag?</button>
+        <button>Days I broke my plan</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────── ASSISTANT bottom sheet ─────────── -->
+<section class="screen" id="ai-sheet">
+  <div class="page">
+    <div class="page-head">
+      <div>
+        <div class="eyebrow">Assistant · Bottom sheet</div>
+        <h1>Ask Orion from anywhere</h1>
+        <p>The sheet docks over the calendar — context flows in automatically.</p>
+      </div>
+    </div>
+    <div class="stage" style="min-height: 640px">
+      <div class="stage-label">Calendar context</div>
+      <div class="ghost-bg"></div>
+      <div class="ai-sheet">
+        <div class="grab"></div>
+        <div class="head">
+          <div class="mark">✦</div>
+          <div class="t">Orion</div>
+          <div class="ctx">Strategy 1A · Eval</div>
+        </div>
+        <div class="body">
+          <div class="ai-msg user">
+            <div class="av">RT</div>
+            <div class="bub"><div class="meta">You</div><div class="text">What's been killing my Tuesdays?</div></div>
+          </div>
+          <div class="ai-msg bot">
+            <div class="av">✦</div>
+            <div class="bub">
+              <div class="meta">Orion</div>
+              <div class="text">7 of your last 10 Tuesdays included a revenge entry tagged <strong>FOMO</strong>, avg <strong>−$210</strong>. The bleed is the C-grade re-entries after a stop, not the A+ plan.
+                <div class="cite-grid" style="grid-template-columns: 1fr 1fr; margin-top:10px">
+                  <div class="cite"><div class="d tnum">Tue · Apr 22</div><div class="v loss tnum">−$340</div></div>
+                  <div class="cite"><div class="d tnum">Tue · Apr 15</div><div class="v loss tnum">−$220</div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="composer">
+          <div class="box">
+            <input placeholder="Ask Orion…">
+            <button class="send"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  document.querySelectorAll('.tabs button').forEach(b => {
+    b.addEventListener('click', () => {
+      document.querySelectorAll('.tabs button').forEach(x => x.classList.remove('active'));
+      document.querySelectorAll('.screen').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      document.getElementById(b.dataset.screen).classList.add('active');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  });
+
+  // Day rail switch
+  document.querySelectorAll('.day-rail .day').forEach(d => {
+    d.addEventListener('click', () => {
+      document.querySelectorAll('.day-rail .day').forEach(x => x.classList.remove('active'));
+      d.classList.add('active');
+    });
+  });
+  // Notes list switch
+  document.querySelectorAll('.nl-item').forEach(d => {
+    d.addEventListener('click', () => {
+      document.querySelectorAll('.nl-item').forEach(x => x.classList.remove('active'));
+      d.classList.add('active');
+    });
+  });
+  // Filter pills
+  document.querySelectorAll('.filter-pill').forEach(p => {
+    p.addEventListener('click', (e) => {
+      const b = e.target.closest('button'); if (!b) return;
+      p.querySelectorAll('button').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+    });
+  });
+  // Suggest pill -> textarea
+  document.querySelectorAll('.ai-suggest button').forEach(b => {
+    b.addEventListener('click', () => {
+      const t = document.querySelector('.ai-composer textarea');
+      if (t) { t.value = b.textContent; t.focus(); }
+    });
+  });
+</script>
+</body></html>

@@ -3,7 +3,7 @@ import { economicCalendarService } from './economicCalendarService';
 import { TradeEconomicEvent } from '../types/dualWrite';
 import { EconomicEvent, ImpactLevel, Currency } from '../types/economicCalendar';
 import { logger } from '../utils/logger';
-import { DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS } from '../components/economicCalendar/EconomicCalendarDrawer';
+import { DEFAULT_FILTER_SETTINGS as DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS } from '../hooks/useEconomicCalendarFilters';
 import { getSessionTimeRange, type TradingSession } from '../utils/sessionTimeUtils';
 import { cleanEventNameForPinning } from '../utils/eventNameUtils';
  

@@ -1,0 +1,506 @@
+<!doctype html>
+<html data-theme="dark"><head>
+<meta charset="utf-8">
+<title>JournoTrades — Note</title>
+<link rel="stylesheet" href="../../colors_and_type.css">
+<style>
+  :root { --bg:#080808; --bg-alt:#0a0a0a; --bg-paper:#101013; --bg-elev:#15151a; --rule:rgba(255,255,255,0.14); --hair:rgba(255,255,255,0.08); --violet:#7c3aed; --violet-deep:#6d28d9; --violet-soft:rgba(124,58,237,0.16); --win:#22c55e; --loss:#ef4444; --fg:#f1f5f9; --fg-mute:rgba(255,255,255,0.62); --fg-low:rgba(255,255,255,0.38); }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font-family: 'DM Sans', sans-serif; -webkit-font-smoothing: antialiased; }
+  .tnum { font-feature-settings: 'tnum' on, 'lnum' on; }
+  .eyebrow { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--violet); }
+
+  /* App chrome */
+  .top { position: sticky; top: 0; z-index: 50; background: rgba(8,8,8,0.85); backdrop-filter: blur(20px) saturate(160%); border-bottom: 1px solid var(--hair); padding: 12px 24px; display: flex; align-items: center; gap: 16px; }
+  .top .word { font-weight: 700; letter-spacing: -0.01em; display:flex; align-items:center; gap:10px; font-size: 0.95rem; }
+  .top .word::before { content:""; width:8px; height:8px; border-radius:2px; background: var(--violet); box-shadow: 0 0 12px rgba(124,58,237,0.7); }
+  .top .crumb { display:flex; align-items:center; gap:8px; color: var(--fg-low); font-size: 0.85rem; }
+  .top .crumb a { color: var(--fg-mute); text-decoration: none; transition: color 150ms; }
+  .top .crumb a:hover { color: var(--fg); }
+  .top .crumb .sep { color: var(--fg-low); }
+  .top .crumb .here { color: var(--fg); font-weight: 600; }
+  .top .right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+  .top .saved { font-size: 0.78rem; color: var(--fg-low); display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 8px; }
+  .top .saved::before { content:""; width:6px; height:6px; border-radius:50%; background: var(--win); }
+  .top .iconbtn { background: transparent; border: 1px solid var(--hair); color: var(--fg-mute); width: 32px; height: 32px; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: color 150ms, border-color 150ms, background 150ms; }
+  .top .iconbtn:hover { color: var(--fg); border-color: rgba(255,255,255,0.22); background: rgba(255,255,255,0.03); }
+  .top .share { background: var(--violet); color: var(--fg); border: 0; font-weight: 600; font-size: 0.82rem; padding: 7px 14px; border-radius: 8px; cursor: pointer; transition: background 150ms; }
+  .top .share:hover { background: var(--violet-deep); }
+
+  /* Layout: list rail / editor / right rail */
+  .shell { display: grid; grid-template-columns: 280px 1fr 320px; min-height: calc(100vh - 57px); }
+  @media (max-width: 1100px) { .shell { grid-template-columns: 240px 1fr; } .right-rail { display: none; } }
+  @media (max-width: 760px) { .shell { grid-template-columns: 1fr; } .left-rail { display: none; } }
+
+  /* Left rail */
+  .left-rail { border-right: 1px solid var(--hair); display: flex; flex-direction: column; min-height: 0; }
+  .lr-head { padding: 16px 18px 12px; }
+  .lr-head .ttl { font-weight: 700; font-size: 1rem; letter-spacing: -0.015em; }
+  .lr-head .meta { color: var(--fg-low); font-size: 0.72rem; margin-top: 4px; font-feature-settings: 'tnum' on; }
+  .lr-search { padding: 0 14px 10px; }
+  .lr-search input { width: 100%; background: rgba(255,255,255,0.03); border: 1px solid var(--hair); color: var(--fg); border-radius: 8px; padding: 8px 12px; font-family: inherit; font-size: 0.85rem; outline: none; transition: border-color 150ms, box-shadow 150ms; }
+  .lr-search input:focus { border-color: var(--violet); box-shadow: 0 0 0 3px var(--violet-soft); }
+  .lr-pills { padding: 0 14px 10px; display: flex; gap: 4px; flex-wrap: wrap; }
+  .lr-pills button { background: transparent; border: 1px solid var(--hair); color: var(--fg-mute); font-family: inherit; font-size: 0.74rem; font-weight: 600; padding: 4px 10px; border-radius: 999px; cursor: pointer; transition: color 150ms, border-color 150ms, background 150ms; }
+  .lr-pills button:hover { color: var(--fg); }
+  .lr-pills button.active { background: var(--violet-soft); color: #c4b5fd; border-color: rgba(124,58,237,0.32); }
+  .lr-list { overflow-y: auto; flex: 1; }
+  .lr-month { padding: 14px 18px 6px; font-size: 0.65rem; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--fg-low); border-top: 1px solid var(--hair); }
+  .lr-item { padding: 12px 16px; border-top: 1px solid var(--hair); cursor: pointer; transition: background 150ms; display: flex; flex-direction: column; gap: 4px; position: relative; }
+  .lr-item:hover { background: rgba(255,255,255,0.02); }
+  .lr-item.active { background: var(--violet-soft); }
+  .lr-item.active::before { content:""; position:absolute; left:0; top:0; bottom:0; width:2px; background: var(--violet); }
+  .lr-item .row1 { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .lr-item .row1 .d { font-weight: 700; font-size: 0.85rem; letter-spacing: -0.01em; font-feature-settings: 'tnum' on; }
+  .lr-item .row1 .pnl { font-size: 0.78rem; font-weight: 700; font-feature-settings: 'tnum' on; }
+  .lr-item .row1 .pnl.win { color: var(--win); }
+  .lr-item .row1 .pnl.loss { color: var(--loss); }
+  .lr-item .preview { font-size: 0.78rem; color: var(--fg-low); line-height: 1.45; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .lr-item .tags { display: flex; gap: 4px; margin-top: 4px; }
+  .lr-item .tags .t { font-size: 0.62rem; padding: 1px 6px; border-radius: 999px; background: rgba(255,255,255,0.05); color: var(--fg-mute); font-weight: 600; letter-spacing: 0.04em; }
+  .lr-item .tags .t.plan { background: var(--violet-soft); color: #c4b5fd; }
+  .lr-item .tags .t.review { background: rgba(34,197,94,0.16); color: var(--win); }
+  .lr-item .tags .t.idea { background: rgba(245,158,11,0.18); color: #f59e0b; }
+
+  /* Editor */
+  .editor { padding: 0; display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+  .ed-meta { padding: 28px 56px 0; max-width: 800px; margin: 0 auto; width: 100%; }
+  .ed-meta .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .ed-meta .date { font-weight: 700; font-size: 0.95rem; letter-spacing: -0.01em; font-feature-settings: 'tnum' on; }
+  .ed-meta .dot { width: 4px; height: 4px; border-radius: 50%; background: var(--fg-low); }
+  .ed-meta .ses { color: var(--fg-mute); font-size: 0.85rem; }
+  .ed-meta .pill { font-size: 0.7rem; padding: 4px 10px; border-radius: 999px; background: var(--violet-soft); color: #c4b5fd; border: 1px solid rgba(124,58,237,0.32); font-weight: 600; }
+  .ed-meta .pnl-pill { font-size: 0.78rem; padding: 4px 12px; border-radius: 999px; background: rgba(34,197,94,0.12); color: var(--win); border: 1px solid rgba(34,197,94,0.25); font-weight: 700; font-feature-settings: 'tnum' on; }
+  .ed-meta .ed { color: var(--fg-low); font-size: 0.78rem; margin-left: auto; }
+
+  .ed-title { padding: 12px 56px 4px; max-width: 800px; margin: 0 auto; width: 100%; }
+  .ed-title h1 { font-weight: 800; font-size: 2.2rem; letter-spacing: -0.03em; line-height: 1.15; margin: 0; outline: none; caret-color: var(--violet); }
+  .ed-title h1[contenteditable]:empty::before { content: attr(data-placeholder); color: var(--fg-low); }
+
+  .ed-tags { padding: 6px 56px 16px; max-width: 800px; margin: 0 auto; width: 100%; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .ed-tags .ch { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,0.04); border: 1px solid var(--hair); color: var(--fg-mute); font-size: 0.75rem; font-weight: 600; cursor: default; transition: border-color 150ms, color 150ms; }
+  .ed-tags .ch:hover { color: var(--fg); border-color: rgba(255,255,255,0.18); }
+  .ed-tags .ch .x { color: var(--fg-low); font-size: 12px; cursor: pointer; padding: 0 2px; border-radius: 4px; transition: color 150ms, background 150ms; }
+  .ed-tags .ch .x:hover { color: var(--loss); background: rgba(239,68,68,0.08); }
+  .ed-tags .add { color: var(--fg-low); border: 1px dashed var(--hair); padding: 4px 10px; border-radius: 999px; cursor: pointer; font-size: 0.75rem; font-weight: 600; transition: color 150ms, border-color 150ms; }
+  .ed-tags .add:hover { color: var(--violet); border-color: rgba(124,58,237,0.35); }
+
+  .ed-toolbar { position: sticky; top: 57px; z-index: 5; background: rgba(8,8,8,0.85); backdrop-filter: blur(20px) saturate(160%); border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair); padding: 8px 56px; display: flex; gap: 4px; align-items: center; flex-wrap: wrap; max-width: none; }
+  .ed-toolbar .grp { display: inline-flex; gap: 2px; }
+  .ed-toolbar .sep { width: 1px; align-self: stretch; background: var(--hair); margin: 0 6px; }
+  .ed-toolbar .tb { background: transparent; border: 0; color: var(--fg-mute); font-family: inherit; font-size: 0.85rem; padding: 6px 9px; border-radius: 6px; cursor: pointer; min-width: 28px; transition: color 150ms, background 150ms; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+  .ed-toolbar .tb:hover { color: var(--fg); background: rgba(255,255,255,0.04); }
+  .ed-toolbar .tb.on { color: var(--violet); background: var(--violet-soft); }
+  .ed-toolbar .tb.special { color: var(--violet); font-weight: 600; }
+
+  .ed-body { padding: 24px 56px 120px; max-width: 800px; margin: 0 auto; width: 100%; font-size: 1rem; line-height: 1.78; color: var(--fg); flex: 1; min-width: 0; outline: none; }
+  .ed-body h2 { color: var(--fg); font-weight: 700; font-size: 1.4rem; letter-spacing: -0.02em; margin: 32px 0 12px; }
+  .ed-body h2:first-child { margin-top: 0; }
+  .ed-body h3 { color: var(--fg); font-weight: 700; font-size: 1.1rem; letter-spacing: -0.015em; margin: 24px 0 8px; }
+  .ed-body p { color: var(--fg-mute); margin: 0 0 14px; }
+  .ed-body ul, .ed-body ol { color: var(--fg-mute); margin: 0 0 14px; padding-left: 22px; }
+  .ed-body li { margin-bottom: 6px; }
+  .ed-body li::marker { color: var(--fg-low); }
+  .ed-body .hi { background: rgba(124,58,237,0.18); color: #ede9fe; padding: 0 4px; border-radius: 3px; }
+
+  .ed-body .ref { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 6px; background: rgba(34,197,94,0.12); color: var(--win); font-size: 0.85rem; font-weight: 600; margin: 0 2px; font-feature-settings: 'tnum' on; cursor: pointer; transition: background 150ms; vertical-align: 1px; }
+  .ed-body .ref:hover { background: rgba(34,197,94,0.2); }
+  .ed-body .ref::before { content:"↗"; font-size: 0.75rem; opacity: 0.8; }
+  .ed-body .ref.loss { background: rgba(239,68,68,0.12); color: var(--loss); }
+  .ed-body .ref.loss:hover { background: rgba(239,68,68,0.2); }
+
+  .ed-body blockquote { border-left: 2px solid var(--violet); margin: 18px 0; padding: 4px 16px; color: var(--fg-mute); background: var(--violet-soft); border-radius: 0 8px 8px 0; font-style: normal; }
+
+  .ed-body .callout { display: grid; grid-template-columns: 28px 1fr; gap: 12px; padding: 14px 18px; background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.25); border-radius: 12px; margin: 18px 0; align-items: start; }
+  .ed-body .callout .ic { color: #f59e0b; font-size: 18px; line-height: 1; padding-top: 2px; }
+  .ed-body .callout p { margin: 0; color: #fde68a; font-size: 0.92rem; }
+
+  .ed-body .embed-trade { display: grid; grid-template-columns: 1fr auto; gap: 12px; padding: 14px 18px; background: var(--bg-alt); border: 1px solid var(--hair); border-radius: 12px; margin: 18px 0; align-items: center; cursor: pointer; transition: border-color 150ms, background 150ms; }
+  .ed-body .embed-trade:hover { border-color: rgba(124,58,237,0.4); background: var(--bg-elev); }
+  .ed-body .embed-trade .lhs { display: flex; align-items: center; gap: 12px; }
+  .ed-body .embed-trade .ic { width: 32px; height: 32px; border-radius: 8px; background: rgba(34,197,94,0.16); color: var(--win); display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; }
+  .ed-body .embed-trade .ic.loss { background: rgba(239,68,68,0.16); color: var(--loss); }
+  .ed-body .embed-trade .info .t { font-weight: 700; font-size: 0.92rem; letter-spacing: -0.01em; font-feature-settings: 'tnum' on; }
+  .ed-body .embed-trade .info .m { color: var(--fg-low); font-size: 0.75rem; margin-top: 2px; font-feature-settings: 'tnum' on; }
+  .ed-body .embed-trade .pnl { font-weight: 700; font-feature-settings: 'tnum' on; font-size: 1rem; }
+  .ed-body .embed-trade .pnl.win { color: var(--win); }
+  .ed-body .embed-trade .pnl.loss { color: var(--loss); }
+
+  .ed-body .embed-img { margin: 18px 0; border: 1px solid var(--hair); border-radius: 12px; overflow: hidden; background: var(--bg-paper); }
+  .ed-body .embed-img .frame { aspect-ratio: 16 / 9; background:
+    linear-gradient(180deg, rgba(124,58,237,0.04), transparent 60%),
+    repeating-linear-gradient(transparent 0 24px, rgba(255,255,255,0.025) 24px 25px),
+    repeating-linear-gradient(90deg, transparent 0 24px, rgba(255,255,255,0.025) 24px 25px);
+    position: relative; overflow: hidden; }
+  .ed-body .embed-img .frame svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .ed-body .embed-img .cap { padding: 10px 16px; font-size: 0.8rem; color: var(--fg-low); border-top: 1px solid var(--hair); display: flex; align-items: center; gap: 8px; }
+  .ed-body .embed-img .cap::before { content:"📎"; font-size: 12px; }
+
+  /* Slash menu (visual only) */
+  .slash { position: absolute; left: 0; top: 0; transform: translate(220px, 360px); background: var(--bg-elev); border: 1px solid var(--hair); border-radius: 12px; padding: 6px; width: 280px; box-shadow: 0 24px 48px -16px rgba(0,0,0,0.7); z-index: 10; display: none; }
+  .slash.show { display: block; }
+  .slash .hdr { font-size: 0.66rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--fg-low); padding: 8px 10px; }
+  .slash .it { display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; padding: 8px 10px; border-radius: 8px; cursor: pointer; align-items: center; transition: background 120ms; }
+  .slash .it:hover, .slash .it.on { background: var(--violet-soft); }
+  .slash .it .ic { width: 28px; height: 28px; border-radius: 6px; background: rgba(255,255,255,0.05); color: var(--fg-mute); display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; }
+  .slash .it.on .ic { background: var(--violet); color: var(--fg); }
+  .slash .it .l { font-size: 0.85rem; font-weight: 600; }
+  .slash .it .l small { display: block; color: var(--fg-low); font-weight: 500; font-size: 0.72rem; margin-top: 1px; }
+  .slash .it .k { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 0.7rem; color: var(--fg-low); padding: 2px 6px; border: 1px solid var(--hair); border-radius: 4px; }
+
+  /* Right rail */
+  .right-rail { border-left: 1px solid var(--hair); padding: 24px 22px 60px; display: flex; flex-direction: column; gap: 26px; }
+  .rr-sec .lbl { font-size: 0.65rem; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--fg-low); margin-bottom: 12px; }
+  .rr-day { background: var(--bg-alt); border: 1px solid var(--hair); border-radius: 12px; padding: 16px; }
+  .rr-day .top-row { display: flex; justify-content: space-between; align-items: baseline; }
+  .rr-day .top-row .d { font-weight: 700; font-feature-settings: 'tnum' on; font-size: 0.9rem; letter-spacing: -0.01em; }
+  .rr-day .top-row .pnl { font-weight: 700; font-feature-settings: 'tnum' on; color: var(--win); font-size: 1rem; }
+  .rr-day .stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 12px; }
+  .rr-day .stats .s .l { font-size: 0.62rem; color: var(--fg-low); font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
+  .rr-day .stats .s .v { font-weight: 700; font-feature-settings: 'tnum' on; font-size: 0.9rem; margin-top: 2px; letter-spacing: -0.015em; }
+  .rr-day .open { display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; padding: 6px 10px; border-radius: 6px; background: rgba(255,255,255,0.03); border: 1px solid var(--hair); color: var(--fg-mute); font-size: 0.78rem; font-weight: 600; cursor: pointer; transition: color 150ms, border-color 150ms, background 150ms; }
+  .rr-day .open:hover { color: var(--violet); border-color: rgba(124,58,237,0.4); background: var(--violet-soft); }
+
+  .linked .it { display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; padding: 10px 12px; border-radius: 10px; cursor: pointer; transition: background 150ms; align-items: center; }
+  .linked .it + .it { margin-top: 4px; }
+  .linked .it:hover { background: rgba(255,255,255,0.03); }
+  .linked .it .ic { width: 28px; height: 28px; border-radius: 7px; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; }
+  .linked .it .ic.t { background: rgba(34,197,94,0.16); color: var(--win); }
+  .linked .it .ic.t.loss { background: rgba(239,68,68,0.16); color: var(--loss); }
+  .linked .it .ic.e { background: rgba(245,158,11,0.16); color: #f59e0b; }
+  .linked .it .ic.n { background: var(--violet-soft); color: var(--violet); }
+  .linked .it .info .t { font-weight: 600; font-size: 0.84rem; letter-spacing: -0.01em; font-feature-settings: 'tnum' on; }
+  .linked .it .info .m { color: var(--fg-low); font-size: 0.7rem; margin-top: 2px; }
+  .linked .it .v { font-weight: 700; font-size: 0.82rem; font-feature-settings: 'tnum' on; }
+  .linked .it .v.win { color: var(--win); } .linked .it .v.loss { color: var(--loss); }
+
+  .outline { display: flex; flex-direction: column; gap: 4px; }
+  .outline a { display: flex; gap: 8px; align-items: center; color: var(--fg-mute); text-decoration: none; padding: 6px 10px; border-radius: 6px; font-size: 0.83rem; transition: color 150ms, background 150ms; border-left: 2px solid transparent; }
+  .outline a::before { content:""; width:4px; height:4px; border-radius:50%; background: var(--fg-low); }
+  .outline a:hover { color: var(--fg); background: rgba(255,255,255,0.025); }
+  .outline a.active { color: var(--violet); border-left-color: var(--violet); background: var(--violet-soft); }
+  .outline a.active::before { background: var(--violet); }
+  .outline a.h3 { padding-left: 22px; font-size: 0.78rem; }
+
+  .wc { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .wc .s { background: var(--bg-alt); border: 1px solid var(--hair); border-radius: 10px; padding: 10px 12px; }
+  .wc .s .l { font-size: 0.62rem; color: var(--fg-low); font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
+  .wc .s .v { font-weight: 700; font-feature-settings: 'tnum' on; font-size: 1rem; margin-top: 2px; letter-spacing: -0.015em; }
+
+  /* Footer status bar */
+  .status { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; padding: 8px 24px; background: rgba(8,8,8,0.92); backdrop-filter: blur(20px); border-top: 1px solid var(--hair); display: flex; gap: 18px; align-items: center; font-size: 0.74rem; color: var(--fg-low); font-weight: 500; }
+  .status .dot { width:6px; height:6px; border-radius:50%; background: var(--win); }
+  .status .right { margin-left: auto; display: flex; gap: 18px; align-items: center; }
+  .status kbd { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 0.7rem; padding: 1px 6px; border-radius: 4px; border: 1px solid var(--hair); background: rgba(255,255,255,0.03); color: var(--fg-mute); }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <span class="word">JournoTrades</span>
+  <nav class="crumb">
+    <a href="#">Strategy 1A · Eval</a>
+    <span class="sep">/</span>
+    <a href="#">Notes</a>
+    <span class="sep">/</span>
+    <span class="here">May 2026</span>
+    <span class="sep">/</span>
+    <span class="here">Mon, May 5</span>
+  </nav>
+  <div class="right">
+    <span class="saved">Saved · 2m ago</span>
+    <button class="iconbtn" title="History">↻</button>
+    <button class="iconbtn" title="Pin">⚑</button>
+    <button class="iconbtn" title="More">⋯</button>
+    <button class="share">Share read-only</button>
+  </div>
+</header>
+
+<div class="shell">
+
+  <aside class="left-rail">
+    <div class="lr-head">
+      <div class="ttl">Notes</div>
+      <div class="meta">12 entries · May 2026</div>
+    </div>
+    <div class="lr-search"><input placeholder="Search notes…"></div>
+    <div class="lr-pills">
+      <button class="active">All</button>
+      <button>Plans</button>
+      <button>Reviews</button>
+      <button>Ideas</button>
+      <button>Pinned</button>
+    </div>
+    <div class="lr-list" id="lrlist">
+      <div class="lr-month">This week</div>
+      <div class="lr-item active">
+        <div class="row1"><div class="d">Mon, May 5</div><div class="pnl win tnum">+$1,247</div></div>
+        <div class="preview">Holding a bullish bias above 5,820. Failure of yesterday's swing low invalidates. Wait for opening drive.</div>
+        <div class="tags"><span class="t plan">PLAN</span><span class="t">ES</span></div>
+      </div>
+      <div class="lr-item">
+        <div class="row1"><div class="d">Sun, May 4</div><div class="pnl win tnum">+$890</div></div>
+        <div class="preview">Weekend prep. Levels for next week. 5,820 must hold or bias flips short below 5,790.</div>
+        <div class="tags"><span class="t plan">PLAN</span><span class="t">prep</span></div>
+      </div>
+      <div class="lr-month">Last week</div>
+      <div class="lr-item">
+        <div class="row1"><div class="d">Fri, May 2</div><div class="pnl loss tnum">−$320</div></div>
+        <div class="preview">Two A+ setups, one taken. The other was the right call to skip — chop. Need to tighten stops on Fridays.</div>
+        <div class="tags"><span class="t review">REVIEW</span><span class="t">A+</span></div>
+      </div>
+      <div class="lr-item">
+        <div class="row1"><div class="d">Thu, May 1</div><div class="pnl win tnum">+$2,180</div></div>
+        <div class="preview">Best day this month. Sized correctly on the third entry. Still over-traded after the close.</div>
+        <div class="tags"><span class="t review">REVIEW</span></div>
+      </div>
+      <div class="lr-item">
+        <div class="row1"><div class="d">Wed, Apr 30</div><div class="pnl win tnum">+$540</div></div>
+        <div class="preview">VWAP-reclaim into prior-day high seems to fire on Wednesdays. Tag and watch for a month.</div>
+        <div class="tags"><span class="t idea">IDEA</span><span class="t">VWAP</span></div>
+      </div>
+      <div class="lr-month">Older</div>
+      <div class="lr-item">
+        <div class="row1"><div class="d">Mon, Apr 28</div><div class="pnl loss tnum">−$640</div></div>
+        <div class="preview">FOMC week. Plan: avoid Wed 9:50–10:30. Backtest shows −0.6R average inside that window.</div>
+        <div class="tags"><span class="t plan">PLAN</span><span class="t">FOMC</span></div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="editor">
+    <div class="ed-meta">
+      <div class="row">
+        <span class="date tnum">Mon, May 5 · 2026</span>
+        <span class="dot"></span>
+        <span class="ses">Pre-market · 08:14 ET</span>
+        <span class="pill">Plan</span>
+        <span class="pnl-pill">Day +$1,247.50</span>
+        <span class="ed">Edited 2 min ago by you</span>
+      </div>
+    </div>
+
+    <div class="ed-title"><h1 contenteditable="true" data-placeholder="Untitled">Bullish above 5,820 — let the open prove it</h1></div>
+
+    <div class="ed-tags">
+      <span class="ch">ES <span class="x">×</span></span>
+      <span class="ch">A+ <span class="x">×</span></span>
+      <span class="ch">opening-drive <span class="x">×</span></span>
+      <span class="ch">FOMC-week <span class="x">×</span></span>
+      <span class="add">+ Add tag</span>
+    </div>
+
+    <div class="ed-toolbar">
+      <div class="grp">
+        <button class="tb" title="Heading 1">H1</button>
+        <button class="tb" title="Heading 2">H2</button>
+        <button class="tb" title="Heading 3">H3</button>
+      </div>
+      <div class="sep"></div>
+      <div class="grp">
+        <button class="tb on" title="Bold" style="font-weight:700">B</button>
+        <button class="tb" title="Italic" style="font-style:italic">I</button>
+        <button class="tb" title="Underline" style="text-decoration:underline">U</button>
+        <button class="tb" title="Strike" style="text-decoration:line-through">S</button>
+        <button class="tb" title="Code" style="font-family:ui-monospace,monospace">‹›</button>
+      </div>
+      <div class="sep"></div>
+      <div class="grp">
+        <button class="tb" title="Bullet list">•</button>
+        <button class="tb" title="Numbered list">1.</button>
+        <button class="tb" title="Quote">❝</button>
+        <button class="tb" title="Callout">!</button>
+      </div>
+      <div class="sep"></div>
+      <div class="grp">
+        <button class="tb special" title="Link a trade">⌘ Link trade</button>
+        <button class="tb" title="Attach screenshot">📎 Attach</button>
+        <button class="tb" title="Embed chart">📈 Chart</button>
+        <button class="tb" title="Highlight">🎨</button>
+      </div>
+      <div style="margin-left:auto; display:flex; gap:6px; align-items:center;">
+        <button class="tb" title="Slash menu">/</button>
+        <button class="tb" title="Focus mode">⤢</button>
+      </div>
+    </div>
+
+    <div class="ed-body" id="edbody" contenteditable="true">
+      <h2 id="bias">Bias</h2>
+      <p>Holding a <span class="hi">bullish bias above 5,820</span>. Failure of yesterday's swing low invalidates. Wait for the opening drive — no scalps in the first five minutes.</p>
+      <p>Yesterday closed strong into the bell. Range was tight, but the second-half push held the prior-day high. Above 5,820, dips are buys; below 5,790, bias flips short and I stand aside through FOMC.</p>
+
+      <div class="callout">
+        <div class="ic">!</div>
+        <p><strong>FOMC at 10:00.</strong> Powell at 10:30. No new positions in the 9:50–10:35 window. Sit on hands; let the print clear.</p>
+      </div>
+
+      <h2 id="setups">Setups I'm hunting</h2>
+      <ul>
+        <li><strong>Opening-range breakout</strong> above 5,832 with retest. Stop under range mid; target prior-day high.</li>
+        <li><strong>VWAP reclaim</strong> after the first hour. Confirmation on the 5m close, not the wick.</li>
+        <li>No fade trades into FOMC. None.</li>
+      </ul>
+
+      <h3 id="invalidation">Invalidation</h3>
+      <blockquote>Two consecutive 5m closes below 5,820, or a single decisive break of 5,790. If either prints, the day is done — flat by 11:00 ET regardless of P&amp;L.</blockquote>
+
+      <h2 id="yesterday">Yesterday's takeaway</h2>
+      <p>Linked: <span class="ref">May 4 · +$890</span>. The C-grade entry after my A+ paid off but it was lucky. Don't size up on those.</p>
+
+      <div class="embed-trade">
+        <div class="lhs">
+          <div class="ic">L</div>
+          <div class="info">
+            <div class="t tnum">ES · LONG · May 4 · 09:42 ET</div>
+            <div class="m tnum">Entry 5,802.50 · Exit 5,818.75 · Stop 5,797.00 · 1.6R</div>
+          </div>
+        </div>
+        <div class="pnl win tnum">+$812.50</div>
+      </div>
+
+      <h2 id="screens">Screens</h2>
+      <div class="embed-img">
+        <div class="frame">
+          <svg viewBox="0 0 800 300" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="cf" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#7c3aed" stop-opacity="0.35"/>
+                <stop offset="100%" stop-color="#7c3aed" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <line x1="0" y1="170" x2="800" y2="170" stroke="rgba(255,255,255,0.1)" stroke-dasharray="3 5"/>
+            <text x="10" y="166" fill="rgba(255,255,255,0.4)" font-family="DM Sans, sans-serif" font-size="11">VWAP 5,810</text>
+            <path d="M0,210 L40,200 L80,180 L120,195 L160,160 L200,150 L240,165 L280,130 L320,115 L360,135 L400,105 L440,90 L480,110 L520,80 L560,65 L600,85 L640,55 L680,40 L720,60 L760,30 L800,25 L800,300 L0,300 Z" fill="url(#cf)"/>
+            <path d="M0,210 L40,200 L80,180 L120,195 L160,160 L200,150 L240,165 L280,130 L320,115 L360,135 L400,105 L440,90 L480,110 L520,80 L560,65 L600,85 L640,55 L680,40 L720,60 L760,30 L800,25" fill="none" stroke="#7c3aed" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="280" cy="130" r="6" fill="#22c55e" stroke="#080808" stroke-width="2"/>
+            <text x="290" y="125" fill="#22c55e" font-family="DM Sans, sans-serif" font-size="11" font-weight="700">Entry · 5,802</text>
+            <circle cx="640" cy="55" r="6" fill="#7c3aed" stroke="#080808" stroke-width="2"/>
+            <text x="558" y="48" fill="#7c3aed" font-family="DM Sans, sans-serif" font-size="11" font-weight="700">Exit · 5,818</text>
+          </svg>
+        </div>
+        <div class="cap">ES 5m · May 4 open · entry/exit + VWAP marked</div>
+      </div>
+
+      <h2 id="rules">Rules for today</h2>
+      <ol>
+        <li>Max 3 trades. Hard stop after a 1R loss.</li>
+        <li>No size up on a re-entry. Ever.</li>
+        <li>Flat by 11:30 unless trend day confirmed.</li>
+      </ol>
+
+      <p style="color: var(--fg-low); font-size: 0.85rem; margin-top: 28px;">— end of plan —</p>
+    </div>
+
+    <!-- visual-only slash menu -->
+    <div class="slash" id="slash">
+      <div class="hdr">Insert</div>
+      <div class="it on"><div class="ic">↗</div><div class="l">Link a trade<small>From this calendar</small></div><div class="k">⌘L</div></div>
+      <div class="it"><div class="ic">📎</div><div class="l">Attach screenshot<small>PNG / JPG up to 8MB</small></div><div class="k">⌘U</div></div>
+      <div class="it"><div class="ic">!</div><div class="l">Callout<small>Warning, info, success</small></div><div class="k">/cal</div></div>
+      <div class="it"><div class="ic">❝</div><div class="l">Quote<small>Block quote</small></div><div class="k">/quo</div></div>
+      <div class="it"><div class="ic">⚑</div><div class="l">Pin event<small>From this week's macro calendar</small></div><div class="k">/eve</div></div>
+    </div>
+  </main>
+
+  <aside class="right-rail">
+    <div class="rr-sec">
+      <div class="lbl">This day</div>
+      <div class="rr-day">
+        <div class="top-row">
+          <div class="d tnum">Mon, May 5 · 2026</div>
+          <div class="pnl tnum">+$1,247.50</div>
+        </div>
+        <div class="stats">
+          <div class="s"><div class="l">Trades</div><div class="v tnum">3</div></div>
+          <div class="s"><div class="l">WR</div><div class="v tnum">66%</div></div>
+          <div class="s"><div class="l">Avg R</div><div class="v tnum">1.4</div></div>
+        </div>
+        <div class="open">↗ Open day in calendar</div>
+      </div>
+    </div>
+
+    <div class="rr-sec">
+      <div class="lbl">Linked</div>
+      <div class="linked">
+        <div class="it">
+          <div class="ic t">L</div>
+          <div class="info"><div class="t tnum">ES · LONG · 09:42</div><div class="m">A+ · ORB · May 4</div></div>
+          <div class="v win tnum">+$812</div>
+        </div>
+        <div class="it">
+          <div class="ic e">⚑</div>
+          <div class="info"><div class="t">FOMC Rate Decision</div><div class="m tnum">Wed May 7 · 10:00</div></div>
+          <div class="v" style="color:var(--loss)">HIGH</div>
+        </div>
+        <div class="it">
+          <div class="ic n">N</div>
+          <div class="info"><div class="t">Sun, May 4 · Prep</div><div class="m">Levels for the week</div></div>
+          <div class="v" style="color:var(--fg-low)">PLAN</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="rr-sec">
+      <div class="lbl">Outline</div>
+      <nav class="outline">
+        <a href="#bias" class="active">Bias</a>
+        <a href="#setups">Setups I'm hunting</a>
+        <a href="#invalidation" class="h3">Invalidation</a>
+        <a href="#yesterday">Yesterday's takeaway</a>
+        <a href="#screens">Screens</a>
+        <a href="#rules">Rules for today</a>
+      </nav>
+    </div>
+
+    <div class="rr-sec">
+      <div class="lbl">Stats</div>
+      <div class="wc">
+        <div class="s"><div class="l">Words</div><div class="v tnum">241</div></div>
+        <div class="s"><div class="l">Read</div><div class="v tnum">1m</div></div>
+        <div class="s"><div class="l">Edits</div><div class="v tnum">14</div></div>
+        <div class="s"><div class="l">Refs</div><div class="v tnum">3</div></div>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<div class="status">
+  <span class="dot"></span>
+  <span>All changes saved</span>
+  <span style="color:var(--fg-low)">·</span>
+  <span>Synced to Strategy 1A · Eval</span>
+  <div class="right">
+    <span><kbd>⌘</kbd> <kbd>K</kbd> Search</span>
+    <span><kbd>⌘</kbd> <kbd>L</kbd> Link trade</span>
+    <span><kbd>⌘</kbd> <kbd>/</kbd> Insert</span>
+  </div>
+</div>
+
+<script>
+  document.querySelectorAll('.lr-item').forEach(d => d.addEventListener('click', () => {
+    document.querySelectorAll('.lr-item').forEach(x => x.classList.remove('active'));
+    d.classList.add('active');
+  }));
+  document.querySelectorAll('.lr-pills button').forEach(d => d.addEventListener('click', () => {
+    document.querySelectorAll('.lr-pills button').forEach(x => x.classList.remove('active'));
+    d.classList.add('active');
+  }));
+  // Outline scroll-spy + click
+  document.querySelectorAll('.outline a').forEach(a => a.addEventListener('click', (e) => {
+    e.preventDefault();
+    const t = document.querySelector(a.getAttribute('href'));
+    if (t) t.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    document.querySelectorAll('.outline a').forEach(x => x.classList.remove('active'));
+    a.classList.add('active');
+  }));
+  // Toggle slash menu with `/` button
+  document.querySelectorAll('.ed-toolbar .tb').forEach(b => {
+    if (b.title === 'Slash menu') b.addEventListener('click', () => document.getElementById('slash').classList.toggle('show'));
+  });
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.slash') && !e.target.closest('[title="Slash menu"]')) {
+      document.getElementById('slash').classList.remove('show');
+    }
+  });
+</script>
+</body></html>

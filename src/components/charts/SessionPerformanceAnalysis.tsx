@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   Box, Paper, Typography, useTheme, Stack, alpha,
   Button, Tooltip,
@@ -8,25 +8,18 @@ import { isSameMonth } from 'date-fns';
 import { Trade } from '../../types/dualWrite';
 import { formatValue } from '../../utils/formatters';
 import { SESSION_COLORS } from '../../utils/sessionTimeUtils';
-import RoundedTabs, { TabPanel } from '../common/RoundedTabs';
-import CumulativePnLChart from './CumulativePnLChart';
 
 interface SessionPerformanceAnalysisProps {
   sessionStats: any[];
   trades: Trade[];
   selectedDate: Date;
-  timePeriod: 'month' | 'year' | 'all';
+  timePeriod: 'month' | 'quarter' | 'ytd' | 'year' | 'all';
   setMultipleTradesDialog: (dialogState: any) => void;
   chartData?: any[];
   targetValue?: number | null;
   monthly_target?: number;
   onOpenPerformanceDetail?: () => void;
 }
-
-const TABS = [
-  { label: 'Session' },
-  { label: 'Cumulative P&L' },
-];
 
 const SessionPerformanceAnalysis: React.FC<SessionPerformanceAnalysisProps> = ({
   sessionStats,
@@ -40,7 +33,6 @@ const SessionPerformanceAnalysis: React.FC<SessionPerformanceAnalysisProps> = ({
   onOpenPerformanceDetail,
 }) => {
   const theme = useTheme();
-  const [activeTab, setActiveTab] = useState(0);
 
   // Define colors
   const COLORS = {
@@ -68,12 +60,9 @@ const SessionPerformanceAnalysis: React.FC<SessionPerformanceAnalysisProps> = ({
         alignItems: 'center',
         mb: 2,
       }}>
-        <RoundedTabs
-          tabs={TABS}
-          activeTab={activeTab}
-          onTabChange={(_, idx) => setActiveTab(idx)}
-          size="small"
-        />
+        <Typography sx={{ fontWeight: 700, fontSize: '1rem', letterSpacing: '-0.01em' }}>
+          Session performance
+        </Typography>
         {onOpenPerformanceDetail && (
           <Tooltip title="Full performance analytics" arrow>
             <Button
@@ -106,8 +95,7 @@ const SessionPerformanceAnalysis: React.FC<SessionPerformanceAnalysisProps> = ({
         )}
       </Box>
 
-      {/* Session Tab */}
-      <TabPanel value={activeTab} index={0}>
+      {/* Session content */}
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, flex: 1 }}>
         <Box sx={{
           display: 'grid',
@@ -227,7 +215,16 @@ const SessionPerformanceAnalysis: React.FC<SessionPerformanceAnalysisProps> = ({
                       color: (session.pnlPercentage ?? 0) > 0 ? theme.palette.success.main : theme.palette.error.main
                     }}
                   >
-                    {(session.pnlPercentage ?? 0).toFixed(2)}%
+                    {(() => {
+                      const pct = session.pnlPercentage ?? 0;
+                      if (Math.abs(pct) >= 1000) {
+                        return `${(pct / 100).toFixed(1)}×`;
+                      }
+                      return `${pct.toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                      })}%`;
+                    })()}
                   </Typography>
                 </Box>
 
@@ -327,30 +324,6 @@ const SessionPerformanceAnalysis: React.FC<SessionPerformanceAnalysisProps> = ({
         )}
 
       </Box>
-      </TabPanel>
-
-      {/* Cumulative P&L Tab */}
-      <TabPanel value={activeTab} index={1}>
-        {chartData && chartData.length > 0 ? (
-          <CumulativePnLChart
-            chartData={chartData}
-            targetValue={targetValue ?? null}
-            monthly_target={monthly_target}
-            setMultipleTradesDialog={setMultipleTradesDialog}
-            timePeriod={timePeriod}
-          />
-        ) : (
-          <Box sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            height: 300,
-            color: 'text.secondary',
-          }}>
-            <Typography>No chart data available</Typography>
-          </Box>
-        )}
-      </TabPanel>
     </Paper>
   );
 };

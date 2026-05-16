@@ -54,28 +54,6 @@ export interface ScoreHistory {
   notes?: string;
 }
 
-export interface ScoreSettings {
-  weights: {
-    consistency: number;
-    riskManagement: number;
-    performance: number;
-    discipline: number;
-  };
-  thresholds: {
-    minTradesForScore: number;
-    lookbackPeriod: number; // days
-    consistencyTolerance: number; // percentage
-  };
-  targets: {
-    win_rate: number;
-    profit_factor: number;
-    max_drawdown: number;
-    avgRiskReward: number;
-  };
-  selectedTags?: string[];
-  excludedTagsFromPatterns?: string[]; // Tags to exclude from pattern analysis
-}
-
 export interface TradingPattern {
   preferredSessions: string[];
   commonTags: string[];

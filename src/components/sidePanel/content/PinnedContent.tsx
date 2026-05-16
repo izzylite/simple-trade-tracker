@@ -39,6 +39,7 @@ import RoundedTabs, { TabPanel } from '../../common/RoundedTabs';
 import { TradeOperationsProps } from '../../../types/tradeOperations';
 import * as calendarService from '../../../services/calendarService';
 import TradeCardShimmer from '../../TradeCardShimmer';
+import { useUserPinnedEvents } from '../../../contexts/UserPinnedEventsContext';
 
 export interface PinnedContentProps {
   calendarId: string | undefined;
@@ -106,10 +107,8 @@ const PinnedContent: React.FC<PinnedContentProps> = ({
     loadPinnedTrades();
   }, [isActive, calendarId]);
 
-  // Get pinned events from calendar
-  const pinnedEvents = useMemo(() => {
-    return calendar?.pinned_events || [];
-  }, [calendar?.pinned_events]);
+  // Pinned events live on the user (replaces per-calendar pin storage).
+  const { pins: pinnedEvents } = useUserPinnedEvents();
 
   // Sort pinned trades by date (most recent first)
   const sortedPinnedTrades = useMemo(() => {

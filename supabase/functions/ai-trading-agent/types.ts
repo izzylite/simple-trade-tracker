@@ -168,7 +168,6 @@ export interface Calendar {
 
   // Settings
   economic_calendar_filters?: EconomicCalendarFilterSettings;
-  pinned_events?: PinnedEvent[];
 
   // Calculated statistics
   win_rate?: number;

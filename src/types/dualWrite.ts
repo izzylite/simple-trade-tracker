@@ -5,9 +5,8 @@
  */
 
 import { TradeImage } from '../components/trades/TradeForm';
-import { ScoreSettings } from './score';
 import { ImageAttribution } from '../components/heroImage';
-import { EconomicCalendarFilterSettings } from '../components/economicCalendar/EconomicCalendarDrawer';
+import { EconomicCalendarFilterSettings } from '../hooks/useEconomicCalendarFilters';
 import { ImpactLevel, Currency } from './economicCalendar';
 
 // =====================================================
@@ -194,9 +193,9 @@ export interface Calendar extends BaseEntity {
   hero_image_attribution?: ImageAttribution;
 
   // Settings
-  score_settings?: ScoreSettings;
+  /** Tags excluded from tag-pattern analysis on the Performance page. */
+  excluded_tags_from_patterns?: string[];
   economic_calendar_filters?: EconomicCalendarFilterSettings;
-  pinned_events?: PinnedEvent[];
 
   // Pre-calculated year statistics
   // Structure: { "2024": YearStats, "2025": YearStats, ... }

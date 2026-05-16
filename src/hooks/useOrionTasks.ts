@@ -13,23 +13,58 @@ import type {
 
 const PAGE_SIZE = 20;
 
+/**
+ * Module-level cache so the Orion badge + lists hydrate instantly on remount
+ * (e.g. Home → Performance → Home). Realtime postgres_changes still mutates
+ * via setTasks/setResults; we mirror those writes back into the cache below.
+ */
+type OrionCacheEntry = {
+  tasks: OrionTask[];
+  results: OrionTaskResult[];
+  unreadCount: number;
+  hasMore: boolean;
+};
+const orionCache = new Map<string, OrionCacheEntry>();
+function makeOrionKey(userId: string, calendarId?: string) {
+  return `${userId}|${calendarId ?? '__no_cal__'}`;
+}
+
 export function useOrionTasks(userId: string | undefined, calendarId?: string): AITasksBundle {
-  const [tasks, setTasks] = useState<OrionTask[]>([]);
-  const [results, setResults] = useState<OrionTaskResult[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [hasMore, setHasMore] = useState(false);
+  const initialEntry = userId ? orionCache.get(makeOrionKey(userId, calendarId)) : undefined;
+
+  const [tasks, setTasks] = useState<OrionTask[]>(initialEntry?.tasks ?? []);
+  const [results, setResults] = useState<OrionTaskResult[]>(initialEntry?.results ?? []);
+  const [unreadCount, setUnreadCount] = useState(initialEntry?.unreadCount ?? 0);
+  // Only show shimmer when there's nothing to display yet.
+  const [loading, setLoading] = useState(!initialEntry);
+  const [hasMore, setHasMore] = useState(initialEntry?.hasMore ?? false);
   const [loadingMore, setLoadingMore] = useState(false);
+
+  const writeCache = useCallback(
+    (patch: Partial<OrionCacheEntry>) => {
+      if (!userId) return;
+      const key = makeOrionKey(userId, calendarId);
+      const existing = orionCache.get(key) ?? {
+        tasks: [],
+        results: [],
+        unreadCount: 0,
+        hasMore: false,
+      };
+      orionCache.set(key, { ...existing, ...patch });
+    },
+    [userId, calendarId],
+  );
 
   const fetchTasks = useCallback(async () => {
     if (!userId) return;
     try {
       const data = await orionTaskService.getTasks(userId, calendarId);
       setTasks(data);
+      writeCache({ tasks: data });
     } catch (err) {
       logger.error('Failed to fetch tasks', err);
     }
-  }, [userId, calendarId]);
+  }, [userId, calendarId, writeCache]);
 
   const fetchResults = useCallback(async () => {
     if (!userId) return;
@@ -37,20 +72,22 @@ export function useOrionTasks(userId: string | undefined, calendarId?: string): 
       const data = await orionTaskService.getResults(userId, undefined, PAGE_SIZE, 0);
       setResults(data);
       setHasMore(data.length === PAGE_SIZE);
+      writeCache({ results: data, hasMore: data.length === PAGE_SIZE });
     } catch (err) {
       logger.error('Failed to fetch results', err);
     }
-  }, [userId]);
+  }, [userId, writeCache]);
 
   const fetchUnreadCount = useCallback(async () => {
     if (!userId) return;
     try {
       const count = await orionTaskService.getUnreadCount(userId);
       setUnreadCount(count);
+      writeCache({ unreadCount: count });
     } catch (err) {
       logger.error('Failed to fetch unread count', err);
     }
-  }, [userId]);
+  }, [userId, writeCache]);
 
   const createTask = useCallback(
     async (taskType: TaskType, config: TaskConfig) => {
@@ -124,7 +161,12 @@ export function useOrionTasks(userId: string | undefined, calendarId?: string): 
   useEffect(() => {
     if (!userId) return;
 
-    setLoading(true);
+    // Silent revalidate when cache already hydrated state — only show shimmer
+    // when there's nothing on screen yet.
+    const hasCachedData = orionCache.has(makeOrionKey(userId, calendarId));
+    if (!hasCachedData) {
+      setLoading(true);
+    }
     Promise.all([fetchTasks(), fetchResults(), fetchUnreadCount()]).finally(
       () => setLoading(false)
     );
@@ -198,7 +240,7 @@ export function useOrionTasks(userId: string | undefined, calendarId?: string): 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [userId, fetchTasks, fetchResults, fetchUnreadCount]);
+  }, [userId, calendarId, fetchTasks, fetchResults, fetchUnreadCount]);
 
   return {
     tasks,
