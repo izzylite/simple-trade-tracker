@@ -5,6 +5,7 @@
 
 import React, { useMemo } from 'react';
 import { Box, Typography, useTheme } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import { Editor, EditorState } from 'draft-js';
 import 'draft-js/dist/Draft.css';
 
@@ -107,6 +108,50 @@ const RichTextViewer: React.FC<RichTextViewerProps> = ({
           fontSize: '1.25rem',
           fontWeight: 600,
           margin: '0.6em 0 0.3em',
+        },
+        // Callout styles — mirror RichTextEditor.tsx so the editor and the
+        // read-only viewer render the same shape for these blocks.
+        '& .RichEditor-callout': {
+          borderLeftStyle: 'solid',
+          borderLeftWidth: '3px',
+          padding: '8px 14px',
+          margin: '4px 0',
+          borderRadius: '4px',
+          lineHeight: 1.6,
+        },
+        // Fuse adjacent callouts of the SAME variant only (mirrors the
+        // editor — see notes on RichTextEditor.tsx for rationale).
+        '& .RichEditor-callout-warning + .RichEditor-callout-warning, & .RichEditor-callout-info + .RichEditor-callout-info, & .RichEditor-callout-success + .RichEditor-callout-success, & .RichEditor-callout-danger + .RichEditor-callout-danger': {
+          marginTop: 0,
+          paddingTop: 0,
+          borderTopLeftRadius: 0,
+          borderTopRightRadius: 0,
+        },
+        '& .RichEditor-callout-warning:has(+ .RichEditor-callout-warning), & .RichEditor-callout-info:has(+ .RichEditor-callout-info), & .RichEditor-callout-success:has(+ .RichEditor-callout-success), & .RichEditor-callout-danger:has(+ .RichEditor-callout-danger)': {
+          paddingBottom: 0,
+          marginBottom: 0,
+          borderBottomLeftRadius: 0,
+          borderBottomRightRadius: 0,
+        },
+        '& .RichEditor-callout-warning': {
+          borderLeftColor: theme.palette.warning.main,
+          backgroundColor: alpha(theme.palette.warning.main, 0.08),
+          color: theme.palette.warning.main,
+        },
+        '& .RichEditor-callout-info': {
+          borderLeftColor: theme.palette.primary.main,
+          backgroundColor: alpha(theme.palette.primary.main, 0.08),
+          color: theme.palette.primary.light,
+        },
+        '& .RichEditor-callout-success': {
+          borderLeftColor: theme.palette.success.main,
+          backgroundColor: alpha(theme.palette.success.main, 0.08),
+          color: theme.palette.success.main,
+        },
+        '& .RichEditor-callout-danger': {
+          borderLeftColor: theme.palette.error.main,
+          backgroundColor: alpha(theme.palette.error.main, 0.08),
+          color: theme.palette.error.main,
         },
         // Blockquote styles
         '& blockquote': {

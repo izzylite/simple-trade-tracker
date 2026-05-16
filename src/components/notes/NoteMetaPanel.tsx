@@ -6,7 +6,11 @@ import {
   alpha,
   useTheme,
 } from '@mui/material';
-import { Close as CloseIcon } from '@mui/icons-material';
+import {
+  Close as CloseIcon,
+  CallMadeOutlined as TradeArrowIcon,
+  CallReceivedOutlined as TradeShortArrowIcon,
+} from '@mui/icons-material';
 import {
   pink, purple, deepPurple, indigo, lightBlue, cyan,
   teal, lightGreen, lime, yellow, amber, deepOrange,
@@ -16,7 +20,13 @@ import type { Theme } from '@mui/material';
 import { convertFromRaw } from 'draft-js';
 
 import { Note } from '../../types/note';
+import { Trade } from '../../types/dualWrite';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
+import type { TradeChipData } from '../common/RichTextEditor/utils/tradeEntityUtils';
+import { getSharedTrade } from '../../services/sharingService';
+import { logger } from '../../utils/logger';
+import TradeGalleryDialog from '../TradeGalleryDialog';
+import ImageZoomDialog, { ImageZoomProp } from '../ImageZoomDialog';
 
 interface NoteMetaPanelProps {
   note: Note | null;
@@ -41,6 +51,40 @@ function extractHeadings(content: string): Heading[] {
         text: b.text,
         id: b.key,
       })) as Heading[];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Pull every TRADE_LINK entity from a note's Draft.js JSON content,
+ * de-duped by tradeId (so a trade referenced twice only appears once in
+ * the side-panel list). Returns them in the order they were first
+ * referenced in the document.
+ */
+function extractLinkedTrades(content: string): TradeChipData[] {
+  if (!content) return [];
+  try {
+    const raw = JSON.parse(content);
+    const entityMap = raw?.entityMap;
+    if (!entityMap || typeof entityMap !== 'object') return [];
+    const seen = new Set<string>();
+    const out: TradeChipData[] = [];
+    Object.values(entityMap).forEach((e: any) => {
+      if (e?.type !== 'TRADE_LINK') return;
+      const data = e?.data;
+      if (!data?.tradeId || !data?.shareId) return;
+      if (seen.has(data.tradeId)) return;
+      seen.add(data.tradeId);
+      out.push({
+        shareId: data.shareId,
+        tradeId: data.tradeId,
+        date: data.date,
+        pnl: typeof data.pnl === 'number' ? data.pnl : 0,
+        direction: data.direction,
+      });
+    });
+    return out;
   } catch {
     return [];
   }
@@ -231,8 +275,31 @@ const NoteMetaPanel: React.FC<NoteMetaPanelProps> = ({ note, notes, onSelectNote
   const theme = useTheme();
 
   const headings = useMemo(() => (note ? extractHeadings(note.content) : []), [note?.content]);
+  const linkedTrades = useMemo(() => (note ? extractLinkedTrades(note.content) : []), [note?.content]);
   const wordCount = useMemo(() => (note ? countWords(note.content) : 0), [note?.content]);
   const readMins = Math.max(1, Math.round(wordCount / 200));
+
+  // Shared-trade preview state. Owned locally so the panel works
+  // regardless of whether the note is being edited (editor mounted) or
+  // viewed (read-only panel mounted) — both surfaces are siblings.
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewTrade, setPreviewTrade] = useState<Trade | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [zoomedImages, setZoomedImages] = useState<ImageZoomProp | null>(null);
+
+  const handleOpenLinkedTrade = useCallback(async (shareId: string) => {
+    setPreviewOpen(true);
+    setPreviewLoading(true);
+    setPreviewTrade(null);
+    try {
+      const data = await getSharedTrade(shareId);
+      if (data?.trade) setPreviewTrade(data.trade);
+    } catch (err) {
+      logger.error('Error loading shared trade for linked-trades panel:', err);
+    } finally {
+      setPreviewLoading(false);
+    }
+  }, []);
 
   const reminderNotes = useMemo(
     () => (notes ?? []).filter(n => n.is_reminder_active === true),
@@ -325,6 +392,122 @@ const NoteMetaPanel: React.FC<NoteMetaPanelProps> = ({ note, notes, onSelectNote
           </Box>
         )}
 
+        {/* Linked trades — surfaces every TRADE_LINK chip embedded in the
+            note so the user can jump back to a referenced trade without
+            scrolling the body. Hidden when the note has none. */}
+        {note && linkedTrades.length > 0 && (
+          <Box>
+            <Typography sx={sectionLabelSx}>Linked Trades</Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+              {linkedTrades.map((t) => {
+                const isWin = t.pnl >= 0;
+                const color = isWin
+                  ? theme.palette.success.main
+                  : theme.palette.error.main;
+                const Arrow = t.direction === 'short'
+                  ? TradeShortArrowIcon
+                  : TradeArrowIcon;
+                let dateLabel = t.date;
+                let timeLabel: string | null = null;
+                try {
+                  const d = new Date(t.date);
+                  if (!isNaN(d.getTime())) {
+                    dateLabel = d.toLocaleDateString('en-US', {
+                      weekday: 'short', month: 'short', day: 'numeric',
+                    });
+                    const hh = d.getHours();
+                    const mm = d.getMinutes();
+                    if (hh !== 0 || mm !== 0) {
+                      timeLabel = d.toLocaleTimeString('en-US', {
+                        hour: '2-digit', minute: '2-digit', hour12: false,
+                      });
+                    }
+                  }
+                } catch { /* keep raw */ }
+                const sign = t.pnl >= 0 ? '+' : '-';
+                const pnlLabel = `${sign}$${Math.abs(t.pnl).toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+                return (
+                  <Box
+                    key={t.tradeId}
+                    onClick={() => { void handleOpenLinkedTrade(t.shareId); }}
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1,
+                      px: 1.25,
+                      py: 0.85,
+                      cursor: 'pointer',
+                      borderRadius: '8px',
+                      border: `1px solid ${theme.palette.divider}`,
+                      bgcolor: alpha(theme.palette.common.white, theme.palette.mode === 'dark' ? 0.02 : 0.5),
+                      transition: 'all 150ms cubic-bezier(0.22, 1, 0.36, 1)',
+                      '&:hover': {
+                        bgcolor: alpha(color, 0.08),
+                        borderColor: alpha(color, 0.35),
+                      },
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        width: 22,
+                        height: 22,
+                        borderRadius: '6px',
+                        bgcolor: alpha(color, 0.14),
+                        color,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Arrow sx={{ fontSize: '0.95rem' }} />
+                    </Box>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography
+                        sx={{
+                          fontSize: '0.78rem',
+                          fontWeight: 600,
+                          color: 'text.primary',
+                          lineHeight: 1.25,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {dateLabel}{timeLabel ? ` · ${timeLabel}` : ''}
+                      </Typography>
+                      <Typography
+                        sx={{
+                          fontSize: '0.7rem',
+                          fontWeight: 500,
+                          color: 'text.disabled',
+                          letterSpacing: '0.04em',
+                          textTransform: 'uppercase',
+                          lineHeight: 1.3,
+                        }}
+                      >
+                        {t.direction === 'short' ? 'Short' : t.direction === 'long' ? 'Long' : 'Shared trade'}
+                      </Typography>
+                    </Box>
+                    <Typography
+                      sx={{
+                        fontSize: '0.82rem',
+                        fontWeight: 700,
+                        color,
+                        fontFeatureSettings: "'tnum' on, 'lnum' on",
+                        letterSpacing: '-0.01em',
+                        flexShrink: 0,
+                      }}
+                    >
+                      {pnlLabel}
+                    </Typography>
+                  </Box>
+                );
+              })}
+            </Box>
+          </Box>
+        )}
+
         {/* Outline */}
         {note && headings.length > 0 && (
           <Box>
@@ -405,9 +588,46 @@ const NoteMetaPanel: React.FC<NoteMetaPanelProps> = ({ note, notes, onSelectNote
           </Box>
         )}
 
-       
+
 
       </Box>
+
+      {/* Shared-trade preview surfaced when a Linked Trades row is clicked.
+          Read-only — this panel never edits trades. */}
+      {previewOpen && (
+        <TradeGalleryDialog
+          open={previewOpen}
+          onClose={() => { setPreviewOpen(false); setPreviewTrade(null); }}
+          trades={previewTrade ? [previewTrade] : []}
+          initialTradeId={previewTrade?.id}
+          loading={previewLoading}
+          setZoomedImage={(url, allImages, initialIndex) => {
+            setZoomedImages({ selectetdImageIndex: initialIndex || 0, allImages: allImages || [url] });
+          }}
+          title={previewTrade?.name || 'Trade Preview'}
+          isReadOnly
+          tradeOperations={{
+            onZoomImage: (url, allImages, initialIndex) => {
+              setZoomedImages({ selectetdImageIndex: initialIndex || 0, allImages: allImages || [url] });
+            },
+            onUpdateTradeProperty: undefined,
+            calendarId: undefined,
+            onOpenGalleryMode: undefined,
+            economicFilter: undefined,
+            onOpenAIChat: undefined,
+            isTradeUpdating: undefined,
+            isReadOnly: true,
+          }}
+        />
+      )}
+
+      {zoomedImages && (
+        <ImageZoomDialog
+          open={!!zoomedImages}
+          onClose={() => setZoomedImages(null)}
+          imageProp={zoomedImages}
+        />
+      )}
     </Box>
   );
 };

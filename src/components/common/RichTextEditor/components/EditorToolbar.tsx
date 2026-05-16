@@ -32,6 +32,8 @@ import {
   Link,
   FormatClear,
   Image as ImageIcon,
+  CampaignOutlined as CalloutIcon,
+  CallMadeOutlined as TradeChipIcon,
 } from '@mui/icons-material';
 import { EditorState, DraftInlineStyle } from 'draft-js';
 
@@ -41,6 +43,12 @@ import { useRecentColors } from '../hooks/useRecentColors';
 import { handleToolbarInteraction } from '../utils/styleUtils';
 import { getCurrentBlockType } from '../utils/editorActions';
 import { getCurrentLink } from '../utils/linkUtils';
+import {
+  CALLOUT_VARIANTS,
+  CALLOUT_LABELS,
+  isCalloutBlockType,
+  type CalloutVariant,
+} from '../utils/calloutUtils';
 
 const Z_INDEX = 2000;
 
@@ -60,6 +68,18 @@ export interface EditorToolbarProps {
   onClearFormatting: () => void;
   onLinkClick: () => void;
   onImageClick: () => void;
+  /**
+   * Callout block toggle. Optional — toolbar gracefully omits the button
+   * when the host doesn't wire it.
+   */
+  onToggleCallout?: (variant: CalloutVariant) => void;
+  /**
+   * Trade-link insert handler. Invoked when the user clicks the trade
+   * button. The host gathers the share URL (e.g. via a dialog), resolves
+   * it to trade data, and then calls insertTradeLink() on the editor.
+   * Optional — when omitted, the toolbar hides the button.
+   */
+  onInsertTradeLink?: () => void;
   // Callback when any menu opens/closes (for floating toolbar visibility management)
   onMenuOpenChange?: (isOpen: boolean) => void;
 }
@@ -79,6 +99,8 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
   onClearFormatting,
   onLinkClick,
   onImageClick,
+  onToggleCallout,
+  onInsertTradeLink,
   onMenuOpenChange,
 }) => {
   const theme = useTheme();
@@ -88,6 +110,14 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
   // Menu states
   const [headingMenuAnchor, setHeadingMenuAnchor] = useState<null | HTMLElement>(null);
   const [colorMenuAnchor, setColorMenuAnchor] = useState<null | HTMLElement>(null);
+  const [calloutMenuAnchor, setCalloutMenuAnchor] = useState<null | HTMLElement>(null);
+
+  const CALLOUT_COLOR: Record<CalloutVariant, string> = {
+    'callout-warning': theme.palette.warning.main,
+    'callout-info': theme.palette.primary.main,
+    'callout-success': theme.palette.success.main,
+    'callout-danger': theme.palette.error.main,
+  };
 
   // Recent colors hook
   const {
@@ -188,6 +218,29 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
     setHeadingMenuAnchor(null);
     onMenuOpenChange?.(Boolean(colorMenuAnchor));
   };
+
+  const handleCalloutButtonClick = (event: React.MouseEvent<HTMLElement>) => {
+    if (calloutMenuAnchor) {
+      setCalloutMenuAnchor(null);
+      onMenuOpenChange?.(Boolean(headingMenuAnchor || colorMenuAnchor));
+    } else {
+      setCalloutMenuAnchor(event.currentTarget);
+      onMenuOpenChange?.(true);
+    }
+  };
+
+  const handleCalloutMenuClose = () => {
+    setCalloutMenuAnchor(null);
+    onMenuOpenChange?.(Boolean(headingMenuAnchor || colorMenuAnchor));
+  };
+
+  const handleCalloutSelect = (variant: CalloutVariant) => {
+    onToggleCallout?.(variant);
+    setCalloutMenuAnchor(null);
+    onMenuOpenChange?.(Boolean(headingMenuAnchor || colorMenuAnchor));
+  };
+
+  const isCurrentCallout = isCalloutBlockType(currentBlockType);
 
   // Render color menu
   const renderColorMenu = () => {
@@ -462,6 +515,70 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
     );
   };
 
+  // Callout menu renderer
+  const renderCalloutMenu = () => {
+    if (!calloutMenuAnchor) return null;
+    return (
+      <Menu
+        id="callout-menu"
+        anchorEl={calloutMenuAnchor}
+        open={Boolean(calloutMenuAnchor)}
+        onClose={handleCalloutMenuClose}
+        disablePortal={false}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'center' }}
+        disableScrollLock={true}
+        disableAutoFocus={true}
+        disableEnforceFocus={true}
+        sx={{ zIndex: Z_INDEX }}
+        slotProps={{
+          paper: {
+            onMouseDown: handleToolbarInteraction,
+            onTouchStart: handleToolbarInteraction,
+            sx: {
+              backgroundColor: theme.palette.background.paper,
+              borderRadius: '12px',
+              border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
+              boxShadow: theme.palette.mode === 'dark'
+                ? `0 8px 32px ${alpha('#000000', 0.4)}, 0 2px 8px ${alpha('#000000', 0.2)}`
+                : `0 8px 32px ${alpha(theme.palette.primary.main, 0.15)}, 0 2px 8px ${alpha('#000000', 0.1)}`,
+              mt: 1,
+            }
+          }
+        }}
+      >
+        {CALLOUT_VARIANTS.map((variant) => {
+          const color = CALLOUT_COLOR[variant];
+          return (
+            <MenuItem
+              key={variant}
+              onClick={() => handleCalloutSelect(variant)}
+              selected={currentBlockType === variant}
+              sx={{
+                fontSize: '0.85rem',
+                borderRadius: '6px',
+                margin: '2px 4px',
+                color,
+                '&:hover': {
+                  backgroundColor: alpha(color, 0.1),
+                },
+                '&.Mui-selected': {
+                  backgroundColor: alpha(color, 0.16),
+                  color,
+                  '&:hover': {
+                    backgroundColor: alpha(color, 0.22),
+                  }
+                }
+              }}
+            >
+              {CALLOUT_LABELS[variant]}
+            </MenuItem>
+          );
+        })}
+      </Menu>
+    );
+  };
+
   // Common toolbar button styles
   const getToolbarButtonStyles = () => ({
     '& .MuiIconButton-root, & .MuiToggleButton-root': {
@@ -622,6 +739,66 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
 
       <Divider orientation="vertical" flexItem />
 
+      {/* Insert trade share link — opens host dialog to paste a /shared/ URL. */}
+      {onInsertTradeLink && (
+        <>
+          <Box>
+            <Tooltip title="Insert trade share link" placement="top">
+              <IconButton
+                size="small"
+                onClick={() => onInsertTradeLink()}
+                onMouseDown={handleToolbarInteraction}
+                onTouchStart={handleToolbarInteraction}
+                disabled={disabled}
+                aria-label="Insert trade share link"
+                sx={{
+                  padding: '6px 8px',
+                  minWidth: '36px',
+                  height: '36px',
+                  margin: '0 2px',
+                }}
+              >
+                <TradeChipIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Box>
+          <Divider orientation="vertical" flexItem />
+        </>
+      )}
+
+      {/* Callout (Warning / Info / Success / Danger) */}
+      {onToggleCallout && (
+        <>
+          <Box>
+            <Tooltip title="Callout block" placement="top">
+              <IconButton
+                size="small"
+                onClick={handleCalloutButtonClick}
+                disabled={disabled}
+                aria-haspopup="true"
+                aria-controls={calloutMenuAnchor ? 'callout-menu' : undefined}
+                aria-expanded={Boolean(calloutMenuAnchor)}
+                aria-label="Insert callout"
+                sx={{
+                  padding: '6px 8px',
+                  minWidth: '36px',
+                  height: '36px',
+                  margin: '0 2px',
+                  ...(isCurrentCallout && {
+                    backgroundColor: alpha(theme.palette.primary.main, 0.12),
+                    color: theme.palette.primary.main,
+                  }),
+                }}
+              >
+                <CalloutIcon fontSize="small" />
+                <ArrowDropDown fontSize="inherit" sx={{ ml: -0.5, fontSize: '16px' }} />
+              </IconButton>
+            </Tooltip>
+          </Box>
+          <Divider orientation="vertical" flexItem />
+        </>
+      )}
+
       {/* Color Formatting */}
       <Box>
         <Tooltip title="Text & Background Color" placement="top">
@@ -743,6 +920,7 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
         </div>
         {renderHeadingMenu()}
         {renderColorMenu()}
+        {renderCalloutMenu()}
       </>
     );
   }
@@ -770,6 +948,7 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
       </Box>
       {renderHeadingMenu()}
       {renderColorMenu()}
+      {renderCalloutMenu()}
     </>
   );
 };

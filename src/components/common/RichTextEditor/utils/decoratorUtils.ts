@@ -8,6 +8,8 @@ import NoteLinkComponent from '../components/NoteLinkComponent';
 import { findNoteLinkEntities } from './noteEntityUtils';
 import EventLinkComponent from '../components/EventLinkComponent';
 import { findEventLinkEntities } from './eventEntityUtils';
+import TradeLinkComponent from '../components/TradeLinkComponent';
+import { findTradeLinkEntities } from './tradeEntityUtils';
 import type { ImpactLevel, Currency } from '../../../../types/economicCalendar';
 
 /**
@@ -59,6 +61,14 @@ export const createDecorator = (
         React.createElement(EventLinkComponent, {
           ...props,
           onEventLinkClick,
+        }),
+    },
+    {
+      strategy: findTradeLinkEntities,
+      component: (props: any) =>
+        React.createElement(TradeLinkComponent, {
+          ...props,
+          onSharedTradeClick,
         }),
     },
   ]);

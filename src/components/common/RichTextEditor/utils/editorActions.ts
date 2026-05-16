@@ -226,6 +226,14 @@ export const blockStyleFn = (contentBlock: any): string => {
       return 'RichEditor-ul';
     case 'ordered-list-item':
       return 'RichEditor-ol';
+    case 'callout-warning':
+      return 'RichEditor-callout RichEditor-callout-warning';
+    case 'callout-info':
+      return 'RichEditor-callout RichEditor-callout-info';
+    case 'callout-success':
+      return 'RichEditor-callout RichEditor-callout-success';
+    case 'callout-danger':
+      return 'RichEditor-callout RichEditor-callout-danger';
     default:
       return ''; // Let Draft handle default block styling
   }

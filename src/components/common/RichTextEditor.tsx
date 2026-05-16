@@ -42,6 +42,10 @@ import {
   getEventTrigger,
   replaceEventTriggerWithLink,
 } from './RichTextEditor/utils/eventEntityUtils';
+import {
+  insertTradeLinkEntity,
+  type TradeChipData,
+} from './RichTextEditor/utils/tradeEntityUtils';
 import type {
   ImpactLevel,
   Currency,
@@ -63,6 +67,11 @@ import {
   handleLinkDialogClose
 } from './RichTextEditor/utils/linkDialogUtils';
 import { createDecorator } from './RichTextEditor/utils/decoratorUtils';
+import {
+  handleCalloutReturn,
+  toggleCalloutBlock,
+  type CalloutVariant,
+} from './RichTextEditor/utils/calloutUtils';
 import { insertImage, removeImageBlock } from './RichTextEditor/utils/imageUtils';
 import ImageBlock from './RichTextEditor/components/ImageBlock';
 import ImageUploadDialog from './RichTextEditor/components/ImageUploadDialog';
@@ -115,7 +124,13 @@ export interface RichTextEditorProps {
     currency: Currency,
     impact: ImpactLevel
   ) => void;
-  // Callback for shared trade link clicks (inline preview)
+  // Trade-link insert. When supplied, the toolbar shows the trade button;
+  // clicking it invokes this callback, which is expected to gather the
+  // share URL (e.g. via a dialog) and then call insertTradeLink(data) on
+  // the editor's imperative handle.
+  onInsertTradeLink?: () => void;
+  // Callback for shared trade link clicks (inline preview). Used for both
+  // raw LINK entities pointing at /shared/... AND TRADE_LINK chip entities.
   onSharedTradeClick?: (shareId: string, tradeId: string) => void;
   // Fires whenever internal editorState changes. Parents that render a
   // sticky toolbar outside this component MUST mirror this state — reading
@@ -133,6 +148,12 @@ export interface RichTextEditorHandle {
   applyTextColor: (color: string) => void;
   applyBackgroundColor: (color: string) => void;
   applyHeading: (headingStyle: string) => void;
+  toggleCallout: (variant: CalloutVariant) => void;
+  /**
+   * Programmatically insert a TRADE_LINK chip at the current cursor.
+   * Host calls this after resolving share-link → trade data.
+   */
+  insertTradeLink: (data: TradeChipData) => void;
   clearFormatting: () => void;
   handleLinkClick: () => void;
   handleImageClick: () => void;
@@ -201,6 +222,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
   availableEvents,
   onEventLinkStateChange,
   onEventLinkClick,
+  onInsertTradeLink,
   onSharedTradeClick,
   onEditorStateChange,
 }, ref) => {
@@ -429,6 +451,18 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
     ]
   );
 
+  // Programmatic chip insert. Caller (host dialog) supplies resolved data
+  // — the editor never fetches; it just renders.
+  const handleInsertTradeLink = useCallback(
+    (data: TradeChipData) => {
+      const newState = insertTradeLinkEntity(editorState, data);
+      setEditorState(newState);
+      emitState(newState);
+      setTimeout(() => editorRef.current?.focus(), 50);
+    },
+    [editorState, emitState]
+  );
+
   // Handle editor state changes
   const handleEditorChange = (state: EditorState) => {
     const prevContentState = editorState.getCurrentContent();
@@ -558,6 +592,15 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
     handleEditorChange(newState);
   };
 
+  // Toggle a callout block. Uses calloutUtils' swap-aware helper so that
+  // tapping the same variant twice clears it and tapping a different
+  // variant on an existing callout swaps in place.
+  const handleToggleCallout = (variant: CalloutVariant) => {
+    const newState = toggleCalloutBlock(editorState, variant);
+    handleEditorChange(newState);
+    setTimeout(() => editorRef.current?.focus(), 0);
+  };
+
   // Clear formatting using utility
   const handleClearFormatting = () => {
     const newState = clearFormatting(editorState, editorRef);
@@ -625,6 +668,17 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
 
   const handleReturn = useCallback(
     (e: React.KeyboardEvent): 'handled' | 'not-handled' => {
+      // Empty-line Enter inside a callout exits the callout. The pickers
+      // are checked first if active so their selection-on-Enter wins;
+      // when no picker is open we fall through to the callout check.
+      if (!mentionActive && !noteLinkActive && !eventLinkActive) {
+        const exitState = handleCalloutReturn(editorState);
+        if (exitState) {
+          e.preventDefault();
+          handleEditorChange(exitState);
+          return 'handled';
+        }
+      }
       if (eventLinkActive && eventLinkFilteredEvents.length > 0) {
         e.preventDefault();
         const selected =
@@ -666,12 +720,16 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
       return 'not-handled';
     },
     [
+      editorState,
       mentionActive, mentionFilteredTags,
       mentionSelectedIndex, handleMentionSelect,
       noteLinkActive, availableNotes, noteLinkSearch,
       noteLinkSelectedIndex, handleNoteLinkSelect,
       eventLinkActive, eventLinkFilteredEvents,
       eventLinkSelectedIndex, handleEventLinkSelect,
+      // handleEditorChange is intentionally omitted — it is a stable inline
+      // function in this component, recreated on every render anyway.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     ]
   );
 
@@ -838,6 +896,8 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
     applyTextColor: handleApplyTextColor,
     applyBackgroundColor: handleApplyBackgroundColor,
     applyHeading: handleApplyHeading,
+    toggleCallout: handleToggleCallout,
+    insertTradeLink: handleInsertTradeLink,
     clearFormatting: handleClearFormatting,
     handleLinkClick,
     handleImageClick,
@@ -864,6 +924,8 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
       handleApplyBackgroundColor, handleApplyHeading,
       handleClearFormatting, handleLinkClick,
       handleImageClick, handleInsertTag,
+      handleToggleCallout,
+      handleInsertTradeLink,
       mentionActive, mentionFilteredTags,
       mentionSelectedIndex, handleMentionSelect,
       noteLinkActive, availableNotes, noteLinkSearch,
@@ -910,7 +972,11 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
 
   // Create keyboard command handler using utility
   const handleKeyCommandWrapper = (command: string, state: EditorState): 'handled' | 'not-handled' => {
-    if (command === 'note-link-nav' || command === 'mention-nav') {
+    if (
+      command === 'note-link-nav' ||
+      command === 'mention-nav' ||
+      command === 'event-link-nav'
+    ) {
       return 'handled';
     }
     return handleKeyCommand(command, state, {
@@ -954,6 +1020,8 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
             onClearFormatting={handleClearFormatting}
             onLinkClick={handleLinkClick}
             onImageClick={handleImageClick}
+            onToggleCallout={handleToggleCallout}
+            onInsertTradeLink={onInsertTradeLink}
             onMenuOpenChange={setIsMenuOpen}
           />
         )}
@@ -1028,6 +1096,55 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
              },
              '& .RichEditor-ol': { // Ensure ol counters work
                  // listStyleType: 'decimal';
+             },
+             // Callout block styles — colored left rail + tinted background.
+             // Adjacent callouts of the same variant fuse into a single visual
+             // box by zeroing the inter-block padding, mirroring how a quote
+             // banner reads in design specimens.
+             '& .RichEditor-callout': {
+               borderLeftStyle: 'solid',
+               borderLeftWidth: '3px',
+               padding: '8px 14px',
+               margin: '4px 0',
+               borderRadius: '4px',
+               fontSize: '0.9rem',
+               lineHeight: 1.6,
+             },
+             // Fuse adjacent callouts of the SAME variant only. Using the
+             // base class here would zero the gap between e.g. a warning
+             // followed by a danger callout, producing a half-yellow /
+             // half-red block with no visual separation.
+             '& .RichEditor-callout-warning + .RichEditor-callout-warning, & .RichEditor-callout-info + .RichEditor-callout-info, & .RichEditor-callout-success + .RichEditor-callout-success, & .RichEditor-callout-danger + .RichEditor-callout-danger': {
+               marginTop: 0,
+               paddingTop: 0,
+               borderTopLeftRadius: 0,
+               borderTopRightRadius: 0,
+             },
+             '& .RichEditor-callout-warning:has(+ .RichEditor-callout-warning), & .RichEditor-callout-info:has(+ .RichEditor-callout-info), & .RichEditor-callout-success:has(+ .RichEditor-callout-success), & .RichEditor-callout-danger:has(+ .RichEditor-callout-danger)': {
+               paddingBottom: 0,
+               marginBottom: 0,
+               borderBottomLeftRadius: 0,
+               borderBottomRightRadius: 0,
+             },
+             '& .RichEditor-callout-warning': {
+               borderLeftColor: theme.palette.warning.main,
+               backgroundColor: alpha(theme.palette.warning.main, 0.08),
+               color: theme.palette.warning.main,
+             },
+             '& .RichEditor-callout-info': {
+               borderLeftColor: theme.palette.primary.main,
+               backgroundColor: alpha(theme.palette.primary.main, 0.08),
+               color: theme.palette.primary.light,
+             },
+             '& .RichEditor-callout-success': {
+               borderLeftColor: theme.palette.success.main,
+               backgroundColor: alpha(theme.palette.success.main, 0.08),
+               color: theme.palette.success.main,
+             },
+             '& .RichEditor-callout-danger': {
+               borderLeftColor: theme.palette.error.main,
+               backgroundColor: alpha(theme.palette.error.main, 0.08),
+               color: theme.palette.error.main,
              },
              // Link styles - enhanced visual feedback
              '& .rich-editor-link': {
@@ -1121,6 +1238,8 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
             onClearFormatting={handleClearFormatting}
             onLinkClick={handleLinkClick}
             onImageClick={handleImageClick}
+            onToggleCallout={handleToggleCallout}
+            onInsertTradeLink={onInsertTradeLink}
             onMenuOpenChange={setIsMenuOpen}
           />
         )}
@@ -1141,6 +1260,8 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
             onClearFormatting={handleClearFormatting}
             onLinkClick={handleLinkClick}
             onImageClick={handleImageClick}
+            onToggleCallout={handleToggleCallout}
+            onInsertTradeLink={onInsertTradeLink}
             onMenuOpenChange={setIsMenuOpen}
           />
         )}

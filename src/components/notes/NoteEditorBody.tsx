@@ -42,6 +42,10 @@ import {
   MenuList,
   MenuItem,
   ListItemText,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import {
   pink,
@@ -87,7 +91,11 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { formatDistanceToNow } from 'date-fns';
 
 import { EditorState } from 'draft-js';
-import RichTextEditor, { RichTextEditorHandle } from '../common/RichTextEditor';
+import RichTextEditor, {
+  RichTextEditorHandle,
+} from '../common/RichTextEditor';
+import type { TradeChipData } from '../common/RichTextEditor/utils/tradeEntityUtils';
+import { isInternalTradeLink } from '../common/RichTextEditor/utils/linkUtils';
 import { Z_INDEX } from '../../styles/zIndex';
 import EditorToolbar from '../common/RichTextEditor/components/EditorToolbar';
 import ImagePickerDialog from '../heroImage/ImagePickerDialog';
@@ -588,6 +596,58 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
     noteNav.navigateTo(noteId, noteTitle);
   }, [noteNav, saveIfDirty]);
 
+  // ─── Insert-trade-link dialog ────────────────────────────────────────────
+  // Toolbar button → dialog → user pastes /shared/<shareId> URL → we resolve
+  // it via getSharedTrade and ask the editor to insert a TRADE_LINK chip.
+  const [tradeLinkDialogOpen, setTradeLinkDialogOpen] = useState(false);
+  const [tradeLinkInputUrl, setTradeLinkInputUrl] = useState('');
+  const [tradeLinkError, setTradeLinkError] = useState<string | null>(null);
+  const [tradeLinkLoading, setTradeLinkLoading] = useState(false);
+
+  const openTradeLinkDialog = useCallback(() => {
+    setTradeLinkInputUrl('');
+    setTradeLinkError(null);
+    setTradeLinkLoading(false);
+    setTradeLinkDialogOpen(true);
+  }, []);
+
+  const submitTradeLinkInsert = useCallback(async () => {
+    const url = tradeLinkInputUrl.trim();
+    if (!url) {
+      setTradeLinkError('Paste a trade share link to continue.');
+      return;
+    }
+    const parsed = isInternalTradeLink(url);
+    if (parsed.type !== 'shared' || !parsed.id) {
+      setTradeLinkError("That doesn't look like a trade share link (expected /shared/<id>).");
+      return;
+    }
+    setTradeLinkError(null);
+    setTradeLinkLoading(true);
+    try {
+      const result = await getSharedTrade(parsed.id);
+      const trade = result?.trade;
+      if (!trade) {
+        setTradeLinkError('Share link not found or is no longer accessible.');
+        return;
+      }
+      const data: TradeChipData = {
+        shareId: parsed.id,
+        tradeId: trade.id,
+        date: new Date(trade.trade_date).toISOString(),
+        // trade.amount is signed P&L; preserve sign for win/loss styling.
+        pnl: trade.amount ?? 0,
+      };
+      editorRef.current?.insertTradeLink(data);
+      setTradeLinkDialogOpen(false);
+    } catch (err) {
+      logger.error('Failed to resolve trade share link', err);
+      setTradeLinkError('Failed to load the trade. Check the link and try again.');
+    } finally {
+      setTradeLinkLoading(false);
+    }
+  }, [tradeLinkInputUrl]);
+
   const handleSharedTradeClick = useCallback(async (shareId: string, _tradeId: string) => {
     setTradePreviewOpen(true);
     setTradePreviewLoading(true);
@@ -753,6 +813,8 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
           onClearFormatting={() => editorRef.current?.clearFormatting()}
           onLinkClick={() => editorRef.current?.handleLinkClick()}
           onImageClick={() => editorRef.current?.handleImageClick()}
+          onToggleCallout={(v) => editorRef.current?.toggleCallout(v)}
+          onInsertTradeLink={openTradeLinkDialog}
           onMenuOpenChange={(open) => {
             setIsToolbarMenuOpen(open);
             editorRef.current?.setIsMenuOpen(open);
@@ -906,7 +968,7 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
               userSelect: 'none',
             }}
           >
-            Type /tag + space, /note + space, or /event + space to embed tags, notes, and pinned events
+            Type /tag, /note, or /event (followed by a space) to embed — or use the toolbar to insert a trade share link
           </Typography>
         )}
       </Box>
@@ -1269,6 +1331,7 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
             onNoteLinkStateChange={() => setMentionVersion(v => v + 1)}
             availableEvents={pinnedEvents}
             onEventLinkStateChange={() => setMentionVersion(v => v + 1)}
+            onInsertTradeLink={openTradeLinkDialog}
             calendarId={calendarId}
             onSharedTradeClick={handleSharedTradeClick}
           />
@@ -1370,6 +1433,57 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
         onImageSelect={handleImageSelect}
         title="Choose a cover image"
       />
+
+      {/* Insert trade share link dialog */}
+      <Dialog
+        open={tradeLinkDialogOpen}
+        onClose={() => !tradeLinkLoading && setTradeLinkDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        sx={{ zIndex: Z_INDEX.RICH_TEXT_DIALOG }}
+      >
+        <DialogTitle>Insert trade share link</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+            Paste a trade share link (e.g. <code>/shared/share_…</code> or full URL).
+          </Typography>
+          <TextField
+            autoFocus
+            fullWidth
+            value={tradeLinkInputUrl}
+            onChange={(e) => {
+              setTradeLinkInputUrl(e.target.value);
+              if (tradeLinkError) setTradeLinkError(null);
+            }}
+            placeholder="https://app/shared/share_…"
+            error={!!tradeLinkError}
+            helperText={tradeLinkError ?? ' '}
+            disabled={tradeLinkLoading}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !tradeLinkLoading) {
+                e.preventDefault();
+                void submitTradeLinkInsert();
+              }
+            }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setTradeLinkDialogOpen(false)}
+            disabled={tradeLinkLoading}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => { void submitTradeLinkInsert(); }}
+            disabled={tradeLinkLoading || !tradeLinkInputUrl.trim()}
+          >
+            {tradeLinkLoading ? 'Loading…' : 'Insert'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
 
       <ConfirmationDialog
         open={deleteConfirmOpen}
