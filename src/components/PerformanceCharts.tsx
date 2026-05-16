@@ -8,7 +8,6 @@ import TagPatternAnalysis from './TagPatternAnalysis';
 import RoundedTabs from './common/RoundedTabs';
 import KpiStrip from './performance/KpiStrip';
 import WeekdayWinRate from './performance/WeekdayWinRate';
-import { perfTokens as perf } from './performance/performanceTokens';
 import { logger } from '../utils/logger';
 import { getFilteredTrades, getNormalizedDate } from '../utils/chartDataUtils';
 import {
@@ -519,10 +518,10 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
         p: { xs: 1, sm: 2 },
         minHeight: { xs: 'auto', sm: 500 },
         '& .MuiPaper-root': {
-          backgroundColor: perf.bgAlt,
+          backgroundColor: theme.palette.background.paper,
           backgroundImage: 'none',
-          border: `1px solid ${perf.hair}`,
-          borderRadius: `${perf.radius.card}px`,
+          border: `1px solid ${theme.palette.divider}`,
+          borderRadius: `${theme.palette.custom.radius.xl}px`,
           boxShadow: 'none',
         },
       }}

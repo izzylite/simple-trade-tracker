@@ -205,7 +205,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({ onToggleTheme, mode }) => {
                             )
                           : 'transparent',
                         textTransform: 'none',
-                        transition: 'all 0.15s ease',
+                        transition: 'all 150ms cubic-bezier(0.22, 1, 0.36, 1)',
                         '&:hover': {
                           bgcolor: active
                             ? (theme) =>
@@ -300,7 +300,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({ onToggleTheme, mode }) => {
                     fontWeight: 600,
                     transition: 'box-shadow 150ms cubic-bezier(0.4, 0, 0.2, 1)',
                     '&:hover': {
-                      boxShadow: `0 0 0 3px ${alpha(theme.palette.primary.main, 0.25)}`
+                      boxShadow: theme.palette.custom.focusRingStrong
                     }
                   }}
                 >

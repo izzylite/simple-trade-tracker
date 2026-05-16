@@ -815,7 +815,7 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
                   border: isSelected
                     ? `1.5px solid ${alpha(theme.palette.primary.main, 0.25)}`
                     : `1px solid ${alpha(theme.palette.text.primary, 0.15)}`,
-                  transition: 'all 0.15s ease',
+                  transition: 'all 150ms cubic-bezier(0.22, 1, 0.36, 1)',
                   '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.1), color: theme.palette.primary.main },
                   '& .MuiChip-icon': { color: 'inherit' },
                 }}
@@ -844,7 +844,7 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
                   border: isSelected
                     ? `1.5px solid ${alpha(theme.palette.primary.main, 0.25)}`
                     : `1px solid ${alpha(theme.palette.text.primary, 0.15)}`,
-                  transition: 'all 0.15s ease',
+                  transition: 'all 150ms cubic-bezier(0.22, 1, 0.36, 1)',
                   '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.1), color: theme.palette.primary.main },
                   '& .MuiChip-icon': { color: 'inherit' },
                 }}
@@ -889,7 +889,7 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
                   border: isSelected
                     ? `1.5px solid ${alpha(impactColor, 0.25)}`
                     : `1px solid ${alpha(theme.palette.text.primary, 0.15)}`,
-                  transition: 'all 0.15s ease',
+                  transition: 'all 150ms cubic-bezier(0.22, 1, 0.36, 1)',
                   '&:hover': { bgcolor: alpha(impactColor, 0.1), color: impactColor },
                   '& .MuiChip-icon': { color: 'inherit' },
                 }}

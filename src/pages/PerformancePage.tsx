@@ -3,6 +3,7 @@ import {
   Box,
   Typography,
   CircularProgress,
+  useTheme,
 } from '@mui/material';
 import { useAuthState } from '../contexts/AuthStateContext';
 import { useCalendars } from '../hooks/useCalendars';
@@ -11,7 +12,6 @@ import PerformanceCharts, { TimePeriod } from '../components/PerformanceCharts';
 import CalendarLockedOverlay from '../components/calendars/CalendarLockedOverlay';
 import { useSelectedCalendar } from '../contexts/SelectedCalendarContext';
 import PerformanceHeader from '../components/performance/PerformanceHeader';
-import { perfTokens } from '../components/performance/performanceTokens';
 
 const SWITCH_SPINNER_MS = 350;
 const APP_HEADER_HEIGHT = 64;
@@ -33,6 +33,7 @@ const PerformancePage: React.FC<PerformancePageProps> = ({
   onUpdateCalendar,
   onCreateCalendar,
 }) => {
+  const theme = useTheme();
   const { user } = useAuthState();
   const { calendars, isLoading } = useCalendars(user?.uid);
   // SWR returns `undefined` until the first fetch resolves; an empty
@@ -155,9 +156,9 @@ const PerformancePage: React.FC<PerformancePageProps> = ({
     <Box
       sx={{
         position: 'relative',
-        bgcolor: perfTokens.bg,
+        bgcolor: theme.palette.background.default,
         minHeight: `calc(100vh - ${APP_HEADER_HEIGHT}px)`,
-        color: perfTokens.fg,
+        color: theme.palette.text.primary,
       }}
     >
       <Box

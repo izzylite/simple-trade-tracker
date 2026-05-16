@@ -1,8 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { Box, Popover } from '@mui/material';
+import { Box, Popover, useTheme } from '@mui/material';
 import { format, addMonths, addQuarters, addYears, startOfQuarter, startOfYear, startOfMonth } from 'date-fns';
 import { TimePeriod } from '../PerformanceCharts';
-import { perfTokens as t } from './performanceTokens';
 
 interface PeriodPickerProps {
   period: TimePeriod;
@@ -46,37 +45,42 @@ const ArrowBtn: React.FC<{ disabled?: boolean; onClick: (e: React.MouseEvent) =>
   onClick,
   children,
   ariaLabel,
-}) => (
-  <Box
-    component="button"
-    aria-label={ariaLabel}
-    disabled={disabled}
-    onClick={onClick}
-    sx={{
-      width: 28,
-      height: 28,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: 'transparent',
-      border: 0,
-      color: disabled ? t.fgLow : t.fgMute,
-      cursor: disabled ? 'default' : 'pointer',
-      borderRadius: '6px',
-      fontFamily: 'inherit',
-      fontSize: '0.95rem',
-      fontWeight: 600,
-      transition: 'color 150ms, background 150ms',
-      '&:hover': disabled
-        ? undefined
-        : { color: t.fg, background: 'rgba(255,255,255,0.04)' },
-    }}
-  >
-    {children}
-  </Box>
-);
+}) => {
+  const theme = useTheme();
+  return (
+    <Box
+      component="button"
+      aria-label={ariaLabel}
+      disabled={disabled}
+      onClick={onClick}
+      sx={{
+        width: 28,
+        height: 28,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'transparent',
+        border: 0,
+        color: disabled ? theme.palette.text.tertiary : theme.palette.text.secondary,
+        cursor: disabled ? 'default' : 'pointer',
+        borderRadius: '6px',
+        fontFamily: 'inherit',
+        fontSize: '0.95rem',
+        fontWeight: 600,
+        transition: 'color 150ms cubic-bezier(0.22, 1, 0.36, 1), background 150ms cubic-bezier(0.22, 1, 0.36, 1)',
+        '&:hover': disabled
+          ? undefined
+          : { color: theme.palette.text.primary, background: theme.palette.action.hover },
+      }}
+    >
+      {children}
+    </Box>
+  );
+};
 
 const PeriodPicker: React.FC<PeriodPickerProps> = ({ period, value, onChange }) => {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   const anchorRef = useRef<HTMLDivElement | null>(null);
   const [open, setOpen] = useState(false);
   // year shown in the popover (independent of value while browsing)
@@ -114,6 +118,23 @@ const PeriodPicker: React.FC<PeriodPickerProps> = ({ period, value, onChange }) 
     setOpen(false);
   };
 
+  const optionSx = (isCurrent: boolean) => ({
+    py: 1,
+    px: 1.5,
+    background: isCurrent ? theme.palette.primary.main : 'transparent',
+    color: isCurrent ? theme.palette.primary.contrastText : theme.palette.text.secondary,
+    border: 0,
+    borderRadius: '8px',
+    fontFamily: 'inherit',
+    fontWeight: 600,
+    fontSize: '0.85rem',
+    cursor: 'pointer',
+    '&:hover': {
+      background: isCurrent ? theme.palette.primary.main : theme.palette.action.hover,
+      color: isCurrent ? theme.palette.primary.contrastText : theme.palette.text.primary,
+    },
+  });
+
   const renderBody = () => {
     if (period === 'month') {
       const currentMonth = value.getMonth();
@@ -123,24 +144,7 @@ const PeriodPicker: React.FC<PeriodPickerProps> = ({ period, value, onChange }) 
           {MONTHS.map((m, idx) => {
             const isCurrent = browseYear === currentYear && idx === currentMonth;
             return (
-              <Box
-                key={m}
-                component="button"
-                onClick={() => pickMonth(idx)}
-                sx={{
-                  py: 1,
-                  px: 1.5,
-                  background: isCurrent ? t.violet : 'transparent',
-                  color: isCurrent ? t.fg : t.fgMute,
-                  border: 0,
-                  borderRadius: '8px',
-                  fontFamily: 'inherit',
-                  fontWeight: 600,
-                  fontSize: '0.85rem',
-                  cursor: 'pointer',
-                  '&:hover': { background: isCurrent ? t.violet : 'rgba(255,255,255,0.06)', color: t.fg },
-                }}
-              >
+              <Box key={m} component="button" onClick={() => pickMonth(idx)} sx={optionSx(isCurrent)}>
                 {m}
               </Box>
             );
@@ -160,19 +164,7 @@ const PeriodPicker: React.FC<PeriodPickerProps> = ({ period, value, onChange }) 
                 key={q}
                 component="button"
                 onClick={() => pickQuarter(q)}
-                sx={{
-                  py: 1.25,
-                  px: 1.5,
-                  background: isCurrent ? t.violet : 'transparent',
-                  color: isCurrent ? t.fg : t.fgMute,
-                  border: 0,
-                  borderRadius: '8px',
-                  fontFamily: 'inherit',
-                  fontWeight: 600,
-                  fontSize: '0.85rem',
-                  cursor: 'pointer',
-                  '&:hover': { background: isCurrent ? t.violet : 'rgba(255,255,255,0.06)', color: t.fg },
-                }}
+                sx={{ ...optionSx(isCurrent), py: 1.25 }}
               >
                 {`Q${q + 1}`}
               </Box>
@@ -190,24 +182,7 @@ const PeriodPicker: React.FC<PeriodPickerProps> = ({ period, value, onChange }) 
         {years.map((y) => {
           const isCurrent = y === currentYear;
           return (
-            <Box
-              key={y}
-              component="button"
-              onClick={() => pickYear(y)}
-              sx={{
-                py: 1,
-                px: 1.5,
-                background: isCurrent ? t.violet : 'transparent',
-                color: isCurrent ? t.fg : t.fgMute,
-                border: 0,
-                borderRadius: '8px',
-                fontFamily: 'inherit',
-                fontWeight: 600,
-                fontSize: '0.85rem',
-                cursor: 'pointer',
-                '&:hover': { background: isCurrent ? t.violet : 'rgba(255,255,255,0.06)', color: t.fg },
-              }}
-            >
+            <Box key={y} component="button" onClick={() => pickYear(y)} sx={optionSx(isCurrent)}>
               {y}
             </Box>
           );
@@ -228,9 +203,9 @@ const PeriodPicker: React.FC<PeriodPickerProps> = ({ period, value, onChange }) 
           alignItems: 'center',
           gap: '2px',
           padding: '2px',
-          borderRadius: `${t.radius.pill}px`,
-          border: `1px solid ${t.hair}`,
-          bgcolor: t.bgAlt,
+          borderRadius: '10px',
+          border: `1px solid ${theme.palette.divider}`,
+          bgcolor: theme.palette.background.paper,
           opacity: disabled ? 0.5 : 1,
         }}
       >
@@ -245,16 +220,16 @@ const PeriodPicker: React.FC<PeriodPickerProps> = ({ period, value, onChange }) 
             minWidth: 96,
             background: 'transparent',
             border: 0,
-            color: t.fg,
+            color: theme.palette.text.primary,
             fontFamily: 'inherit',
             fontWeight: 600,
             fontSize: '0.82rem',
             padding: '6px 10px',
             borderRadius: '7px',
             cursor: disabled ? 'default' : 'pointer',
-            fontFeatureSettings: t.fontFeatures.tabular,
-            transition: 'background 150ms',
-            '&:hover': disabled ? undefined : { background: 'rgba(255,255,255,0.04)' },
+            fontFeatureSettings: "'tnum' on, 'lnum' on",
+            transition: 'background 150ms cubic-bezier(0.22, 1, 0.36, 1)',
+            '&:hover': disabled ? undefined : { background: theme.palette.action.hover },
           }}
         >
           {label}
@@ -274,10 +249,12 @@ const PeriodPicker: React.FC<PeriodPickerProps> = ({ period, value, onChange }) 
           paper: {
             sx: {
               mt: 1,
-              bgcolor: t.bgPaper,
-              border: `1px solid ${t.hair}`,
+              bgcolor: theme.palette.background.paper,
+              border: `1px solid ${theme.palette.divider}`,
               borderRadius: '12px',
-              boxShadow: '0 12px 28px rgba(0,0,0,0.5)',
+              boxShadow: isDark
+                ? '0 4px 16px rgba(0,0,0,0.40)'
+                : '0 4px 12px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.04)',
               minWidth: 220,
               p: 1.25,
             },
@@ -297,7 +274,14 @@ const PeriodPicker: React.FC<PeriodPickerProps> = ({ period, value, onChange }) 
             <ArrowBtn ariaLabel="Previous year" onClick={() => setBrowseYear((y) => y - 1)}>
               ‹
             </ArrowBtn>
-            <Box sx={{ color: t.fg, fontWeight: 700, fontSize: '0.9rem', fontFeatureSettings: t.fontFeatures.tabular }}>
+            <Box
+              sx={{
+                color: theme.palette.text.primary,
+                fontWeight: 700,
+                fontSize: '0.9rem',
+                fontFeatureSettings: "'tnum' on, 'lnum' on",
+              }}
+            >
               {browseYear}
             </Box>
             <ArrowBtn ariaLabel="Next year" onClick={() => setBrowseYear((y) => y + 1)}>

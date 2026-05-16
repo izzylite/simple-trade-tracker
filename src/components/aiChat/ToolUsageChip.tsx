@@ -100,7 +100,7 @@ const ToolUsageChip: React.FC<ToolUsageChipProps> = ({
           color: 'text.secondary',
           backgroundColor: alpha(theme.palette.background.paper, 0.6),
           border: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
-          transition: 'all 0.15s ease',
+          transition: 'all 150ms cubic-bezier(0.22, 1, 0.36, 1)',
           '&:hover': {
             backgroundColor: alpha(theme.palette.action.hover, 0.2),
             borderColor: alpha(theme.palette.primary.main, 0.4),

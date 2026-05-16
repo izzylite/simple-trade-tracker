@@ -786,7 +786,7 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
                     borderRadius: '10px',
                     border: `1px solid ${theme.palette.divider}`,
                     cursor: 'pointer',
-                    transition: 'all 0.15s ease',
+                    transition: 'all 150ms cubic-bezier(0.22, 1, 0.36, 1)',
                     '&:hover': {
                       borderColor: alpha(info.iconColor, 0.5),
                       backgroundColor: alpha(info.iconColor, 0.04),

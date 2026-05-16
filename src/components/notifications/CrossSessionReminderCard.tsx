@@ -84,7 +84,7 @@ const CrossSessionReminderCard: React.FC<CrossSessionReminderCardProps> = ({
           },
           '&:focus-visible': {
             borderColor: theme.palette.primary.main,
-            boxShadow: `0 0 0 3px ${alpha(theme.palette.primary.main, 0.25)}`,
+            boxShadow: theme.palette.custom.focusRingStrong,
           },
         }}
       >

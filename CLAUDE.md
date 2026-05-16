@@ -21,6 +21,36 @@ The platform is built around five core features. All design, architecture, and p
 
 Follow KISS, YAGNI, and SOLID principles. Fail fast — check for errors early and raise exceptions immediately.
 
+## Design Source of Truth
+
+Before any UI work — new component, redesign, restyle, dialog, page, panel, marketing surface — absorb the style language from `.aidesigner/handoff/journotrades-design-system/project/`. Apply the *style concept* (type scale, color usage, spacing rhythm, button and input shape, focus ring, chip language) even if no specimen matches the surface 1:1. Do **not** treat the handoff as a lookup table for pixel-matching one component to one file.
+
+**Reference index**
+
+- **Tokens** (`preview/`): `type-display.html`, `type-text.html`, `type-numeric.html`, `colors-violet.html`, `colors-slate.html`, `colors-surfaces-dark.html`, `colors-surfaces-light.html`, `colors-winloss.html`, `radii.html`, `shadows.html`, `spacing-scale.html`.
+- **Components** (`preview/`): `components-buttons.html`, `components-inputs.html`, `components-cards.html`, `components-chips.html`, `components-sidenav.html`, `components-selector-bar.html`, `components-lock.html`.
+- **Brand** (`preview/`): `brand-logo.html`, `brand-pnl.html`.
+- **Full compositions** (`ui_kits/`): `web-app/`, `marketing/`, `Redesigned dialog.html` — use these for layout patterns and composition rhythm, not pixel matching.
+- **CSS drop-in**: `colors_and_type.css` exposes every token as CSS vars. Mirror its values when working in MUI `sx` or theme.
+
+**How to read AIDesigner HTMLs**
+
+There are **two kinds** of HTML under `.aidesigner/handoff/` and they need different handling. Use the file size as the signal: if it is under ~10 KB, `Read` it; if it is over ~100 KB, render it.
+
+- **`preview/` files (small, <3 KB each)** — standalone token cards that link to `colors_and_type.css` and `_card.css` for their styles. **Read them directly.** Rendering them in isolation through Playwright is unreliable because the parent stylesheet path resolves wrong out of context and the design falls back to browser defaults (you will get a flat, ugly page that looks nothing like the real specimen). Always pair a preview read with `project/colors_and_type.css` and `project/preview/_card.css` so you see the actual CSS that drives the design.
+- **`ui_kits/*.html` files (large, often >1 MB)** — full app shell exports with fonts inlined as base64. **Never `Read` or `Grep` these — you will get base64 noise.** Render them:
+  1. `python -m http.server <port>` from inside `ui_kits/` (`file://` is blocked in Playwright).
+  2. Navigate `http://localhost:<port>/<file>.html` via Playwright MCP.
+  3. `browser_take_screenshot fullPage:true` and look at the image.
+
+**Canonical token source**
+
+`.aidesigner/handoff/journotrades-design-system/project/colors_and_type.css` is the **single source of CSS truth** — every brand color, win/loss hex, surface, slate value, text color, divider, shadow tier, radius, spacing step, motion duration, and the canonical `.btn` / `.input` / `.chip` / `.card` / `.pnl` primitives are defined there as CSS vars under `[data-theme="dark"]` and `[data-theme="light"]`. Read it before adding any token to `src/theme.ts` and mirror its values exactly.
+
+**Precedence**
+
+When sources disagree, walk this ladder top-down: `DESIGN.md` rules > `colors_and_type.css` token values > `preview/` token usage > `ui_kits/` composition. Rules beat values, values beat usage, usage beats composition.
+
 ## 🧱 Code Structure & Modularity
 
 ### File and Function Limits

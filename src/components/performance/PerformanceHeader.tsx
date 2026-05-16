@@ -1,8 +1,7 @@
 import React from 'react';
-import { Box, Typography } from '@mui/material';
+import { Box, Typography, useTheme } from '@mui/material';
 import { format } from 'date-fns';
 import PerfPill, { PerfPillOption } from './PerfPill';
-import { perfTokens as t } from './performanceTokens';
 import { TimePeriod } from '../PerformanceCharts';
 import PeriodPicker from './PeriodPicker';
 
@@ -49,6 +48,7 @@ const PerformanceHeader: React.FC<PerformanceHeaderProps> = ({
   onTimePeriodChange,
   subtitleSuffix,
 }) => {
+  const theme = useTheme();
   const date = selectedDate || new Date();
   const title = formatPeriod(timePeriod, date);
   const subParts = [calendarName, subtitleSuffix].filter(Boolean) as string[];
@@ -71,7 +71,7 @@ const PerformanceHeader: React.FC<PerformanceHeaderProps> = ({
             fontWeight: 600,
             letterSpacing: '0.18em',
             textTransform: 'uppercase',
-            color: t.violet,
+            color: theme.palette.primary.main,
           }}
         >
           Performance
@@ -82,7 +82,7 @@ const PerformanceHeader: React.FC<PerformanceHeaderProps> = ({
             fontWeight: 800,
             fontSize: '1.85rem',
             letterSpacing: '-0.025em',
-            color: t.fg,
+            color: theme.palette.text.primary,
             mt: '6px',
             mb: 0,
           }}
@@ -92,7 +92,7 @@ const PerformanceHeader: React.FC<PerformanceHeaderProps> = ({
         {subParts.length > 0 && (
           <Typography
             sx={{
-              color: t.fgMute,
+              color: theme.palette.text.secondary,
               fontSize: '0.92rem',
               mt: '4px',
             }}

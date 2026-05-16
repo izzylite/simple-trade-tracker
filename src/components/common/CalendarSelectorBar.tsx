@@ -102,7 +102,7 @@ const CalendarSelectorBar: React.FC<CalendarSelectorBarProps> = ({
           },
           '&:focus-visible': {
             outline: 'none',
-            boxShadow: `0 0 0 3px ${alpha(theme.palette.primary.main, 0.25)}`,
+            boxShadow: theme.palette.custom.focusRingStrong,
           },
         }}
       >

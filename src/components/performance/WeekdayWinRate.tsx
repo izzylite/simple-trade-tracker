@@ -1,8 +1,7 @@
 import React, { useMemo } from 'react';
-import { Box, Tooltip } from '@mui/material';
+import { Box, Tooltip, useTheme } from '@mui/material';
 import { Trade } from '../../types/dualWrite';
 import PerfCard from './PerfCard';
-import { perfTokens as t } from './performanceTokens';
 
 interface WeekdayWinRateProps {
   trades: Trade[];
@@ -25,6 +24,7 @@ const ORDER: Array<{ label: string; index: number }> = [
 ];
 
 const WeekdayWinRate: React.FC<WeekdayWinRateProps> = ({ trades }) => {
+  const theme = useTheme();
   const stats = useMemo<DayStat[]>(() => {
     const buckets = new Map<number, { wins: number; total: number }>();
     for (const trade of trades) {
@@ -109,9 +109,11 @@ const WeekdayWinRate: React.FC<WeekdayWinRateProps> = ({ trades }) => {
                         maxWidth: 36,
                         height: `${barHeightPct}%`,
                         borderRadius: '4px 4px 2px 2px',
-                        background: isBest ? t.violet : t.violetSoft,
-                        border: isBest ? `1px solid ${t.violet}` : `1px solid ${t.hair}`,
-                        transition: 'opacity 150ms, background 150ms',
+                        background: isBest
+                          ? theme.palette.primary.main
+                          : theme.palette.custom.tintViolet.strong,
+                        border: `1px solid ${isBest ? theme.palette.primary.main : theme.palette.divider}`,
+                        transition: 'opacity 150ms cubic-bezier(0.22, 1, 0.36, 1), background 150ms cubic-bezier(0.22, 1, 0.36, 1)',
                         '&:hover': { opacity: 0.85 },
                       }}
                     />
@@ -120,7 +122,7 @@ const WeekdayWinRate: React.FC<WeekdayWinRateProps> = ({ trades }) => {
                 <Box
                   sx={{
                     fontSize: '0.72rem',
-                    color: t.fgLow,
+                    color: theme.palette.text.tertiary,
                     fontWeight: 600,
                   }}
                 >
@@ -129,9 +131,9 @@ const WeekdayWinRate: React.FC<WeekdayWinRateProps> = ({ trades }) => {
                 <Box
                   sx={{
                     fontSize: '0.7rem',
-                    color: isBest ? t.violet : t.fgMute,
+                    color: isBest ? theme.palette.primary.main : theme.palette.text.secondary,
                     fontWeight: 700,
-                    fontFeatureSettings: t.fontFeatures.tabular,
+                    fontFeatureSettings: "'tnum' on, 'lnum' on",
                   }}
                 >
                   {s.total > 0 ? `${s.winRate.toFixed(0)}%` : '—'}

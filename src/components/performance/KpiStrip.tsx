@@ -1,7 +1,6 @@
 import React, { useMemo } from 'react';
-import { Box } from '@mui/material';
+import { Box, useTheme } from '@mui/material';
 import { formatCurrency, formatPercentage } from '../../utils/formatters';
-import { perfTokens as t } from './performanceTokens';
 import { PerformanceCalculationResult } from '../../services/performanceCalculationService';
 
 interface KpiStripProps {
@@ -15,20 +14,26 @@ interface KpiCardProps {
 }
 
 const KpiCard: React.FC<KpiCardProps> = ({ label, value, tone = 'neutral' }) => {
-  const color = tone === 'win' ? t.win : tone === 'loss' ? t.loss : t.fg;
+  const theme = useTheme();
+  const color =
+    tone === 'win'
+      ? theme.palette.success.main
+      : tone === 'loss'
+      ? theme.palette.error.main
+      : theme.palette.text.primary;
   return (
     <Box
       sx={{
-        bgcolor: t.bgAlt,
-        border: `1px solid ${t.hair}`,
-        borderRadius: `${t.radius.stat}px`,
+        bgcolor: theme.palette.background.paper,
+        border: `1px solid ${theme.palette.divider}`,
+        borderRadius: '14px',
         padding: 2,
       }}
     >
       <Box
         sx={{
           fontSize: '0.72rem',
-          color: t.fgLow,
+          color: theme.palette.text.tertiary,
           fontWeight: 600,
           letterSpacing: '0.08em',
           textTransform: 'uppercase',
@@ -43,7 +48,7 @@ const KpiCard: React.FC<KpiCardProps> = ({ label, value, tone = 'neutral' }) => 
           letterSpacing: '-0.025em',
           mt: '6px',
           color,
-          fontFeatureSettings: t.fontFeatures.tabular,
+          fontFeatureSettings: "'tnum' on, 'lnum' on",
         }}
       >
         {value}

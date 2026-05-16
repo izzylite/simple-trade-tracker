@@ -1,6 +1,5 @@
 import React from 'react';
-import { Box } from '@mui/material';
-import { perfTokens as t } from './performanceTokens';
+import { Box, useTheme } from '@mui/material';
 
 export interface PerfPillOption<V extends string> {
   label: string;
@@ -22,6 +21,7 @@ function PerfPill<V extends string>({
   fullWidth = false,
   size = 'medium',
 }: PerfPillProps<V>) {
+  const theme = useTheme();
   const padY = size === 'small' ? 6 : 7;
   const padX = size === 'small' ? 11 : 13;
   const font = size === 'small' ? '0.78rem' : '0.8rem';
@@ -33,9 +33,9 @@ function PerfPill<V extends string>({
         display: 'inline-flex',
         gap: '4px',
         padding: '4px',
-        borderRadius: `${t.radius.pill}px`,
-        border: `1px solid ${t.hair}`,
-        bgcolor: t.bgAlt,
+        borderRadius: '10px',
+        border: `1px solid ${theme.palette.divider}`,
+        bgcolor: theme.palette.background.paper,
         width: fullWidth ? '100%' : 'fit-content',
       }}
     >
@@ -50,18 +50,18 @@ function PerfPill<V extends string>({
             onClick={() => onChange(opt.value)}
             sx={{
               flex: fullWidth ? 1 : 'unset',
-              background: active ? t.violet : 'transparent',
+              background: active ? theme.palette.primary.main : 'transparent',
               border: 0,
-              color: active ? t.fg : t.fgMute,
+              color: active ? theme.palette.primary.contrastText : theme.palette.text.secondary,
               fontFamily: 'inherit',
               fontWeight: 600,
               fontSize: font,
               padding: `${padY}px ${padX}px`,
               borderRadius: '7px',
               cursor: 'pointer',
-              transition: 'color 150ms, background 150ms',
+              transition: 'color 150ms cubic-bezier(0.22, 1, 0.36, 1), background 150ms cubic-bezier(0.22, 1, 0.36, 1)',
               '&:hover': {
-                color: t.fg,
+                color: active ? theme.palette.primary.contrastText : theme.palette.text.primary,
               },
             }}
           >
