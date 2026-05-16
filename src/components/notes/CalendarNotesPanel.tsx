@@ -19,6 +19,8 @@ import { Note } from '../../types/note';
 import type { Currency, ImpactLevel } from '../../types/economicCalendar';
 import { useAuthState } from '../../contexts/AuthStateContext';
 import { useNotes } from '../../hooks/useNotes';
+import * as notesService from '../../services/notesService';
+import { logger } from '../../utils/logger';
 
 import NoteListPanel, { NotesTab, NotesTagPill } from './NoteListPanel';
 import NoteEditorDialog from './NoteEditorDialog';
@@ -56,6 +58,7 @@ const CalendarNotesPanel: React.FC<CalendarNotesPanelProps> = ({
     loadingMore,
     hasMore,
     total,
+    tabCounts,
     loadMore,
     updateNote,
     removeNote,
@@ -77,6 +80,30 @@ const CalendarNotesPanel: React.FC<CalendarNotesPanelProps> = ({
     setSelectedNote(null);
   };
 
+  const handleTogglePin = async (note: Note) => {
+    const next = !note.is_pinned;
+    updateNote(note.id, { is_pinned: next });
+    try {
+      if (next) await notesService.pinNote(note.id);
+      else await notesService.unpinNote(note.id);
+    } catch (err) {
+      logger.error('Error toggling pin:', err);
+      updateNote(note.id, { is_pinned: !next });
+    }
+  };
+
+  const handleToggleArchive = async (note: Note) => {
+    const next = !note.is_archived;
+    updateNote(note.id, { is_archived: next });
+    try {
+      if (next) await notesService.archiveNote(note.id);
+      else await notesService.unarchiveNote(note.id);
+    } catch (err) {
+      logger.error('Error toggling archive:', err);
+      updateNote(note.id, { is_archived: !next });
+    }
+  };
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
       <NoteListPanel
@@ -89,11 +116,14 @@ const CalendarNotesPanel: React.FC<CalendarNotesPanelProps> = ({
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onNoteClick={handleNoteClick}
+        onTogglePin={isReadOnly ? undefined : handleTogglePin}
+        onToggleArchive={isReadOnly ? undefined : handleToggleArchive}
         tab={tab}
         onTabChange={setTab}
         pill={pill}
         onPillChange={setPill}
         total={total}
+        tabCounts={tabCounts}
         showHeader={false}
       />
 
@@ -105,7 +135,6 @@ const CalendarNotesPanel: React.FC<CalendarNotesPanelProps> = ({
           calendarId={selectedNote.calendar_id || calendarId || ''}
           onSave={(note) => {
             updateNote(note.id, note);
-            setSelectedNote(note);
           }}
           onDelete={(noteId) => {
             removeNote(noteId);
