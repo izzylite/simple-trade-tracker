@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, Suspense } from 'react';
+import React, { useEffect, useRef, useState, Suspense, lazy } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
   Box,
@@ -19,13 +19,20 @@ import {
 import { Outlet } from 'react-router-dom';
 import SideNav, { SIDE_NAV_WIDTH } from './SideNav';
 import { useCalendarsListPanel } from '../../contexts/CalendarsListPanelContext';
-import CalendarsListContent from '../sidePanel/content/CalendarsListContent';
-import CalendarsListDrawer from '../calendars/CalendarsListDrawer';
+// CalendarsListDrawer wraps CalendarsListContent for <lg viewports. Lazy
+// keeps both out of the main bundle until the drawer actually opens.
 import { useSelectedCalendar } from '../../contexts/SelectedCalendarContext';
 import SidePanel from '../sidePanel/SidePanel';
 import { useSidePanel } from '../../contexts/SidePanelContext';
 import { appRenderView } from '../sidePanel/appRenderView';
 import UnifiedDrawer from '../common/UnifiedDrawer';
+
+// CalendarsListContent: pulls list-management UI + dialogs. Only rendered
+// when the inline panel opens (lg+) — keep it out of main bundle.
+const CalendarsListContent = lazy(
+  () => import('../sidePanel/content/CalendarsListContent')
+);
+const CalendarsListDrawer = lazy(() => import('../calendars/CalendarsListDrawer'));
 
 const PANEL_WIDTH = 'clamp(360px, 36vw, 580px)';
 // Kept as an alias so existing readers see the legacy name in this file.
@@ -260,21 +267,23 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, onNewCalendar }) => {
                   minHeight: 0,
                 }}
               >
-                <CalendarsListContent
-                  isActive={inlinePanelOpen}
-                  activeCalendarId={calendarId || undefined}
-                  onCalendarClick={(id) => {
-                    actions.onCalendarClick(id);
-                    closePanel();
-                  }}
-                  onEditCalendar={actions.onEditCalendar}
-                  onDuplicateCalendar={actions.onDuplicateCalendar}
-                  onLinkCalendar={actions.onLinkCalendar}
-                  onDeleteCalendar={actions.onDeleteCalendar}
-                  onUpdateCalendarProperty={actions.onUpdateCalendarProperty}
-                  onRestoreCalendar={actions.onRestoreCalendar}
-                  onPermanentDeleteCalendar={actions.onPermanentDeleteCalendar}
-                />
+                <Suspense fallback={<CircularProgress size={24} sx={{ m: 2 }} />}>
+                  <CalendarsListContent
+                    isActive={inlinePanelOpen}
+                    activeCalendarId={calendarId || undefined}
+                    onCalendarClick={(id) => {
+                      actions.onCalendarClick(id);
+                      closePanel();
+                    }}
+                    onEditCalendar={actions.onEditCalendar}
+                    onDuplicateCalendar={actions.onDuplicateCalendar}
+                    onLinkCalendar={actions.onLinkCalendar}
+                    onDeleteCalendar={actions.onDeleteCalendar}
+                    onUpdateCalendarProperty={actions.onUpdateCalendarProperty}
+                    onRestoreCalendar={actions.onRestoreCalendar}
+                    onPermanentDeleteCalendar={actions.onPermanentDeleteCalendar}
+                  />
+                </Suspense>
               </Box>
             </Box>
           )}
@@ -286,24 +295,26 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, onNewCalendar }) => {
           to width 0 when `isOpen` is false. */}
       {isLgUp && <SidePanel renderView={appRenderView} />}
 
-      {/* Drawer fallback — <lg only. */}
-      {!isLgUp && (
-        <CalendarsListDrawer
-          open={isCalendarsListOpen}
-          onClose={closePanel}
-          activeCalendarId={calendarId || undefined}
-          onCalendarClick={(id) => {
-            actions.onCalendarClick(id);
-            closePanel();
-          }}
-          onEditCalendar={actions.onEditCalendar}
-          onDuplicateCalendar={actions.onDuplicateCalendar}
-          onLinkCalendar={actions.onLinkCalendar}
-          onDeleteCalendar={actions.onDeleteCalendar}
-          onUpdateCalendarProperty={actions.onUpdateCalendarProperty}
-          onRestoreCalendar={actions.onRestoreCalendar}
-          onPermanentDeleteCalendar={actions.onPermanentDeleteCalendar}
-        />
+      {/* Drawer fallback — <lg only; lazy-mounted on first open. */}
+      {!isLgUp && isCalendarsListOpen && (
+        <Suspense fallback={null}>
+          <CalendarsListDrawer
+            open={isCalendarsListOpen}
+            onClose={closePanel}
+            activeCalendarId={calendarId || undefined}
+            onCalendarClick={(id) => {
+              actions.onCalendarClick(id);
+              closePanel();
+            }}
+            onEditCalendar={actions.onEditCalendar}
+            onDuplicateCalendar={actions.onDuplicateCalendar}
+            onLinkCalendar={actions.onLinkCalendar}
+            onDeleteCalendar={actions.onDeleteCalendar}
+            onUpdateCalendarProperty={actions.onUpdateCalendarProperty}
+            onRestoreCalendar={actions.onRestoreCalendar}
+            onPermanentDeleteCalendar={actions.onPermanentDeleteCalendar}
+          />
+        </Suspense>
       )}
 
       {/* Global app-level side panel — drawer fallback at <lg. */}

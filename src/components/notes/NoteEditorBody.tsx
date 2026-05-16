@@ -86,6 +86,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { formatDistanceToNow } from 'date-fns';
 
+import { EditorState } from 'draft-js';
 import RichTextEditor, { RichTextEditorHandle } from '../common/RichTextEditor';
 import { Z_INDEX } from '../../styles/zIndex';
 import EditorToolbar from '../common/RichTextEditor/components/EditorToolbar';
@@ -200,6 +201,11 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
   const editorRef = useRef<RichTextEditorHandle>(null);
   const [, setIsToolbarMenuOpen] = useState(false);
   const [editorMounted, setEditorMounted] = useState(false);
+  // Mirror the RTE's internal editorState so the external sticky toolbar
+  // reflects active inline styles + block type on every keystroke. The
+  // imperative ref returns a stale value here because typing doesn't
+  // re-render this parent unless we explicitly track the state.
+  const [liveEditorState, setLiveEditorState] = useState<EditorState | null>(null);
 
   useEffect(() => {
     if (isActive) {
@@ -207,6 +213,7 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
       return () => clearTimeout(timer);
     } else {
       setEditorMounted(false);
+      setLiveEditorState(null);
     }
   }, [isActive]);
 
@@ -372,11 +379,18 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
   const saveNote = useCallback(async (): Promise<void> => {
     if (savingRef.current) return; // dedupe concurrent saves
     if (!user?.uid) return;
+    // Read live content from the editor ref. Closure-captured `content`
+    // may lag by one render when save fires in the same event as a
+    // keystroke (e.g. picker-chip click). Falling back to state for the
+    // case where the editor hasn't mounted yet.
+    const liveContent = editorRef.current?.editorState
+      ? getContentAsJson(editorRef.current.editorState)
+      : content;
     // Persist partial drafts — title or content alone is enough. Reject only
     // if both are empty AND nothing else (cover, reminder, tags, color) has
     // been set, to avoid creating an entirely blank row.
     const hasTitle = title.trim() !== '';
-    const hasContent = content.trim() !== '';
+    const hasContent = liveContent.trim() !== '';
     const hasOtherSignal =
       coverImage !== null ||
       tags.length > 0 ||
@@ -389,7 +403,7 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
     // lastSavedRef so subsequent hasChanges calls compare against what we
     // actually shipped, not against the server-coerced row.
     const sentSnapshot: SavedSnapshot = {
-      title, content, coverImage, reminderType, reminderDate, reminderDays,
+      title, content: liveContent, coverImage, reminderType, reminderDate, reminderDays,
       isReminderActive, tags, noteColor, isGlobal,
     };
     try {
@@ -398,7 +412,7 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
       if (liveNote) {
         const updates: any = {
           title,
-          content,
+          content: liveContent,
           cover_image: coverImage,
           reminder_type: reminderType,
           reminder_date: reminderDate,
@@ -426,7 +440,7 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
           user_id: user.uid,
           calendar_id: isGlobal && !weekKey ? null : calendarId,
           title,
-          content,
+          content: liveContent,
           cover_image: coverImage,
           reminder_type: reminderType,
           reminder_date: reminderDate,
@@ -458,6 +472,13 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
   }, [user?.uid, title, content, coverImage, reminderType, reminderDate, reminderDays, isReminderActive, noteColor, isGlobal, calendarId, weekKey, tags, onSave]);
 
   const hasChanges = useCallback((): boolean => {
+    // Pull live content from the editor ref. The `content` state lags by
+    // one render when a save is dispatched in the same event as a
+    // keystroke (e.g. picker-chip click), and saveIfDirty()'s gate must
+    // see the freshest content or it will short-circuit the save.
+    const liveContent = editorRef.current?.editorState
+      ? getContentAsJson(editorRef.current.editorState)
+      : content;
     // Once a save has happened in this session, compare to the snapshot of
     // what we last shipped — this is the only authoritative "clean" state.
     // Comparing to noteRef.current.title would falsely flag a save's empty
@@ -466,7 +487,7 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
     if (snap) {
       return (
         title !== snap.title ||
-        content !== snap.content ||
+        liveContent !== snap.content ||
         coverImage !== snap.coverImage ||
         reminderType !== snap.reminderType ||
         reminderDate !== snap.reminderDate ||
@@ -482,7 +503,7 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
     const liveNote = noteRef.current;
     if (!liveNote) {
       const hasNonEmptyTitle = title && title.trim() !== '';
-      const hasNonEmptyContent = content && content.trim() !== '';
+      const hasNonEmptyContent = liveContent && liveContent.trim() !== '';
       const hasCoverImage = coverImage !== null;
       const hasReminder = reminderType !== 'none' && isReminderActive;
       const hasTags = tags.length > 0;
@@ -490,7 +511,7 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
       return Boolean(hasNonEmptyTitle || hasNonEmptyContent || hasCoverImage || hasReminder || hasTags || hasColor);
     }
     const titleChanged = title !== liveNote.title;
-    const contentChanged = content !== liveNote.content;
+    const contentChanged = liveContent !== liveNote.content;
     const coverImageChanged = coverImage !== liveNote.cover_image;
     const reminderTypeChanged = reminderType !== (liveNote.reminder_type || 'none');
     const reminderDateChanged = reminderDate !== (liveNote.reminder_date || null);
@@ -558,22 +579,14 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
   }, [noteNav.navVersion]);
 
   const handleNoteLinkClick = useCallback(async (noteId: string, noteTitle: string) => {
-    if (note && editorRef.current?.editorState) {
-      const latestContent = getContentAsJson(editorRef.current.editorState);
-      setContent(latestContent);
-      await notesService.updateNote(note.id, {
-        title,
-        content: latestContent,
-        cover_image: coverImage ?? undefined,
-        color: noteColor ?? undefined,
-        tags,
-      });
-    } else {
-      await saveNote();
-    }
+    // Route through the shared save path so savingRef + lastSavedRef stay
+    // honest. hasChanges + saveNote both read live content from
+    // editorRef, so we don't need to sync setContent first — the save
+    // path picks up the freshest content regardless of whether the
+    // setContent for the last keystroke has flushed.
+    await saveIfDirty();
     noteNav.navigateTo(noteId, noteTitle);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [noteNav.navigateTo, note, title, coverImage, noteColor, tags]);
+  }, [noteNav, saveIfDirty]);
 
   const handleSharedTradeClick = useCallback(async (shareId: string, _tradeId: string) => {
     setTradePreviewOpen(true);
@@ -725,9 +738,9 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
       </Box>
 
       {/* Editor toolbar (sticky) */}
-      {editorMounted && editorRef.current && (
+      {editorMounted && editorRef.current && (liveEditorState ?? editorRef.current.editorState) && (
         <EditorToolbar
-          editorState={editorRef.current.editorState}
+          editorState={liveEditorState ?? editorRef.current.editorState}
           disabled={false}
           variant="sticky"
           stickyPosition="top"
@@ -1243,6 +1256,7 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
             ref={editorRef}
             value={content}
             onChange={setContent}
+            onEditorStateChange={setLiveEditorState}
             placeholder="Document your emotions, game plan, lessons learned, or trading insights... (type /tag to insert a trade tag)"
             minHeight={300}
             maxLength={5000}

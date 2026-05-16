@@ -1,8 +1,11 @@
 import { Trade } from '../types/dualWrite';
 import { format, parse } from 'date-fns';
-import * as XLSX from 'xlsx';
 import { error, warn } from './logger';
 import { formatTagsWithCapitalizedGroups } from './tagColors';
+
+// Lazy-load xlsx (~600KB) only when an .xlsx export/import is actually invoked.
+// CSV path bypasses this entirely.
+const loadXLSX = () => import('xlsx');
 
 // Helper function to prepare trade data for export
 const prepareTradeDataForExport = (trades: Trade[], initial_balance: number = 0) => {
@@ -42,7 +45,8 @@ const prepareTradeDataForExport = (trades: Trade[], initial_balance: number = 0)
 };
 
 // Export trades to Excel format
-const exportToExcel = (data: any[], fileName: string): void => {
+const exportToExcel = async (data: any[], fileName: string): Promise<void> => {
+  const XLSX = await loadXLSX();
   // Create workbook and worksheet
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.json_to_sheet(data);
@@ -112,7 +116,11 @@ const exportToCsv = (data: any[], fileName: string): void => {
 };
 
 // Main export function that supports both Excel and CSV formats
-export const exportTrades = (trades: Trade[], initial_balance: number = 0, fileFormat: 'xlsx' | 'csv' = 'xlsx'): void => {
+export const exportTrades = async (
+  trades: Trade[],
+  initial_balance: number = 0,
+  fileFormat: 'xlsx' | 'csv' = 'xlsx'
+): Promise<void> => {
   if (trades.length === 0) return;
 
   // Prepare data for export
@@ -124,7 +132,7 @@ export const exportTrades = (trades: Trade[], initial_balance: number = 0, fileF
 
   // Export in the requested format
   if (fileFormat === 'xlsx') {
-    exportToExcel(exportData, fileName);
+    await exportToExcel(exportData, fileName);
   } else {
     exportToCsv(exportData, fileName);
   }
@@ -133,6 +141,7 @@ export const exportTrades = (trades: Trade[], initial_balance: number = 0, fileF
 // Import trades from Excel format
 const importFromExcel = async (data: ArrayBuffer): Promise<Trade[]> => {
   try {
+    const XLSX = await loadXLSX();
     const workbook = XLSX.read(new Uint8Array(data), { type: 'array' });
 
     // Check if the workbook has any sheets
@@ -147,7 +156,7 @@ const importFromExcel = async (data: ArrayBuffer): Promise<Trade[]> => {
       throw new Error('Excel sheet is empty or invalid');
     }
 
-    const jsonData = XLSX.utils.sheet_to_json(worksheet);
+    const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
 
     // Check if we have any data
     if (!jsonData || jsonData.length === 0) {

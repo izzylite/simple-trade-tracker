@@ -93,8 +93,6 @@ import CalendarFormDialog, { CalendarFormData } from '../components/CalendarForm
 import PinnedTradesDrawer from '../components/PinnedTradesDrawer';
 import ShareButton from '../components/sharing/ShareButton';
 import { exportTrades } from '../utils/tradeExportImport';
-import { ImportMappingDialog } from '../components/import/ImportMappingDialog';
-
 import { useAIChat } from '../contexts/AIChatContext';
 import NoteEditorDialog from '../components/notes/NoteEditorDialog';
 import CalendarNotesPanel from '../components/notes/CalendarNotesPanel';
@@ -142,6 +140,14 @@ import TagManagementContent from '../components/sidePanel/content/TagManagementC
 import DayTradesContent from '../components/sidePanel/content/DayTradesContent';
 import StatsContent from '../components/sidePanel/content/StatsContent';
 import StatsDrawer from '../components/StatsDrawer';
+
+// Lazy-load: ImportMappingDialog pulls xlsx + multi-step wizard. Only mount
+// when the user actually opens the import flow.
+const ImportMappingDialog = React.lazy(() =>
+  import('../components/import/ImportMappingDialog').then((m) => ({
+    default: m.ImportMappingDialog,
+  }))
+);
 
 interface TradeCalendarProps {
   // Trade CRUD operations now handled internally via useCalendarTrades hook
@@ -1552,7 +1558,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
 
   const handleHeaderExport = (fileFormat: 'xlsx' | 'csv') => {
     if (trades.length === 0) return;
-    exportTrades(trades, accountBalance, fileFormat);
+    void exportTrades(trades, accountBalance, fileFormat);
     setMoreMenuAnchor(null);
   };
 
@@ -2420,16 +2426,20 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
           submitButtonText="Save"
         />
 
-        {/* Header Import Trades Dialog */}
-        <ImportMappingDialog
-          open={showImportDialog}
-          onClose={() => {
-            setShowImportDialog(false);
-            setImportFile(null);
-          }}
-          onImport={handleHeaderImportComplete}
-          file={importFile}
-        />
+        {/* Header Import Trades Dialog — lazy chunk; only mount when opening. */}
+        {showImportDialog && (
+          <React.Suspense fallback={null}>
+            <ImportMappingDialog
+              open={showImportDialog}
+              onClose={() => {
+                setShowImportDialog(false);
+                setImportFile(null);
+              }}
+              onImport={handleHeaderImportComplete}
+              file={importFile}
+            />
+          </React.Suspense>
+        )}
 
       {/* Economic Calendar Drawer — only rendered on <lg (panel handles it on lg+) */}
       {!isLgUp && (

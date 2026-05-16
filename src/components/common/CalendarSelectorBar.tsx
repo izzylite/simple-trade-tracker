@@ -108,7 +108,7 @@ const CalendarSelectorBar: React.FC<CalendarSelectorBarProps> = ({
       >
         <Avatar
           src={active.hero_image_url || undefined}
-          variant="rounded"
+          variant="circular"
           sx={{
             width: 28,
             height: 28,
@@ -220,7 +220,7 @@ const CalendarSelectorBar: React.FC<CalendarSelectorBarProps> = ({
                 >
                   <Avatar
                     src={item.hero_image_url || undefined}
-                    variant="rounded"
+                    variant="circular"
                     sx={{
                       width: 28,
                       height: 28,

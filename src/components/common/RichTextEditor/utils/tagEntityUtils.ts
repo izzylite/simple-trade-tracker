@@ -41,8 +41,18 @@ export const insertTagEntity = (
   const entityKey =
     contentStateWithEntity.getLastCreatedEntityKey();
 
-  // Insert the tag text with the entity applied
-  const displayText = ` ${tagName} `;
+  // Only inject a leading space when the cursor isn't already at BOL or
+  // sitting after whitespace — otherwise toolbar-driven inserts produce
+  // a visible double-space before the chip.
+  const blockKey = selection.getStartKey();
+  const startOffset = selection.getStartOffset();
+  const block = contentState.getBlockForKey(blockKey);
+  const charBefore = startOffset > 0
+    ? block.getText().charAt(startOffset - 1)
+    : '';
+  const needLeadingSpace = charBefore !== '' && !/\s/.test(charBefore);
+
+  const displayText = `${needLeadingSpace ? ' ' : ''}${tagName}`;
   let newContentState = Modifier.insertText(
     contentStateWithEntity,
     selection,
@@ -144,8 +154,15 @@ export const replaceTagTriggerWithTag = (
   const entityKey =
     contentStateWithEntity.getLastCreatedEntityKey();
 
-  // Replace the /tag text with the tag chip text
-  const displayText = ` ${tagName} `;
+  // Skip leading entity-space when prior char is BOL or whitespace, else
+  // the chip ends up with visible double leading space.
+  const block = contentState.getBlockForKey(blockKey);
+  const charBefore = triggerOffset > 0
+    ? block.getText().charAt(triggerOffset - 1)
+    : '';
+  const needLeadingSpace = charBefore !== '' && !/\s/.test(charBefore);
+
+  const displayText = `${needLeadingSpace ? ' ' : ''}${tagName}`;
   let newContentState = Modifier.replaceText(
     contentStateWithEntity,
     replaceSelection,

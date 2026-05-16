@@ -97,7 +97,15 @@ export const replaceEventTriggerWithLink = (
   const entityKey =
     contentStateWithEntity.getLastCreatedEntityKey();
 
-  const displayText = ` ${eventName} `;
+  // Skip leading entity-space when prior char is BOL or whitespace —
+  // otherwise the chip ends up with double leading space.
+  const block = contentState.getBlockForKey(blockKey);
+  const charBefore = triggerOffset > 0
+    ? block.getText().charAt(triggerOffset - 1)
+    : '';
+  const needLeadingSpace = charBefore !== '' && !/\s/.test(charBefore);
+
+  const displayText = `${needLeadingSpace ? ' ' : ''}${eventName}`;
   let newContentState = Modifier.replaceText(
     contentStateWithEntity,
     replaceSelection,

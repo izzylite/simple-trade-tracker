@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, lazy, Suspense } from 'react';
 import {
   AppBar,
   Toolbar,
@@ -26,9 +26,11 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/SupabaseAuthContext';
 import { error } from '../../utils/logger';
 import DebugPanel from './DebugPanel';
-import LoginDialog from '../auth/LoginDialog';
 import NotificationsBell from '../notifications/NotificationsBell';
 import HeaderCalendarSelector from './HeaderCalendarSelector';
+
+// Login dialog opens only on user action; lazy keeps auth UI out of main bundle.
+const LoginDialog = lazy(() => import('../auth/LoginDialog'));
 
 // Discord icon component
 const DiscordIcon = (props: any) => (
@@ -161,13 +163,15 @@ const AppHeader: React.FC<AppHeaderProps> = ({ onToggleTheme, mode }) => {
             </Typography>
           </Box>
 
+
+
+          {/* Spacer */}
+          <Box sx={{ flexGrow: 1 }} />
+
           {/* Calendar selector — auth-only. HeaderCalendarSelector returns
               null when the user has no calendars, so it self-hides on the
               empty state (and contributes no spacing to the Toolbar gap). */}
           {user && <HeaderCalendarSelector />}
-
-          {/* Spacer */}
-          <Box sx={{ flexGrow: 1 }} />
 
           {/* Right Section: Navigation + Actions */}
           <Stack direction="row" spacing={{ xs: 1, sm: 2 }} alignItems="center">
@@ -195,20 +199,20 @@ const AppHeader: React.FC<AppHeaderProps> = ({ onToggleTheme, mode }) => {
                         color: active ? 'text.primary' : 'text.secondary',
                         bgcolor: active
                           ? (theme) =>
-                              alpha(
-                                theme.palette.primary.main,
-                                theme.palette.mode === 'dark' ? 0.12 : 0.08
-                              )
+                            alpha(
+                              theme.palette.primary.main,
+                              theme.palette.mode === 'dark' ? 0.12 : 0.08
+                            )
                           : 'transparent',
                         textTransform: 'none',
                         transition: 'all 0.15s ease',
                         '&:hover': {
                           bgcolor: active
                             ? (theme) =>
-                                alpha(
-                                  theme.palette.primary.main,
-                                  theme.palette.mode === 'dark' ? 0.18 : 0.12
-                                )
+                              alpha(
+                                theme.palette.primary.main,
+                                theme.palette.mode === 'dark' ? 0.18 : 0.12
+                              )
                             : alpha(theme.palette.action.hover, 0.08),
                           color: 'text.primary'
                         }
@@ -380,11 +384,15 @@ const AppHeader: React.FC<AppHeaderProps> = ({ onToggleTheme, mode }) => {
         />
       )}
 
-      {/* Login Dialog */}
-      <LoginDialog
-        open={loginDialogOpen}
-        onClose={() => setLoginDialogOpen(false)}
-      />
+      {/* Login Dialog — lazy chunk; only mounts when opened. */}
+      {loginDialogOpen && (
+        <Suspense fallback={null}>
+          <LoginDialog
+            open={loginDialogOpen}
+            onClose={() => setLoginDialogOpen(false)}
+          />
+        </Suspense>
+      )}
     </>
   );
 };

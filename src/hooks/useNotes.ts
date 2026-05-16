@@ -229,7 +229,14 @@ export function useNotes(options: UseNotesOptions): UseNotesResult {
           offsetRef.current = result.notes.length;
           setNotes(nextNotes);
         } else {
-          nextNotes = [...notesRef.current, ...result.notes];
+          // Dedupe by id — realtime INSERT may have prepended a row the
+          // server now also returns at this offset, and any merge must
+          // never produce duplicate ids in the visible list.
+          const existing = new Set(notesRef.current.map((n) => n.id));
+          const incoming = result.notes.filter((n) => !existing.has(n.id));
+          nextNotes = [...notesRef.current, ...incoming];
+          // Advance offset by what the server returned (its page cursor),
+          // not by what we kept after dedupe.
           offsetRef.current += result.notes.length;
           setNotes(nextNotes);
         }
@@ -449,11 +456,21 @@ export function useNotes(options: UseNotesOptions): UseNotesResult {
                 : undefined);
             if (effectiveCalId && newNote.calendar_id !== effectiveCalId) return;
 
+            let accepted = false;
             setNotes((prev) => {
               if (prev.some((n) => n.id === newNote.id)) return prev;
+              accepted = true;
               return [newNote, ...prev];
             });
-            setTotal((t) => t + 1);
+            if (accepted) {
+              // The new row now occupies position 0 on the server. Bump
+              // offsetRef so the next loadMore skips it; otherwise the
+              // same row comes back at offset N and produces a dup
+              // (caught by the loadNotes dedupe, but wastes a row of
+              // pagination).
+              offsetRef.current += 1;
+              setTotal((t) => t + 1);
+            }
           }
         }
       )

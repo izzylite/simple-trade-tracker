@@ -117,6 +117,11 @@ export interface RichTextEditorProps {
   ) => void;
   // Callback for shared trade link clicks (inline preview)
   onSharedTradeClick?: (shareId: string, tradeId: string) => void;
+  // Fires whenever internal editorState changes. Parents that render a
+  // sticky toolbar outside this component MUST mirror this state — reading
+  // it from the imperative ref is stale (the ref is captured at render
+  // time and won't reflect typing-driven content updates).
+  onEditorStateChange?: (state: EditorState) => void;
 }
 
 // Ref handle for external toolbar control
@@ -197,6 +202,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
   onEventLinkStateChange,
   onEventLinkClick,
   onSharedTradeClick,
+  onEditorStateChange,
 }, ref) => {
   const theme = useTheme();
   const Z_INDEX = 2000;
@@ -207,6 +213,11 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
   const toolbarRef = useRef<HTMLDivElement>(null);
   const previousValueRef = useRef<string | undefined>(value);
   const savedScrollPositionRef = useRef<number>(0);
+  // Tracks the JSON we most recently emitted via onChange. The parent
+  // typically echoes this back into `value`, and we must NOT re-init the
+  // editor from our own echo — doing so would JSON-roundtrip on every
+  // keystroke and wipe undo history + selection.
+  const lastEmittedValueRef = useRef<string | undefined>(value);
 
   // Create decorator with props
   const decorator = useMemo(
@@ -254,24 +265,30 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
   const [eventLinkSelectedIndex, setEventLinkSelectedIndex]
     = useState(0);
 
-  // Update editor state when value prop changes (for controlled component behavior)
+  // Update editor state when `value` prop changes from an EXTERNAL source.
+  // We skip:
+  //   - Our own echo (parent re-passing what we emitted via onChange)
+  //   - No-op repeats (same value as last seen)
+  // Previously this effect ran convertToRaw + JSON.stringify on every
+  // keystroke (editorState was in deps); now it only fires when `value`
+  // identity changes and the value differs from what we emitted.
+  //
+  // NOTE: decorator-identity changes do NOT propagate to the live
+  // editorState (matches original behavior). Eagerly syncing the
+  // decorator would cause an extra setEditorState per keystroke whenever
+  // a parent passes a non-memoized handler — see audit notes for B1.
   useEffect(() => {
-    if (value !== previousValueRef.current) {
-      previousValueRef.current = value;
+    if (value === previousValueRef.current) return;
+    previousValueRef.current = value;
+    if (value === undefined) return;
+    if (value === lastEmittedValueRef.current) return;
 
-      if (value !== undefined) {
-        const newEditorState = createEditorStateFromValue(value);
-        const newEditorStateWithDecorator = EditorState.set(newEditorState, { decorator });
-        // Only update if the content is actually different to avoid infinite loops
-        const currentContent = convertToRaw(editorState.getCurrentContent());
-        const newContent = convertToRaw(newEditorStateWithDecorator.getCurrentContent());
-
-        if (JSON.stringify(currentContent) !== JSON.stringify(newContent)) {
-          setEditorState(newEditorStateWithDecorator);
-        }
-      }
-    }
-  }, [value, editorState, decorator]);
+    const newEditorState = createEditorStateFromValue(value);
+    setEditorState(EditorState.set(newEditorState, { decorator }));
+  // decorator is read inside the effect to ensure new editor states pick
+  // it up; we intentionally do NOT depend on it (see note above).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
 
   // Effect to restore scroll position when link dialog closes
   useEffect(() => {
@@ -322,6 +339,18 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
     return availableTradeTags.filter((t) => t.toLowerCase().includes(q));
   }, [mentionActive, mentionSearch, availableTradeTags]);
 
+  // Emit the editor state through both the value channel (onChange JSON)
+  // and the live state channel (onEditorStateChange). Used by entity
+  // inserts that bypass Draft's user-input onChange path.
+  const emitState = useCallback((newState: EditorState) => {
+    onEditorStateChange?.(newState);
+    if (onChange) {
+      const json = JSON.stringify(convertToRaw(newState.getCurrentContent()));
+      lastEmittedValueRef.current = json;
+      onChange(json);
+    }
+  }, [onChange, onEditorStateChange]);
+
   // Handle @ mention tag selection
   const handleMentionSelect = useCallback((tag: string) => {
     const newState = replaceAtMentionWithTag(
@@ -332,15 +361,10 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
     setMentionSelectedIndex(0);
     setEditorState(newState);
     onMentionStateChange?.(false);
-
-    // Fire onChange
-    if (onChange) {
-      const newRaw = convertToRaw(newState.getCurrentContent());
-      onChange(JSON.stringify(newRaw));
-    }
+    emitState(newState);
 
     setTimeout(() => editorRef.current?.focus(), 50);
-  }, [editorState, mentionTriggerOffset, mentionBlockKey, onChange]);
+  }, [editorState, mentionTriggerOffset, mentionBlockKey, emitState, onMentionStateChange]);
 
   // Handle /note link selection
   const handleNoteLinkSelect = useCallback(
@@ -357,13 +381,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
       setNoteLinkSelectedIndex(0);
       setEditorState(newState);
       onNoteLinkStateChange?.(false);
-
-      if (onChange) {
-        const newRaw = convertToRaw(
-          newState.getCurrentContent()
-        );
-        onChange(JSON.stringify(newRaw));
-      }
+      emitState(newState);
 
       setTimeout(() => editorRef.current?.focus(), 50);
     },
@@ -371,7 +389,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
       editorState,
       noteLinkTriggerOffset,
       noteLinkBlockKey,
-      onChange,
+      emitState,
       onNoteLinkStateChange,
     ]
   );
@@ -398,13 +416,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
       setEventLinkSelectedIndex(0);
       setEditorState(newState);
       onEventLinkStateChange?.(false);
-
-      if (onChange) {
-        const newRaw = convertToRaw(
-          newState.getCurrentContent()
-        );
-        onChange(JSON.stringify(newRaw));
-      }
+      emitState(newState);
 
       setTimeout(() => editorRef.current?.focus(), 50);
     },
@@ -412,7 +424,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
       editorState,
       eventLinkTriggerOffset,
       eventLinkBlockKey,
-      onChange,
+      emitState,
       onEventLinkStateChange,
     ]
   );
@@ -484,12 +496,19 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
       }
     }
 
-    if (onChange) {
-      const prevRaw = convertToRaw(prevContentState);
-      const newRaw = convertToRaw(newContentState);
+    // Notify external listeners (e.g. parent rendering a sticky toolbar)
+    // BEFORE serializing — they only care about EditorState identity.
+    onEditorStateChange?.(state);
 
-      if (JSON.stringify(prevRaw) !== JSON.stringify(newRaw)) {
-        onChange(JSON.stringify(newRaw));
+    if (onChange) {
+      // Skip the double-serialize equality check from the old impl.
+      // Draft preserves ContentState reference equality across selection-
+      // only changes, so a single reference compare gates the expensive
+      // convertToRaw + JSON.stringify path.
+      if (prevContentState !== newContentState) {
+        const json = JSON.stringify(convertToRaw(newContentState));
+        lastEmittedValueRef.current = json;
+        onChange(json);
       }
     }
   };

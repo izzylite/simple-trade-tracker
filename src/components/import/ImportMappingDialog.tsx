@@ -44,7 +44,8 @@ import {
   saveMappingTemplate,
   updateTemplateLastUsed
 } from '../../utils/importMappingStorage';
-import * as XLSX from 'xlsx';
+// Lazy-load xlsx (~600KB) only when an .xlsx file is actually parsed.
+const loadXLSX = () => import('xlsx');
 
 interface ImportMappingDialogProps {
   open: boolean;
@@ -149,6 +150,7 @@ export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
   };
 
   const parseExcel = async (file: File): Promise<ImportFileData> => {
+    const XLSX = await loadXLSX();
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
 

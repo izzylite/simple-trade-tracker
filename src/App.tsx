@@ -23,7 +23,7 @@ import AppLoadingProgress from './components/AppLoadingProgress';
 
 import AppHeader from './components/common/AppHeader';
 import AppLayout from './components/layout/AppLayout';
-import CalendarFormDialog, { CalendarFormData } from './components/CalendarFormDialog';
+import type { CalendarFormData } from './components/CalendarFormDialog';
 import CalendarLockedOverlay from './components/calendars/CalendarLockedOverlay';
 import CalendarManagementDialogs from './components/calendars/CalendarManagementDialogs';
 import { useCalendarPanelActions } from './hooks/useCalendarPanelActions';
@@ -40,11 +40,6 @@ import { AIChatProvider } from './contexts/AIChatContext';
 import { TradeViewerProvider } from './contexts/TradeViewerContext';
 import { TradeOperationsProvider } from './contexts/TradeOperationsContext';
 import { EventNotificationsProvider } from './contexts/EventNotificationsContext';
-import GlobalAIChat from './components/aiChat/GlobalAIChat';
-import GlobalAIChatFab from './components/aiChat/GlobalAIChatFab';
-import GlobalTradeViewer from './components/trades/GlobalTradeViewer';
-import GlobalTradeOperations from './components/trades/GlobalTradeOperations';
-import GlobalEventNotifications from './components/notifications/GlobalEventNotifications';
 import { PanelMutexProvider, usePanelMutexSlot } from './contexts/PanelMutexContext';
 import { useCalendarsListPanel } from './contexts/CalendarsListPanelContext';
 
@@ -64,6 +59,20 @@ const PerformancePage = lazy(() => import('./pages/PerformancePage'));
 const NotesPage = lazy(() => import('./pages/NotesPage'));
 const EconomicEventsPage = lazy(() => import('./pages/EconomicEventsPage'));
 // const SupabaseAuthTest = lazy(() => import('./components/auth/SupabaseAuthTest')); // Commented out - for testing only
+
+// Global app-level surfaces — lazy so AI chat (markdown/draft-js), trade
+// viewer dialogs, etc. don't block first paint. Wrapped in <Suspense
+// fallback={null}> at the mount site; fallback is null because these are
+// invisible until the user interacts (no UI to skeleton).
+// CalendarFormDialog only mounts when user clicks Create. Eager import drags
+// MUI Dialog + form components into main bundle.
+const CalendarFormDialog = lazy(() => import('./components/CalendarFormDialog'));
+
+const GlobalAIChat = lazy(() => import('./components/aiChat/GlobalAIChat'));
+const GlobalAIChatFab = lazy(() => import('./components/aiChat/GlobalAIChatFab'));
+const GlobalTradeViewer = lazy(() => import('./components/trades/GlobalTradeViewer'));
+const GlobalTradeOperations = lazy(() => import('./components/trades/GlobalTradeOperations'));
+const GlobalEventNotifications = lazy(() => import('./components/notifications/GlobalEventNotifications'));
 
 
 // Loading component for Suspense
@@ -326,11 +335,15 @@ function AppContent() {
       <PanelMutexProvider>
       <GlobalSidePanelMutexBridge />
       <CalendarsListMutexBridge />
-      {user && <GlobalAIChat />}
-      {user && <GlobalAIChatFab />}
-      {user && <GlobalTradeViewer />}
-      {user && <GlobalTradeOperations />}
-      {user && <GlobalEventNotifications />}
+      {user && (
+        <Suspense fallback={null}>
+          <GlobalAIChat />
+          <GlobalAIChatFab />
+          <GlobalTradeViewer />
+          <GlobalTradeOperations />
+          <GlobalEventNotifications />
+        </Suspense>
+      )}
       <Box sx={{ display: 'flex', minHeight: '100vh' }}>
         {/* App Header — hidden on landing page (has its own nav) */}
         {!isLandingPage && (
@@ -517,17 +530,19 @@ function AppContent() {
       </SelectedCalendarProvider>
 
       {/* Global Create Calendar dialog — opened by side nav "+ New" and any
-          calendar lock overlay. Single instance shared across routes. */}
-      {user && (
-        <CalendarFormDialog
-          open={isCreateDialogOpen}
-          onClose={() => setIsCreateDialogOpen(false)}
-          onSubmit={handleCreateCalendarSubmit}
-          isSubmitting={isCreatingCalendar}
-          mode="create"
-          title="Create Calendar"
-          submitButtonText="Create"
-        />
+          calendar lock overlay. Lazy-loaded; only mounts once user opens it. */}
+      {user && isCreateDialogOpen && (
+        <Suspense fallback={null}>
+          <CalendarFormDialog
+            open={isCreateDialogOpen}
+            onClose={() => setIsCreateDialogOpen(false)}
+            onSubmit={handleCreateCalendarSubmit}
+            isSubmitting={isCreatingCalendar}
+            mode="create"
+            title="Create Calendar"
+            submitButtonText="Create"
+          />
+        </Suspense>
       )}
 
       <Snackbar
