@@ -1,7 +1,6 @@
 import { log } from '../_shared/supabase.ts';
 import { summarizeToolCalls } from '../_shared/toolLabels.ts';
 import {
-  searchNewsMultiple,
   searchNewsMultipleCached,
   searchBreakingMultipleCached,
 } from '../_shared/searchProvider.ts';
@@ -98,15 +97,17 @@ export async function handleMarketResearch(
 ): Promise<TaskResult | null> {
   const config = task.config as unknown as MarketResearchConfig;
 
-  // Staleness guard: cache TTL must stay shorter than task frequency, or
-  // consecutive runs see identical cached news and briefings go stale.
-  const frequencySeconds = (config.frequency_minutes ?? 30) * 60;
-  const effectiveMinFreq = Math.min(frequencySeconds, MIN_TASK_FREQUENCY_SECONDS);
+  // Staleness guard: cache TTL must not exceed task frequency, or consecutive
+  // runs in the same window see identical cached news and briefings go stale.
+  // Hourly cron + 1h TTL is the design sweet spot — first run per hour primes
+  // the cache, subsequent runs hit it. Equality is fine; strictly greater is
+  // a bug we want to know about.
+  const frequencySeconds = (config.frequency_minutes ?? 60) * 60;
   if (
-    NEWS_CACHE_TTL_SECONDS >= effectiveMinFreq ||
-    BREAKING_CACHE_TTL_SECONDS >= effectiveMinFreq
+    NEWS_CACHE_TTL_SECONDS > frequencySeconds ||
+    BREAKING_CACHE_TTL_SECONDS > frequencySeconds
   ) {
-    log('Market research: cache TTL >= task frequency (will serve stale news)', 'warn', {
+    log('Market research: cache TTL > task frequency (will serve stale news)', 'warn', {
       frequency_seconds: frequencySeconds,
       news_ttl: NEWS_CACHE_TTL_SECONDS,
       breaking_ttl: BREAKING_CACHE_TTL_SECONDS,
@@ -139,10 +140,16 @@ export async function handleMarketResearch(
   let instrumentErrorCount = 0;
   let instrumentTotalQueries = 0;
   if (instrumentNames.length > 0) {
-    const batch = await searchNewsMultiple(
+    // Cached on the 1h NEWS_CACHE_TTL_SECONDS bucket. The query template is
+    // a fixed string per instrument (`"{name} trading analysis today"`), so
+    // every user watching the same instrument hits the same cache key — at
+    // scale this drops instrument Tavily cost from O(users × instruments) to
+    // O(unique instruments per hour).
+    const batch = await searchNewsMultipleCached(
       supabase,
       instrumentNames.map((n) => `${n} trading analysis today`),
       3,
+      NEWS_CACHE_TTL_SECONDS,
       'tavily'
     );
     instrumentNews = batch.results;
@@ -311,7 +318,11 @@ function buildSearchQueries(config: MarketResearchConfig): CategorizedQueries {
   const macroQueries = (config.macro_queries ?? DEFAULT_MACRO_QUERIES)
     .slice(0, MAX_MACRO_QUERIES);
 
-  const market: string[] = config.markets.map(
+  // Defensive: legacy rows could lack the field, and the edge function
+  // trusts whatever is in the DB (no frontend hydrate runs here). Without
+  // this guard, `undefined.map` would throw and the handler would error
+  // out instead of degrading gracefully.
+  const market: string[] = (config.markets ?? []).map(
     (m) => `${m} market outlook today`
   );
 
@@ -321,22 +332,28 @@ function buildSearchQueries(config: MarketResearchConfig): CategorizedQueries {
   };
 }
 
-// Cache TTLs:
-//   NEWS_TTL: 5 min — news articles don't change meaningfully within a window
-//     that short, and with N shared queries × M users we collapse to N total
-//     search-provider calls per 5-min window across the whole user base.
-//   BREAKING_TTL: 2 min — breaking content needs to be fresher, but same
-//     sharing logic applies.
-//   Instrument queries skip the cache (user-specific by watchlist choice).
+// Cache TTLs.
 //
-// INVARIANT: both TTLs MUST be shorter than the minimum task frequency
-// (currently 15 min). If cache TTL >= frequency, consecutive runs would see
-// the same cached news and the briefing would go stale. Enforced at runtime
-// in handleMarketResearch (warns on violation) so a future config change
-// that lowers frequency below 5 min can't silently break the system.
-const NEWS_CACHE_TTL_SECONDS = 300;
+// NEWS_CACHE_TTL_SECONDS (1h) is aligned with the minimum supported cron
+// cadence so the staleness guard (in handleMarketResearch) holds: cache TTL
+// must NOT exceed task frequency, or consecutive runs in the same TTL window
+// would serve the same cached news and briefings would go stale. Supported
+// cadences are 60/120/180/240/360/1440 min — all ≥ 60, so 3600s TTL is safe
+// at every option.
+//
+// At scale, the 1h TTL collapses per-query search-provider cost from
+// O(users × queries per hour) to O(unique queries per hour): the first user
+// to fire at :00 primes the cache; everyone else within that hour gets cache
+// hits. Macro and instrument queries both use this bucket because their
+// query strings are canonical (catalog-driven or templated from watchlist
+// symbols) and shared across users.
+//
+// Macro queries are deliberately daily-cycle content (Fed, ECB, oil, gold,
+// Treasury) so 1h staleness is acceptable. Breaking content stays on its
+// own 2-min Serper bucket below — it needs fresher data and has its own
+// past-hour filter that Tavily can't replicate.
+const NEWS_CACHE_TTL_SECONDS = 3600;
 const BREAKING_CACHE_TTL_SECONDS = 120;
-const MIN_TASK_FREQUENCY_SECONDS = 15 * 60;
 
 interface MarketNewsBundle {
   news: NewsResult[];

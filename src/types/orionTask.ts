@@ -1,5 +1,3 @@
-import { FOREX_MACRO_TEMPLATE } from '../config/researchTemplates';
-
 export type TaskType =
   | 'market_research'
   | 'daily_analysis'
@@ -14,7 +12,24 @@ export type TradingSession = 'asia' | 'london' | 'ny_am' | 'ny_pm';
 
 export type CoachingTone = 'tough_love' | 'blunt_analyst' | 'supportive_mentor';
 
-export type AlertFrequency = 15 | 30 | 60;
+/**
+ * Supported sweep cadences (minutes). Sub-hourly options were removed because
+ * the 1h NEWS_CACHE_TTL kept cold-missing across consecutive runs, breaking
+ * cross-user cache reuse. Anything ≥ 60 is safe — the cache TTL stays the
+ * same regardless of frequency, so longer cadences just see more cache hits
+ * (cheaper) and lower wall-clock cost (fewer scheduled runs).
+ *
+ * 60   = 1h (most responsive — every hour)
+ * 120  = 2h
+ * 180  = 3h
+ * 240  = 4h
+ * 360  = 6h
+ * 1440 = 24h (once daily)
+ *
+ * Legacy 15/30 rows are upgraded to 60 by hydrateMarketResearchConfig and
+ * by the cron migration (20260517110000_orion_tasks_hourly_only.sql).
+ */
+export type AlertFrequency = 60 | 120 | 180 | 240 | 360 | 1440;
 export type AlertMinSignificance = 'medium' | 'high';
 
 /**
@@ -28,15 +43,15 @@ export type AlertMinSignificance = 'medium' | 'high';
  * mapping), and economic-event currency filtering (via a symbol→currencies
  * mapping). Required non-empty at save time.
  *
- * Template fields (`template_id`, `macro_queries`) snapshot from a preset at
- * creation time. The user can edit any of them after picking; edits to the
- * original preset definition do not propagate back into existing tasks.
+ * `macro_queries` holds the user's picks from the DB-backed macro query
+ * catalog (public.macro_query_catalog). Stored as query strings (not catalog
+ * IDs) so the edge function runs them directly and renaming a catalog entry
+ * never breaks a running task.
  */
 export interface MarketResearchConfig {
   markets: string[];
   frequency_minutes: AlertFrequency;
   min_significance: AlertMinSignificance;
-  template_id: string;
   macro_queries: string[];
   watchlist_symbols: string[];
 }
@@ -154,14 +169,32 @@ export const TASK_TYPE_COLORS: Record<TaskType, string> = {
   monthly_rollup: '#EC407A',  // pink
 };
 
+/**
+ * Starter pack pre-populated into new market_research tasks. Five market-wide
+ * queries from the catalog (is_market_wide=true) so they fire regardless of
+ * which markets/watchlist the user picks. Gives new users immediate signal
+ * on day 1 without needing to navigate the catalog.
+ *
+ * MUST stay in sync with corresponding entries in public.macro_query_catalog —
+ * exact string match is required for cache reuse and catalog lookup. If you
+ * rename a catalog entry here, update the matching query string in the DB
+ * (or vice versa) or new tasks will fire uncached one-off strings.
+ */
+export const MARKET_RESEARCH_STARTER_QUERIES = [
+  'Federal Reserve OR FOMC speech statement policy today',
+  'geopolitical tension war sanctions markets today',
+  'White House OR US President statement market impact today',
+  'US CPI inflation data release reaction today',
+  'US Treasury yields bond market today',
+];
+
 export function buildDefaultConfigs(timezone: string): Record<TaskType, TaskConfig> {
   return {
     market_research: {
       markets: ['forex'],
-      frequency_minutes: 30,
+      frequency_minutes: 60,
       min_significance: 'high',
-      template_id: FOREX_MACRO_TEMPLATE.id,
-      macro_queries: [...FOREX_MACRO_TEMPLATE.macro_queries],
+      macro_queries: [...MARKET_RESEARCH_STARTER_QUERIES],
       watchlist_symbols: [],
     },
     daily_analysis: {

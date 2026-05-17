@@ -28,11 +28,15 @@ export type TaskHandler = (
 
 export interface MarketResearchConfig {
   markets: string[];
-  frequency_minutes: 15 | 30 | 60;
+  /** Sweep cadence in minutes. Sub-hourly removed (broke cross-user cache
+   *  reuse). Supported: 60 | 120 | 180 | 240 | 360 | 1440. The 1h cache TTL
+   *  is safe at any cadence ≥ 60 — longer cadences just see more cache hits
+   *  from other users firing within the TTL window. */
+  frequency_minutes: 60 | 120 | 180 | 240 | 360 | 1440;
   min_significance: 'medium' | 'high';
-  // Template snapshot fields. Optional so legacy rows (pre-template) still
-  // typecheck — the handler falls back to hardcoded defaults when absent.
-  template_id?: string;
+  /** User-picked queries from the public.macro_query_catalog. Stored as raw
+   *  strings (not catalog IDs) so the handler runs them directly and a
+   *  catalog rename never breaks running tasks. Optional for legacy rows. */
   macro_queries?: string[];
   /** Yahoo symbols for price grounding, news queries, and economic-event
    *  currency filtering. UI requires non-empty at save time; handler caps

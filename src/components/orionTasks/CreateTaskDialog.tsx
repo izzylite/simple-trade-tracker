@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Button,
   FormControl,
@@ -22,7 +22,6 @@ import {
   Assessment as WeeklyReviewIcon,
   CalendarMonth as MonthlyRollupIcon,
   CheckCircleOutline as CheckIcon,
-  Add as AddIcon,
   AutoAwesome as AIIcon,
   AddTask as AddTaskIcon,
   Edit as EditIcon,
@@ -40,18 +39,20 @@ import {
   detectBrowserTimezone,
 } from '../../types/orionTask';
 import {
-  RESEARCH_TEMPLATES,
-  getTemplate,
-  FOREX_MACRO_TEMPLATE,
-} from '../../config/researchTemplates';
+  filterMacroQueries,
+  type MacroQueryEntry,
+  type Market,
+} from '../../data/macroQueryCatalog';
+import { getMacroQueryCatalog } from '../../services/macroQueryCatalogService';
+import { logger } from '../../utils/logger';
 import BaseDialog from '../common/BaseDialog';
 import { Z_INDEX } from '../../styles/zIndex';
 import { useDialogTokens, MONO_FONT } from '../../styles/dialogTokens';
 
-// Backfill template fields on legacy task configs saved before templates
-// existed. Returns a fully-populated MarketResearchConfig so the form never
-// sees undefined arrays. Preserves prior `custom_topics` by merging them into
-// `macro_queries` so a user's ad-hoc topics don't silently vanish.
+// Backfill fields on legacy task configs so the form never sees undefined
+// arrays. Preserves prior `custom_topics` by merging them into `macro_queries`
+// so a user's ad-hoc topics don't silently vanish (they'll render as
+// out-of-catalog chips that the user can replace from the catalog dropdown).
 function hydrateMarketResearchConfig(
   raw: Record<string, unknown>
 ): MarketResearchConfig {
@@ -60,12 +61,19 @@ function hydrateMarketResearchConfig(
     : [];
   const macroQueries = Array.isArray(raw.macro_queries)
     ? (raw.macro_queries as string[])
-    : [...FOREX_MACRO_TEMPLATE.macro_queries, ...legacyTopics];
+    : legacyTopics;
+  // Coerce frequency to the supported set. Sub-hourly (15/30) is no longer
+  // supported — those legacy rows get upgraded to 60. Anything else outside
+  // the supported list (defensive: a corrupted config) also falls back to 60.
+  const rawFreq = raw.frequency_minutes as number | undefined;
+  const supportedFreqs = new Set([60, 120, 180, 240, 360, 1440]);
+  const frequency = supportedFreqs.has(rawFreq ?? 0)
+    ? (rawFreq as 60 | 120 | 180 | 240 | 360 | 1440)
+    : 60;
   return {
     markets: (raw.markets as string[]) ?? ['forex'],
-    frequency_minutes: (raw.frequency_minutes as 15 | 30 | 60) ?? 30,
+    frequency_minutes: frequency,
     min_significance: (raw.min_significance as 'medium' | 'high') ?? 'high',
-    template_id: (raw.template_id as string) ?? FOREX_MACRO_TEMPLATE.id,
     macro_queries: macroQueries.slice(0, MAX_MACRO_QUERIES),
     watchlist_symbols: Array.isArray(raw.watchlist_symbols)
       ? (raw.watchlist_symbols as string[])
@@ -325,17 +333,22 @@ const YAHOO_SYMBOL_CATALOG: YahooSymbolOption[] = [
   { symbol: 'BRK-B', label: 'Berkshire Hathaway B', group: 'Mega-cap stocks' },
 ];
 
-const CUSTOM_TEMPLATE_ID = 'custom';
-
-// Each macro query fires a Serper call every sweep. Capped to keep quota usage
-// bounded; edge function trims defensively to the same limit.
+// Each macro query fires a search-provider call every sweep. Capped to keep
+// quota usage bounded; edge function trims defensively to the same limit.
 const MAX_MACRO_QUERIES = 10;
+
+// Friendly label for the sweep cadence used in the helper text under the
+// schedule row. Mirrors the MenuItem labels in the Select.
+function formatFrequencyLabel(minutes: number): string {
+  if (minutes === 60) return '1 hour';
+  if (minutes === 1440) return '24 hours';
+  if (minutes % 60 === 0) return `${minutes / 60} hours`;
+  return `${minutes} min`;
+}
 
 interface MarketResearchFormProps {
   config: MarketResearchConfig;
   setConfig: (c: MarketResearchConfig) => void;
-  macroQueryInput: string;
-  setMacroQueryInput: (v: string) => void;
 }
 
 const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
@@ -360,7 +373,6 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
   const [taskType, setTaskType] = useState<TaskType | ''>('');
   const [config, setConfig] = useState<TaskConfig | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [macroQueryInput, setMacroQueryInput] = useState('');
 
   const menuPaperSx = {
     borderRadius: 1.5,
@@ -428,7 +440,6 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
           ? (hydrateMarketResearchConfig(raw) as unknown as TaskConfig)
           : ({ ...editingTask.config } as TaskConfig);
       setConfig(hydrated);
-      setMacroQueryInput('');
     }
   }, [editingTask]);
 
@@ -445,14 +456,12 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
     if (isEditMode) return; // in edit mode, back is disabled — only cancel/save
     setTaskType('');
     setConfig(null);
-    setMacroQueryInput('');
   };
 
   const handleClose = () => {
     onClose();
     setTaskType('');
     setConfig(null);
-    setMacroQueryInput('');
   };
 
   const handleSubmit = async () => {
@@ -728,8 +737,6 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
             <MarketResearchForm
               config={config as MarketResearchConfig}
               setConfig={(next) => setConfig(next)}
-              macroQueryInput={macroQueryInput}
-              setMacroQueryInput={setMacroQueryInput}
               monoLabelSx={monoLabelSx}
               optionalSx={optionalSx}
               inputSx={inputSx}
@@ -1011,8 +1018,6 @@ const MarketResearchForm: React.FC<
 > = ({
   config,
   setConfig,
-  macroQueryInput,
-  setMacroQueryInput,
   monoLabelSx,
   optionalSx,
   inputSx,
@@ -1030,103 +1035,111 @@ const MarketResearchForm: React.FC<
   const toggleArrayItem = <T extends string>(arr: T[], item: T): T[] =>
     arr.includes(item) ? arr.filter((v) => v !== item) : [...arr, item];
 
-  const handleTemplateChange = (templateId: string) => {
-    const template = getTemplate(templateId);
-    if (!template) return;
-    // Overwrite the macro-query snapshot with the chosen template. Preserve
-    // markets/frequency/threshold/watchlist — those are orthogonal to the
-    // preset queries.
-    setConfig({
-      ...config,
-      template_id: template.id,
-      macro_queries: template.macro_queries.slice(0, MAX_MACRO_QUERIES),
-    });
-  };
+  // Catalog is fetched once per session by the service; this component's
+  // useEffect just primes that cache so the dropdown renders without a
+  // visible loading flash on subsequent opens.
+  const [catalog, setCatalog] = useState<MacroQueryEntry[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  useEffect(() => {
+    let cancelled = false;
+    getMacroQueryCatalog()
+      .then((entries) => {
+        if (!cancelled) setCatalog(entries);
+      })
+      .catch((err) => {
+        logger.error('Failed to load macro query catalog', err);
+      })
+      .finally(() => {
+        if (!cancelled) setCatalogLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-  const addMacroQuery = () => {
-    const trimmed = macroQueryInput.trim();
-    if (!trimmed || config.macro_queries.includes(trimmed)) return;
-    if (config.macro_queries.length >= MAX_MACRO_QUERIES) return;
-    setConfig({
-      ...config,
-      macro_queries: [...config.macro_queries, trimmed],
-      template_id: CUSTOM_TEMPLATE_ID,
-    });
-    setMacroQueryInput('');
-  };
-
-  const removeMacroQuery = (q: string) => {
-    setConfig({
-      ...config,
-      macro_queries: config.macro_queries.filter((x) => x !== q),
-      template_id: CUSTOM_TEMPLATE_ID,
-    });
+  // Drop any catalog-sourced queries that no longer match the user's
+  // markets/watchlist after they change one. Legacy queries (those not in
+  // the catalog at all) are preserved — they're orphaned by the catalog
+  // refactor, not by the user's filter choice, and removing them would be
+  // a second-order side effect of changing markets which the user didn't ask for.
+  const pruneOrphanedMacros = (
+    nextMarkets: Market[],
+    nextWatchlist: string[],
+    currentMacros: string[],
+  ): string[] => {
+    if (catalog.length === 0) return currentMacros;
+    const allCatalogQueries = new Set(catalog.map((e) => e.query));
+    const filtered = filterMacroQueries(catalog, nextMarkets, nextWatchlist);
+    const allowedAfterFilter = new Set(filtered.map((e) => e.query));
+    return currentMacros.filter(
+      (q) => !allCatalogQueries.has(q) || allowedAfterFilter.has(q),
+    );
   };
 
   const updateWatchlistSymbols = (symbols: string[]) => {
+    const nextMacros = pruneOrphanedMacros(
+      config.markets as Market[],
+      symbols,
+      config.macro_queries ?? [],
+    );
     setConfig({
       ...config,
       watchlist_symbols: symbols,
+      macro_queries: nextMacros,
     });
   };
 
-  // If the stored template_id is something we don't recognize (custom or
-  // legacy), show it as "Custom" in the picker rather than leaving the
-  // Select empty.
-  const templateValue = RESEARCH_TEMPLATES.some((t) => t.id === config.template_id)
-    ? config.template_id
-    : CUSTOM_TEMPLATE_ID;
+  const updateMarkets = (nextMarkets: string[]) => {
+    const nextMacros = pruneOrphanedMacros(
+      nextMarkets as Market[],
+      config.watchlist_symbols ?? [],
+      config.macro_queries ?? [],
+    );
+    setConfig({
+      ...config,
+      markets: nextMarkets,
+      macro_queries: nextMacros,
+    });
+  };
 
+  // Filtered dropdown options. Pure recompute on every markets/watchlist
+  // change — catalog is small (~70 rows) so this is trivial.
+  const filteredCatalog = useMemo(
+    () =>
+      filterMacroQueries(
+        catalog,
+        config.markets as Market[],
+        config.watchlist_symbols ?? []
+      ),
+    [catalog, config.markets, config.watchlist_symbols]
+  );
+
+  // The chip list shows the user's currently-selected queries. If a stored
+  // query string isn't in the current catalog (legacy custom query from
+  // before this refactor, or one the user added when the catalog had a
+  // different entry), still surface it as a chip so they don't silently
+  // lose it — they can re-pick from the dropdown to "register" it.
+  const selectedEntries = useMemo(() => {
+    const byQuery = new Map(catalog.map((e) => [e.query, e]));
+    return (config.macro_queries ?? []).map(
+      (q) =>
+        byQuery.get(q) ?? {
+          id: `legacy:${q}`,
+          query: q,
+          markets: [],
+          isMarketWide: false,
+          symbols: [],
+          category: 'Custom (legacy)',
+          displayOrder: 0,
+        }
+    );
+  }, [catalog, config.macro_queries]);
+
+  const atLimit = (config.macro_queries ?? []).length >= MAX_MACRO_QUERIES;
   const watchlistEmpty = (config.watchlist_symbols ?? []).length === 0;
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      {/* Template */}
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
-        <Typography sx={monoLabelSx}>Template</Typography>
-        <Select
-          value={templateValue}
-          onChange={(e) => handleTemplateChange(e.target.value as string)}
-          size="small"
-          fullWidth
-          sx={inputSx}
-          MenuProps={{
-            sx: { zIndex: Z_INDEX.DIALOG_POPUP },
-            PaperProps: { sx: menuPaperSx },
-          }}
-          renderValue={(val) => {
-            const label =
-              val === CUSTOM_TEMPLATE_ID
-                ? 'Custom (edited)'
-                : getTemplate(val as string)?.name ?? (val as string);
-            return (
-              <Typography sx={{ fontWeight: 600, fontSize: '0.88rem' }}>
-                {label}
-              </Typography>
-            );
-          }}
-        >
-          {RESEARCH_TEMPLATES.map((t) => (
-            <MenuItem key={t.id} value={t.id} sx={{ ...menuItemSx, py: 1 }}>
-              <Box>
-                <Typography sx={{ fontWeight: 600, fontSize: '0.88rem' }}>
-                  {t.name}
-                </Typography>
-                <Typography
-                  sx={{
-                    fontSize: '0.74rem',
-                    color: theme.palette.text.secondary,
-                    lineHeight: 1.4,
-                  }}
-                >
-                  {t.description}
-                </Typography>
-              </Box>
-            </MenuItem>
-          ))}
-        </Select>
-      </Box>
-
       {/* Frequency + significance */}
       <Box sx={{ display: 'flex', gap: 1.5 }}>
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0.75 }}>
@@ -1136,7 +1149,7 @@ const MarketResearchForm: React.FC<
             onChange={(e) =>
               setConfig({
                 ...config,
-                frequency_minutes: e.target.value as 15 | 30 | 60,
+                frequency_minutes: e.target.value as MarketResearchConfig['frequency_minutes'],
               })
             }
             size="small"
@@ -1147,9 +1160,12 @@ const MarketResearchForm: React.FC<
               PaperProps: { sx: menuPaperSx },
             }}
           >
-            <MenuItem value={15} sx={menuItemSx}>15 min</MenuItem>
-            <MenuItem value={30} sx={menuItemSx}>30 min</MenuItem>
             <MenuItem value={60} sx={menuItemSx}>1 hour</MenuItem>
+            <MenuItem value={120} sx={menuItemSx}>2 hours</MenuItem>
+            <MenuItem value={180} sx={menuItemSx}>3 hours</MenuItem>
+            <MenuItem value={240} sx={menuItemSx}>4 hours</MenuItem>
+            <MenuItem value={360} sx={menuItemSx}>6 hours</MenuItem>
+            <MenuItem value={1440} sx={menuItemSx}>24 hours</MenuItem>
           </Select>
         </Box>
 
@@ -1176,6 +1192,28 @@ const MarketResearchForm: React.FC<
           </Select>
         </Box>
       </Box>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mt: -1 }}>
+        <Typography
+          sx={{
+            color: theme.palette.text.secondary,
+            fontSize: '0.72rem',
+            lineHeight: 1.5,
+          }}
+        >
+          Orion sweeps your watchlist every {formatFrequencyLabel(config.frequency_minutes)} and posts when a catalyst clears your alert threshold.
+        </Typography>
+        <Typography
+          sx={{
+            color: theme.palette.text.secondary,
+            fontSize: '0.72rem',
+            lineHeight: 1.5,
+          }}
+        >
+          {config.min_significance === 'medium'
+            ? 'Medium & high catches softer catalysts too — more alerts, fewer surprises missed.'
+            : 'High only filters to major market‑moving events — fewer alerts, only what really matters.'}
+        </Typography>
+      </Box>
 
       {/* Markets */}
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
@@ -1188,10 +1226,7 @@ const MarketResearchForm: React.FC<
                 key={m.value}
                 sx={chipBaseSx(selected)}
                 onClick={() =>
-                  setConfig({
-                    ...config,
-                    markets: toggleArrayItem(config.markets, m.value),
-                  })
+                  updateMarkets(toggleArrayItem(config.markets, m.value))
                 }
               >
                 {m.label}
@@ -1290,13 +1325,13 @@ const MarketResearchForm: React.FC<
         />
       </Box>
 
-      {/* Macro queries */}
+      {/* Macro queries — catalog-driven Autocomplete */}
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Typography sx={monoLabelSx}>
             Macro queries
             <Box component="span" sx={{ ...optionalSx, ml: 0.5 }}>
-              · {config.macro_queries.length}/{MAX_MACRO_QUERIES}
+              · {(config.macro_queries ?? []).length}/{MAX_MACRO_QUERIES}
             </Box>
           </Typography>
         </Box>
@@ -1307,85 +1342,97 @@ const MarketResearchForm: React.FC<
             lineHeight: 1.5,
           }}
         >
-          Baseline queries Orion runs every sweep. Edit to tailor to your market — e.g. add "$TSLA earnings" or "BTC ETF flows". Up to {MAX_MACRO_QUERIES} queries.
+          Pick from the catalog. Filters by your selected markets + watchlist — broaden either to see more options. Up to {MAX_MACRO_QUERIES} queries.
         </Typography>
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <TextField
-            size="small"
-            placeholder={
-              config.macro_queries.length >= MAX_MACRO_QUERIES
-                ? `Limit reached (${MAX_MACRO_QUERIES})`
-                : 'Add a query…'
-            }
-            value={macroQueryInput}
-            onChange={(e) => setMacroQueryInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                addMacroQuery();
-              }
-            }}
-            disabled={config.macro_queries.length >= MAX_MACRO_QUERIES}
-            fullWidth
-            sx={inputSx}
-          />
-          <Button
-            size="small"
-            startIcon={<AddIcon sx={{ fontSize: 14 }} />}
-            disabled={
-              !macroQueryInput.trim() ||
-              config.macro_queries.length >= MAX_MACRO_QUERIES
-            }
-            onClick={addMacroQuery}
-            sx={{
-              textTransform: 'none',
-              fontWeight: 600,
-              fontSize: '0.8rem',
-              color: violet,
-              backgroundColor: violetSofter,
-              border: `1px solid ${violetBorder}`,
-              borderRadius: 1.25,
-              px: 1.25,
-              py: 0.5,
-              minWidth: 0,
-              flexShrink: 0,
-              '&:hover': { backgroundColor: violetSoft },
-              '&.Mui-disabled': {
-                color: alpha(violet, 0.45),
-                borderColor: alpha(violet, 0.18),
-                backgroundColor: alpha(violet, 0.05),
-              },
-            }}
-          >
-            Add
-          </Button>
-        </Box>
-        {config.macro_queries.length > 0 && (
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
-            {config.macro_queries.map((q) => (
-              <Chip
-                key={q}
-                label={q}
-                size="small"
-                onDelete={() => removeMacroQuery(q)}
+        <Autocomplete<MacroQueryEntry, true>
+          multiple
+          size="small"
+          loading={catalogLoading}
+          options={filteredCatalog}
+          groupBy={(opt) => opt.category}
+          getOptionLabel={(opt) => opt.query}
+          isOptionEqualToValue={(a, b) => a.query === b.query}
+          getOptionDisabled={(opt) =>
+            atLimit && !(config.macro_queries ?? []).includes(opt.query)
+          }
+          value={selectedEntries}
+          onChange={(_, newValue) => {
+            const capped = newValue.slice(0, MAX_MACRO_QUERIES);
+            setConfig({
+              ...config,
+              macro_queries: capped.map((v) => v.query),
+            });
+          }}
+          slotProps={{
+            popper: { sx: { zIndex: Z_INDEX.DIALOG_POPUP } },
+            paper: { sx: menuPaperSx },
+          }}
+          renderTags={(value, getTagProps) =>
+            value.map((opt, index) => {
+              const tagProps = getTagProps({ index });
+              const isLegacy = opt.id.startsWith('legacy:');
+              return (
+                <Chip
+                  {...tagProps}
+                  key={opt.query}
+                  label={opt.query}
+                  size="small"
+                  sx={{
+                    height: 24,
+                    fontSize: '0.74rem',
+                    fontWeight: 500,
+                    backgroundColor: isLegacy
+                      ? alpha(theme.palette.warning.main, 0.12)
+                      : surfaceInset,
+                    color: isLegacy
+                      ? theme.palette.warning.main
+                      : theme.palette.text.primary,
+                    border: `1px solid ${isLegacy ? alpha(theme.palette.warning.main, 0.4) : hairline}`,
+                    fontFamily: MONO_FONT,
+                    '& .MuiChip-deleteIcon': {
+                      color: alpha(theme.palette.text.secondary, 0.6),
+                      fontSize: 14,
+                      '&:hover': { color: theme.palette.text.primary },
+                    },
+                  }}
+                />
+              );
+            })
+          }
+          renderOption={(props, opt) => (
+            <li {...props} key={opt.id}>
+              <Typography
                 sx={{
-                  height: 24,
-                  fontSize: '0.76rem',
+                  fontSize: '0.82rem',
                   fontWeight: 500,
-                  backgroundColor: surfaceInset,
-                  color: theme.palette.text.primary,
-                  border: `1px solid ${hairline}`,
                   fontFamily: MONO_FONT,
-                  '& .MuiChip-deleteIcon': {
-                    color: alpha(theme.palette.text.secondary, 0.6),
-                    fontSize: 14,
-                    '&:hover': { color: theme.palette.text.primary },
-                  },
                 }}
-              />
-            ))}
-          </Box>
-        )}
+              >
+                {opt.query}
+              </Typography>
+            </li>
+          )}
+          renderInput={(params) => (
+            <TextField
+              {...params}
+              placeholder={
+                atLimit
+                  ? `Limit reached (${MAX_MACRO_QUERIES})`
+                  : (config.markets ?? []).length === 0 || watchlistEmpty
+                    ? 'Select markets and watchlist to populate catalog…'
+                    : 'Search catalog…'
+              }
+              sx={inputSx}
+            />
+          )}
+          noOptionsText={
+            (config.markets ?? []).length === 0
+              ? 'Select at least one market above.'
+              : watchlistEmpty
+                ? 'Add a watchlist symbol to see relevant queries.'
+                : 'No matching queries — try broadening markets or watchlist.'
+          }
+        />
       </Box>
     </Box>
   );
