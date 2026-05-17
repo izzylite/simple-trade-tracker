@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -9,12 +9,10 @@ import {
   useTheme,
   useMediaQuery,
   alpha,
-  Alert,
   CircularProgress,
   IconButton,
   InputAdornment,
-  Divider,
-  Stack
+  Stack,
 } from '@mui/material';
 import {
   Google as GoogleIcon,
@@ -23,7 +21,13 @@ import {
   ArrowBack,
   CheckCircle,
   Close as CloseIcon,
-  VpnKey
+  VpnKey,
+  LockOutlined,
+  PersonAddOutlined,
+  EmailOutlined,
+  ArrowForward as ArrowIcon,
+  ErrorOutline as ErrorOutlineIcon,
+  CheckCircleOutline as CheckCircleOutlineIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/SupabaseAuthContext';
 import { inviteService } from '../../services/inviteService';
@@ -47,12 +51,15 @@ export interface LoginPromptContentProps {
 type AuthStep = 'invite' | 'auth' | 'reset-password';
 type EmailAuthType = 'signin' | 'signup';
 
+const MONO_FONT = "'JetBrains Mono', ui-monospace, monospace";
+
 export const LoginPromptContent: React.FC<LoginPromptContentProps> = ({
-  title = 'Welcome Back',
+  title = 'Welcome back',
   subtitle = 'Sign in to continue to JournoTrades',
   onAfterSignIn,
 }) => {
   const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   const { signInWithGoogle, signInWithEmail, signUpWithEmail, requestPasswordReset } = useAuth();
 
   // Step management
@@ -79,6 +86,56 @@ export const LoginPromptContent: React.FC<LoginPromptContentProps> = ({
   const [resetLoading, setResetLoading] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
   const [resetSuccess, setResetSuccess] = useState<string | null>(null);
+
+  // Tokens
+  const violet = theme.palette.primary.main;
+  const violetSoft = alpha(violet, isDark ? 0.18 : 0.14);
+  const violetSofter = alpha(violet, isDark ? 0.12 : 0.10);
+  const violetBorder = alpha(violet, isDark ? 0.35 : 0.28);
+  const surfaceInset = isDark ? 'rgba(255,255,255,0.03)' : alpha(theme.palette.text.primary, 0.03);
+  const hairline = isDark ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
+
+  const monoLabelSx = useMemo(
+    () => ({
+      fontFamily: MONO_FONT,
+      fontSize: '0.68rem',
+      fontWeight: 600,
+      letterSpacing: '0.12em',
+      textTransform: 'uppercase' as const,
+      color: theme.palette.text.secondary,
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: 0.75,
+    }),
+    [theme.palette.text.secondary],
+  );
+
+  const optionalSx = {
+    fontFamily: MONO_FONT,
+    fontSize: '0.68rem',
+    fontWeight: 500,
+    letterSpacing: '0.08em',
+    color: alpha(theme.palette.text.secondary, 0.7),
+    textTransform: 'none' as const,
+  };
+
+  const inputSx = useMemo(
+    () => ({
+      '& .MuiOutlinedInput-root': {
+        borderRadius: 1.5,
+        backgroundColor: surfaceInset,
+        '& fieldset': { borderColor: hairline },
+        '&:hover fieldset': { borderColor: alpha(violet, 0.5) },
+        '&.Mui-focused fieldset': { borderColor: violet, borderWidth: 1 },
+      },
+      '& .MuiOutlinedInput-input': {
+        py: 1.1,
+        fontSize: '0.88rem',
+        fontWeight: 500,
+      },
+    }),
+    [surfaceInset, hairline, violet],
+  );
 
   // Handle invite verification
   const handleVerifyInvite = async () => {
@@ -242,321 +299,521 @@ export const LoginPromptContent: React.FC<LoginPromptContentProps> = ({
     setResetEmail('');
   };
 
+  // Header icon + copy per sub-flow
+  const headerIcon =
+    currentStep === 'invite' ? (
+      <VpnKey sx={{ fontSize: 20 }} />
+    ) : currentStep === 'reset-password' ? (
+      <EmailOutlined sx={{ fontSize: 20 }} />
+    ) : emailAuthType === 'signup' ? (
+      <PersonAddOutlined sx={{ fontSize: 20 }} />
+    ) : (
+      <LockOutlined sx={{ fontSize: 20 }} />
+    );
+
+  const headerTitle =
+    currentStep === 'invite'
+      ? 'Get started'
+      : currentStep === 'reset-password'
+      ? 'Reset password'
+      : emailAuthType === 'signup'
+      ? 'Create account'
+      : title;
+
+  const headerSubtitle =
+    currentStep === 'invite'
+      ? 'Enter your invite code to continue'
+      : currentStep === 'reset-password'
+      ? "We'll send you a reset link"
+      : emailAuthType === 'signup'
+      ? 'Join JournoTrades and start journaling your trades'
+      : subtitle;
+
+  // Reusable tinted callout (error / success)
+  const calloutSx = (severity: 'error' | 'success') => {
+    const color =
+      severity === 'error' ? theme.palette.error.main : theme.palette.success.main;
+    return {
+      display: 'flex',
+      alignItems: 'flex-start',
+      gap: 1,
+      px: 1.25,
+      py: 1,
+      borderRadius: 1.25,
+      border: `1px solid ${alpha(color, 0.35)}`,
+      backgroundColor: alpha(color, 0.08),
+    };
+  };
+
+  const renderCallout = (
+    severity: 'error' | 'success',
+    message: string,
+    onClose?: () => void,
+  ) => {
+    const color =
+      severity === 'error' ? theme.palette.error.main : theme.palette.success.main;
+    const Icon = severity === 'error' ? ErrorOutlineIcon : CheckCircleOutlineIcon;
+    return (
+      <Box sx={calloutSx(severity)}>
+        <Icon sx={{ fontSize: 16, color, mt: 0.15, flexShrink: 0 }} />
+        <Typography
+          sx={{
+            flex: 1,
+            fontSize: '0.8rem',
+            color: theme.palette.text.primary,
+            lineHeight: 1.45,
+          }}
+        >
+          {message}
+        </Typography>
+        {onClose && (
+          <IconButton
+            onClick={onClose}
+            size="small"
+            sx={{ p: 0.25, color: alpha(theme.palette.text.secondary, 0.8) }}
+          >
+            <CloseIcon sx={{ fontSize: 14 }} />
+          </IconButton>
+        )}
+      </Box>
+    );
+  };
+
+  // Footer hairline-bordered surface
+  const footerSurfaceSx = {
+    px: { xs: 2.5, sm: 3 },
+    py: 1.5,
+    borderTop: `1px solid ${hairline}`,
+    backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : alpha(theme.palette.text.primary, 0.02),
+  };
+
+  const ghostButtonSx = {
+    textTransform: 'none' as const,
+    fontWeight: 600,
+    fontSize: '0.82rem',
+    color: theme.palette.text.secondary,
+    '&:hover': { backgroundColor: alpha(theme.palette.text.primary, 0.04) },
+  };
+
+  const primaryButtonSx = {
+    textTransform: 'none' as const,
+    fontWeight: 600,
+    fontSize: '0.85rem',
+    backgroundColor: violet,
+    color: '#fff',
+    borderRadius: 1.25,
+    px: 1.75,
+    py: 0.75,
+    boxShadow: 'none',
+    '&:hover': { backgroundColor: theme.palette.primary.dark, boxShadow: 'none' },
+    '&.Mui-disabled': {
+      backgroundColor: alpha(violet, 0.35),
+      color: alpha('#fff', 0.7),
+    },
+  };
+
+  // Social button — keep brand glyph, inset-surface card pattern
+  const socialButtonSx = {
+    textTransform: 'none' as const,
+    fontWeight: 600,
+    fontSize: '0.88rem',
+    color: theme.palette.text.primary,
+    backgroundColor: surfaceInset,
+    border: `1px solid ${hairline}`,
+    borderRadius: 1.5,
+    py: 1.1,
+    justifyContent: 'center',
+    boxShadow: 'none',
+    '&:hover': {
+      backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : alpha(theme.palette.text.primary, 0.05),
+      borderColor: alpha(violet, 0.4),
+      boxShadow: 'none',
+    },
+  };
+
   return (
-    <Box sx={{ minHeight: '100%' }}>
+    <Box sx={{ minHeight: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
       <Box
         sx={{
-          pt: { xs: 4, sm: 5 },
-          pb: { xs: 3, sm: 4 },
-          px: { xs: 3, sm: 4 },
-          textAlign: 'center'
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1.5,
+          px: { xs: 2.5, sm: 3 },
+          py: 1.75,
+          borderBottom: `1px solid ${hairline}`,
         }}
       >
-        {/* Logo */}
         <Box
-          component="img"
-          src="/android-chrome-192x192.png"
-          alt="JournoTrades"
           sx={{
-            width: { xs: 56, sm: 64 },
-            height: { xs: 56, sm: 64 },
-            borderRadius: 2.5,
-            boxShadow: `0 8px 24px ${alpha(theme.palette.primary.main, 0.25)}`,
-            mb: 2.5
-          }}
-        />
-
-        {/* Title */}
-        <Typography
-          variant="h5"
-          sx={{
-            fontWeight: 700,
-            mb: 0.75,
-            fontSize: { xs: '1.375rem', sm: '1.5rem' }
+            width: 36,
+            height: 36,
+            borderRadius: 1.25,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: violetSoft,
+            color: violet,
+            border: `1px solid ${violetBorder}`,
+            flexShrink: 0,
           }}
         >
-          {currentStep === 'invite' ? 'Get Started' : currentStep === 'reset-password' ? 'Reset Password' : title}
-        </Typography>
-
-        {/* Subtitle */}
-        <Typography
-          variant="body2"
-          color="text.secondary"
-          sx={{ fontSize: { xs: '0.875rem', sm: '0.9375rem' } }}
-        >
-          {currentStep === 'invite'
-            ? 'Enter your invite code to continue'
-            : currentStep === 'reset-password'
-            ? "We'll send you a reset link"
-            : subtitle}
-        </Typography>
+          {headerIcon}
+        </Box>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography sx={{ fontWeight: 700, fontSize: '0.98rem', lineHeight: 1.2 }}>
+            {headerTitle}
+          </Typography>
+          <Typography
+            sx={{
+              fontSize: '0.78rem',
+              color: theme.palette.text.secondary,
+              lineHeight: 1.3,
+            }}
+          >
+            {headerSubtitle}
+          </Typography>
+        </Box>
       </Box>
 
-      {/* Content */}
-      <Box sx={{ px: { xs: 3, sm: 4 }, pb: { xs: 3, sm: 4 } }}>
+      {/* Body */}
+      <Box
+        sx={{
+          px: { xs: 2.5, sm: 3 },
+          py: 2.25,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 2,
+          ...scrollbarStyles(theme),
+          overflowY: 'auto',
+          flex: 1,
+        }}
+      >
         {/* Step 1: Invite Code */}
         {currentStep === 'invite' && (
-          <Stack spacing={2.5}>
-            <TextField
-              fullWidth
-              label="Invite Code"
-              placeholder="Enter your invite code"
-              value={inviteCode}
-              onChange={(e) => {
-                setInviteCode(e.target.value.toUpperCase());
-                setInviteError(null);
-              }}
-              error={!!inviteError}
-              helperText={inviteError}
-              disabled={inviteVerifying}
-              onKeyPress={(e) => {
-                if (e.key === 'Enter') handleVerifyInvite();
-              }}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <VpnKey sx={{ color: 'text.disabled', fontSize: 20 }} />
-                  </InputAdornment>
-                ),
-                endAdornment: inviteVerified && (
-                  <InputAdornment position="end">
-                    <CheckCircle color="success" />
-                  </InputAdornment>
-                )
-              }}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: 2
-                }
-              }}
-            />
+          <Stack spacing={1.75}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+              <Typography sx={monoLabelSx}>
+                Invite code
+                <Box
+                  component="span"
+                  sx={{ color: theme.palette.error.main, fontFamily: 'inherit' }}
+                >
+                  *
+                </Box>
+              </Typography>
+              <TextField
+                fullWidth
+                placeholder="Enter your invite code"
+                value={inviteCode}
+                onChange={(e) => {
+                  setInviteCode(e.target.value.toUpperCase());
+                  setInviteError(null);
+                }}
+                error={!!inviteError}
+                disabled={inviteVerifying}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') handleVerifyInvite();
+                }}
+                size="small"
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <VpnKey
+                        sx={{ color: theme.palette.text.secondary, fontSize: 18 }}
+                      />
+                    </InputAdornment>
+                  ),
+                  endAdornment: inviteVerified ? (
+                    <InputAdornment position="end">
+                      <CheckCircle sx={{ color: theme.palette.success.main, fontSize: 18 }} />
+                    </InputAdornment>
+                  ) : undefined,
+                }}
+                sx={inputSx}
+              />
+              {inviteError && (
+                <Typography
+                  sx={{ fontSize: '0.75rem', color: theme.palette.error.main, mt: 0.25 }}
+                >
+                  {inviteError}
+                </Typography>
+              )}
+            </Box>
 
             <Button
               variant="contained"
-              size="large"
               fullWidth
               onClick={handleVerifyInvite}
               disabled={inviteVerifying || !inviteCode.trim()}
-              sx={{
-                py: 1.5,
-                borderRadius: 2,
-                fontSize: '0.9375rem',
-                fontWeight: 600,
-                textTransform: 'none',
-                boxShadow: 'none',
-                '&:hover': {
-                  boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`
-                }
-              }}
+              endIcon={
+                inviteVerifying ? (
+                  <CircularProgress size={14} thickness={5} sx={{ color: 'inherit' }} />
+                ) : (
+                  <ArrowIcon sx={{ fontSize: 16 }} />
+                )
+              }
+              sx={{ ...primaryButtonSx, py: 1.1 }}
             >
-              {inviteVerifying ? (
-                <>
-                  <CircularProgress size={20} sx={{ mr: 1 }} color="inherit" />
-                  Verifying...
-                </>
-              ) : (
-                'Continue'
-              )}
+              {inviteVerifying ? 'Verifying…' : 'Continue'}
             </Button>
 
             <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ textAlign: 'center', display: 'block' }}
+              sx={{
+                ...optionalSx,
+                textAlign: 'center',
+                display: 'block',
+                color: theme.palette.text.secondary,
+              }}
             >
-              Don't have an invite code? Check our Discord community.
+              Don&apos;t have an invite code? Check our Discord community.
             </Typography>
           </Stack>
         )}
 
         {/* Step 2: Authentication */}
         {currentStep === 'auth' && (
-          <Stack spacing={2}>
-            {/* Back Button */}
+          <Stack spacing={1.75}>
+            {/* Back */}
             <Button
-              startIcon={<ArrowBack fontSize="small" />}
+              startIcon={<ArrowBack sx={{ fontSize: 14 }} />}
               onClick={handleBackToInvite}
               size="small"
               sx={{
                 alignSelf: 'flex-start',
                 textTransform: 'none',
-                color: 'text.secondary',
-                mb: 0.5
+                fontSize: '0.78rem',
+                fontWeight: 600,
+                color: theme.palette.text.secondary,
+                px: 0.75,
+                minHeight: 0,
+                py: 0.25,
+                '&:hover': { backgroundColor: alpha(theme.palette.text.primary, 0.04) },
               }}
             >
               Back
             </Button>
 
-            {/* Alerts */}
-            {authError && (
-              <Alert
-                severity="error"
-                onClose={() => setAuthError(null)}
-                sx={{ borderRadius: 2 }}
-              >
-                {authError}
-              </Alert>
-            )}
-            {authSuccess && (
-              <Alert
-                severity="success"
-                onClose={() => setAuthSuccess(null)}
-                sx={{ borderRadius: 2 }}
-              >
-                {authSuccess}
-              </Alert>
-            )}
+            {/* Callouts */}
+            {authError && renderCallout('error', authError, () => setAuthError(null))}
+            {authSuccess && renderCallout('success', authSuccess, () => setAuthSuccess(null))}
 
-            {/* Google Sign-In - Primary Option */}
+            {/* Google Sign-In */}
             <Button
-              variant="outlined"
-              size="large"
               fullWidth
-              startIcon={<GoogleIcon />}
+              startIcon={<GoogleIcon sx={{ fontSize: 18 }} />}
               onClick={handleGoogleSignIn}
               disabled={authLoading}
-              sx={{
-                py: 1.5,
-                borderRadius: 2,
-                fontSize: '0.9375rem',
-                fontWeight: 600,
-                textTransform: 'none',
-                borderColor: alpha(theme.palette.divider, 0.3),
-                color: 'text.primary',
-                '&:hover': {
-                  borderColor: theme.palette.primary.main,
-                  bgcolor: alpha(theme.palette.primary.main, 0.04)
-                }
-              }}
+              sx={socialButtonSx}
             >
               Continue with Google
             </Button>
 
-            {/* Divider */}
-            <Box sx={{ position: 'relative', py: 1 }}>
-              <Divider />
+            {/* Hairline divider with 'or' */}
+            <Box
+              sx={{
+                position: 'relative',
+                display: 'flex',
+                alignItems: 'center',
+                py: 0.25,
+              }}
+            >
+              <Box sx={{ flex: 1, height: 1, backgroundColor: hairline }} />
               <Typography
-                variant="caption"
                 sx={{
-                  position: 'absolute',
-                  top: '50%',
-                  left: '50%',
-                  transform: 'translate(-50%, -50%)',
-                  bgcolor: 'background.paper',
-                  px: 2,
-                  color: 'text.disabled'
+                  ...optionalSx,
+                  px: 1.25,
+                  color: alpha(theme.palette.text.secondary, 0.8),
                 }}
               >
                 or
               </Typography>
+              <Box sx={{ flex: 1, height: 1, backgroundColor: hairline }} />
             </Box>
 
-            {/* Email Field */}
-            <TextField
-              fullWidth
-              type="email"
-              label="Email"
-              value={email}
-              onChange={(e) => {
-                setEmail(e.target.value);
-                setAuthError(null);
-                setAuthSuccess(null);
-              }}
-              disabled={authLoading}
-              size="medium"
-              sx={{
-                '& .MuiOutlinedInput-root': { borderRadius: 2 }
-              }}
-            />
-
-            {/* Display Name (Sign-Up Only) */}
-            {emailAuthType === 'signup' && (
+            {/* Email */}
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+              <Typography sx={monoLabelSx}>
+                Email
+                <Box
+                  component="span"
+                  sx={{ color: theme.palette.error.main, fontFamily: 'inherit' }}
+                >
+                  *
+                </Box>
+              </Typography>
               <TextField
                 fullWidth
-                label="Display Name (Optional)"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                disabled={authLoading}
-                size="medium"
-                sx={{
-                  '& .MuiOutlinedInput-root': { borderRadius: 2 }
+                type="email"
+                placeholder="you@domain.com"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setAuthError(null);
+                  setAuthSuccess(null);
                 }}
+                disabled={authLoading}
+                size="small"
+                sx={inputSx}
               />
+            </Box>
+
+            {/* Display Name (sign-up only) */}
+            {emailAuthType === 'signup' && (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                <Typography sx={monoLabelSx}>
+                  Display name
+                  <Box component="span" sx={{ ...optionalSx, ml: 0.5 }}>
+                    · Optional
+                  </Box>
+                </Typography>
+                <TextField
+                  fullWidth
+                  placeholder="How should we address you?"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  disabled={authLoading}
+                  size="small"
+                  sx={inputSx}
+                />
+              </Box>
             )}
 
-            {/* Password Field */}
-            <TextField
-              fullWidth
-              type={showPassword ? 'text' : 'password'}
-              label="Password"
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                setAuthError(null);
-                setAuthSuccess(null);
-              }}
-              disabled={authLoading}
-              onKeyPress={(e) => {
-                if (e.key === 'Enter') {
-                  emailAuthType === 'signin' ? handleEmailSignIn() : handleEmailSignUp();
+            {/* Password */}
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <Typography sx={monoLabelSx}>
+                  Password
+                  <Box
+                    component="span"
+                    sx={{ color: theme.palette.error.main, fontFamily: 'inherit' }}
+                  >
+                    *
+                  </Box>
+                </Typography>
+                {emailAuthType === 'signin' && (
+                  <Button
+                    onClick={() => {
+                      setCurrentStep('reset-password');
+                      setResetEmail(email);
+                    }}
+                    size="small"
+                    sx={{
+                      textTransform: 'none',
+                      fontSize: '0.72rem',
+                      fontWeight: 600,
+                      color: violet,
+                      minHeight: 0,
+                      px: 0.75,
+                      py: 0.25,
+                      '&:hover': { backgroundColor: violetSofter },
+                    }}
+                  >
+                    Forgot password?
+                  </Button>
+                )}
+              </Box>
+              <TextField
+                fullWidth
+                type={showPassword ? 'text' : 'password'}
+                placeholder={
+                  emailAuthType === 'signup' ? 'Minimum 8 characters' : 'Enter your password'
                 }
-              }}
-              helperText={emailAuthType === 'signup' ? 'Minimum 8 characters' : undefined}
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton
-                      onClick={() => setShowPassword(!showPassword)}
-                      edge="end"
-                      size="small"
-                    >
-                      {showPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
-                    </IconButton>
-                  </InputAdornment>
-                )
-              }}
-              sx={{
-                '& .MuiOutlinedInput-root': { borderRadius: 2 }
-              }}
-            />
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setAuthError(null);
+                  setAuthSuccess(null);
+                }}
+                disabled={authLoading}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    emailAuthType === 'signin' ? handleEmailSignIn() : handleEmailSignUp();
+                  }
+                }}
+                size="small"
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        onClick={() => setShowPassword(!showPassword)}
+                        edge="end"
+                        size="small"
+                        sx={{ color: theme.palette.text.secondary }}
+                      >
+                        {showPassword ? (
+                          <VisibilityOff sx={{ fontSize: 16 }} />
+                        ) : (
+                          <Visibility sx={{ fontSize: 16 }} />
+                        )}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
+                sx={inputSx}
+              />
+              {emailAuthType === 'signup' && (
+                <Typography
+                  sx={{
+                    fontSize: '0.72rem',
+                    color: theme.palette.text.secondary,
+                    mt: 0.15,
+                  }}
+                >
+                  Use at least 8 characters.
+                </Typography>
+              )}
+            </Box>
 
-            {/* Submit Button */}
+            {/* Submit */}
             <Button
               variant="contained"
-              size="large"
               fullWidth
-              onClick={emailAuthType === 'signin' ? handleEmailSignIn : handleEmailSignUp}
+              onClick={
+                emailAuthType === 'signin' ? handleEmailSignIn : handleEmailSignUp
+              }
               disabled={authLoading || !email.trim() || !password.trim()}
-              sx={{
-                py: 1.5,
-                borderRadius: 2,
-                fontSize: '0.9375rem',
-                fontWeight: 600,
-                textTransform: 'none',
-                boxShadow: 'none',
-                '&:hover': {
-                  boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`
-                }
-              }}
+              endIcon={
+                authLoading ? (
+                  <CircularProgress size={14} thickness={5} sx={{ color: 'inherit' }} />
+                ) : (
+                  <ArrowIcon sx={{ fontSize: 16 }} />
+                )
+              }
+              sx={{ ...primaryButtonSx, py: 1.1 }}
             >
-              {authLoading ? (
-                <>
-                  <CircularProgress size={20} sx={{ mr: 1 }} color="inherit" />
-                  {emailAuthType === 'signin' ? 'Signing in...' : 'Creating account...'}
-                </>
-              ) : (
-                emailAuthType === 'signin' ? 'Sign In' : 'Create Account'
-              )}
+              {authLoading
+                ? emailAuthType === 'signin'
+                  ? 'Signing in…'
+                  : 'Creating account…'
+                : emailAuthType === 'signin'
+                ? 'Sign in'
+                : 'Create account'}
             </Button>
 
-            {/* Footer Links */}
-            <Stack
-              direction="row"
-              justifyContent="space-between"
-              alignItems="center"
-              sx={{ pt: 0.5 }}
+            {/* Switch sign-in/sign-up */}
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 0.75,
+                pt: 0.25,
+              }}
             >
+              <Typography
+                sx={{ fontSize: '0.8rem', color: theme.palette.text.secondary }}
+              >
+                {emailAuthType === 'signin'
+                  ? "Don't have an account?"
+                  : 'Already have an account?'}
+              </Typography>
               <Button
                 onClick={() => {
                   setEmailAuthType(emailAuthType === 'signin' ? 'signup' : 'signin');
@@ -566,131 +823,103 @@ export const LoginPromptContent: React.FC<LoginPromptContentProps> = ({
                 size="small"
                 sx={{
                   textTransform: 'none',
-                  fontWeight: 500,
-                  fontSize: '0.8125rem'
+                  fontWeight: 600,
+                  fontSize: '0.8rem',
+                  color: violet,
+                  minHeight: 0,
+                  px: 0.5,
+                  py: 0.25,
+                  '&:hover': { backgroundColor: violetSofter },
                 }}
               >
-                {emailAuthType === 'signin' ? 'Create account' : 'Sign in instead'}
+                {emailAuthType === 'signin' ? 'Sign up' : 'Sign in'}
               </Button>
-
-              {emailAuthType === 'signin' && (
-                <Button
-                  onClick={() => {
-                    setCurrentStep('reset-password');
-                    setResetEmail(email);
-                  }}
-                  size="small"
-                  sx={{
-                    textTransform: 'none',
-                    color: 'text.secondary',
-                    fontSize: '0.8125rem',
-                    '&:hover': { color: 'primary.main' }
-                  }}
-                >
-                  Forgot password?
-                </Button>
-              )}
-            </Stack>
+            </Box>
           </Stack>
         )}
 
         {/* Step 3: Password Reset */}
         {currentStep === 'reset-password' && (
-          <Stack spacing={2}>
-            {/* Back Button */}
+          <Stack spacing={1.75}>
             <Button
-              startIcon={<ArrowBack fontSize="small" />}
+              startIcon={<ArrowBack sx={{ fontSize: 14 }} />}
               onClick={handleBackToAuth}
               size="small"
               sx={{
                 alignSelf: 'flex-start',
                 textTransform: 'none',
-                color: 'text.secondary',
-                mb: 0.5
+                fontSize: '0.78rem',
+                fontWeight: 600,
+                color: theme.palette.text.secondary,
+                px: 0.75,
+                minHeight: 0,
+                py: 0.25,
+                '&:hover': { backgroundColor: alpha(theme.palette.text.primary, 0.04) },
               }}
             >
               Back
             </Button>
 
-            {/* Alerts */}
-            {resetError && (
-              <Alert
-                severity="error"
-                onClose={() => setResetError(null)}
-                sx={{ borderRadius: 2 }}
-              >
-                {resetError}
-              </Alert>
-            )}
-            {resetSuccess && (
-              <Alert
-                severity="success"
-                onClose={() => setResetSuccess(null)}
-                sx={{ borderRadius: 2 }}
-              >
-                {resetSuccess}
-              </Alert>
-            )}
+            {resetError && renderCallout('error', resetError, () => setResetError(null))}
+            {resetSuccess &&
+              renderCallout('success', resetSuccess, () => setResetSuccess(null))}
 
-            {/* Email Field */}
-            <TextField
-              fullWidth
-              type="email"
-              label="Email Address"
-              value={resetEmail}
-              onChange={(e) => {
-                setResetEmail(e.target.value);
-                setResetError(null);
-                setResetSuccess(null);
-              }}
-              disabled={resetLoading}
-              onKeyPress={(e) => {
-                if (e.key === 'Enter') handlePasswordReset();
-              }}
-              sx={{
-                '& .MuiOutlinedInput-root': { borderRadius: 2 }
-              }}
-            />
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+              <Typography sx={monoLabelSx}>
+                Email
+                <Box
+                  component="span"
+                  sx={{ color: theme.palette.error.main, fontFamily: 'inherit' }}
+                >
+                  *
+                </Box>
+              </Typography>
+              <TextField
+                fullWidth
+                type="email"
+                placeholder="you@domain.com"
+                value={resetEmail}
+                onChange={(e) => {
+                  setResetEmail(e.target.value);
+                  setResetError(null);
+                  setResetSuccess(null);
+                }}
+                disabled={resetLoading}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') handlePasswordReset();
+                }}
+                size="small"
+                sx={inputSx}
+              />
+            </Box>
 
-            {/* Submit Button */}
             <Button
               variant="contained"
-              size="large"
               fullWidth
               onClick={handlePasswordReset}
               disabled={resetLoading || !resetEmail.trim()}
-              sx={{
-                py: 1.5,
-                borderRadius: 2,
-                fontSize: '0.9375rem',
-                fontWeight: 600,
-                textTransform: 'none',
-                boxShadow: 'none',
-                '&:hover': {
-                  boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`
-                }
-              }}
+              endIcon={
+                resetLoading ? (
+                  <CircularProgress size={14} thickness={5} sx={{ color: 'inherit' }} />
+                ) : (
+                  <ArrowIcon sx={{ fontSize: 16 }} />
+                )
+              }
+              sx={{ ...primaryButtonSx, py: 1.1 }}
             >
-              {resetLoading ? (
-                <>
-                  <CircularProgress size={20} sx={{ mr: 1 }} color="inherit" />
-                  Sending...
-                </>
-              ) : (
-                'Send Reset Link'
-              )}
+              {resetLoading ? 'Sending…' : 'Send reset link'}
             </Button>
 
-            {/* Back Link */}
             <Button
               onClick={handleBackToAuth}
               size="small"
               sx={{
                 alignSelf: 'center',
                 textTransform: 'none',
-                color: 'text.secondary',
-                fontSize: '0.8125rem',
-                '&:hover': { color: 'primary.main' }
+                fontWeight: 600,
+                fontSize: '0.78rem',
+                color: theme.palette.text.secondary,
+                '&:hover': { color: violet, backgroundColor: violetSofter },
               }}
             >
               Back to sign in
@@ -700,14 +929,13 @@ export const LoginPromptContent: React.FC<LoginPromptContentProps> = ({
       </Box>
 
       {/* Footer */}
-      <Box sx={{ px: { xs: 3, sm: 4 }, pb: { xs: 2, sm: 3 } }}>
+      <Box sx={footerSurfaceSx}>
         <Typography
-          variant="caption"
-          color="text.disabled"
           sx={{
+            ...optionalSx,
             textAlign: 'center',
             display: 'block',
-            fontSize: '0.6875rem'
+            color: alpha(theme.palette.text.secondary, 0.75),
           }}
         >
           By continuing, you agree to our Terms of Service and Privacy Policy
@@ -719,16 +947,19 @@ export const LoginPromptContent: React.FC<LoginPromptContentProps> = ({
 
 /**
  * LoginDialog Component
- * Clean, minimal login dialog with invite code verification and authentication
+ * Tag-dialog-style login flow with invite verification, email/Google auth,
+ * and password reset.
  */
 const LoginDialog: React.FC<LoginDialogProps> = ({
   open,
   onClose,
-  title = 'Welcome Back',
+  title = 'Welcome back',
   subtitle = 'Sign in to continue to JournoTrades',
 }) => {
   const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const hairline = isDark ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
 
   return (
     <Dialog
@@ -740,13 +971,16 @@ const LoginDialog: React.FC<LoginDialogProps> = ({
       {...dialogProps}
       PaperProps={{
         sx: {
-          borderRadius: isMobile ? 0 : 3,
+          borderRadius: isMobile ? 0 : 2,
+          border: isMobile ? 'none' : `1px solid ${hairline}`,
+          boxShadow: theme.shadows[10],
+          backgroundImage: 'none',
           overflow: 'hidden',
           bgcolor: 'background.paper',
           m: isMobile ? 0 : undefined,
           maxHeight: isMobile ? '100vh' : 'calc(100vh - 64px)',
-          position: 'relative'
-        }
+          position: 'relative',
+        },
       }}
     >
       {/* Close Button */}
@@ -755,15 +989,14 @@ const LoginDialog: React.FC<LoginDialogProps> = ({
         size="small"
         sx={{
           position: 'absolute',
-          right: 12,
-          top: 12,
+          right: 10,
+          top: 10,
           zIndex: 1,
-          color: 'text.secondary',
-          bgcolor: alpha(theme.palette.action.hover, 0.08),
+          color: theme.palette.text.secondary,
           '&:hover': {
-            bgcolor: alpha(theme.palette.action.hover, 0.16),
-            color: 'text.primary'
-          }
+            backgroundColor: alpha(theme.palette.text.primary, 0.06),
+            color: theme.palette.text.primary,
+          },
         }}
       >
         <CloseIcon fontSize="small" />
@@ -773,7 +1006,7 @@ const LoginDialog: React.FC<LoginDialogProps> = ({
         sx={{
           p: 0,
           overflow: 'auto',
-          ...scrollbarStyles(theme)
+          ...scrollbarStyles(theme),
         }}
       >
         <LoginPromptContent
