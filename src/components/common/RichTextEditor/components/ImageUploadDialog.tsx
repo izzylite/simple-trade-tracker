@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useCallback, useMemo } from 'react';
 import {
   Dialog,
   Button,
@@ -8,7 +8,6 @@ import {
   LinearProgress,
   IconButton,
   Link,
-  CircularProgress,
   alpha,
   useTheme,
 } from '@mui/material';
@@ -16,16 +15,14 @@ import {
   CloudUpload as UploadIcon,
   Close as CloseIcon,
   Image as ImageIcon,
-  Search as SearchIcon,
   Link as LinkIcon,
   PhotoLibrary as LibraryIcon,
-  Cached as CachedIcon,
   ArrowForward as ArrowIcon,
 } from '@mui/icons-material';
-import Shimmer from '../../../Shimmer';
 import { uploadFile, getPublicUrl, optimizeImage } from '../../../../services/supabaseStorageService';
 import { supabase } from '../../../../config/supabase';
-import { unsplashCache, UnsplashImage } from '../../../../services/unsplashCache';
+import { UnsplashImagePicker } from '../../../heroImage';
+import { UnsplashImage } from '../../../../services/unsplashCache';
 import { FILE_SIZE_LIMITS, formatFileSize } from '../../../../utils/fileValidation';
 import { scrollbarStyles } from '../../../../styles/scrollbarStyles';
 import { Z_INDEX } from '../../../../styles/zIndex';
@@ -48,7 +45,7 @@ const TABS: { key: TabKey; label: string; icon: React.ReactNode }[] = [
   { key: 'unsplash', label: 'Unsplash', icon: <LibraryIcon sx={{ fontSize: 14 }} /> },
 ];
 
-const POPULAR_SEARCHES = [
+const UNSPLASH_TAB_QUERIES = [
   'trading charts',
   'business',
   'technology',
@@ -75,11 +72,6 @@ const ImageUploadDialog: React.FC<ImageUploadDialogProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
-
-  const [searchQuery, setSearchQuery] = useState('');
-  const [unsplashImages, setUnsplashImages] = useState<UnsplashImage[]>([]);
-  const [unsplashLoading, setUnsplashLoading] = useState(false);
-  const [isFromCache, setIsFromCache] = useState(false);
 
   const UNSPLASH_ACCESS_KEY = process.env.REACT_APP_UNSPLASH_ACCESS_KEY;
 
@@ -247,96 +239,12 @@ const ImageUploadDialog: React.FC<ImageUploadDialogProps> = ({
     }
   };
 
-  const handleSearchUnsplash = async (query: string = searchQuery) => {
-    if (!query.trim()) return;
-
-    setUnsplashLoading(true);
-    setIsFromCache(false);
-    setError(null);
-
-    try {
-      const cachedImages = unsplashCache.getCachedImages(query);
-      if (cachedImages) {
-        setUnsplashImages(cachedImages);
-        setIsFromCache(true);
-        setUnsplashLoading(false);
-        return;
-      }
-
-      if (!UNSPLASH_ACCESS_KEY) {
-        setError('Unsplash API key not configured');
-        setUnsplashLoading(false);
-        return;
-      }
-
-      const response = await fetch(
-        `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=24&orientation=landscape`,
-        { headers: { Authorization: `Client-ID ${UNSPLASH_ACCESS_KEY}` } },
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        setUnsplashImages(data.results);
-        unsplashCache.cacheImages(query, data.results);
-      } else {
-        setError('Failed to fetch images from Unsplash');
-      }
-    } catch (_err) {
-      setError('Error fetching images');
-    } finally {
-      setUnsplashLoading(false);
-    }
-  };
-
-  const handleUnsplashImageSelect = async (image: UnsplashImage) => {
-    if (image.links.download_location && UNSPLASH_ACCESS_KEY) {
-      try {
-        await fetch(image.links.download_location, {
-          headers: { Authorization: `Client-ID ${UNSPLASH_ACCESS_KEY}` },
-        });
-      } catch {
-        /* silent fail for download tracking */
-      }
-    }
-
+  const handleUnsplashImageSelect = (image: UnsplashImage) => {
     const url = `${image.urls.regular}&w=800`;
     onImageInsert(url, image.alt_description || `Photo by ${image.user.name}`);
     resetState();
     onClose();
   };
-
-  const handlePopularSearchClick = (search: string) => {
-    setSearchQuery(search);
-    handleSearchUnsplash(search);
-  };
-
-  useEffect(() => {
-    if (open && activeTab === 'unsplash' && unsplashImages.length === 0) {
-      setSearchQuery('abstract');
-      handleSearchUnsplash('abstract');
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, activeTab]);
-
-  const chipStyle = (selected: boolean) => ({
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 0.5,
-    px: 1.25,
-    py: 0.5,
-    borderRadius: 999,
-    cursor: 'pointer',
-    fontSize: '0.78rem',
-    fontWeight: 600,
-    userSelect: 'none' as const,
-    transition: 'all 120ms ease',
-    backgroundColor: selected ? violetSoft : surfaceInset,
-    color: selected ? violet : theme.palette.text.primary,
-    border: `1px solid ${selected ? violetBorder : hairline}`,
-    '&:hover': {
-      backgroundColor: selected ? violetSoft : alpha(theme.palette.text.primary, isDark ? 0.06 : 0.05),
-    },
-  });
 
   const renderTabs = () => (
     <Box
@@ -663,244 +571,14 @@ const ImageUploadDialog: React.FC<ImageUploadDialogProps> = ({
 
         {/* Unsplash */}
         {activeTab === 'unsplash' && (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-            <Box
-              sx={{
-                display: 'flex',
-                gap: 1.25,
-                alignItems: 'stretch',
-                flexDirection: { xs: 'column', sm: 'row' },
-              }}
-            >
-              <TextField
-                fullWidth
-                size="small"
-                placeholder="Search Unsplash…"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSearchUnsplash()}
-                slotProps={{
-                  input: {
-                    startAdornment: (
-                      <SearchIcon
-                        sx={{ mr: 1.25, fontSize: 18, color: theme.palette.text.secondary }}
-                      />
-                    ),
-                  },
-                }}
-                sx={inputSx}
-              />
-              <Button
-                onClick={() => handleSearchUnsplash()}
-                disabled={unsplashLoading || !searchQuery.trim()}
-                variant="contained"
-                sx={{
-                  minWidth: 110,
-                  textTransform: 'none',
-                  fontWeight: 600,
-                  fontSize: '0.85rem',
-                  backgroundColor: violet,
-                  color: '#fff',
-                  borderRadius: 1.25,
-                  boxShadow: 'none',
-                  '&:hover': { backgroundColor: theme.palette.primary.dark, boxShadow: 'none' },
-                  '&.Mui-disabled': {
-                    backgroundColor: alpha(violet, 0.35),
-                    color: alpha('#fff', 0.7),
-                  },
-                }}
-              >
-                {unsplashLoading ? <CircularProgress size={16} thickness={5} color="inherit" /> : 'Search'}
-              </Button>
-            </Box>
-
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
-                <Typography sx={{ ...monoLabelSx, fontSize: '0.62rem' }}>Popular searches</Typography>
-                {isFromCache && (
-                  <Box
-                    sx={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 0.5,
-                      px: 0.875,
-                      py: 0.25,
-                      borderRadius: 999,
-                      backgroundColor: surfaceInset,
-                      border: `1px solid ${hairline}`,
-                      fontFamily: MONO_FONT,
-                      fontSize: '0.65rem',
-                      color: theme.palette.text.secondary,
-                    }}
-                  >
-                    <CachedIcon sx={{ fontSize: 12 }} />
-                    cached
-                  </Box>
-                )}
-              </Box>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
-                {POPULAR_SEARCHES.map((search) => {
-                  const selected = searchQuery.toLowerCase() === search.toLowerCase();
-                  const isCached = unsplashCache.isCached(search);
-                  return (
-                    <Box
-                      key={search}
-                      onClick={() => handlePopularSearchClick(search)}
-                      sx={chipStyle(selected)}
-                    >
-                      {isCached && <CachedIcon sx={{ fontSize: 12, opacity: 0.7 }} />}
-                      {search}
-                    </Box>
-                  );
-                })}
-              </Box>
-            </Box>
-
-            <Box
-              sx={{
-                borderRadius: 1.5,
-                border: `1px solid ${hairline}`,
-                backgroundColor: surfaceInset,
-                p: 1.25,
-                minHeight: 340,
-                maxHeight: 340,
-                overflowY: 'auto',
-                overflowX: 'hidden',
-                ...scrollbarStyles(theme),
-              }}
-            >
-              {!unsplashLoading && unsplashImages.length === 0 ? (
-                <Box
-                  sx={{
-                    height: '100%',
-                    minHeight: 316,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 0.75,
-                  }}
-                >
-                  <ImageIcon sx={{ fontSize: 28, color: alpha(violet, 0.45) }} />
-                  <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: theme.palette.text.secondary }}>
-                    No images yet
-                  </Typography>
-                  <Typography
-                    sx={{
-                      fontFamily: MONO_FONT,
-                      fontSize: '0.7rem',
-                      color: alpha(theme.palette.text.secondary, 0.7),
-                    }}
-                  >
-                    Search or pick a popular query above
-                  </Typography>
-                </Box>
-              ) : (
-                <Box
-                  sx={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
-                    gap: 1.25,
-                  }}
-                >
-                  {unsplashLoading
-                    ? Array.from({ length: 12 }).map((_, i) => (
-                        <Shimmer key={i} height={110} borderRadius={10} variant="wave" intensity="medium" />
-                      ))
-                    : unsplashImages.map((image) => (
-                        <Box
-                          key={image.id}
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => handleUnsplashImageSelect(image)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault();
-                              handleUnsplashImageSelect(image);
-                            }
-                          }}
-                          sx={{
-                            position: 'relative',
-                            height: 110,
-                            borderRadius: 1.25,
-                            overflow: 'hidden',
-                            cursor: 'pointer',
-                            border: `1px solid ${hairline}`,
-                            backgroundColor: theme.palette.background.default,
-                            backgroundImage: `url(${image.urls.small})`,
-                            backgroundSize: 'cover',
-                            backgroundPosition: 'center',
-                            transition: 'transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease',
-                            '& .picker-overlay': { opacity: 0, transition: 'opacity 160ms ease' },
-                            '&:hover': {
-                              transform: 'translateY(-2px)',
-                              borderColor: violetBorder,
-                              boxShadow: `0 6px 18px ${alpha(violet, isDark ? 0.35 : 0.2)}`,
-                              '& .picker-overlay': { opacity: 1 },
-                            },
-                            '&:focus-visible': {
-                              outline: `2px solid ${violet}`,
-                              outlineOffset: 2,
-                            },
-                          }}
-                        >
-                          <Box
-                            className="picker-overlay"
-                            sx={{
-                              position: 'absolute',
-                              inset: 0,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              background: `linear-gradient(180deg, ${alpha(violet, 0.15)} 0%, ${alpha(theme.palette.common.black, 0.55)} 100%)`,
-                            }}
-                          >
-                            <Box
-                              sx={{
-                                px: 1,
-                                py: 0.375,
-                                borderRadius: 999,
-                                backgroundColor: '#fff',
-                                color: violet,
-                                fontSize: '0.68rem',
-                                fontWeight: 700,
-                                letterSpacing: '0.04em',
-                              }}
-                            >
-                              Select
-                            </Box>
-                          </Box>
-                          <Box
-                            sx={{
-                              position: 'absolute',
-                              bottom: 0,
-                              left: 0,
-                              right: 0,
-                              px: 0.75,
-                              py: 0.375,
-                              background: `linear-gradient(transparent, ${alpha(theme.palette.common.black, 0.7)})`,
-                            }}
-                          >
-                            <Typography
-                              sx={{
-                                fontSize: '0.62rem',
-                                fontWeight: 500,
-                                color: '#fff',
-                                textShadow: '0 1px 2px rgba(0,0,0,0.6)',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap',
-                              }}
-                            >
-                              by {image.user.name}
-                            </Typography>
-                          </Box>
-                        </Box>
-                      ))}
-                </Box>
-              )}
-            </Box>
-          </Box>
+          <UnsplashImagePicker
+            onImageSelect={handleUnsplashImageSelect}
+            defaultQuery="abstract"
+            popularSearches={UNSPLASH_TAB_QUERIES}
+            resultsHeight={340}
+            tileHeight={110}
+            loadingPlaceholders={12}
+          />
         )}
 
         {error && (

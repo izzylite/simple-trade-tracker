@@ -46,6 +46,7 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  CircularProgress,
 } from '@mui/material';
 import {
   pink,
@@ -84,7 +85,10 @@ import {
   StickyNote2Outlined as NoteIcon,
   LocalOfferOutlined as TagIcon2,
   EventOutlined as EventIcon,
+  CallMadeOutlined as TradeLinkIcon,
+  ArrowForward as ArrowIcon,
 } from '@mui/icons-material';
+import { dialogProps } from '../../styles/dialogStyles';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -1435,54 +1439,311 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
       />
 
       {/* Insert trade share link dialog */}
-      <Dialog
-        open={tradeLinkDialogOpen}
-        onClose={() => !tradeLinkLoading && setTradeLinkDialogOpen(false)}
-        maxWidth="sm"
-        fullWidth
-        sx={{ zIndex: Z_INDEX.RICH_TEXT_DIALOG }}
-      >
-        <DialogTitle>Insert trade share link</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-            Paste a trade share link (e.g. <code>/shared/share_…</code> or full URL).
-          </Typography>
-          <TextField
-            autoFocus
+      {(() => {
+        const isDarkTL = theme.palette.mode === 'dark';
+        const violet = theme.palette.primary.main;
+        const violetSoft = alpha(violet, isDarkTL ? 0.18 : 0.14);
+        const violetBorder = alpha(violet, isDarkTL ? 0.35 : 0.28);
+        const surfaceInset = isDarkTL
+          ? 'rgba(255,255,255,0.03)'
+          : alpha(theme.palette.text.primary, 0.03);
+        const hairline = isDarkTL
+          ? 'rgba(255,255,255,0.08)'
+          : theme.palette.divider;
+        const MONO_FONT_TL = "'JetBrains Mono', ui-monospace, monospace";
+        const monoLabelSx = {
+          fontFamily: MONO_FONT_TL,
+          fontSize: '0.68rem',
+          fontWeight: 600,
+          letterSpacing: '0.12em',
+          textTransform: 'uppercase' as const,
+          color: theme.palette.text.secondary,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 0.75,
+        };
+        const inputSx = {
+          '& .MuiOutlinedInput-root': {
+            borderRadius: 1.5,
+            backgroundColor: surfaceInset,
+            '& fieldset': { borderColor: hairline },
+            '&:hover fieldset': { borderColor: alpha(violet, 0.5) },
+            '&.Mui-focused fieldset': { borderColor: violet, borderWidth: 1 },
+          },
+          '& .MuiOutlinedInput-input': {
+            py: 1.1,
+            fontSize: '0.88rem',
+            fontWeight: 500,
+            fontFamily: MONO_FONT_TL,
+          },
+        };
+        const errorInputSx = {
+          ...inputSx,
+          '& .MuiOutlinedInput-root': {
+            ...inputSx['& .MuiOutlinedInput-root'],
+            '& fieldset': {
+              borderColor: tradeLinkError
+                ? alpha(theme.palette.error.main, 0.6)
+                : hairline,
+            },
+            '&:hover fieldset': {
+              borderColor: tradeLinkError
+                ? theme.palette.error.main
+                : alpha(violet, 0.5),
+            },
+            '&.Mui-focused fieldset': {
+              borderColor: tradeLinkError ? theme.palette.error.main : violet,
+              borderWidth: 1,
+            },
+          },
+        };
+        const handleClose = () =>
+          !tradeLinkLoading && setTradeLinkDialogOpen(false);
+
+        return (
+          <Dialog
+            open={tradeLinkDialogOpen}
+            onClose={handleClose}
+            maxWidth="sm"
             fullWidth
-            value={tradeLinkInputUrl}
-            onChange={(e) => {
-              setTradeLinkInputUrl(e.target.value);
-              if (tradeLinkError) setTradeLinkError(null);
+            {...dialogProps}
+            sx={{ zIndex: Z_INDEX.RICH_TEXT_DIALOG }}
+            slotProps={{
+              paper: {
+                sx: {
+                  borderRadius: 2,
+                  border: `1px solid ${hairline}`,
+                  boxShadow: theme.shadows[10],
+                  backgroundImage: 'none',
+                  overflow: 'hidden',
+                },
+              },
             }}
-            placeholder="https://app/shared/share_…"
-            error={!!tradeLinkError}
-            helperText={tradeLinkError ?? ' '}
-            disabled={tradeLinkLoading}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !tradeLinkLoading) {
-                e.preventDefault();
-                void submitTradeLinkInsert();
-              }
-            }}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={() => setTradeLinkDialogOpen(false)}
-            disabled={tradeLinkLoading}
           >
-            Cancel
-          </Button>
-          <Button
-            variant="contained"
-            onClick={() => { void submitTradeLinkInsert(); }}
-            disabled={tradeLinkLoading || !tradeLinkInputUrl.trim()}
-          >
-            {tradeLinkLoading ? 'Loading…' : 'Insert'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+            {/* Header */}
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5,
+                px: 2.5,
+                py: 1.75,
+                borderBottom: `1px solid ${hairline}`,
+              }}
+            >
+              <Box
+                sx={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 1.25,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: violetSoft,
+                  color: violet,
+                  border: `1px solid ${violetBorder}`,
+                  flexShrink: 0,
+                }}
+              >
+                <TradeLinkIcon sx={{ fontSize: 18 }} />
+              </Box>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography
+                  sx={{ fontWeight: 700, fontSize: '0.95rem', lineHeight: 1.2 }}
+                >
+                  Insert trade share link
+                </Typography>
+                <Typography
+                  sx={{
+                    fontSize: '0.78rem',
+                    color: theme.palette.text.secondary,
+                    lineHeight: 1.3,
+                  }}
+                >
+                  Embed a live trade chip from any shared trade URL
+                </Typography>
+              </Box>
+              <IconButton
+                onClick={handleClose}
+                disabled={tradeLinkLoading}
+                size="small"
+                sx={{ color: theme.palette.text.secondary }}
+              >
+                <CloseIcon fontSize="small" />
+              </IconButton>
+            </Box>
+
+            {/* Body */}
+            <Box
+              sx={{
+                px: 2.5,
+                py: 2,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 1.75,
+              }}
+            >
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 1,
+                  px: 1.25,
+                  py: 1,
+                  borderRadius: 1.25,
+                  border: `1px solid ${hairline}`,
+                  backgroundColor: surfaceInset,
+                }}
+              >
+                <TradeLinkIcon
+                  sx={{ fontSize: 14, color: violet, mt: 0.25, flexShrink: 0 }}
+                />
+                <Typography
+                  sx={{
+                    fontSize: '0.78rem',
+                    color: theme.palette.text.secondary,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  Paste a path like{' '}
+                  <Box
+                    component="code"
+                    sx={{
+                      fontFamily: MONO_FONT_TL,
+                      fontSize: '0.74rem',
+                      px: 0.5,
+                      py: 0.125,
+                      borderRadius: 0.5,
+                      backgroundColor: alpha(violet, 0.1),
+                      color: violet,
+                    }}
+                  >
+                    /shared/share_…
+                  </Box>{' '}
+                  or the full URL. Orion will resolve it to a clickable trade chip.
+                </Typography>
+              </Box>
+
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                <Typography sx={monoLabelSx}>
+                  Share URL
+                  <Box
+                    component="span"
+                    sx={{
+                      color: theme.palette.error.main,
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    *
+                  </Box>
+                </Typography>
+                <TextField
+                  autoFocus
+                  fullWidth
+                  size="small"
+                  value={tradeLinkInputUrl}
+                  onChange={(e) => {
+                    setTradeLinkInputUrl(e.target.value);
+                    if (tradeLinkError) setTradeLinkError(null);
+                  }}
+                  placeholder="https://app/shared/share_…"
+                  error={!!tradeLinkError}
+                  disabled={tradeLinkLoading}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !tradeLinkLoading) {
+                      e.preventDefault();
+                      void submitTradeLinkInsert();
+                    }
+                  }}
+                  sx={errorInputSx}
+                />
+                {tradeLinkError && (
+                  <Typography
+                    sx={{
+                      fontSize: '0.75rem',
+                      color: theme.palette.error.main,
+                      mt: 0.25,
+                    }}
+                  >
+                    {tradeLinkError}
+                  </Typography>
+                )}
+              </Box>
+            </Box>
+
+            {/* Footer */}
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                gap: 1,
+                px: 2.5,
+                py: 1.5,
+                borderTop: `1px solid ${hairline}`,
+                backgroundColor: isDarkTL
+                  ? 'rgba(255,255,255,0.02)'
+                  : alpha(theme.palette.text.primary, 0.02),
+              }}
+            >
+              <Button
+                onClick={handleClose}
+                disabled={tradeLinkLoading}
+                sx={{
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  fontSize: '0.85rem',
+                  color: theme.palette.text.secondary,
+                  '&:hover': {
+                    backgroundColor: alpha(theme.palette.text.primary, 0.04),
+                  },
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  void submitTradeLinkInsert();
+                }}
+                disabled={tradeLinkLoading || !tradeLinkInputUrl.trim()}
+                variant="contained"
+                endIcon={
+                  tradeLinkLoading ? (
+                    <CircularProgress
+                      size={14}
+                      thickness={5}
+                      sx={{ color: 'inherit' }}
+                    />
+                  ) : (
+                    <ArrowIcon sx={{ fontSize: 14 }} />
+                  )
+                }
+                sx={{
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  fontSize: '0.85rem',
+                  backgroundColor: violet,
+                  color: '#fff',
+                  borderRadius: 1.25,
+                  px: 1.75,
+                  py: 0.75,
+                  boxShadow: 'none',
+                  '&:hover': {
+                    backgroundColor: theme.palette.primary.dark,
+                    boxShadow: 'none',
+                  },
+                  '&.Mui-disabled': {
+                    backgroundColor: alpha(violet, 0.35),
+                    color: alpha('#fff', 0.7),
+                  },
+                }}
+              >
+                {tradeLinkLoading ? 'Resolving…' : 'Insert trade'}
+              </Button>
+            </Box>
+          </Dialog>
+        );
+      })()}
 
 
       <ConfirmationDialog
