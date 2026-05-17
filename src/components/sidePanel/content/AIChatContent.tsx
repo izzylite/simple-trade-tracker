@@ -1,4 +1,4 @@
-/**
+﻿/**
  * AIChatContent Component
  * Inner content for AI chat — usable inside AIChatDrawer (mobile bottom sheet)
  * or side panel (desktop). Contains all chat logic, history, and sub-dialogs.
@@ -20,22 +20,14 @@ import {
   TextField,
   InputAdornment,
   CircularProgress,
-  Select,
-  MenuItem,
-  FormControl
 } from '@mui/material';
 import {
-  AddComment as NewChatIcon,
-  History as HistoryIcon,
-  ArrowBack as ArrowBackIcon,
   Delete as DeleteIcon,
   Schedule as ScheduleIcon,
   Search as SearchIcon,
   PushPin as PushPinIcon,
   PushPinOutlined as PushPinOutlinedIcon,
-  Alarm as AlarmIcon
 } from '@mui/icons-material';
-import ManageSearchIcon from '@mui/icons-material/ManageSearch';
 import { format } from 'date-fns';
 import EconomicEventShimmer from '../../economicCalendar/EconomicEventShimmer';
 import AIChatInterface, { AIChatInterfaceRef, QuestionTemplate } from '../../aiChat/AIChatInterface';
@@ -74,12 +66,6 @@ export interface AIChatContentProps {
   initialTradeId?: string;
   /** When provided, uses this shared chat state instead of creating its own useAIChat instance */
   sharedChatState?: UseAIChatReturn;
-  /** Available calendars for the context picker dropdown */
-  availableCalendars?: Calendar[];
-  /** Currently selected calendar ID for AI context */
-  selectedCalendarId?: string;
-  /** Callback when user changes the calendar context */
-  onCalendarChange?: (calendarId: string) => void;
   /** When set (non-empty), populates the chat input with this text. Used by the
    *  "Follow up with Orion" button on Orion Task briefings. */
   seedMessage?: string;
@@ -96,6 +82,17 @@ export interface AIChatContentProps {
    *  deep-link swapped it out. */
   canReturnToPrevious?: boolean;
   onReturnToPrevious?: () => void;
+  /** Controlled view toggles — when provided, the chat surface defers to the
+   *  parent (drawer) for which overlay is visible. Lets the action buttons
+   *  live in the drawer's tab row instead of inside this component. When
+   *  omitted (e.g. side-panel embedding), AIChatContent falls back to its
+   *  own internal state. */
+  showHistoryView?: boolean;
+  setShowHistoryView?: (v: boolean | ((prev: boolean) => boolean)) => void;
+  showRemindersView?: boolean;
+  setShowRemindersView?: (v: boolean | ((prev: boolean) => boolean)) => void;
+  showMemoryLogsView?: boolean;
+  setShowMemoryLogsView?: (v: boolean | ((prev: boolean) => boolean)) => void;
 }
 
 const AIChatContent: React.FC<AIChatContentProps> = ({
@@ -106,15 +103,18 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
   isActive = false,
   initialTradeId,
   sharedChatState,
-  availableCalendars,
-  selectedCalendarId = '',
-  onCalendarChange,
   seedMessage = '',
   onSeedMessageConsumed,
   scrollToMessageId,
   onScrolledToMessage,
   canReturnToPrevious = false,
   onReturnToPrevious,
+  showHistoryView: showHistoryViewProp,
+  setShowHistoryView: setShowHistoryViewProp,
+  showRemindersView: showRemindersViewProp,
+  setShowRemindersView: setShowRemindersViewProp,
+  showMemoryLogsView: showMemoryLogsViewProp,
+  setShowMemoryLogsView: setShowMemoryLogsViewProp,
 }) => {
   const { onOpenGalleryMode } = tradeOperations;
   const theme = useTheme();
@@ -214,9 +214,18 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
   } = sharedChatState || ownChatState;
 
   // Local UI state
-  const [showHistoryView, setShowHistoryView] = useState(false);
-  const [showRemindersView, setShowRemindersView] = useState(false);
-  const [showMemoryLogsView, setShowMemoryLogsView] = useState(false);
+  // Local fallback state — used only when the parent doesn't pass controlled
+  // props (e.g. side-panel embedding). When the drawer hosts this component,
+  // the controlled props are always present and these are inert.
+  const [showHistoryViewLocal, setShowHistoryViewLocal] = useState(false);
+  const [showRemindersViewLocal, setShowRemindersViewLocal] = useState(false);
+  const [showMemoryLogsViewLocal, setShowMemoryLogsViewLocal] = useState(false);
+  const showHistoryView = showHistoryViewProp ?? showHistoryViewLocal;
+  const setShowHistoryView = setShowHistoryViewProp ?? setShowHistoryViewLocal;
+  const showRemindersView = showRemindersViewProp ?? showRemindersViewLocal;
+  const setShowRemindersView = setShowRemindersViewProp ?? setShowRemindersViewLocal;
+  const showMemoryLogsView = showMemoryLogsViewProp ?? showMemoryLogsViewLocal;
+  const setShowMemoryLogsView = setShowMemoryLogsViewProp ?? setShowMemoryLogsViewLocal;
 
   // Dismiss any open slash/mention popup in the chat input when sliding to the
   // history view, opening the reminders overlay, or when the chat panel itself
@@ -509,261 +518,11 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
       minHeight: 0,
       overflow: 'hidden',
     }}>
-      {/* Header Action Bar */}
-      <Box sx={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 1,
-        px: 1.25,
-        py: 0.75,
-        flexShrink: 0,
-        borderBottom: `1px solid ${hairline}`,
-      }}>
-        {/* Calendar context picker — chip-style trigger that opens a themed
-            paper menu. Mirrors the dialog-token chipStyle() language. */}
-        {availableCalendars && availableCalendars.length > 0 && onCalendarChange ? (
-          <FormControl size="small" sx={{ flex: 1, minWidth: 0 }}>
-            <Select
-              value={selectedCalendarId}
-              onChange={(e) => onCalendarChange(e.target.value)}
-              displayEmpty
-              variant="standard"
-              disableUnderline
-              MenuProps={{
-                sx: { zIndex: Z_INDEX.DIALOG_POPUP },
-                PaperProps: {
-                  sx: {
-                    mt: 0.75,
-                    borderRadius: 1.5,
-                    border: `1px solid ${hairline}`,
-                    boxShadow: theme.shadows[10],
-                    backgroundImage: 'none',
-                    overflow: 'hidden',
-                    '& .MuiMenuItem-root': {
-                      fontSize: '0.82rem',
-                      fontWeight: 500,
-                      py: 0.85,
-                      px: 1.5,
-                      '&:hover': { backgroundColor: violetSofter },
-                      '&.Mui-selected': {
-                        backgroundColor: violetSoft,
-                        color: violet,
-                        '&:hover': { backgroundColor: violetSoft },
-                      },
-                    },
-                  },
-                },
-              }}
-              renderValue={(val) => {
-                const selected = availableCalendars.find((c) => c.id === val);
-                return (
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      fontSize: '0.82rem',
-                      fontWeight: 600,
-                      color: selected ? violet : theme.palette.text.primary,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {selected ? selected.name : 'All Calendars'}
-                  </Typography>
-                );
-              }}
-              sx={{
-                borderRadius: 999,
-                px: 1.25,
-                py: 0.25,
-                backgroundColor: surfaceInset,
-                border: `1px solid ${hairline}`,
-                transition: 'all 120ms ease',
-                '&:hover': {
-                  backgroundColor: violetSofter,
-                  borderColor: violetBorder,
-                },
-                '& .MuiSelect-select': {
-                  py: 0.4,
-                  pl: 0.5,
-                  pr: '24px !important',
-                  backgroundColor: 'transparent !important',
-                  display: 'flex',
-                  alignItems: 'center',
-                  minHeight: '0 !important',
-                },
-                '& .MuiSvgIcon-root': {
-                  color: theme.palette.text.secondary,
-                  right: 4,
-                },
-              }}
-            >
-              <MenuItem value="">All Calendars</MenuItem>
-              {availableCalendars.map((cal) => (
-                <MenuItem key={cal.id} value={cal.id}>{cal.name}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        ) : calendar ? (
-          <Box
-            sx={{
-              flex: 1,
-              minWidth: 0,
-              display: 'inline-flex',
-              alignItems: 'center',
-              px: 1.25,
-              py: 0.55,
-              borderRadius: 999,
-              backgroundColor: surfaceInset,
-              border: `1px solid ${hairline}`,
-            }}
-          >
-            <Typography
-              variant="body2"
-              sx={{
-                fontSize: '0.82rem',
-                fontWeight: 600,
-                color: theme.palette.text.primary,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {calendar.name}
-            </Typography>
-          </Box>
-        ) : null}
-
-        {user && (
-          <Box sx={{ display: 'flex', gap: 0.5, ml: 'auto' }}>
-            {/* First slot morphs in priority order:
-                1. inside history / reminders / memory  → back-to-Chat
-                2. notification deep-link is active     → back-to-previous-conversation
-                3. default                              → "+" new chat */}
-            {showHistoryView || showRemindersView || showMemoryLogsView ? (
-              <Tooltip title="Back to Chat">
-                <IconButton
-                  size="small"
-                  onClick={() => {
-                    setShowHistoryView(false);
-                    setShowRemindersView(false);
-                    setShowMemoryLogsView(false);
-                  }}
-                  aria-label="Back to Chat"
-                  sx={{
-                    color: violet,
-                    borderRadius: 1.25,
-                    '&:hover': { backgroundColor: violetSofter },
-                  }}
-                >
-                  <ArrowBackIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            ) : canReturnToPrevious ? (
-              <Tooltip title="Back to previous conversation">
-                <IconButton
-                  size="small"
-                  onClick={() => onReturnToPrevious?.()}
-                  aria-label="Back to previous conversation"
-                  sx={{
-                    color: violet,
-                    borderRadius: 1.25,
-                    '&:hover': { backgroundColor: violetSofter },
-                  }}
-                >
-                  <ArrowBackIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            ) : (
-              <Tooltip title="New Chat">
-                <IconButton
-                  size="small"
-                  onClick={handleNewChat}
-                  disabled={messages.length === 0}
-                  sx={{
-                    color: violet,
-                    borderRadius: 1.25,
-                    '&:hover': { backgroundColor: violetSofter },
-                    '&:disabled': { color: 'text.disabled' },
-                  }}
-                >
-                  <NewChatIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            )}
-
-            <Tooltip title="Conversation History">
-              <IconButton
-                size="small"
-                onClick={() => {
-                  setShowHistoryView(prev => !prev);
-                  setShowRemindersView(false);
-                  setShowMemoryLogsView(false);
-                }}
-                aria-label="Conversation History"
-                sx={{
-                  color: showHistoryView ? violet : 'text.secondary',
-                  borderRadius: 1.25,
-                  backgroundColor: showHistoryView ? violetSoft : 'transparent',
-                  border: showHistoryView
-                    ? `1px solid ${violetBorder}`
-                    : '1px solid transparent',
-                  '&:hover': { backgroundColor: violetSofter },
-                }}
-              >
-                <HistoryIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-
-            <Tooltip title="Reminders">
-              <IconButton
-                size="small"
-                onClick={() => {
-                  setShowRemindersView(prev => !prev);
-                  setShowHistoryView(false);
-                  setShowMemoryLogsView(false);
-                }}
-                aria-label="Reminders"
-                sx={{
-                  color: showRemindersView ? violet : 'text.secondary',
-                  borderRadius: 1.25,
-                  backgroundColor: showRemindersView ? violetSoft : 'transparent',
-                  border: showRemindersView
-                    ? `1px solid ${violetBorder}`
-                    : '1px solid transparent',
-                  '&:hover': { backgroundColor: violetSofter },
-                }}
-              >
-                <AlarmIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-
-            <Tooltip title="Memory Logs">
-              <IconButton
-                size="small"
-                onClick={() => {
-                  setShowMemoryLogsView(prev => !prev);
-                  setShowHistoryView(false);
-                  setShowRemindersView(false);
-                }}
-                aria-label="Memory Logs"
-                sx={{
-                  color: showMemoryLogsView ? violet : 'text.secondary',
-                  borderRadius: 1.25,
-                  backgroundColor: showMemoryLogsView ? violetSoft : 'transparent',
-                  border: showMemoryLogsView
-                    ? `1px solid ${violetBorder}`
-                    : '1px solid transparent',
-                  '&:hover': { backgroundColor: violetSofter },
-                }}
-              >
-                <ManageSearchIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-          </Box>
-        )}
-
-      </Box>
+      {/* Header action bar removed — calendar switching is no longer supported
+          inside the chat surface, and the New chat / History / Reminders /
+          Memory Logs buttons live in the drawer's tab row now (see AIChatDrawer).
+          The view-toggle state (showHistoryView etc.) is still managed here
+          but now driven by the drawer via controlled props. */}
 
       {/* Content area. Chat is always rendered; history and reminders
           render as absolute overlays when active (no slide animation —

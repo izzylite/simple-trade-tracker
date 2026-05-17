@@ -20,7 +20,12 @@ import {
   Close as CloseIcon,
   ChatBubbleOutline as ChatIcon,
   AssignmentOutlined as TasksIcon,
+  AddComment as NewChatIcon,
+  History as HistoryIcon,
+  Alarm as AlarmIcon,
+  ArrowBack as ArrowBackIcon,
 } from '@mui/icons-material';
+import ManageSearchIcon from '@mui/icons-material/ManageSearch';
 import { format } from 'date-fns';
 import { v5 as uuidv5 } from 'uuid';
 import { Trade } from '../../types/trade';
@@ -50,10 +55,6 @@ interface AIChatDrawerProps {
   tradeOperations: TradeOperationsProps;
   /** When provided, shares chat state with the panel version */
   sharedChatState?: UseAIChatReturn;
-  /** Calendar picker props (Home page) */
-  availableCalendars?: Calendar[];
-  selectedCalendarId?: string;
-  onCalendarChange?: (calendarId: string) => void;
   /** Orion Tasks state + actions, typically from `useOrionTasks`. When omitted
    *  the Tasks tab renders in empty/disabled form. */
   aiTasks?: AITasksBundle;
@@ -90,9 +91,6 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   isReadOnly = false,
   tradeOperations,
   sharedChatState,
-  availableCalendars,
-  selectedCalendarId,
-  onCalendarChange,
   aiTasks,
   pendingDeepLink,
   onDeepLinkConsumed,
@@ -109,6 +107,11 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   } = useDialogTokens();
   const [activeTab, setActiveTab] = useState(0);
   const [chatSeedMessage, setChatSeedMessage] = useState<string>('');
+  // Chat-surface view toggles lifted up so the action buttons can live inline
+  // with the tab row at the drawer level instead of inside AIChatContent.
+  const [showHistoryView, setShowHistoryView] = useState(false);
+  const [showRemindersView, setShowRemindersView] = useState(false);
+  const [showMemoryLogsView, setShowMemoryLogsView] = useState(false);
 
   // Fallback chat state lives at the drawer level so it survives tab switches
   // (AIChatContent unmounts when activeTab changes). Callers that already manage
@@ -393,7 +396,8 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
             </Tooltip>
           </Box>
 
-          {/* Chip-style segmented tabs */}
+          {/* Tab row — chip-style segmented tabs on the left, chat-surface
+              action buttons on the right (only on Chat tab). */}
           <Box
             sx={{
               px: 2.5,
@@ -401,7 +405,9 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
               pb: 1,
               flexShrink: 0,
               display: 'flex',
-              justifyContent: 'flex-start',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 1,
             }}
           >
             <Box
@@ -474,6 +480,109 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
                 );
               })}
             </Box>
+
+            {/* Chat-surface action buttons: New chat / Back, History, Reminders, Memory Logs.
+                Visible only on the Chat tab. */}
+            {activeTab === 0 && user && (() => {
+              const inOverlay = showHistoryView || showRemindersView || showMemoryLogsView;
+              const handleNewChat = async () => {
+                setShowHistoryView(false);
+                setShowRemindersView(false);
+                setShowMemoryLogsView(false);
+                await effectiveChatState.startNewChat();
+              };
+              const handleBackToChat = () => {
+                setShowHistoryView(false);
+                setShowRemindersView(false);
+                setShowMemoryLogsView(false);
+              };
+              const iconBtnSx = (active: boolean) => ({
+                color: active ? violet : theme.palette.text.secondary,
+                borderRadius: 1.25,
+                backgroundColor: active ? violetSoft : 'transparent',
+                border: active ? `1px solid ${violetBorder}` : '1px solid transparent',
+                '&:hover': { backgroundColor: alpha(violet, isDark ? 0.12 : 0.1) },
+                '&.Mui-disabled': { color: theme.palette.text.disabled },
+              });
+
+              return (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  {/* Slot 1: Back-to-Chat / Back-to-previous / New chat */}
+                  {inOverlay ? (
+                    <Tooltip title="Back to Chat">
+                      <IconButton size="small" onClick={handleBackToChat} sx={iconBtnSx(false)}>
+                        <ArrowBackIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  ) : deepLinkOrigin ? (
+                    <Tooltip title="Back to previous conversation">
+                      <IconButton
+                        size="small"
+                        onClick={handleReturnToPrevious}
+                        sx={iconBtnSx(false)}
+                      >
+                        <ArrowBackIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  ) : (
+                    <Tooltip title="New Chat">
+                      <span>
+                        <IconButton
+                          size="small"
+                          onClick={handleNewChat}
+                          disabled={effectiveChatState.messages.length === 0}
+                          sx={iconBtnSx(false)}
+                        >
+                          <NewChatIcon fontSize="small" />
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                  )}
+
+                  <Tooltip title="Conversation History">
+                    <IconButton
+                      size="small"
+                      onClick={() => {
+                        setShowHistoryView((v) => !v);
+                        setShowRemindersView(false);
+                        setShowMemoryLogsView(false);
+                      }}
+                      sx={iconBtnSx(showHistoryView)}
+                    >
+                      <HistoryIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+
+                  <Tooltip title="Reminders">
+                    <IconButton
+                      size="small"
+                      onClick={() => {
+                        setShowRemindersView((v) => !v);
+                        setShowHistoryView(false);
+                        setShowMemoryLogsView(false);
+                      }}
+                      sx={iconBtnSx(showRemindersView)}
+                    >
+                      <AlarmIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+
+                  <Tooltip title="Memory Logs">
+                    <IconButton
+                      size="small"
+                      onClick={() => {
+                        setShowMemoryLogsView((v) => !v);
+                        setShowHistoryView(false);
+                        setShowRemindersView(false);
+                      }}
+                      sx={iconBtnSx(showMemoryLogsView)}
+                    >
+                      <ManageSearchIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+              );
+            })()}
           </Box>
 
           {/* Tab content */}
@@ -504,9 +613,6 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
                 tradeOperations={tradeOperations}
                 isActive={open && activeTab === 0}
                 sharedChatState={effectiveChatState}
-                availableCalendars={availableCalendars}
-                selectedCalendarId={selectedCalendarId}
-                onCalendarChange={onCalendarChange}
                 seedMessage={chatSeedMessage}
                 onSeedMessageConsumed={() => setChatSeedMessage('')}
                 scrollToMessageId={scrollToMessageId}
@@ -514,6 +620,12 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
                 canReturnToPrevious={!!deepLinkOrigin}
                 onReturnToPrevious={handleReturnToPrevious}
                 initialTradeId={initialTradeId}
+                showHistoryView={showHistoryView}
+                setShowHistoryView={setShowHistoryView}
+                showRemindersView={showRemindersView}
+                setShowRemindersView={setShowRemindersView}
+                showMemoryLogsView={showMemoryLogsView}
+                setShowMemoryLogsView={setShowMemoryLogsView}
               />
             </TabPanel>
 
