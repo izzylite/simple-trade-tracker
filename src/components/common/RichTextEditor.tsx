@@ -22,7 +22,7 @@ import { alpha } from '@mui/material/styles';
 import { dialogProps } from '../../styles/dialogStyles';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import { useDialogTokens } from '../../styles/dialogTokens';
-import { Editor, EditorState, convertToRaw } from 'draft-js';
+import { Editor, EditorState, Modifier, convertToRaw } from 'draft-js';
 import 'draft-js/dist/Draft.css';
 
 // Import utilities, constants, and hooks
@@ -978,6 +978,55 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
   // Create style map using utility
   const styleMap = createStyleMap(theme, TEXT_COLORS, BACKGROUND_COLORS);
 
+  // ─── maxLength enforcement at input source ─────────────────────────────
+  // The onChange cap (handleEditorChange) is a backstop; Draft.js's
+  // controlled-component model can still let the DOM briefly show overflow
+  // when the user types or pastes fast. handleBeforeInput / handlePastedText
+  // intercept BEFORE Draft.js applies the change, so we never overshoot the
+  // limit and pastes get truncated to fit.
+  const handleBeforeInput = (
+    chars: string,
+    state: EditorState,
+  ): 'handled' | 'not-handled' => {
+    if (!maxLength) return 'not-handled';
+    const currentLength = state.getCurrentContent().getPlainText().length;
+    // Account for any text the user has selected — selected chars will be
+    // replaced, so they shouldn't count against the limit.
+    const selection = state.getSelection();
+    const selectedLength = selection.isCollapsed()
+      ? 0
+      : Math.abs(selection.getEndOffset() - selection.getStartOffset());
+    if (currentLength - selectedLength + chars.length > maxLength) {
+      return 'handled';
+    }
+    return 'not-handled';
+  };
+
+  const handlePastedText = (
+    text: string,
+    _html: string | undefined,
+    state: EditorState,
+  ): 'handled' | 'not-handled' => {
+    if (!maxLength) return 'not-handled';
+    const content = state.getCurrentContent();
+    const selection = state.getSelection();
+    const selectedLength = selection.isCollapsed()
+      ? 0
+      : Math.abs(selection.getEndOffset() - selection.getStartOffset());
+    const room = maxLength - (content.getPlainText().length - selectedLength);
+    if (room <= 0) return 'handled'; // No room — drop the paste entirely.
+    if (text.length <= room) return 'not-handled'; // Default paste path.
+
+    // Truncate the paste to what fits. replaceText handles the selection
+    // (collapsed or ranged) the same way Draft.js's default paste would.
+    const truncated = text.slice(0, room);
+    const newContent = Modifier.replaceText(content, selection, truncated);
+    handleEditorChange(
+      EditorState.push(state, newContent, 'insert-characters'),
+    );
+    return 'handled';
+  };
+
   // Create keyboard command handler using utility
   const handleKeyCommandWrapper = (command: string, state: EditorState): 'handled' | 'not-handled' => {
     if (
@@ -999,7 +1048,13 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
       {label && (
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5, fontWeight: 500 }}>
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          // px matches the editor wrapper's horizontal padding (theme.spacing(1.8))
+          // so the label aligns with the placeholder/content baseline.
+          sx={{ mb: 0.5, px: 3.5, fontWeight: 500 }}
+        >
           {label}
         </Typography>
       )}
@@ -1054,13 +1109,13 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
                 zIndex: 0,
                 pointerEvents: 'none',
                 opacity: 0.8,
-                fontFamily: "'Segoe UI', 'Roboto', 'Helvetica', sans-serif",
+                fontFamily: theme.typography.fontFamily,
                 fontWeight: 500,
                 fontSize: '0.9rem', // Reduced placeholder font size
             },
             '& .public-DraftEditor-content': {
               minHeight: typeof minHeight === 'number' ? `calc(${minHeight}px - ${theme.spacing(3)})` : `calc(${minHeight} - ${theme.spacing(3)})`,
-              fontFamily: "'Segoe UI', 'Roboto', 'Helvetica', sans-serif",
+              fontFamily: theme.typography.fontFamily,
               fontSize: '0.9rem', // Reduced text size
               lineHeight: 2.1,
               fontWeight: 500,
@@ -1074,28 +1129,28 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
             // Custom Block Styles
             '& .RichEditor-h1': {
               fontSize: '1.1rem', fontWeight: 'bold', margin: '0.8rem 0 0.4rem',
-              fontFamily: "'Segoe UI', 'Roboto', 'Helvetica', sans-serif",
+              fontFamily: theme.typography.fontFamily,
             },
             '& .RichEditor-h2': {
               fontSize: '1rem', fontWeight: 'bold', margin: '0.6rem 0 0.3rem',
-              fontFamily: "'Segoe UI', 'Roboto', 'Helvetica', sans-serif",
+              fontFamily: theme.typography.fontFamily,
             },
             '& .RichEditor-h3': {
               fontSize: '0.95rem', fontWeight: 'bold', margin: '0.5rem 0 0.25rem', fontStyle: 'italic',
-              fontFamily: "'Segoe UI', 'Roboto', 'Helvetica', sans-serif",
+              fontFamily: theme.typography.fontFamily,
             },
             '& .RichEditor-ul, & .RichEditor-ol': {
               marginLeft: '1.5rem', // Reduced indentation for lists
               marginBlockStart: '0.4em',
               marginBlockEnd: '0.4em',
               paddingInlineStart: '0', // Reset browser default padding
-              fontFamily: "'Segoe UI', 'Roboto', 'Helvetica', sans-serif",
+              fontFamily: theme.typography.fontFamily,
               fontWeight: 500, // Medium weight for thicker text
             },
             '& .RichEditor-ul li, & .RichEditor-ol li': {
               margin: '0.2rem 0',
               paddingLeft: '0.4rem', // Reduced space between bullet/number and text
-              fontFamily: "'Segoe UI', 'Roboto', 'Helvetica', sans-serif",
+              fontFamily: theme.typography.fontFamily,
               fontWeight: 500, // Medium weight for thicker text
             },
              '& .RichEditor-ul li::marker': { // Style bullets if needed
@@ -1197,6 +1252,8 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
             blockRendererFn={blockRendererFn}
             handleKeyCommand={handleKeyCommandWrapper}
             handleReturn={handleReturn}
+            handleBeforeInput={handleBeforeInput}
+            handlePastedText={handlePastedText}
             keyBindingFn={(e: any) => {
               if (mentionActive
                 && mentionFilteredTags.length > 0) {
