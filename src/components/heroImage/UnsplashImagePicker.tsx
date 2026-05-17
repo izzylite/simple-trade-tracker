@@ -477,7 +477,7 @@ const UnsplashImagePicker: React.FC<UnsplashImagePickerProps> = ({
                     <Shimmer
                       key={index}
                       height={tileHeight}
-                      borderRadius={10}
+                      borderRadius={2}
                       variant="wave"
                       intensity="medium"
                     />
@@ -506,15 +506,9 @@ const UnsplashImagePicker: React.FC<UnsplashImagePickerProps> = ({
                         backgroundSize: 'cover',
                         backgroundPosition: 'center',
                         transition: 'transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease',
-                        '& .picker-overlay': {
-                          opacity: 0,
-                          transition: 'opacity 160ms ease',
-                        },
                         '&:hover': {
                           transform: 'translateY(-2px)',
-                          borderColor: violetBorder,
-                          boxShadow: `0 6px 18px ${alpha(violet, isDark ? 0.35 : 0.2)}`,
-                          '& .picker-overlay': { opacity: 1 },
+                          borderColor: violetBorder
                         },
                         '&:focus-visible': {
                           outline: `2px solid ${violet}`,
@@ -522,32 +516,6 @@ const UnsplashImagePicker: React.FC<UnsplashImagePickerProps> = ({
                         },
                       }}
                     >
-                      <Box
-                        className="picker-overlay"
-                        sx={{
-                          position: 'absolute',
-                          inset: 0,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          background: `linear-gradient(180deg, ${alpha(violet, 0.15)} 0%, ${alpha(theme.palette.common.black, 0.55)} 100%)`,
-                        }}
-                      >
-                        <Box
-                          sx={{
-                            px: 1.25,
-                            py: 0.5,
-                            borderRadius: 999,
-                            backgroundColor: '#fff',
-                            color: violet,
-                            fontSize: '0.72rem',
-                            fontWeight: 700,
-                            letterSpacing: '0.04em',
-                          }}
-                        >
-                          Select
-                        </Box>
-                      </Box>
                       {image.user.username !== 'demo_user' && (
                         <Box
                           sx={{

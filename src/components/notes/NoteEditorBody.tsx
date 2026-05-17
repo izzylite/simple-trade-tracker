@@ -1605,22 +1605,7 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
                     lineHeight: 1.5,
                   }}
                 >
-                  Paste a path like{' '}
-                  <Box
-                    component="code"
-                    sx={{
-                      fontFamily: MONO_FONT_TL,
-                      fontSize: '0.74rem',
-                      px: 0.5,
-                      py: 0.125,
-                      borderRadius: 0.5,
-                      backgroundColor: alpha(violet, 0.1),
-                      color: violet,
-                    }}
-                  >
-                    /shared/share_…
-                  </Box>{' '}
-                  or the full URL. Orion will resolve it to a clickable trade chip.
+                  Paste a trade share link. This will resolve to a clickable trade chip.
                 </Typography>
               </Box>
 
