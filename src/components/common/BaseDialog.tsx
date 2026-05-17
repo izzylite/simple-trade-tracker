@@ -7,13 +7,13 @@ import {
   Box,
   Button,
   CircularProgress,
-  alpha,
   useTheme,
 } from '@mui/material';
 import { Close as CloseIcon } from '@mui/icons-material';
 import { dialogProps } from '../../styles/dialogStyles';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import { Z_INDEX } from '../../styles/zIndex';
+import { useDialogTokens } from '../../styles/dialogTokens';
 
 export interface BaseDialogProps extends Omit<DialogProps, 'title'> {
   open: boolean;
@@ -58,12 +58,7 @@ const BaseDialog: React.FC<BaseDialogProps> = ({
   ...rest
 }) => {
   const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
-
-  const violet = theme.palette.primary.main;
-  const violetSoft = alpha(violet, isDark ? 0.18 : 0.14);
-  const violetBorder = alpha(violet, isDark ? 0.35 : 0.28);
-  const hairline = isDark ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
+  const { paperSx, headerSx, iconAvatarSx, footerSx, primaryButtonSx, ghostButtonSx } = useDialogTokens();
 
   const showFooter = !!(actions || !hideFooterCancelButton || primaryButtonAction);
 
@@ -77,48 +72,14 @@ const BaseDialog: React.FC<BaseDialogProps> = ({
       sx={{ zIndex: Z_INDEX.DIALOG }}
       slotProps={{
         paper: {
-          sx: {
-            borderRadius: 2,
-            border: `1px solid ${hairline}`,
-            boxShadow: theme.shadows[10],
-            backgroundImage: 'none',
-            maxHeight: '90vh',
-            overflow: 'hidden',
-          },
+          sx: { ...paperSx, maxHeight: '90vh' },
         },
       }}
       {...rest}
     >
       {/* Header */}
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 1.5,
-          px: 2.5,
-          py: 1.75,
-          borderBottom: `1px solid ${hairline}`,
-          flexShrink: 0,
-        }}
-      >
-        {headerIcon && (
-          <Box
-            sx={{
-              width: 32,
-              height: 32,
-              borderRadius: 1.25,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: violetSoft,
-              color: violet,
-              border: `1px solid ${violetBorder}`,
-              flexShrink: 0,
-            }}
-          >
-            {headerIcon}
-          </Box>
-        )}
+      <Box sx={{ ...headerSx, flexShrink: 0 }}>
+        {headerIcon && <Box sx={iconAvatarSx}>{headerIcon}</Box>}
         <Box sx={{ flex: 1, minWidth: 0 }}>
           {typeof title === 'string' ? (
             <Typography
@@ -171,34 +132,12 @@ const BaseDialog: React.FC<BaseDialogProps> = ({
 
       {/* Footer */}
       {showFooter && (
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'flex-end',
-            gap: 1,
-            px: 2.5,
-            py: 1.5,
-            borderTop: `1px solid ${hairline}`,
-            backgroundColor: isDark
-              ? 'rgba(255,255,255,0.02)'
-              : alpha(theme.palette.text.primary, 0.02),
-            flexShrink: 0,
-          }}
-        >
+        <Box sx={{ ...footerSx, flexShrink: 0 }}>
           {(!hideFooterCancelButton || cancelButtonAction) && (
             <Button
               onClick={cancelButtonAction || onClose}
               disabled={isSubmitting}
-              sx={{
-                textTransform: 'none',
-                fontWeight: 600,
-                fontSize: '0.85rem',
-                color: theme.palette.text.secondary,
-                '&:hover': {
-                  backgroundColor: alpha(theme.palette.text.primary, 0.04),
-                },
-              }}
+              sx={ghostButtonSx}
             >
               {cancelButtonText}
             </Button>
@@ -213,32 +152,10 @@ const BaseDialog: React.FC<BaseDialogProps> = ({
               variant="contained"
               endIcon={
                 isSubmitting ? (
-                  <CircularProgress
-                    size={14}
-                    thickness={5}
-                    sx={{ color: 'inherit' }}
-                  />
+                  <CircularProgress size={14} thickness={5} sx={{ color: 'inherit' }} />
                 ) : undefined
               }
-              sx={{
-                textTransform: 'none',
-                fontWeight: 600,
-                fontSize: '0.85rem',
-                backgroundColor: violet,
-                color: '#fff',
-                borderRadius: 1.25,
-                px: 1.75,
-                py: 0.75,
-                boxShadow: 'none',
-                '&:hover': {
-                  backgroundColor: theme.palette.primary.dark,
-                  boxShadow: 'none',
-                },
-                '&.Mui-disabled': {
-                  backgroundColor: alpha(violet, 0.35),
-                  color: alpha('#fff', 0.7),
-                },
-              }}
+              sx={primaryButtonSx}
             >
               {primaryButtonText}
             </Button>

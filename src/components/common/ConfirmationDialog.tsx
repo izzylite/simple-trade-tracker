@@ -8,7 +8,6 @@ import {
   CircularProgress,
   SxProps,
   Theme,
-  alpha,
   useTheme,
 } from '@mui/material';
 import {
@@ -20,6 +19,7 @@ import {
 } from '@mui/icons-material';
 import { dialogProps } from '../../styles/dialogStyles';
 import { Z_INDEX } from '../../styles/zIndex';
+import { useDialogTokens } from '../../styles/dialogTokens';
 
 type ConfirmColor = 'primary' | 'error' | 'warning' | 'success' | 'info';
 
@@ -57,19 +57,20 @@ const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
   sx,
 }) => {
   const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
 
   const accent =
     confirmColor === 'primary'
       ? theme.palette.primary.main
       : theme.palette[confirmColor].main;
-  const accentDark =
-    confirmColor === 'primary'
-      ? theme.palette.primary.dark
-      : theme.palette[confirmColor].dark;
-  const accentSoft = alpha(accent, isDark ? 0.18 : 0.14);
-  const accentBorder = alpha(accent, isDark ? 0.35 : 0.28);
-  const hairline = isDark ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
+
+  const {
+    paperSx,
+    headerSx,
+    iconAvatarSx,
+    footerSx,
+    primaryButtonSx,
+    ghostButtonSx,
+  } = useDialogTokens(accent);
 
   const Icon = ICONS[confirmColor];
 
@@ -81,43 +82,11 @@ const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
       fullWidth
       {...dialogProps}
       sx={{ zIndex: Z_INDEX.DIALOG, ...sx }}
-      slotProps={{
-        paper: {
-          sx: {
-            borderRadius: 2,
-            border: `1px solid ${hairline}`,
-            boxShadow: theme.shadows[10],
-            backgroundImage: 'none',
-            overflow: 'hidden',
-          },
-        },
-      }}
+      slotProps={{ paper: { sx: paperSx } }}
     >
       {/* Header */}
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 1.5,
-          px: 2.5,
-          py: 1.75,
-          borderBottom: `1px solid ${hairline}`,
-        }}
-      >
-        <Box
-          sx={{
-            width: 32,
-            height: 32,
-            borderRadius: 1.25,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: accentSoft,
-            color: accent,
-            border: `1px solid ${accentBorder}`,
-            flexShrink: 0,
-          }}
-        >
+      <Box sx={headerSx}>
+        <Box sx={iconAvatarSx}>
           <Icon sx={{ fontSize: 18 }} />
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -153,31 +122,8 @@ const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
       </Box>
 
       {/* Footer */}
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'flex-end',
-          gap: 1,
-          px: 2.5,
-          py: 1.5,
-          borderTop: `1px solid ${hairline}`,
-          backgroundColor: isDark
-            ? 'rgba(255,255,255,0.02)'
-            : alpha(theme.palette.text.primary, 0.02),
-        }}
-      >
-        <Button
-          onClick={onCancel}
-          disabled={isSubmitting}
-          sx={{
-            textTransform: 'none',
-            fontWeight: 600,
-            fontSize: '0.85rem',
-            color: theme.palette.text.secondary,
-            '&:hover': { backgroundColor: alpha(theme.palette.text.primary, 0.04) },
-          }}
-        >
+      <Box sx={footerSx}>
+        <Button onClick={onCancel} disabled={isSubmitting} sx={ghostButtonSx}>
           {cancelText}
         </Button>
         <Button
@@ -189,22 +135,7 @@ const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
               <CircularProgress size={14} thickness={5} sx={{ color: 'inherit' }} />
             ) : undefined
           }
-          sx={{
-            textTransform: 'none',
-            fontWeight: 600,
-            fontSize: '0.85rem',
-            backgroundColor: accent,
-            color: '#fff',
-            borderRadius: 1.25,
-            px: 1.75,
-            py: 0.75,
-            boxShadow: 'none',
-            '&:hover': { backgroundColor: accentDark, boxShadow: 'none' },
-            '&.Mui-disabled': {
-              backgroundColor: alpha(accent, 0.35),
-              color: alpha('#fff', 0.7),
-            },
-          }}
+          sx={primaryButtonSx}
         >
           {confirmText}
         </Button>
