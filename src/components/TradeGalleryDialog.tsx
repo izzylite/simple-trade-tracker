@@ -17,12 +17,14 @@ import {
   ArrowForwardIos as ArrowForwardIcon,
   CalendarToday as CalendarIcon,
   SmartToy as AssistantIcon,
-  Slideshow as SlideshowIcon
+  Slideshow as SlideshowIcon,
+  StickyNote2 as GamePlanIcon,
+  TrendingUp as EconomicIcon
 } from '@mui/icons-material';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { Trade, Calendar } from '../types/dualWrite';
 import { EconomicEvent } from '../types/economicCalendar';
-import { Note } from '../types/note';
+import { Note, DayAbbreviation } from '../types/note';
 import TradeDetailExpanded from './TradeDetailExpanded';
 import { scrollbarStyles } from '../styles/scrollbarStyles';
 import { TradeOperationsProps } from '../types/tradeOperations';
@@ -32,12 +34,18 @@ import OrionPanel from './aiChat/OrionPanel';
 import { useAuthState } from '../contexts/AuthStateContext';
 import Shimmer from './Shimmer';
 import EconomicEventDetailDialog from './economicCalendar/EconomicEventDetailDialog';
+import EconomicEventsPanel from './economicCalendar/EconomicEventsPanel';
 import NoteViewerPanel from './notes/NoteViewerPanel';
 import { logger } from '../utils/logger';
 import { Z_INDEX } from '../styles/zIndex';
 import { getTradeRepository } from '../services/calendarService';
+import {
+  getReminderNotesForDay,
+  getReminderNotesForDate,
+} from '../services/notesService';
 import { useTradeSyncContextOptional } from '../contexts/TradeSyncContext';
 import { normalizeTradeDates } from '../utils/tradeUtils';
+import { DEFAULT_FILTER_SETTINGS as DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS } from '../hooks/useEconomicCalendarFilters';
 
 interface TradeGalleryDialogProps {
   open: boolean;
@@ -101,6 +109,15 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
   // launched the dialog into chat mode).
   const [orionOpen, setOrionOpen] = useState(aiOnlyMode);
   const [orionShowHistory, setOrionShowHistory] = useState(false);
+
+  // Economic events side-panel (mutex with Orion + Note viewer).
+  const [eventsOpen, setEventsOpen] = useState(false);
+
+  // Game plan fetch state. The button lives in the gallery header (not
+  // in TradeDetailExpanded any more), so the dialog owns the fetch and
+  // routes the resolved note into the existing NoteViewerPanel flow.
+  const [loadingGamePlan, setLoadingGamePlan] = useState(false);
+  const [gamePlanCache, setGamePlanCache] = useState<Record<string, Note[]>>({});
 
   // Fetch mode state - used when trades array is empty and fetchYear is set
   const [internalTrades, setInternalTrades] = useState<Trade[]>([]);
@@ -299,7 +316,8 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
     setViewerNoteId(null);
     setViewerLoading(false);
     setViewerOpen(true);
-    setOrionOpen(false); // Right slot is mutex — close Orion if it was up
+    setOrionOpen(false); // Right slot is mutex — close any other panel
+    setEventsOpen(false);
   }, []);
 
   // Open immediately with shimmer; the panel fetches by id internally.
@@ -311,6 +329,7 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
     setViewerLoading(false);
     setViewerOpen(true);
     setOrionOpen(false);
+    setEventsOpen(false);
   }, []);
 
   // Open immediately with shimmer; caller will populate via
@@ -324,20 +343,35 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
       setViewerLoading(true);
       setViewerOpen(true);
       setOrionOpen(false);
+      setEventsOpen(false);
       if (opts?.emptyTitle) setViewerEmptyTitle(opts.emptyTitle);
       if (opts?.emptyMessage) setViewerEmptyMessage(opts.emptyMessage);
     },
     []
   );
 
-  // Opening Orion closes any open note. State for both sides is dialog-
-  // level (aiChat hook + viewerNote/viewerNoteId), so reopening either
-  // panel restores its previous content — no loss of conversation or
-  // viewed note across toggles.
+  // Opening Orion closes any other panel. State for every side is
+  // dialog-level (aiChat hook + viewerNote/viewerNoteId + EventsPanel
+  // fetched data), so reopening any panel restores its previous content
+  // — no loss of conversation, viewed note, or filter state.
   const handleToggleOrion = useCallback(() => {
     setOrionOpen((prev) => {
       const next = !prev;
-      if (next) setViewerOpen(false);
+      if (next) {
+        setViewerOpen(false);
+        setEventsOpen(false);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleToggleEvents = useCallback(() => {
+    setEventsOpen((prev) => {
+      const next = !prev;
+      if (next) {
+        setOrionOpen(false);
+        setViewerOpen(false);
+      }
       return next;
     });
   }, []);
@@ -352,6 +386,63 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
     }, 300);
   }, []);
 
+  // Game plan: opens NoteViewerPanel with the day's reminder note(s).
+  // Cached per trade.id so toggling the panel after the first open is
+  // instant — no re-fetch flicker.
+  const handleOpenGamePlan = useCallback(async () => {
+    if (!currentTrade?.trade_date) return;
+    const tradeId = currentTrade.id;
+    const effectiveCalendarId = calendarId || currentTrade.calendar_id;
+    if (!effectiveCalendarId) return;
+
+    const cached = gamePlanCache[tradeId];
+    if (cached) {
+      if (cached.length > 0) handleOpenNote(cached[0]);
+      else handleOpenNote(null);
+      return;
+    }
+
+    // Show shimmer immediately; populate when the fetch resolves.
+    handleOpenNoteLoading({
+      emptyTitle: 'No game plan',
+      emptyMessage: 'No game plan available for this day.',
+    });
+
+    setLoadingGamePlan(true);
+    try {
+      const date =
+        typeof currentTrade.trade_date === 'string'
+          ? parseISO(currentTrade.trade_date)
+          : currentTrade.trade_date;
+      const dayAbbr = format(date, 'EEE') as DayAbbreviation;
+
+      const [weeklyNotes, dateNotes] = await Promise.all([
+        getReminderNotesForDay(effectiveCalendarId, dayAbbr),
+        getReminderNotesForDate(effectiveCalendarId, date),
+      ]);
+
+      // Exclude every-day reminders — those aren't day-specific game
+      // plans. One-time date reminders always qualify.
+      const daySpecificNotes = weeklyNotes.filter(
+        (note) => !note.reminder_days || note.reminder_days.length < 7,
+      );
+
+      const merged = [...daySpecificNotes, ...dateNotes];
+      const unique = merged.filter(
+        (note, idx, arr) => arr.findIndex((n) => n.id === note.id) === idx,
+      );
+
+      setGamePlanCache((prev) => ({ ...prev, [tradeId]: unique }));
+      if (unique.length > 0) handleOpenNote(unique[0]);
+      else handleOpenNote(null);
+    } catch (err) {
+      logger.error('Error fetching game plan notes:', err);
+      handleOpenNote(null);
+    } finally {
+      setLoadingGamePlan(false);
+    }
+  }, [currentTrade, calendarId, gamePlanCache, handleOpenNote, handleOpenNoteLoading]);
+
   // Immersive mode state
   const [immersiveMode, setImmersiveMode] = useState(false);
   const [immersiveImageIndex, setImmersiveImageIndex] = useState(0);
@@ -362,13 +453,15 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
   // When navigating between trades, close transient panels whose
   // contents were tied to the previous trade. Orion stays open (the
   // conversation reset below keeps it scoped) but its history pager
-  // collapses back to the chat view.
+  // collapses back to the chat view. Events panel closes because its
+  // session-window fetch is trade-scoped.
   useEffect(() => {
     setOrionShowHistory(false);
     setViewerOpen(false);
     setViewerNote(null);
     setViewerNoteId(null);
     setViewerLoading(false);
+    setEventsOpen(false);
   }, [safeCurrentIndex]);
 
   // Clear panel state whenever the dialog closes so it doesn't
@@ -379,6 +472,7 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
       setViewerNote(null);
       setViewerNoteId(null);
       setViewerLoading(false);
+      setEventsOpen(false);
     }
   }, [open]);
 
@@ -744,6 +838,64 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
             </Tooltip>
           )}
 
+          {/* Game Plan — opens the day's reminder note in NoteViewerPanel.
+              Hidden when the trade has no calendar context (nothing to
+              fetch against). */}
+          {(calendarId || currentTrade?.calendar_id) && (
+            <Tooltip
+              title="Open game plan for this day"
+              slotProps={{ popper: { sx: { zIndex: Z_INDEX.TOOLTIP } } }}
+            >
+              <span>
+                <IconButton
+                  size="small"
+                  onClick={handleOpenGamePlan}
+                  disabled={loadingGamePlan}
+                  sx={{
+                    color: 'text.secondary',
+                    '&:hover': {
+                      backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                      color: 'primary.main',
+                    },
+                    '&:disabled': { color: 'text.disabled' },
+                  }}
+                >
+                  {loadingGamePlan ? (
+                    <CircularProgress size={18} color="inherit" />
+                  ) : (
+                    <GamePlanIcon sx={{ fontSize: 20 }} />
+                  )}
+                </IconButton>
+              </span>
+            </Tooltip>
+          )}
+
+          {/* Economic Events toggle — opens the session-window events
+              panel. Active state when the panel is currently open. */}
+          {currentTrade?.session && (
+            <Tooltip
+              title={eventsOpen ? 'Close events' : 'Economic events for this session'}
+              slotProps={{ popper: { sx: { zIndex: Z_INDEX.TOOLTIP } } }}
+            >
+              <IconButton
+                size="small"
+                onClick={handleToggleEvents}
+                sx={{
+                  color: eventsOpen ? 'primary.main' : 'text.secondary',
+                  bgcolor: eventsOpen
+                    ? alpha(theme.palette.primary.main, 0.12)
+                    : 'transparent',
+                  '&:hover': {
+                    backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                    color: 'primary.main',
+                  },
+                }}
+              >
+                <EconomicIcon sx={{ fontSize: 20 }} />
+              </IconButton>
+            </Tooltip>
+          )}
+
           {/* Ask Orion toggle — opens the side panel. Active state when
               the panel is currently open. */}
           <Tooltip
@@ -953,8 +1105,6 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
                 onOpenGalleryMode: undefined
               }}
               showAIButton={false}
-              onOpenNote={handleOpenNote}
-              onOpenNoteLoading={handleOpenNoteLoading}
             />
           ) : null}
         </Box>
@@ -996,11 +1146,24 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
         }}
       />
 
+      {/* EconomicEventsPanel — direct flex sibling. Owns its own
+          fetch + filter + realtime sub. Mutex enforced at the
+          toggle handlers, so only one panel ever has non-zero width. */}
+      <EconomicEventsPanel
+        open={eventsOpen}
+        onClose={() => setEventsOpen(false)}
+        trade={currentTrade}
+        filterSettings={
+          calendar?.economic_calendar_filters ||
+          DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS
+        }
+      />
+
       {/* NoteViewerPanel — direct flex sibling. The right slot is
-          mutex with Orion (handleOpenNote* + handleToggleOrion
-          enforce one-at-a-time) so no overlay is needed. Both
-          panels keep their content via dialog-level state, so
-          toggling between them is non-destructive. */}
+          mutex with Orion + Events (handleOpenNote* + handleToggle*
+          enforce one-at-a-time) so no overlay is needed. All panels
+          keep their content via dialog-level state, so toggling
+          between them is non-destructive. */}
       <NoteViewerPanel
         open={viewerOpen}
         onClose={handleCloseNoteViewer}

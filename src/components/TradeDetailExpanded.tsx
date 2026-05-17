@@ -9,16 +9,6 @@ import {
   Button,
   IconButton,
   Tooltip,
-  List,
-  Collapse,
-  Chip,
-  FormControl,
-  Select,
-  MenuItem,
-  OutlinedInput,
-  Autocomplete,
-  Checkbox,
-  TextField,
   LinearProgress
 } from '@mui/material';
 import { alpha, useTheme, keyframes } from '@mui/material/styles';
@@ -36,42 +26,21 @@ import {
   PushPinOutlined as UnpinIcon,
   ViewList as ViewListIcon,
   Category as CategoryIcon,
-  TrendingUp as EconomicIcon,
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-  FilterList as FilterIcon,
   ListAlt as ListAltIcon,
   SmartToy as AIIcon,
   Edit as EditIcon,
-  StickyNote2 as GamePlanIcon,
   OpenInFull as ExpandIcon
 } from '@mui/icons-material';
 import { AnimatedDropdown } from './Animations';
 import { TagsDisplay } from './common';
 import { TradeImage } from './trades/TradeForm';
 import RichTextEditor from './common/RichTextEditor';
-import EconomicEventListItem from './economicCalendar/EconomicEventListItem';
-import { economicCalendarService } from '../services/economicCalendarService';
-import { EconomicEvent, ImpactLevel, Currency } from '../types/economicCalendar';
-import { DEFAULT_FILTER_SETTINGS as DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS, EconomicCalendarFilterSettings } from '../hooks/useEconomicCalendarFilters';
 import { logger } from '../utils/logger';
-import { formatCount } from '../utils/formatters';
-import { tradeEconomicEventService } from '../services/tradeEconomicEventService';
-import { useEventPinning } from '../hooks/useEventPinning';
-import { useUserPinnedEvents } from '../contexts/UserPinnedEventsContext';
 import ShareButton from './sharing/ShareButton';
-import { useRealtimeSubscription } from '../hooks/useRealtimeSubscription';
-import { isToday } from 'date-fns';
 import { TradeOperationsProps } from '../types/tradeOperations';
 import { Z_INDEX } from '../styles/zIndex';
 import { useTradeSyncContextOptional } from '../contexts/TradeSyncContext';
 import { normalizeTradeDates } from '../utils/tradeUtils';
-import { Note, DayAbbreviation } from '../types/note';
-import {
-  getReminderNotesForDay,
-  getReminderNotesForDate
-} from '../services/notesService';
-import NoteViewerDialog from './notes/NoteViewerDialog';
 
 // Global cache to track loaded images across the entire application
 const imageLoadCache = new Set<string>();
@@ -82,27 +51,9 @@ interface TradeDetailExpandedProps {
   animate?: boolean;
   trades?: Array<{ id: string;[key: string]: any }>;
   tradeOperations: TradeOperationsProps;
+  /** Show "Ask Orion" button in the Properties row. TradeGalleryDialog
+   *  hides this because Orion is in its header. */
   showAIButton?: boolean;
-  /**
-   * When provided, game-plan note clicks bubble up to the parent
-   * instead of opening a local NoteViewerDialog. Used by
-   * TradeGalleryDialog so the parent can render an inline panel
-   * (avoiding nested-dialog z-index conflicts).
-   *
-   * Pass `null` to indicate loading completed without finding a note —
-   * the parent should close the loading panel.
-   */
-  onOpenNote?: (note: Note | null) => void;
-  /**
-   * Called *before* the game-plan fetch resolves so the parent panel
-   * can open in a loading/shimmer state immediately. Pairs with
-   * `onOpenNote`, which delivers the resolved note (or `null` if the
-   * fetch finds nothing).
-   */
-  onOpenNoteLoading?: (opts?: {
-    emptyTitle?: string;
-    emptyMessage?: string;
-  }) => void;
 }
 
 // Define shimmer animation
@@ -125,29 +76,13 @@ const isImageLoading = (image: TradeImage, loadingState: { [key: string]: boolea
   return isPendingImage(image) || loadingState[image.id] === true;
 };
 
-// Helper function to get impact colors
-const getImpactColor = (impact: string, theme: any) => {
-  switch (impact) {
-    case 'High':
-      return theme.palette.error.main;
-    case 'Medium':
-      return theme.palette.warning.main;
-    case 'Low':
-      return theme.palette.success.main;
-    default:
-      return theme.palette.text.secondary;
-  }
-};
-
 const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
   tradeData,
   isExpanded,
   animate,
   trades,
   tradeOperations,
-  showAIButton = true,
-  onOpenNote,
-  onOpenNoteLoading
+  showAIButton = true
 }) => {
   // Destructure from tradeOperations directly
   const {
@@ -155,10 +90,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
     onUpdateTradeProperty,
     calendarId,
     onOpenGalleryMode,
-    economicFilter,
     onOpenAIChat,
-    calendar,
-    onUpdateCalendarProperty,
     onEditTrade,
     isReadOnly = false,
     onSharedTradeClick
@@ -172,40 +104,12 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
   const isUpdating = tradeSync?.isTradeUpdating(trade.id) || false;
   const [isPinning, setIsPinning] = useState(false);
   const [loadingImages, setLoadingImages] = useState<{ [key: string]: boolean }>({});
-
-  // Use the reusable event pinning hook (now backed by user-level storage)
-  const {
-    pinningEventId,
-    handlePinEvent,
-    handleUnpinEvent
-  } = useEventPinning();
-  const { pins: userPinnedEvents } = useUserPinnedEvents();
   const [showTagGroups, setShowTagGroups] = useState(() => {
     // Load from localStorage, default to false if not found
     const saved = localStorage.getItem('tradeDetail_showTagGroups');
     return saved !== null ? JSON.parse(saved) : false;
   });
 
-  // Economic events state
-  const [economicEvents, setEconomicEvents] = useState<EconomicEvent[]>([]);
-  const [loadingEconomicEvents, setLoadingEconomicEvents] = useState(false);
-  const [showEconomicEvents, setShowEconomicEvents] = useState(false);
-  const [economicEventsError, setEconomicEventsError] = useState<string | null>(null);
-  const [allEconomicEvents, setAllEconomicEvents] = useState<EconomicEvent[]>([]);
-  const [eventNameSearch, setEventNameSearch] = useState('');
-
-  // Add state
-  const [selectedImpacts, setSelectedImpacts] = useState<ImpactLevel[]>(['High']
-  );
-
-  // Game plan (reminder notes) state
-  const [gamePlanNotes, setGamePlanNotes] = useState<Note[]>([]);
-  const [loadingGamePlan, setLoadingGamePlan] = useState(false);
-  const [gamePlanViewNote, setGamePlanViewNote] = useState<Note | null>(null);
-
-  const filterSetting: EconomicCalendarFilterSettings = economicFilter ? economicFilter(calendarId!) : DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS
-
-  
   // Update local trade state when tradeData prop changes
   useEffect(() => {
     setTrade(tradeData);
@@ -261,20 +165,6 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
     }
   }, [trade.images]);
 
-  // Filter events by event name search
-  useEffect(() => {
-    if (!eventNameSearch) {
-      setEconomicEvents(allEconomicEvents);
-    } else {
-      const searchLower = eventNameSearch.toLowerCase();
-      setEconomicEvents(
-        allEconomicEvents.filter(event =>
-          event.event_name.toLowerCase().includes(searchLower)
-        )
-      );
-    }
-  }, [eventNameSearch, allEconomicEvents]);
-
   // Function to toggle pin status
   const handleTogglePin = async () => {
     if (!onUpdateTradeProperty || isPinning) return;
@@ -299,224 +189,6 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
     setShowTagGroups(newValue);
     localStorage.setItem('tradeDetail_showTagGroups', JSON.stringify(newValue));
   };
-
-  // Function to fetch economic events for the trade's date
-  const fetchEconomicEvents = async () => {
-    if (!trade.trade_date) return;
-
-    try {
-      setLoadingEconomicEvents(true);
-      setEconomicEventsError(null);
-
-      // Convert trade_date to Date object if it's a string
-      const tradeDate = typeof trade.trade_date === 'string' ? parseISO(trade.trade_date) : trade.trade_date;
-      const sessionRange = tradeEconomicEventService.getSessionTimeRange(trade.session!, tradeDate);
-      console.log(`sessionRange : ${JSON.stringify(sessionRange)}`)
-      const events = await economicCalendarService.fetchEvents(
-        { start: sessionRange.start, end: sessionRange.end },
-        {
-          currencies: (filterSetting?.currencies as Currency[]),
-          impacts: (filterSetting?.impacts as ImpactLevel[]),
-          limit: 100  // Reasonable limit for session range
-        }
-      );
-
-      // Sort events by time
-      const sortedEvents = events.sort((a, b) =>
-        new Date(a.time_utc).getTime() - new Date(b.time_utc).getTime()
-      );
-
-      setAllEconomicEvents(sortedEvents);
-      setEconomicEvents(sortedEvents);
-    } catch (error) {
-      logger.error('Error fetching economic events:', error);
-      setEconomicEventsError('Failed to load economic events');
-    } finally {
-      setLoadingEconomicEvents(false);
-    }
-  };
-
-  // Function to toggle economic events section
-  const handleToggleEconomicEvents = () => {
-    const newValue = !showEconomicEvents;
-    setShowEconomicEvents(newValue);
-
-    // Fetch events when expanding for the first time
-    if (newValue && economicEvents.length === 0 && !loadingEconomicEvents) {
-      fetchEconomicEvents();
-    }
-  };
-
-  // Function to fetch game plan notes for the trade's date
-  const fetchGamePlanNotes = async (): Promise<Note[]> => {
-    const effectiveCalendarId = calendarId || trade.calendar_id;
-    if (!trade.trade_date || !effectiveCalendarId) return [];
-
-    try {
-      setLoadingGamePlan(true);
-      const tradeDate = typeof trade.trade_date === 'string'
-        ? parseISO(trade.trade_date) : trade.trade_date;
-      const dayAbbr = format(tradeDate, 'EEE') as DayAbbreviation;
-
-      // Fetch both weekly and one-time reminders in parallel
-      const [weeklyNotes, dateNotes] = await Promise.all([
-        getReminderNotesForDay(effectiveCalendarId, dayAbbr),
-        getReminderNotesForDate(effectiveCalendarId, tradeDate)
-      ]);
-
-      // Exclude notes that remind every day — those aren't
-      // day-specific game plans. One-time date reminders always qualify.
-      const daySpecificNotes = weeklyNotes.filter(
-        note => !note.reminder_days || note.reminder_days.length < 7
-      );
-
-      // Merge and deduplicate
-      const allNotes = [...daySpecificNotes, ...dateNotes];
-      const uniqueNotes = allNotes.filter(
-        (note, idx, arr) => arr.findIndex(n => n.id === note.id) === idx
-      );
-      setGamePlanNotes(uniqueNotes);
-      return uniqueNotes;
-    } catch (error) {
-      logger.error('Error fetching game plan notes:', error);
-      setGamePlanNotes([]);
-      return [];
-    } finally {
-      setLoadingGamePlan(false);
-    }
-  };
-
-  // Open game plan note viewer — defers to parent (panel) when
-  // onOpenNote is provided, otherwise falls back to the local dialog.
-  // When the parent supports a loading state, open the panel
-  // immediately with shimmer and populate once the day-based fetch
-  // resolves.
-  const handleOpenGamePlan = async () => {
-    const usePanel = !!onOpenNote;
-    const cached = gamePlanNotes;
-
-    // If we already have cached notes, skip the loading state.
-    if (usePanel && cached.length === 0 && onOpenNoteLoading) {
-      onOpenNoteLoading({
-        emptyTitle: 'No game plan',
-        emptyMessage: 'No game plan available for this day.',
-      });
-    }
-
-    let notes = cached;
-    if (notes.length === 0 && !loadingGamePlan) {
-      notes = await fetchGamePlanNotes();
-    }
-
-    if (notes.length > 0) {
-      if (onOpenNote) {
-        onOpenNote(notes[0]);
-      } else {
-        setGamePlanViewNote(notes[0]);
-      }
-    } else if (onOpenNote) {
-      // No notes for this day — signal the parent to close the
-      // loading panel (otherwise it would shimmer indefinitely).
-      onOpenNote(null);
-    }
-  };
-
-  // Re-fetch economic events when trade changes (for gallery mode)
-  // Use stable string representation of trade_date to prevent unnecessary refetches
-  const tradeDateString = trade.trade_date
-    ? (typeof trade.trade_date === 'string' ? trade.trade_date : trade.trade_date.toISOString())
-    : '';
-
-  useEffect(() => {
-    // Clear existing events when trade changes
-    setEconomicEvents([]);
-    setAllEconomicEvents([]);
-    setEconomicEventsError(null);
-
-    // Re-fetch events if section is expanded
-    if (showEconomicEvents) {
-      fetchEconomicEvents();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trade.id, tradeDateString, trade.session]);
-
-  // Clear game plan when trade changes
-  useEffect(() => {
-    setGamePlanNotes([]);
-    setGamePlanViewNote(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trade.id, tradeDateString]);
-
-  // Subscribe to economic events updates only if trade date is today
-  // No point subscribing to past events as they don't change
-  const tradeDate = typeof trade.trade_date === 'string' ? parseISO(trade.trade_date) : trade.trade_date;
-  const tradeDateIsToday = isToday(tradeDate);
-  const tradeDateStr = format(tradeDate, 'yyyy-MM-dd');
-
-  const { createChannel } = useRealtimeSubscription({
-    channelName: `trade-economic-events-${trade.id}`,
-    enabled: showEconomicEvents && tradeDateIsToday,
-    onChannelCreated: (channel) => {
-      // Configure the channel before it subscribes
-      channel.on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'economic_events'
-        },
-        async (payload) => {
-          logger.log(`🔄 Economic event ${payload.eventType} for trade date ${tradeDateStr}`);
-
-          // Refetch events for the trade date
-          try {
-
-            const updatedEvents = await economicCalendarService.fetchEvents({
-              start: tradeDateStr,
-              end: tradeDateStr
-            }, {
-              currencies: (filterSetting?.currencies as Currency[]),
-              impacts: (filterSetting?.impacts as ImpactLevel[]),
-              limit: 100  // Reasonable limit for single day
-            });
-            setAllEconomicEvents(updatedEvents.sort((a, b) =>
-              new Date(a.time_utc).getTime() - new Date(b.time_utc).getTime()
-            ));
-          } catch (error) {
-            logger.error('Error refetching economic events:', error);
-          }
-        }
-      );
-    },
-    onSubscribed: () => {
-      logger.log(`✅ Subscribed to economic events for trade ${trade.id} (${tradeDateStr})`);
-    },
-    onError: (error) => {
-      logger.error(`❌ Economic events subscription error:`, error);
-    },
-  });
-
-   
-
-  useEffect(() => {
-    if (!showEconomicEvents || !tradeDateIsToday) return;
-
-    // Create and subscribe to the channel
-    // The channel is configured via onChannelCreated callback before subscribing
-    createChannel();
-
-    // Cleanup handled automatically by the hook
-  }, [showEconomicEvents, tradeDateIsToday, createChannel, trade.id, tradeDateStr]);
-
-  // Update filtering logic
-  useEffect(() => {
-    setEconomicEvents(
-      allEconomicEvents.filter(event =>
-        selectedImpacts.includes(event.impact) &&
-        event.event_name.toLowerCase().includes(eventNameSearch.toLowerCase())
-      )
-    );
-  }, [eventNameSearch, allEconomicEvents, selectedImpacts]);
 
   if (!isExpanded) return null;
 
@@ -695,32 +367,6 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                 }}>
                   Properties
                 </Typography>
-                {(calendarId || trade.calendar_id) && (
-                  <Button
-                    size="small"
-                    startIcon={loadingGamePlan
-                      ? <CircularProgress size={14} color="inherit" />
-                      : <GamePlanIcon sx={{ fontSize: 16 }} />}
-                    onClick={handleOpenGamePlan}
-                    disabled={loadingGamePlan}
-                    sx={{
-                      color: 'text.secondary',
-                      textTransform: 'none',
-                      fontSize: '0.8rem',
-                      minWidth: 'auto',
-                      px: 1,
-                      py: 0.25,
-                      '&:hover': {
-                        backgroundColor: alpha(
-                          theme.palette.primary.main, 0.1
-                        ),
-                        color: 'primary.main'
-                      }
-                    }}
-                  >
-                    Game Plan
-                  </Button>
-                )}
                 {showAIButton && onOpenAIChat && (
                   <Button
                     size="small"
@@ -1274,245 +920,6 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                     />
                   </Box>
                 </Box>
-
-                {/* Economic Events Section */}
-                <Box>
-                  <Box sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    mb: 1,
-                    flexWrap: { xs: 'wrap', sm: 'nowrap' }, // Allow wrapping on mobile
-                    gap: { xs: 1, sm: 0 }
-                  }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flex: 1, minWidth: 0 }}>
-                      <EconomicIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-                      <Typography variant="subtitle2" color="text.primary" sx={{
-                        fontWeight: 600,
-                        fontSize: { xs: '0.8rem', sm: '0.9rem' }, // Smaller on mobile
-                        wordBreak: 'break-word',
-                        overflowWrap: 'break-word'
-                      }}>
-                        Economic Events ({format(typeof trade.trade_date === 'string' ? parseISO(trade.trade_date) : trade.trade_date, 'MMM d, yyyy')})
-                      </Typography>
-                    </Box>
-                    <Tooltip
-                      title={showEconomicEvents ? "Hide economic events" : "Show economic events"}
-                      slotProps={{ popper: { sx: { zIndex: Z_INDEX.TOOLTIP } } }}
-                    >
-                      <IconButton
-                        size="small"
-                        onClick={handleToggleEconomicEvents}
-                        sx={{
-                          color: 'text.secondary',
-                          flexShrink: 0, // Prevent button from shrinking
-                          '&:hover': {
-                            backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                            color: 'primary.main'
-                          }
-                        }}
-                      >
-                        {showEconomicEvents ? <ExpandLessIcon sx={{ fontSize: 18 }} /> : <ExpandMoreIcon sx={{ fontSize: 18 }} />}
-                      </IconButton>
-                    </Tooltip>
-                  </Box>
-
-                  <Collapse in={showEconomicEvents}>
-                    <Box sx={{
-                      borderRadius: 1,
-                      backgroundColor: theme.palette.background.paper,
-                      border: `1px solid ${alpha(theme.palette.divider, 0.2)}`
-                    }}>
-                      {loadingEconomicEvents ? (
-                        <Box sx={{ p: 3, textAlign: 'center' }}>
-                          <CircularProgress size={32} sx={{ mb: 2, color: 'primary.main' }} />
-                          <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
-                            Loading economic events...
-                          </Typography>
-                        </Box>
-                      ) : economicEventsError ? (
-                        <Box sx={{ p: 3, textAlign: 'center' }}>
-                          <Typography variant="body2" color="error.main" sx={{ mb: 2, fontWeight: 500 }}>
-                            {economicEventsError}
-                          </Typography>
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            onClick={fetchEconomicEvents}
-                            sx={{
-                              fontSize: '0.8rem',
-                              borderRadius: 2,
-                              textTransform: 'none',
-                              fontWeight: 600
-                            }}
-                          >
-                            Retry
-                          </Button>
-                        </Box>
-                      ) : (
-                        <>
-                          {/* Impact filter UI above the search bar */}
-                          {allEconomicEvents.length > 0 && (
-                            <Box sx={{
-                              p: { xs: 1, sm: 2.5 }, // Reduced padding on mobile
-                              borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                              backgroundColor: alpha(theme.palette.background.default, 0.3)
-                            }}>
-                              <Box
-                                sx={{
-                                  display: 'flex',
-                                  flexDirection: 'column', // Always stack vertically for better mobile experience
-                                  gap: { xs: 1, sm: 1.5 },
-                                  mb: { xs: 1, sm: 1.5 }
-                                }}
-                              >
-                                {/* Event Name Search Bar */}
-                                <TextField
-                                  variant="outlined"
-                                  size="small"
-                                  label="Search events"
-                                  placeholder="Type to search by event name"
-                                  value={eventNameSearch || ''}
-                                  onChange={e => setEventNameSearch(e.target.value)}
-                                  sx={{
-                                    width: '100%', // Full width on all screen sizes
-                                    '& .MuiInputBase-input': {
-                                      fontSize: { xs: '0.875rem', sm: '1rem' } // Smaller text on mobile
-                                    }
-                                  }}
-                                />
-
-                                {/* Impact Filter Section */}
-                                <Box sx={{
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  gap: 1
-                                }}>
-                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    <FilterIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-                                    <Typography variant="caption" color="text.secondary" sx={{
-                                      fontWeight: 600,
-                                      fontSize: { xs: '0.75rem', sm: '0.8rem' }
-                                    }}>
-                                      Filter by Impact:
-                                    </Typography>
-                                  </Box>
-                                  <Box sx={{
-                                    display: 'flex',
-                                    flexWrap: 'wrap',
-                                    gap: { xs: 0.5, sm: 0.75 },
-                                    justifyContent: { xs: 'flex-start', sm: 'flex-start' }
-                                  }}>
-                                    {(filterSetting.impacts).map((impact: ImpactLevel) => (
-                                      <Chip
-                                        key={impact}
-                                        label={impact}
-                                        size="small"
-                                        variant={selectedImpacts.includes(impact) ? "filled" : "outlined"}
-                                        onClick={() => {
-                                          const newImpacts = selectedImpacts.includes(impact)
-                                            ? selectedImpacts.filter(i => i !== impact)
-                                            : [...selectedImpacts, impact];
-                                          setSelectedImpacts(newImpacts);
-                                        }}
-                                        sx={{
-                                          fontSize: { xs: '0.65rem', sm: '0.75rem' }, // Smaller on mobile
-                                          height: { xs: 22, sm: 28 }, // Smaller height on mobile
-                                          fontWeight: 600,
-                                          borderRadius: 1.5,
-                                          backgroundColor: selectedImpacts.includes(impact)
-                                            ? getImpactColor(impact, theme)
-                                            : 'transparent',
-                                          color: selectedImpacts.includes(impact) ? 'white' : getImpactColor(impact, theme),
-                                          borderColor: getImpactColor(impact, theme),
-                                          borderWidth: selectedImpacts.includes(impact) ? 0 : 1.5,
-                                          '&:hover': {
-                                            backgroundColor: selectedImpacts.includes(impact)
-                                              ? alpha(getImpactColor(impact, theme), 0.8)
-                                              : alpha(getImpactColor(impact, theme), 0.08),
-                                            transform: 'translateY(-1px)',
-                                            transition: 'all 0.2s ease-in-out'
-                                          },
-                                          '& .MuiChip-label': {
-                                            px: { xs: 0.8, sm: 1.2 }, // Reduced padding on mobile
-                                            py: 0.4
-                                          }
-                                        }}
-                                      />
-                                    ))}
-                                  </Box>
-                                </Box>
-                              </Box>
-                              <Typography variant="caption" color="text.secondary" sx={{
-                                mt: 1,
-                                display: 'block',
-                                fontSize: { xs: '0.7rem', sm: '0.75rem' } // Smaller on mobile
-                              }}>
-                                Showing {formatCount(economicEvents.length)} of {formatCount(allEconomicEvents.length)} events
-                              </Typography>
-                            </Box>
-                          )}
-
-
-
-                          {/* Events List */}
-                          {economicEvents.length === 0 ? (
-                            <Box sx={{ p: 4, textAlign: 'center' }}>
-                              <EconomicIcon sx={{
-                                fontSize: 48,
-                                color: 'text.disabled',
-                                mb: 2,
-                                opacity: 0.5
-                              }} />
-                              <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
-                                {allEconomicEvents.length === 0
-                                  ? 'No economic events found for this date'
-                                  : 'No events match the selected impact filters'
-                                }
-                              </Typography>
-                              {allEconomicEvents.length > 0 && (
-                                <Typography variant="caption" color="text.disabled" sx={{ mt: 1, display: 'block' }}>
-                                  Try adjusting your impact filters above
-                                </Typography>
-                              )}
-                            </Box>
-                          ) : (
-                            <Box sx={{ p: 0 }}>
-                              {economicEvents.map((event, index) => (
-                                <React.Fragment key={`${event.id}-${event.time_utc}-${index}`}>
-                                  <Box sx={{
-                                    px: { xs: 1.5, sm: 2.5 }, // Reduced padding on mobile
-                                    py: { xs: 1, sm: 1.5 }, // Reduced padding on mobile
-                                    '&:hover': {
-                                      backgroundColor: alpha(theme.palette.action.hover, 0.04)
-                                    },
-                                    transition: 'background-color 0.2s ease-in-out'
-                                  }}>
-                                    <EconomicEventListItem
-                                      px={0}
-                                      py={0}
-                                      event={event}
-                                      pinnedEvents={userPinnedEvents}
-                                      onPinEvent={handlePinEvent}
-                                      onUnpinEvent={handleUnpinEvent}
-                                      isPinning={pinningEventId === event.id}
-                                    />
-                                  </Box>
-                                  {index < economicEvents.length - 1 && (
-                                    <Divider sx={{
-                                      mx: { xs: 1.5, sm: 2.5 }, // Reduced margin on mobile
-                                      borderColor: alpha(theme.palette.divider, 0.1)
-                                    }} />
-                                  )}
-                                </React.Fragment>
-                              ))}
-                            </Box>
-                          )}
-                        </>
-                      )}
-                    </Box>
-                  </Collapse>
-                </Box>
               </Stack>
             </Box>
           </Stack>
@@ -1527,18 +934,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
     </AnimatedDropdown>
   ) : buildContent();
 
-  return (
-    <>
-      {content}
-      {!onOpenNote && (
-        <NoteViewerDialog
-          open={!!gamePlanViewNote}
-          onClose={() => setGamePlanViewNote(null)}
-          note={gamePlanViewNote}
-        />
-      )}
-    </>
-  );
+  return content;
 };
 
 export default TradeDetailExpanded;
