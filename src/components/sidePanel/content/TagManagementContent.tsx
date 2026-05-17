@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Box,
   Typography,
@@ -71,8 +71,46 @@ export interface TagManagementContentProps {
 }
 
 /**
+ * Eases a number from its previous value to `target` over `durationMs` using
+ * ease-out-cubic. Starts from 0 on mount so the donut sweeps in when the
+ * panel opens; subsequent target changes (e.g. user defines a tag mid-view)
+ * tween smoothly from the current displayed value.
+ */
+const useAnimatedNumber = (target: number, durationMs = 750): number => {
+  const [value, setValue] = useState(0);
+  const fromRef = useRef(0);
+  const rafRef = useRef<number | null>(null);
+  const startRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    fromRef.current = value;
+    startRef.current = null;
+    const tick = (ts: number) => {
+      if (startRef.current === null) startRef.current = ts;
+      const elapsed = ts - startRef.current;
+      const t = Math.min(1, elapsed / durationMs);
+      const eased = 1 - Math.pow(1 - t, 3);
+      setValue(fromRef.current + (target - fromRef.current) * eased);
+      if (t < 1) rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    };
+    // We intentionally only re-run on target change. Including `value` would
+    // create a render loop since the effect itself drives value.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [target, durationMs]);
+
+  return value;
+};
+
+/**
  * Compact coverage donut — SVG, 1-stroke arc, percentage in center.
  * Used by the coverage card and the "all tags" KPI strip.
+ *
+ * Sweeps from 0 to its target on mount (panel open) and smoothly tweens on
+ * subsequent ratio changes.
  */
 const CoverageDonut: React.FC<{
   ratio: number;
@@ -83,8 +121,10 @@ const CoverageDonut: React.FC<{
   const theme = useTheme();
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
-  const filled = Math.max(0, Math.min(1, ratio)) * c;
-  const percent = Math.round(Math.max(0, Math.min(1, ratio)) * 100);
+  const clamped = Math.max(0, Math.min(1, ratio));
+  const animated = useAnimatedNumber(clamped);
+  const filled = animated * c;
+  const percent = Math.round(animated * 100);
   return (
     <Box sx={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
