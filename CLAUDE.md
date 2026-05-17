@@ -195,6 +195,44 @@ This project uses specialized AI subagents for specific domains. Claude Code sho
 - Calendar statistics recalculation on trade changes
 - Background processing with user feedback
 
+## Deferred Architecture Work
+
+Designs that are frozen but intentionally NOT implemented yet. Each has a trigger
+condition documented in its planning doc — do not start implementation without
+re-reading the doc and confirming the trigger has hit.
+
+### Catalyst Extraction Refactor (Orion market_research)
+
+**Doc:** `.planning/architecture/catalyst-extraction-refactor.md`
+**Designed:** 2026-05-17 (4-agent brainstorm + 15-item red-team review)
+**Trigger to revisit:** whichever first —
+- 1 month before public launch (current target: ~2026-10)
+- User count crosses 5
+- Adding a second LLM-heavy scheduled task type at scale
+- Gemini pricing changes >25% in either direction
+
+**What it does:** splits the per-user Gemini briefing call into (1) shared
+catalyst extraction stored in `extracted_catalysts` table, (2) per-user
+SQL-based delivery against `catalyst_exposures` junction. Cuts Gemini cost
+from O(users) to O(unique news bundles per hour). Crossover at ~2-3 users;
+99%+ reduction at 1000 users. Lossless dedup via SQL set difference.
+
+**Why deferred:** at 1 user the refactor is slightly MORE expensive (explicit
+cache storage fee). No code rot risk from waiting. Gemini API surface evolves
+fast — building against current docs is wasted if launch is 6 months out.
+
+**Already shipped (prerequisites complete, do NOT re-litigate):**
+- `public.macro_query_catalog` table — canonical macro queries shared cross-user
+- Cache TTL 1h aligned with hourly cron
+- Drain-one-at-a-time API key pool
+- Instrument-query caching via `searchNewsMultipleCached`
+- Hourly-only cron cadence (sub-hourly removed)
+
+When triggered, the doc contains: full DDL, prompt engineering notes, phased
+implementation plan (~1-2 weeks), and the 10 critical red-team fixes that must
+not be skipped (cosine threshold + numeric guard, fingerprint title drift,
+explicit-vs-implicit caching, currency canonicalization, etc.).
+
 ## Development Guidelines
 
 ### Code Style and Conventions
