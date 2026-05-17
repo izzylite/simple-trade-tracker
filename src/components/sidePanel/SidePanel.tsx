@@ -10,9 +10,13 @@ interface ViewConfig {
   component: React.ReactNode;
   /** Content rendered between header and main content (e.g. sticky reminders) */
   stickyContent?: React.ReactNode;
+  /** When true, suppress the back-arrow even if the nav stack has history. */
+  hideBack?: boolean;
 }
 
-const PANEL_WIDTH = 'clamp(360px, 36vw, 580px)';
+// Matches the <lg drawer width (450px) so the panel feels the same on
+// either side of the breakpoint. Floor at 340px for narrow lg viewports.
+const PANEL_WIDTH = 'clamp(340px, 28vw, 450px)';
 
 interface SidePanelProps {
   /**
@@ -57,6 +61,7 @@ const SidePanel: React.FC<SidePanelProps> = ({ renderView }) => {
           <SidePanelHeader
             title={viewConfig.title}
             icon={viewConfig.icon}
+            hideBack={viewConfig.hideBack}
           />
 
           {viewConfig.stickyContent}

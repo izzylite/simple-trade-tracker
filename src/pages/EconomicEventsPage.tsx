@@ -413,6 +413,9 @@ const EconomicEventsPageInner: React.FC = () => {
           return {
             title: 'Event details',
             icon: <EventsIcon fontSize="small" />,
+            // The X close button + the events list on the left handle
+            // navigation back; the stack back-arrow would be visual noise.
+            hideBack: true,
             component: (
               <EconomicEventDetailPanel
                 event={v.event}
@@ -426,6 +429,7 @@ const EconomicEventsPageInner: React.FC = () => {
           return {
             title: `Pinned events · ${userPins.length}`,
             icon: <PinIcon fontSize="small" />,
+            hideBack: true,
             component: (
               <AllPinnedEventsContent
                 pins={userPins}
@@ -441,6 +445,7 @@ const EconomicEventsPageInner: React.FC = () => {
           return {
             title: 'Gameplan',
             icon: <NotesIcon fontSize="small" />,
+            hideBack: true,
             component: (
               <NotesContent
                 isActive={isPanelOpen && currentView.id === 'notes'}
@@ -454,6 +459,7 @@ const EconomicEventsPageInner: React.FC = () => {
           return {
             title: 'Events',
             icon: <EventsIcon fontSize="small" />,
+            hideBack: true,
             component: (
               <Box
                 sx={{

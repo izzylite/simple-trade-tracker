@@ -10,11 +10,14 @@ import { useSidePanel } from '../../contexts/SidePanelContext';
 interface SidePanelHeaderProps {
   title: string;
   icon?: React.ReactNode;
+  /** When true, suppress the back-arrow even if the nav stack has history. */
+  hideBack?: boolean;
 }
 
-const SidePanelHeader: React.FC<SidePanelHeaderProps> = ({ title, icon }) => {
+const SidePanelHeader: React.FC<SidePanelHeaderProps> = ({ title, icon, hideBack }) => {
   const theme = useTheme();
   const { canGoBack, popPanel, setOpen } = useSidePanel();
+  const showBack = canGoBack && !hideBack;
 
   return (
     <Box
@@ -32,7 +35,7 @@ const SidePanelHeader: React.FC<SidePanelHeaderProps> = ({ title, icon }) => {
         flexShrink: 0,
       }}
     >
-      {canGoBack && (
+      {showBack && (
         <IconButton
           onClick={popPanel}
           size="small"

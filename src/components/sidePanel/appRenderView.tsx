@@ -10,6 +10,8 @@ export interface SidePanelViewConfig {
   icon?: React.ReactNode;
   component: React.ReactNode;
   stickyContent?: React.ReactNode;
+  /** When true, suppress the back-arrow even if the nav stack has history. */
+  hideBack?: boolean;
 }
 
 /**

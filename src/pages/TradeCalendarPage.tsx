@@ -1379,6 +1379,9 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
             weeklyStatsMap.get(wKey)?.weekTrades;
           return {
             title: format(dayView.date, 'MMM d, yyyy'),
+            // Day panel uses its own internal prev/next-day navigation +
+            // close, so the header's stack back-arrow is redundant.
+            hideBack: true,
             component: (
               <DayTradesContent
                 date={dayView.date}
