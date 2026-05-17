@@ -1,9 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   Button,
   FormControl,
   InputLabel,
@@ -15,6 +11,7 @@ import {
   TextField,
   IconButton,
   Autocomplete,
+  CircularProgress,
   useTheme,
   alpha,
 } from '@mui/material';
@@ -26,6 +23,9 @@ import {
   CalendarMonth as MonthlyRollupIcon,
   CheckCircleOutline as CheckIcon,
   Add as AddIcon,
+  AutoAwesome as AIIcon,
+  AddTask as AddTaskIcon,
+  Edit as EditIcon,
 } from '@mui/icons-material';
 import type {
   TaskType,
@@ -44,6 +44,10 @@ import {
   getTemplate,
   FOREX_MACRO_TEMPLATE,
 } from '../../config/researchTemplates';
+import BaseDialog from '../common/BaseDialog';
+import { Z_INDEX } from '../../styles/zIndex';
+
+const MONO_FONT = "'JetBrains Mono', ui-monospace, monospace";
 
 // Backfill template fields on legacy task configs saved before templates
 // existed. Returns a fully-populated MarketResearchConfig so the form never
@@ -202,29 +206,6 @@ const TONE_LABELS: Record<CoachingTone, string> = {
   supportive_mentor: 'Supportive Mentor',
 };
 
-interface CoachingToneSelectProps {
-  value: CoachingTone | undefined;
-  onChange: (tone: CoachingTone) => void;
-}
-
-const CoachingToneSelect: React.FC<CoachingToneSelectProps> = ({ value, onChange }) => (
-  <FormControl fullWidth>
-    <InputLabel>Coaching Tone</InputLabel>
-    <Select
-      value={value ?? 'tough_love'}
-      label="Coaching Tone"
-      onChange={(e) => onChange(e.target.value as CoachingTone)}
-      MenuProps={{ sx: { zIndex: 1600 } }}
-    >
-      {(Object.keys(TONE_LABELS) as CoachingTone[]).map((t) => (
-        <MenuItem key={t} value={t}>
-          {TONE_LABELS[t]}
-        </MenuItem>
-      ))}
-    </Select>
-  </FormControl>
-);
-
 const MARKET_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'forex', label: 'Forex' },
   { value: 'stocks', label: 'Stocks' },
@@ -358,295 +339,6 @@ interface MarketResearchFormProps {
   setMacroQueryInput: (v: string) => void;
 }
 
-const MarketResearchForm: React.FC<MarketResearchFormProps> = ({
-  config,
-  setConfig,
-  macroQueryInput,
-  setMacroQueryInput,
-}) => {
-  const toggleArrayItem = <T extends string>(arr: T[], item: T): T[] =>
-    arr.includes(item) ? arr.filter((v) => v !== item) : [...arr, item];
-
-  const handleTemplateChange = (templateId: string) => {
-    const template = getTemplate(templateId);
-    if (!template) return;
-    // Overwrite the macro-query snapshot with the chosen template. Preserve
-    // markets/frequency/threshold/watchlist — those are orthogonal to the
-    // preset queries.
-    setConfig({
-      ...config,
-      template_id: template.id,
-      macro_queries: template.macro_queries.slice(0, MAX_MACRO_QUERIES),
-    });
-  };
-
-  const addMacroQuery = () => {
-    const trimmed = macroQueryInput.trim();
-    if (!trimmed || config.macro_queries.includes(trimmed)) return;
-    if (config.macro_queries.length >= MAX_MACRO_QUERIES) return;
-    setConfig({
-      ...config,
-      macro_queries: [...config.macro_queries, trimmed],
-      template_id: CUSTOM_TEMPLATE_ID,
-    });
-    setMacroQueryInput('');
-  };
-
-  const removeMacroQuery = (q: string) => {
-    setConfig({
-      ...config,
-      macro_queries: config.macro_queries.filter((x) => x !== q),
-      template_id: CUSTOM_TEMPLATE_ID,
-    });
-  };
-
-  const updateWatchlistSymbols = (symbols: string[]) => {
-    setConfig({
-      ...config,
-      watchlist_symbols: symbols,
-    });
-  };
-
-  // If the stored template_id is something we don't recognize (custom or
-  // legacy), show it as "Custom" in the picker rather than leaving the
-  // Select empty.
-  const templateValue = RESEARCH_TEMPLATES.some((t) => t.id === config.template_id)
-    ? config.template_id
-    : CUSTOM_TEMPLATE_ID;
-
-  const watchlistEmpty = (config.watchlist_symbols ?? []).length === 0;
-
-  return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <FormControl size="small" fullWidth>
-        <InputLabel>Template</InputLabel>
-        <Select
-          value={templateValue}
-          label="Template"
-          onChange={(e) => handleTemplateChange(e.target.value as string)}
-          MenuProps={{ sx: { zIndex: 1600 } }}
-          renderValue={(val) => {
-            const label =
-              val === CUSTOM_TEMPLATE_ID
-                ? 'Custom (edited)'
-                : getTemplate(val as string)?.name ?? (val as string);
-            return (
-              <Typography
-                variant="body2"
-                sx={{ fontWeight: 600, color: 'text.primary' }}
-              >
-                {label}
-              </Typography>
-            );
-          }}
-        >
-          {RESEARCH_TEMPLATES.map((t) => (
-            <MenuItem key={t.id} value={t.id}>
-              <Box>
-                <Typography
-                  variant="body2"
-                  sx={{ fontWeight: 600, color: 'text.primary' }}
-                >
-                  {t.name}
-                </Typography>
-                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                  {t.description}
-                </Typography>
-              </Box>
-            </MenuItem>
-          ))}
-        </Select>
-      </FormControl>
-
-      <Box sx={{ display: 'flex', gap: 1.5 }}>
-        <FormControl size="small" sx={{ flex: 1 }}>
-          <InputLabel>Check every</InputLabel>
-          <Select
-            value={config.frequency_minutes}
-            label="Check every"
-            onChange={(e) =>
-              setConfig({
-                ...config,
-                frequency_minutes: e.target.value as 15 | 30 | 60,
-              })
-            }
-            MenuProps={{ sx: { zIndex: 1600 } }}
-          >
-            <MenuItem value={15}>15 min</MenuItem>
-            <MenuItem value={30}>30 min</MenuItem>
-            <MenuItem value={60}>1 hour</MenuItem>
-          </Select>
-        </FormControl>
-
-        <FormControl size="small" sx={{ flex: 1 }}>
-          <InputLabel>Alert on</InputLabel>
-          <Select
-            value={config.min_significance}
-            label="Alert on"
-            onChange={(e) =>
-              setConfig({
-                ...config,
-                min_significance: e.target.value as 'medium' | 'high',
-              })
-            }
-            MenuProps={{ sx: { zIndex: 1600 } }}
-          >
-            <MenuItem value="medium">Medium &amp; high</MenuItem>
-            <MenuItem value="high">High only</MenuItem>
-          </Select>
-        </FormControl>
-      </Box>
-
-      <Box>
-        <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
-          Markets
-        </Typography>
-        <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-          {MARKET_OPTIONS.map((m) => (
-            <Chip
-              key={m.value}
-              label={m.label}
-              size="small"
-              onClick={() =>
-                setConfig({
-                  ...config,
-                  markets: toggleArrayItem(config.markets, m.value),
-                })
-              }
-              color={config.markets.includes(m.value) ? 'primary' : 'default'}
-              variant={config.markets.includes(m.value) ? 'filled' : 'outlined'}
-            />
-          ))}
-        </Box>
-      </Box>
-
-      <Box>
-        <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
-          Watchlist symbols <Box component="span" sx={{ color: 'error.main' }}>*</Box>
-        </Typography>
-        <Typography
-          variant="caption"
-          sx={{
-            display: 'block',
-            color: 'text.secondary',
-            mb: 1,
-            fontSize: '0.72rem',
-          }}
-        >
-          Pick the instruments you're watching. Drives live price grounding, per‑instrument news queries, and economic‑event currency filtering. Capped at ~12 total.
-        </Typography>
-        <Autocomplete<YahooSymbolOption, true>
-          multiple
-          size="small"
-          options={YAHOO_SYMBOL_CATALOG}
-          groupBy={(opt) => opt.group}
-          getOptionLabel={(opt) => `${opt.label} (${opt.symbol})`}
-          isOptionEqualToValue={(a, b) => a.symbol === b.symbol}
-          value={YAHOO_SYMBOL_CATALOG.filter((opt) =>
-            (config.watchlist_symbols ?? []).includes(opt.symbol)
-          )}
-          onChange={(_, newValue) =>
-            updateWatchlistSymbols(newValue.map((v) => v.symbol))
-          }
-          // The enclosing Dialog sets z-index 1500; default Popper lands behind it.
-          slotProps={{ popper: { sx: { zIndex: 1600 } } }}
-          renderOption={(props, opt) => (
-            <li {...props} key={opt.symbol}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                <span>{opt.label}</span>
-                <Typography
-                  component="span"
-                  variant="caption"
-                  sx={{ color: 'text.secondary', fontFamily: 'monospace' }}
-                >
-                  {opt.symbol}
-                </Typography>
-              </Box>
-            </li>
-          )}
-          renderInput={(params) => (
-            <TextField
-              {...params}
-              placeholder="Search instruments…"
-              error={watchlistEmpty}
-              helperText={watchlistEmpty ? 'Pick at least one instrument.' : undefined}
-            />
-          )}
-        />
-      </Box>
-
-      <Box>
-        <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
-          Macro Queries{' '}
-          <Typography
-            component="span"
-            variant="caption"
-            sx={{ color: 'text.secondary', fontWeight: 400 }}
-          >
-            ({config.macro_queries.length}/{MAX_MACRO_QUERIES})
-          </Typography>
-        </Typography>
-        <Typography
-          variant="caption"
-          sx={{
-            display: 'block',
-            color: 'text.secondary',
-            mb: 1,
-            fontSize: '0.72rem',
-          }}
-        >
-          Baseline queries Orion runs every sweep. Edit to tailor to your market — e.g. add "$TSLA earnings" or "BTC ETF flows". Up to {MAX_MACRO_QUERIES} queries.
-        </Typography>
-        <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
-          <TextField
-            size="small"
-            placeholder={
-              config.macro_queries.length >= MAX_MACRO_QUERIES
-                ? `Limit reached (${MAX_MACRO_QUERIES})`
-                : 'Add a query…'
-            }
-            value={macroQueryInput}
-            onChange={(e) => setMacroQueryInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                addMacroQuery();
-              }
-            }}
-            disabled={config.macro_queries.length >= MAX_MACRO_QUERIES}
-            fullWidth
-          />
-          <Button
-            variant="outlined"
-            size="small"
-            startIcon={<AddIcon />}
-            disabled={
-              !macroQueryInput.trim() ||
-              config.macro_queries.length >= MAX_MACRO_QUERIES
-            }
-            onClick={addMacroQuery}
-          >
-            Add
-          </Button>
-        </Box>
-        {config.macro_queries.length > 0 && (
-          <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-            {config.macro_queries.map((q) => (
-              <Chip
-                key={q}
-                label={q}
-                size="small"
-                onDelete={() => removeMacroQuery(q)}
-              />
-            ))}
-          </Box>
-        )}
-      </Box>
-
-    </Box>
-  );
-};
-
 const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
   open,
   onClose,
@@ -656,11 +348,99 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
   onSave,
 }) => {
   const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   const isEditMode = !!editingTask;
   const [taskType, setTaskType] = useState<TaskType | ''>('');
   const [config, setConfig] = useState<TaskConfig | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [macroQueryInput, setMacroQueryInput] = useState('');
+
+  // Style tokens — match canonical tag-dialog language.
+  const violet = theme.palette.primary.main;
+  const violetSoft = alpha(violet, isDark ? 0.18 : 0.14);
+  const violetSofter = alpha(violet, isDark ? 0.12 : 0.10);
+  const violetBorder = alpha(violet, isDark ? 0.35 : 0.28);
+  const surfaceInset = isDark ? 'rgba(255,255,255,0.03)' : alpha(theme.palette.text.primary, 0.03);
+  const hairline = isDark ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
+
+  const monoLabelSx = {
+    fontFamily: MONO_FONT,
+    fontSize: '0.68rem',
+    fontWeight: 600,
+    letterSpacing: '0.12em',
+    textTransform: 'uppercase' as const,
+    color: theme.palette.text.secondary,
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 0.75,
+  };
+
+  const optionalSx = {
+    fontFamily: MONO_FONT,
+    fontSize: '0.68rem',
+    fontWeight: 500,
+    letterSpacing: '0.08em',
+    color: alpha(theme.palette.text.secondary, 0.7),
+    textTransform: 'none' as const,
+  };
+
+  const inputSx = {
+    '& .MuiOutlinedInput-root': {
+      borderRadius: 1.5,
+      backgroundColor: surfaceInset,
+      '& fieldset': { borderColor: hairline },
+      '&:hover fieldset': { borderColor: alpha(violet, 0.5) },
+      '&.Mui-focused fieldset': { borderColor: violet, borderWidth: 1 },
+    },
+    '& .MuiOutlinedInput-input, & .MuiSelect-select': {
+      py: 1.1,
+      fontSize: '0.88rem',
+      fontWeight: 500,
+    },
+  };
+
+  const menuPaperSx = {
+    borderRadius: 1.5,
+    border: `1px solid ${hairline}`,
+    boxShadow: theme.shadows[8],
+    backgroundImage: 'none',
+    mt: 0.5,
+  };
+
+  const menuItemSx = {
+    fontSize: '0.88rem',
+    fontWeight: 500,
+    borderRadius: 1,
+    mx: 0.5,
+    my: 0.25,
+    '&.Mui-selected': {
+      backgroundColor: violetSoft,
+      color: violet,
+      '&:hover': { backgroundColor: violetSoft },
+    },
+  };
+
+  const chipBaseSx = (selected: boolean) => ({
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 0.75,
+    px: 1.25,
+    py: 0.5,
+    borderRadius: 999,
+    cursor: 'pointer',
+    fontSize: '0.8rem',
+    fontWeight: 600,
+    userSelect: 'none' as const,
+    transition: 'all 120ms ease',
+    backgroundColor: selected ? violetSoft : surfaceInset,
+    color: selected ? violet : theme.palette.text.primary,
+    border: `1px solid ${selected ? violetBorder : hairline}`,
+    '&:hover': {
+      backgroundColor: selected
+        ? violetSoft
+        : alpha(theme.palette.text.primary, isDark ? 0.06 : 0.05),
+    },
+  });
 
   // Detect once per mount — changing TZ mid-dialog is unexpected.
   const browserTimezone = React.useMemo(() => detectBrowserTimezone(), []);
@@ -738,39 +518,131 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
     return !!mr && (mr.watchlist_symbols ?? []).length > 0;
   })();
 
+  // Header title node — includes a back affordance during create-mode step 2.
+  const title = isEditMode && taskType && selectedInfo
+    ? `Edit ${TASK_TYPE_LABELS[taskType]}`
+    : taskType && selectedInfo
+      ? TASK_TYPE_LABELS[taskType]
+      : 'New Orion task';
+
+  const subtitle = isEditMode
+    ? 'Update schedule and parameters for this task'
+    : taskType && selectedInfo
+      ? selectedInfo.summary
+      : 'Schedule Orion to run analysis on autopilot';
+
+  const titleNode = (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+      {taskType && !isEditMode && (
+        <IconButton
+          size="small"
+          onClick={handleBack}
+          sx={{
+            color: theme.palette.text.secondary,
+            border: `1px solid ${hairline}`,
+            borderRadius: 1,
+            width: 22,
+            height: 22,
+            mr: 0.25,
+            '&:hover': {
+              backgroundColor: alpha(theme.palette.text.primary, isDark ? 0.06 : 0.04),
+            },
+          }}
+        >
+          <ArrowBackIcon sx={{ fontSize: 14 }} />
+        </IconButton>
+      )}
+      <Typography sx={{ fontWeight: 700, fontSize: '0.95rem', lineHeight: 1.2 }}>
+        {title}
+      </Typography>
+    </Box>
+  );
+
+  const headerIcon = isEditMode
+    ? <EditIcon sx={{ fontSize: 18 }} />
+    : taskType
+      ? <AIIcon sx={{ fontSize: 18 }} />
+      : <AddTaskIcon sx={{ fontSize: 18 }} />;
+
+  const primaryLabel = submitting
+    ? (isEditMode ? 'Saving…' : 'Creating…')
+    : (isEditMode ? 'Save changes' : 'Create task');
+
+  const primaryButton = taskType ? (
+    <Button
+      onClick={handleSubmit}
+      disabled={!config || submitting || !canSubmit}
+      variant="contained"
+      endIcon={
+        submitting ? (
+          <CircularProgress size={14} thickness={5} sx={{ color: 'inherit' }} />
+        ) : undefined
+      }
+      sx={{
+        textTransform: 'none',
+        fontWeight: 600,
+        fontSize: '0.85rem',
+        backgroundColor: violet,
+        color: '#fff',
+        borderRadius: 1.25,
+        px: 1.75,
+        py: 0.75,
+        boxShadow: 'none',
+        '&:hover': {
+          backgroundColor: theme.palette.primary.dark,
+          boxShadow: 'none',
+        },
+        '&.Mui-disabled': {
+          backgroundColor: alpha(violet, 0.35),
+          color: alpha('#fff', 0.7),
+        },
+      }}
+    >
+      {primaryLabel}
+    </Button>
+  ) : null;
+
   return (
-    <Dialog
+    <BaseDialog
       open={open}
       onClose={handleClose}
+      title={titleNode}
+      subtitle={subtitle}
+      headerIcon={headerIcon}
       maxWidth="sm"
       fullWidth
-      sx={{ zIndex: 1500 }}
-      PaperProps={{ sx: { borderRadius: '12px' } }}
+      sx={{ zIndex: Z_INDEX.DIALOG }}
+      contentSx={{ maxHeight: '70vh' }}
+      actions={primaryButton}
+      hideFooterCancelButton={false}
     >
-      <DialogTitle sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
-        {taskType && !isEditMode && (
-          <IconButton size="small" onClick={handleBack} sx={{ mr: 0.5 }}>
-            <ArrowBackIcon fontSize="small" />
-          </IconButton>
-        )}
-        {isEditMode && taskType && selectedInfo
-          ? `Edit ${TASK_TYPE_LABELS[taskType]}`
-          : taskType && selectedInfo
-            ? TASK_TYPE_LABELS[taskType]
-            : 'Create Task'}
-      </DialogTitle>
-
-      <DialogContent>
-        {!taskType && (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25, mt: 0.5 }}>
-            <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1 }}>
-              Pick a task type. Orion will run it on schedule and post results here.
+      {!taskType && (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.25 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+            <Typography sx={monoLabelSx}>Pick a task type</Typography>
+            <Typography sx={{ fontSize: '0.82rem', color: theme.palette.text.secondary, lineHeight: 1.5 }}>
+              Orion will run it on schedule and post results directly into your assistant feed.
             </Typography>
-            {availableTypes.length === 0 && (
-              <Typography variant="body2" sx={{ color: 'text.secondary', textAlign: 'center', py: 3 }}>
+          </Box>
+
+          {availableTypes.length === 0 && (
+            <Box
+              sx={{
+                px: 2,
+                py: 3,
+                borderRadius: 1.5,
+                border: `1px dashed ${hairline}`,
+                backgroundColor: surfaceInset,
+                textAlign: 'center',
+              }}
+            >
+              <Typography sx={{ fontSize: '0.85rem', color: theme.palette.text.secondary }}>
                 All task types are already configured.
               </Typography>
-            )}
+            </Box>
+          )}
+
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             {availableTypes.map((type) => {
               const info = TASK_TYPE_INFO[type];
               const Icon = info.Icon;
@@ -781,38 +653,48 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
                   sx={{
                     display: 'flex',
                     alignItems: 'flex-start',
-                    gap: 1.5,
-                    p: 1.5,
-                    borderRadius: '10px',
-                    border: `1px solid ${theme.palette.divider}`,
+                    gap: 1.25,
+                    px: 1.5,
+                    py: 1.25,
+                    borderRadius: 1.5,
+                    border: `1px solid ${hairline}`,
+                    backgroundColor: surfaceInset,
                     cursor: 'pointer',
-                    transition: 'all 150ms cubic-bezier(0.22, 1, 0.36, 1)',
+                    transition: 'all 150ms ease',
                     '&:hover': {
                       borderColor: alpha(info.iconColor, 0.5),
-                      backgroundColor: alpha(info.iconColor, 0.04),
+                      backgroundColor: alpha(info.iconColor, isDark ? 0.08 : 0.05),
                     },
                   }}
                 >
                   <Box
                     sx={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: '8px',
+                      width: 32,
+                      height: 32,
+                      borderRadius: 1.25,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      backgroundColor: alpha(info.iconColor, 0.12),
+                      backgroundColor: alpha(info.iconColor, isDark ? 0.18 : 0.14),
                       color: info.iconColor,
+                      border: `1px solid ${alpha(info.iconColor, isDark ? 0.35 : 0.28)}`,
                       flexShrink: 0,
                     }}
                   >
-                    <Icon fontSize="small" />
+                    <Icon sx={{ fontSize: 18 }} />
                   </Box>
                   <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: '0.9rem' }}>
+                    <Typography sx={{ fontWeight: 700, fontSize: '0.9rem', lineHeight: 1.3 }}>
                       {TASK_TYPE_LABELS[type]}
                     </Typography>
-                    <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.78rem' }}>
+                    <Typography
+                      sx={{
+                        color: theme.palette.text.secondary,
+                        fontSize: '0.78rem',
+                        lineHeight: 1.4,
+                        mt: 0.25,
+                      }}
+                    >
                       {info.summary}
                     </Typography>
                   </Box>
@@ -820,190 +702,225 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
               );
             })}
           </Box>
-        )}
+        </Box>
+      )}
 
-        {taskType && selectedInfo && config && (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 0.5 }}>
-            {/* Description + Example output */}
-            <Box
-              sx={{
-                p: 1.5,
-                borderRadius: '10px',
-                backgroundColor: alpha(selectedInfo.iconColor, 0.06),
-                border: `1px solid ${alpha(selectedInfo.iconColor, 0.2)}`,
-              }}
-            >
-              <Typography variant="body2" sx={{ mb: 1.5, fontSize: '0.85rem', lineHeight: 1.5 }}>
-                {selectedInfo.description}
-              </Typography>
+      {taskType && selectedInfo && config && (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.25 }}>
+          {/* Description + example output */}
+          <Box
+            sx={{
+              p: 1.5,
+              borderRadius: 1.5,
+              backgroundColor: alpha(selectedInfo.iconColor, isDark ? 0.1 : 0.06),
+              border: `1px solid ${alpha(selectedInfo.iconColor, isDark ? 0.3 : 0.22)}`,
+            }}
+          >
+            <Typography sx={{ mb: 1.5, fontSize: '0.85rem', lineHeight: 1.55 }}>
+              {selectedInfo.description}
+            </Typography>
 
-              <Box
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 0.5,
-                  mb: 0.75,
-                }}
-              >
-                <CheckIcon sx={{ fontSize: 14, color: selectedInfo.iconColor }} />
-                <Typography
-                  variant="caption"
-                  sx={{
-                    fontWeight: 700,
-                    color: selectedInfo.iconColor,
-                    textTransform: 'uppercase',
-                    letterSpacing: 0.5,
-                    fontSize: '0.68rem',
-                  }}
-                >
-                  Example Output
-                </Typography>
-              </Box>
-
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.75 }}>
+              <CheckIcon sx={{ fontSize: 14, color: selectedInfo.iconColor }} />
               <Typography
-                variant="caption"
                 sx={{
-                  display: 'block',
-                  fontWeight: 600,
-                  fontSize: '0.78rem',
-                  mb: 0.5,
+                  ...monoLabelSx,
+                  color: selectedInfo.iconColor,
+                  fontSize: '0.62rem',
                 }}
               >
-                {selectedInfo.exampleTitle}
-              </Typography>
-              <Typography
-                variant="caption"
-                component="pre"
-                sx={{
-                  display: 'block',
-                  fontFamily: 'inherit',
-                  fontSize: '0.75rem',
-                  lineHeight: 1.55,
-                  color: 'text.secondary',
-                  whiteSpace: 'pre-wrap',
-                  m: 0,
-                }}
-              >
-                {selectedInfo.exampleOutput}
+                Example Output
               </Typography>
             </Box>
 
             <Typography
-              variant="caption"
               sx={{
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                letterSpacing: 0.5,
-                fontSize: '0.68rem',
-                color: 'text.secondary',
-                mt: 0.5,
+                display: 'block',
+                fontWeight: 600,
+                fontSize: '0.78rem',
+                mb: 0.5,
               }}
             >
-              Configure
+              {selectedInfo.exampleTitle}
             </Typography>
+            <Typography
+              component="pre"
+              sx={{
+                display: 'block',
+                fontFamily: 'inherit',
+                fontSize: '0.75rem',
+                lineHeight: 1.55,
+                color: theme.palette.text.secondary,
+                whiteSpace: 'pre-wrap',
+                m: 0,
+              }}
+            >
+              {selectedInfo.exampleOutput}
+            </Typography>
+          </Box>
 
-            {taskType === 'market_research' && (
-              <MarketResearchForm
-                config={config as MarketResearchConfig}
-                setConfig={(next) => setConfig(next)}
-                macroQueryInput={macroQueryInput}
-                setMacroQueryInput={setMacroQueryInput}
-              />
-            )}
+          <Typography sx={monoLabelSx}>Configure</Typography>
 
-            {taskType === 'daily_analysis' && (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <Box sx={{ display: 'flex', gap: 1.5 }}>
+          {taskType === 'market_research' && (
+            <MarketResearchForm
+              config={config as MarketResearchConfig}
+              setConfig={(next) => setConfig(next)}
+              macroQueryInput={macroQueryInput}
+              setMacroQueryInput={setMacroQueryInput}
+              monoLabelSx={monoLabelSx}
+              optionalSx={optionalSx}
+              inputSx={inputSx}
+              menuPaperSx={menuPaperSx}
+              menuItemSx={menuItemSx}
+              chipBaseSx={chipBaseSx}
+              violet={violet}
+              violetSoft={violetSoft}
+              violetSofter={violetSofter}
+              violetBorder={violetBorder}
+              hairline={hairline}
+              surfaceInset={surfaceInset}
+            />
+          )}
+
+          {taskType === 'daily_analysis' && (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <Box sx={{ display: 'flex', gap: 1.5 }}>
+                <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                  <Typography sx={monoLabelSx}>Run time</Typography>
                   <TextField
-                    label="Run Time"
                     type="time"
                     value={(config as any).run_time_utc}
                     onChange={(e) =>
                       setConfig({ ...config, run_time_utc: e.target.value })
                     }
-                    sx={{ flex: 1 }}
+                    size="small"
+                    fullWidth
+                    sx={inputSx}
                   />
-                  <FormControl size="small" sx={{ flex: 1.3 }}>
-                    <InputLabel>Timezone</InputLabel>
-                    <Select
-                      value={(config as any).timezone || 'UTC'}
-                      label="Timezone"
-                      onChange={(e) =>
-                        setConfig({ ...config, timezone: e.target.value as string })
-                      }
-                      MenuProps={{ sx: { zIndex: 1600 } }}
-                    >
-                      {timezoneOptions.map((tz) => (
-                        <MenuItem key={tz.value} value={tz.value}>
-                          {tz.label}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
                 </Box>
-                <CoachingToneSelect
-                  value={(config as any).tone}
-                  onChange={(tone) => setConfig({ ...config, tone })}
-                />
-              </Box>
-            )}
-
-            {taskType === 'weekly_review' && (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <CoachingToneSelect
-                  value={(config as any).tone}
-                  onChange={(tone) => setConfig({ ...config, tone })}
-                />
-                <FormControl fullWidth>
-                  <InputLabel>Run Day</InputLabel>
+                <Box sx={{ flex: 1.3, display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                  <Typography sx={monoLabelSx}>Timezone</Typography>
                   <Select
-                    value={(config as any).run_day}
-                    label="Run Day"
+                    value={(config as any).timezone || 'UTC'}
                     onChange={(e) =>
-                      setConfig({
-                        ...config,
-                        run_day: e.target.value as number,
-                      })
+                      setConfig({ ...config, timezone: e.target.value as string })
                     }
-                    MenuProps={{ sx: { zIndex: 1600 } }}
+                    size="small"
+                    fullWidth
+                    sx={inputSx}
+                    MenuProps={{
+                      sx: { zIndex: Z_INDEX.DIALOG_POPUP },
+                      PaperProps: { sx: menuPaperSx },
+                    }}
                   >
-                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d, i) => (
-                      <MenuItem key={d} value={i}>
-                        {d}
+                    {timezoneOptions.map((tz) => (
+                      <MenuItem key={tz.value} value={tz.value} sx={menuItemSx}>
+                        {tz.label}
                       </MenuItem>
                     ))}
                   </Select>
-                </FormControl>
-                <Box sx={{ display: 'flex', gap: 1.5 }}>
+                </Box>
+              </Box>
+
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                <Typography sx={monoLabelSx}>Coaching tone</Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+                  {(Object.keys(TONE_LABELS) as CoachingTone[]).map((t) => {
+                    const selected = ((config as any).tone ?? 'tough_love') === t;
+                    return (
+                      <Box
+                        key={t}
+                        sx={chipBaseSx(selected)}
+                        onClick={() => setConfig({ ...config, tone: t })}
+                      >
+                        {TONE_LABELS[t]}
+                      </Box>
+                    );
+                  })}
+                </Box>
+              </Box>
+            </Box>
+          )}
+
+          {taskType === 'weekly_review' && (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                <Typography sx={monoLabelSx}>Coaching tone</Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+                  {(Object.keys(TONE_LABELS) as CoachingTone[]).map((t) => {
+                    const selected = ((config as any).tone ?? 'tough_love') === t;
+                    return (
+                      <Box
+                        key={t}
+                        sx={chipBaseSx(selected)}
+                        onClick={() => setConfig({ ...config, tone: t })}
+                      >
+                        {TONE_LABELS[t]}
+                      </Box>
+                    );
+                  })}
+                </Box>
+              </Box>
+
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                <Typography sx={monoLabelSx}>Run day</Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d, i) => {
+                    const selected = (config as any).run_day === i;
+                    return (
+                      <Box
+                        key={d}
+                        sx={chipBaseSx(selected)}
+                        onClick={() => setConfig({ ...config, run_day: i })}
+                      >
+                        {d}
+                      </Box>
+                    );
+                  })}
+                </Box>
+              </Box>
+
+              <Box sx={{ display: 'flex', gap: 1.5 }}>
+                <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                  <Typography sx={monoLabelSx}>Run time</Typography>
                   <TextField
-                    label="Run Time"
                     type="time"
                     value={(config as any).run_time_utc}
                     onChange={(e) =>
                       setConfig({ ...config, run_time_utc: e.target.value })
                     }
-                    sx={{ flex: 1 }}
+                    size="small"
+                    fullWidth
+                    sx={inputSx}
                   />
-                  <FormControl size="small" sx={{ flex: 1.3 }}>
-                    <InputLabel>Timezone</InputLabel>
-                    <Select
-                      value={(config as any).timezone || 'UTC'}
-                      label="Timezone"
-                      onChange={(e) =>
-                        setConfig({ ...config, timezone: e.target.value as string })
-                      }
-                      MenuProps={{ sx: { zIndex: 1600 } }}
-                    >
-                      {timezoneOptions.map((tz) => (
-                        <MenuItem key={tz.value} value={tz.value}>
-                          {tz.label}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
                 </Box>
+                <Box sx={{ flex: 1.3, display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                  <Typography sx={monoLabelSx}>Timezone</Typography>
+                  <Select
+                    value={(config as any).timezone || 'UTC'}
+                    onChange={(e) =>
+                      setConfig({ ...config, timezone: e.target.value as string })
+                    }
+                    size="small"
+                    fullWidth
+                    sx={inputSx}
+                    MenuProps={{
+                      sx: { zIndex: Z_INDEX.DIALOG_POPUP },
+                      PaperProps: { sx: menuPaperSx },
+                    }}
+                  >
+                    {timezoneOptions.map((tz) => (
+                      <MenuItem key={tz.value} value={tz.value} sx={menuItemSx}>
+                        {tz.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </Box>
+              </Box>
+
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                <Typography sx={monoLabelSx}>Comparison weeks</Typography>
                 <TextField
-                  label="Comparison Weeks"
                   type="number"
                   value={(config as any).comparison_weeks}
                   onChange={(e) =>
@@ -1013,47 +930,75 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
                     })
                   }
                   inputProps={{ min: 1, max: 12 }}
+                  size="small"
                   fullWidth
+                  sx={inputSx}
                 />
               </Box>
-            )}
+            </Box>
+          )}
 
-            {taskType === 'monthly_rollup' && (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <CoachingToneSelect
-                  value={(config as any).tone}
-                  onChange={(tone) => setConfig({ ...config, tone })}
-                />
-                <Box sx={{ display: 'flex', gap: 1.5 }}>
+          {taskType === 'monthly_rollup' && (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                <Typography sx={monoLabelSx}>Coaching tone</Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+                  {(Object.keys(TONE_LABELS) as CoachingTone[]).map((t) => {
+                    const selected = ((config as any).tone ?? 'tough_love') === t;
+                    return (
+                      <Box
+                        key={t}
+                        sx={chipBaseSx(selected)}
+                        onClick={() => setConfig({ ...config, tone: t })}
+                      >
+                        {TONE_LABELS[t]}
+                      </Box>
+                    );
+                  })}
+                </Box>
+              </Box>
+
+              <Box sx={{ display: 'flex', gap: 1.5 }}>
+                <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                  <Typography sx={monoLabelSx}>Run time</Typography>
                   <TextField
-                    label="Run Time"
                     type="time"
                     value={(config as any).run_time_utc}
                     onChange={(e) =>
                       setConfig({ ...config, run_time_utc: e.target.value })
                     }
-                    sx={{ flex: 1 }}
+                    size="small"
+                    fullWidth
+                    sx={inputSx}
                   />
-                  <FormControl size="small" sx={{ flex: 1.3 }}>
-                    <InputLabel>Timezone</InputLabel>
-                    <Select
-                      value={(config as any).timezone || 'UTC'}
-                      label="Timezone"
-                      onChange={(e) =>
-                        setConfig({ ...config, timezone: e.target.value as string })
-                      }
-                      MenuProps={{ sx: { zIndex: 1600 } }}
-                    >
-                      {timezoneOptions.map((tz) => (
-                        <MenuItem key={tz.value} value={tz.value}>
-                          {tz.label}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
                 </Box>
+                <Box sx={{ flex: 1.3, display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                  <Typography sx={monoLabelSx}>Timezone</Typography>
+                  <Select
+                    value={(config as any).timezone || 'UTC'}
+                    onChange={(e) =>
+                      setConfig({ ...config, timezone: e.target.value as string })
+                    }
+                    size="small"
+                    fullWidth
+                    sx={inputSx}
+                    MenuProps={{
+                      sx: { zIndex: Z_INDEX.DIALOG_POPUP },
+                      PaperProps: { sx: menuPaperSx },
+                    }}
+                  >
+                    {timezoneOptions.map((tz) => (
+                      <MenuItem key={tz.value} value={tz.value} sx={menuItemSx}>
+                        {tz.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </Box>
+              </Box>
+
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                <Typography sx={monoLabelSx}>Comparison months</Typography>
                 <TextField
-                  label="Comparison Months"
                   type="number"
                   value={(config as any).comparison_months}
                   onChange={(e) =>
@@ -1063,28 +1008,423 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
                     })
                   }
                   inputProps={{ min: 1, max: 12 }}
+                  size="small"
                   fullWidth
+                  sx={inputSx}
                 />
               </Box>
-            )}
+            </Box>
+          )}
+        </Box>
+      )}
+    </BaseDialog>
+  );
+};
+
+// ────────────────────────────────────────────────────────────────────────────
+// Market Research sub-form
+// Kept inside this file to avoid extracting helpers to new files (circular-
+// import trap). Pulls style tokens from props so it stays themed in sync with
+// the parent.
+// ────────────────────────────────────────────────────────────────────────────
+
+interface MarketResearchFormStyleProps {
+  monoLabelSx: Record<string, unknown>;
+  optionalSx: Record<string, unknown>;
+  inputSx: Record<string, unknown>;
+  menuPaperSx: Record<string, unknown>;
+  menuItemSx: Record<string, unknown>;
+  chipBaseSx: (selected: boolean) => Record<string, unknown>;
+  violet: string;
+  violetSoft: string;
+  violetSofter: string;
+  violetBorder: string;
+  hairline: string;
+  surfaceInset: string;
+}
+
+const MarketResearchForm: React.FC<
+  MarketResearchFormProps & MarketResearchFormStyleProps
+> = ({
+  config,
+  setConfig,
+  macroQueryInput,
+  setMacroQueryInput,
+  monoLabelSx,
+  optionalSx,
+  inputSx,
+  menuPaperSx,
+  menuItemSx,
+  chipBaseSx,
+  violet,
+  violetSoft,
+  violetSofter,
+  violetBorder,
+  hairline,
+  surfaceInset,
+}) => {
+  const theme = useTheme();
+  const toggleArrayItem = <T extends string>(arr: T[], item: T): T[] =>
+    arr.includes(item) ? arr.filter((v) => v !== item) : [...arr, item];
+
+  const handleTemplateChange = (templateId: string) => {
+    const template = getTemplate(templateId);
+    if (!template) return;
+    // Overwrite the macro-query snapshot with the chosen template. Preserve
+    // markets/frequency/threshold/watchlist — those are orthogonal to the
+    // preset queries.
+    setConfig({
+      ...config,
+      template_id: template.id,
+      macro_queries: template.macro_queries.slice(0, MAX_MACRO_QUERIES),
+    });
+  };
+
+  const addMacroQuery = () => {
+    const trimmed = macroQueryInput.trim();
+    if (!trimmed || config.macro_queries.includes(trimmed)) return;
+    if (config.macro_queries.length >= MAX_MACRO_QUERIES) return;
+    setConfig({
+      ...config,
+      macro_queries: [...config.macro_queries, trimmed],
+      template_id: CUSTOM_TEMPLATE_ID,
+    });
+    setMacroQueryInput('');
+  };
+
+  const removeMacroQuery = (q: string) => {
+    setConfig({
+      ...config,
+      macro_queries: config.macro_queries.filter((x) => x !== q),
+      template_id: CUSTOM_TEMPLATE_ID,
+    });
+  };
+
+  const updateWatchlistSymbols = (symbols: string[]) => {
+    setConfig({
+      ...config,
+      watchlist_symbols: symbols,
+    });
+  };
+
+  // If the stored template_id is something we don't recognize (custom or
+  // legacy), show it as "Custom" in the picker rather than leaving the
+  // Select empty.
+  const templateValue = RESEARCH_TEMPLATES.some((t) => t.id === config.template_id)
+    ? config.template_id
+    : CUSTOM_TEMPLATE_ID;
+
+  const watchlistEmpty = (config.watchlist_symbols ?? []).length === 0;
+
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      {/* Template */}
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+        <Typography sx={monoLabelSx}>Template</Typography>
+        <Select
+          value={templateValue}
+          onChange={(e) => handleTemplateChange(e.target.value as string)}
+          size="small"
+          fullWidth
+          sx={inputSx}
+          MenuProps={{
+            sx: { zIndex: Z_INDEX.DIALOG_POPUP },
+            PaperProps: { sx: menuPaperSx },
+          }}
+          renderValue={(val) => {
+            const label =
+              val === CUSTOM_TEMPLATE_ID
+                ? 'Custom (edited)'
+                : getTemplate(val as string)?.name ?? (val as string);
+            return (
+              <Typography sx={{ fontWeight: 600, fontSize: '0.88rem' }}>
+                {label}
+              </Typography>
+            );
+          }}
+        >
+          {RESEARCH_TEMPLATES.map((t) => (
+            <MenuItem key={t.id} value={t.id} sx={{ ...menuItemSx, py: 1 }}>
+              <Box>
+                <Typography sx={{ fontWeight: 600, fontSize: '0.88rem' }}>
+                  {t.name}
+                </Typography>
+                <Typography
+                  sx={{
+                    fontSize: '0.74rem',
+                    color: theme.palette.text.secondary,
+                    lineHeight: 1.4,
+                  }}
+                >
+                  {t.description}
+                </Typography>
+              </Box>
+            </MenuItem>
+          ))}
+        </Select>
+      </Box>
+
+      {/* Frequency + significance */}
+      <Box sx={{ display: 'flex', gap: 1.5 }}>
+        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+          <Typography sx={monoLabelSx}>Check every</Typography>
+          <Select
+            value={config.frequency_minutes}
+            onChange={(e) =>
+              setConfig({
+                ...config,
+                frequency_minutes: e.target.value as 15 | 30 | 60,
+              })
+            }
+            size="small"
+            fullWidth
+            sx={inputSx}
+            MenuProps={{
+              sx: { zIndex: Z_INDEX.DIALOG_POPUP },
+              PaperProps: { sx: menuPaperSx },
+            }}
+          >
+            <MenuItem value={15} sx={menuItemSx}>15 min</MenuItem>
+            <MenuItem value={30} sx={menuItemSx}>30 min</MenuItem>
+            <MenuItem value={60} sx={menuItemSx}>1 hour</MenuItem>
+          </Select>
+        </Box>
+
+        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+          <Typography sx={monoLabelSx}>Alert on</Typography>
+          <Select
+            value={config.min_significance}
+            onChange={(e) =>
+              setConfig({
+                ...config,
+                min_significance: e.target.value as 'medium' | 'high',
+              })
+            }
+            size="small"
+            fullWidth
+            sx={inputSx}
+            MenuProps={{
+              sx: { zIndex: Z_INDEX.DIALOG_POPUP },
+              PaperProps: { sx: menuPaperSx },
+            }}
+          >
+            <MenuItem value="medium" sx={menuItemSx}>Medium &amp; high</MenuItem>
+            <MenuItem value="high" sx={menuItemSx}>High only</MenuItem>
+          </Select>
+        </Box>
+      </Box>
+
+      {/* Markets */}
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+        <Typography sx={monoLabelSx}>Markets</Typography>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+          {MARKET_OPTIONS.map((m) => {
+            const selected = config.markets.includes(m.value);
+            return (
+              <Box
+                key={m.value}
+                sx={chipBaseSx(selected)}
+                onClick={() =>
+                  setConfig({
+                    ...config,
+                    markets: toggleArrayItem(config.markets, m.value),
+                  })
+                }
+              >
+                {m.label}
+              </Box>
+            );
+          })}
+        </Box>
+      </Box>
+
+      {/* Watchlist symbols */}
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+        <Typography sx={monoLabelSx}>
+          Watchlist symbols
+          <Box component="span" sx={{ color: theme.palette.error.main, fontFamily: 'inherit', ml: 0.5 }}>*</Box>
+        </Typography>
+        <Typography
+          sx={{
+            color: theme.palette.text.secondary,
+            fontSize: '0.75rem',
+            lineHeight: 1.5,
+          }}
+        >
+          Pick the instruments you're watching. Drives live price grounding, per‑instrument news queries, and economic‑event currency filtering. Capped at ~12 total.
+        </Typography>
+        <Autocomplete<YahooSymbolOption, true>
+          multiple
+          size="small"
+          options={YAHOO_SYMBOL_CATALOG}
+          groupBy={(opt) => opt.group}
+          getOptionLabel={(opt) => `${opt.label} (${opt.symbol})`}
+          isOptionEqualToValue={(a, b) => a.symbol === b.symbol}
+          value={YAHOO_SYMBOL_CATALOG.filter((opt) =>
+            (config.watchlist_symbols ?? []).includes(opt.symbol)
+          )}
+          onChange={(_, newValue) =>
+            updateWatchlistSymbols(newValue.map((v) => v.symbol))
+          }
+          slotProps={{
+            popper: { sx: { zIndex: Z_INDEX.DIALOG_POPUP } },
+            paper: { sx: menuPaperSx },
+          }}
+          renderTags={(value, getTagProps) =>
+            value.map((opt, index) => {
+              const tagProps = getTagProps({ index });
+              return (
+                <Chip
+                  {...tagProps}
+                  key={opt.symbol}
+                  label={opt.label}
+                  size="small"
+                  sx={{
+                    height: 22,
+                    fontSize: '0.74rem',
+                    fontWeight: 600,
+                    backgroundColor: violetSoft,
+                    color: violet,
+                    border: `1px solid ${violetBorder}`,
+                    fontFamily: MONO_FONT,
+                    '& .MuiChip-deleteIcon': {
+                      color: alpha(violet, 0.7),
+                      fontSize: 14,
+                      '&:hover': { color: violet },
+                    },
+                  }}
+                />
+              );
+            })
+          }
+          renderOption={(props, opt) => (
+            <li {...props} key={opt.symbol}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                <Typography sx={{ fontSize: '0.85rem', fontWeight: 500 }}>
+                  {opt.label}
+                </Typography>
+                <Typography
+                  sx={{
+                    color: theme.palette.text.secondary,
+                    fontFamily: MONO_FONT,
+                    fontSize: '0.72rem',
+                  }}
+                >
+                  {opt.symbol}
+                </Typography>
+              </Box>
+            </li>
+          )}
+          renderInput={(params) => (
+            <TextField
+              {...params}
+              placeholder="Search instruments…"
+              error={watchlistEmpty}
+              helperText={watchlistEmpty ? 'Pick at least one instrument.' : undefined}
+              sx={inputSx}
+            />
+          )}
+        />
+      </Box>
+
+      {/* Macro queries */}
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Typography sx={monoLabelSx}>
+            Macro queries
+            <Box component="span" sx={{ ...optionalSx, ml: 0.5 }}>
+              · {config.macro_queries.length}/{MAX_MACRO_QUERIES}
+            </Box>
+          </Typography>
+        </Box>
+        <Typography
+          sx={{
+            color: theme.palette.text.secondary,
+            fontSize: '0.75rem',
+            lineHeight: 1.5,
+          }}
+        >
+          Baseline queries Orion runs every sweep. Edit to tailor to your market — e.g. add "$TSLA earnings" or "BTC ETF flows". Up to {MAX_MACRO_QUERIES} queries.
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <TextField
+            size="small"
+            placeholder={
+              config.macro_queries.length >= MAX_MACRO_QUERIES
+                ? `Limit reached (${MAX_MACRO_QUERIES})`
+                : 'Add a query…'
+            }
+            value={macroQueryInput}
+            onChange={(e) => setMacroQueryInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                addMacroQuery();
+              }
+            }}
+            disabled={config.macro_queries.length >= MAX_MACRO_QUERIES}
+            fullWidth
+            sx={inputSx}
+          />
+          <Button
+            size="small"
+            startIcon={<AddIcon sx={{ fontSize: 14 }} />}
+            disabled={
+              !macroQueryInput.trim() ||
+              config.macro_queries.length >= MAX_MACRO_QUERIES
+            }
+            onClick={addMacroQuery}
+            sx={{
+              textTransform: 'none',
+              fontWeight: 600,
+              fontSize: '0.8rem',
+              color: violet,
+              backgroundColor: violetSofter,
+              border: `1px solid ${violetBorder}`,
+              borderRadius: 1.25,
+              px: 1.25,
+              py: 0.5,
+              minWidth: 0,
+              flexShrink: 0,
+              '&:hover': { backgroundColor: violetSoft },
+              '&.Mui-disabled': {
+                color: alpha(violet, 0.45),
+                borderColor: alpha(violet, 0.18),
+                backgroundColor: alpha(violet, 0.05),
+              },
+            }}
+          >
+            Add
+          </Button>
+        </Box>
+        {config.macro_queries.length > 0 && (
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
+            {config.macro_queries.map((q) => (
+              <Chip
+                key={q}
+                label={q}
+                size="small"
+                onDelete={() => removeMacroQuery(q)}
+                sx={{
+                  height: 24,
+                  fontSize: '0.76rem',
+                  fontWeight: 500,
+                  backgroundColor: surfaceInset,
+                  color: theme.palette.text.primary,
+                  border: `1px solid ${hairline}`,
+                  fontFamily: MONO_FONT,
+                  '& .MuiChip-deleteIcon': {
+                    color: alpha(theme.palette.text.secondary, 0.6),
+                    fontSize: 14,
+                    '&:hover': { color: theme.palette.text.primary },
+                  },
+                }}
+              />
+            ))}
           </Box>
         )}
-      </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2 }}>
-        <Button onClick={handleClose}>Cancel</Button>
-        {taskType && (
-          <Button
-            variant="contained"
-            onClick={handleSubmit}
-            disabled={!config || submitting || !canSubmit}
-          >
-            {submitting
-              ? (isEditMode ? 'Saving...' : 'Creating...')
-              : (isEditMode ? 'Save Changes' : 'Create Task')}
-          </Button>
-        )}
-      </DialogActions>
-    </Dialog>
+      </Box>
+    </Box>
   );
 };
 
