@@ -31,6 +31,11 @@ export const Z_INDEX = {
   // Dialog popover layer (menus, date pickers, autocomplete dropdowns inside dialogs)
   DIALOG_POPUP: 1600,
 
+  // Nested dialog layer — for dialogs that open from inside another dialog
+  // (e.g. TagFormDialog launched from TagsInput inside TradeFormDialog).
+  // Must sit above DIALOG_POPUP so it stacks on top of its parent dialog.
+  NESTED_DIALOG: 1650,
+
   // Tooltip layer (tooltips inside dialogs need higher z-index)
   TOOLTIP: 1750,
 

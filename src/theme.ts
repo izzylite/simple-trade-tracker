@@ -327,10 +327,18 @@ export function createAppTheme(mode: 'light' | 'dark') {
         styleOverrides: {
           root: {
             borderRadius: 8,
+            // Hover: tint the outline with the brand violet so every input
+            // (not just ones using the dialog-tokens inputSx) reads as part
+            // of the same family. MUI's default hover is a near-white grey
+            // that clashes with the violet-on-focus state.
+            '&:hover .MuiOutlinedInput-notchedOutline': {
+              borderColor: alpha(palette.violet.main, 0.5),
+            },
             '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
               borderColor: palette.violet.main,
               boxShadow: `0 0 0 3px ${alpha(palette.violet.main, 0.15)}`,
             },
+            // Disabled / error states stay theme-driven — don't override here.
           },
         },
       },

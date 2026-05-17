@@ -387,7 +387,7 @@ const TagFormDialog: React.FC<TagFormDialogProps> = ({
             maxWidth="sm"
             fullWidth
             {...dialogProps}
-            sx={{ zIndex: Z_INDEX.DIALOG }}
+            sx={{ zIndex: Z_INDEX.NESTED_DIALOG }}
             slotProps={{
                 paper: { sx: paperSx },
             }}
