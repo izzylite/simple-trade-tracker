@@ -1,13 +1,13 @@
 /**
  * Economic Event Detail Dialog
- * Simple dialog for pinning events and adding notes
+ * Viewer dialog for a single economic event — metadata, history, AI insights,
+ * related trades.
  */
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import {
   Box,
   Typography,
-  Chip,
   useTheme,
   alpha,
   IconButton,
@@ -23,7 +23,8 @@ import {
   ViewCarousel as GalleryIcon,
   AutoAwesome as AutoAwesomeIcon,
   ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon
+  ExpandLess as ExpandLessIcon,
+  EventOutlined,
 } from '@mui/icons-material';
 import ReactMarkdown from 'react-markdown';
 import { EconomicEvent } from '../../types/economicCalendar';
@@ -55,6 +56,8 @@ interface EconomicEventDetailDialogProps {
   isReadOnly?: boolean;
 }
 
+const MONO_FONT = "'JetBrains Mono', ui-monospace, monospace";
+
 const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
   open,
   onClose,
@@ -67,6 +70,7 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
     onOpenGalleryMode,
   } = tradeOperations;
   const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   const { user } = useAuthState();
   const userId = user?.id ?? null;
   // Cross-calendar mode: load calendars once so the trade list can show a
@@ -103,6 +107,27 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
   const [eventTrades, setEventTrades] = useState<Trade[]>([]);
   const [isLoadingTrades, setIsLoadingTrades] = useState(false);
   const hasInitialLoad = useRef(false);
+
+  // ── design tokens ──────────────────────────────────────────────────────
+  const violet = theme.palette.primary.main;
+  const violetSoft = alpha(violet, isDark ? 0.18 : 0.14);
+  const violetSofter = alpha(violet, isDark ? 0.12 : 0.10);
+  const violetBorder = alpha(violet, isDark ? 0.35 : 0.28);
+  const surfaceInset = isDark ? 'rgba(255,255,255,0.03)' : alpha(theme.palette.text.primary, 0.03);
+  const surfaceInsetHover = isDark ? 'rgba(255,255,255,0.06)' : alpha(theme.palette.text.primary, 0.05);
+  const hairline = isDark ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
+
+  const monoLabelSx = {
+    fontFamily: MONO_FONT,
+    fontSize: '0.68rem',
+    fontWeight: 600,
+    letterSpacing: '0.12em',
+    textTransform: 'uppercase' as const,
+    color: theme.palette.text.secondary,
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 0.75,
+  };
 
   // Determine which trading session this event falls under
   const eventSession = useMemo(
@@ -169,8 +194,6 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
     if (cachedData) {
       try {
         const parsed = JSON.parse(cachedData);
-        // timestamp check removed as per user request
-        // const now = Date.now();
         const tradeCount = eventTrades.length;
 
         // Check if trade count matches (to ensure analysis is fresh for current data)
@@ -190,7 +213,7 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
     } else {
       setAiAnalysis('');
     }
-  }, [calendarId, userId, event.id, eventTrades.length, open, isLoadingTrades]); // Depend on trade count to invalidate/reload
+  }, [calendarId, userId, event.id, eventTrades.length, open, isLoadingTrades]);
 
   // Check if event is pinned and get pinned event data (user-level)
   const pinnedEventData = useMemo(() => {
@@ -262,6 +285,33 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
     }
   };
 
+  const impactColor = getImpactColor(event.impact);
+
+  // Format event time for subtitle (e.g. "USD · High impact · 14:30 · London")
+  const formattedTime = useMemo(() => {
+    if (event.is_all_day) return 'All day';
+    try {
+      return new Date(event.time_utc).toLocaleTimeString(undefined, {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch {
+      return '';
+    }
+  }, [event.time_utc, event.is_all_day]);
+
+  const formattedDate = useMemo(() => {
+    try {
+      return new Date(event.time_utc).toLocaleDateString(undefined, {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+      });
+    } catch {
+      return '';
+    }
+  }, [event.time_utc]);
+
   // Compute event trade stats
   const stats = useMemo(() => {
     const total = eventTrades.length;
@@ -317,8 +367,7 @@ ${eventTrades.map(t => `- ${t.id}`).join('\n')}
           const scope = calendarId ?? `user_${userId}`;
           const cacheKey = `ai_analysis_${scope}_${cleanedName}`;
           const cacheData = {
-            // timestamp: Date.now(), // No longer needed
-            tradeCount: stats.total, // Use stats.total which comes from eventTrades.length
+            tradeCount: stats.total,
             analysis: response.message
           };
           localStorage.setItem(cacheKey, JSON.stringify(cacheData));
@@ -337,325 +386,578 @@ ${eventTrades.map(t => `- ${t.id}`).join('\n')}
     }
   };
 
+  // ── header title row ──────────────────────────────────────────────────
+  const dialogTitle = (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%', minWidth: 0 }}>
+      {event.flag_url && (
+        <img
+          src={event.flag_url}
+          alt={event.currency}
+          style={{
+            width: 22,
+            height: 16,
+            borderRadius: 3,
+            objectFit: 'cover',
+            flexShrink: 0,
+          }}
+        />
+      )}
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Typography
+          sx={{
+            fontWeight: 700,
+            fontSize: '0.95rem',
+            lineHeight: 1.2,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {event.event_name}
+        </Typography>
+      </Box>
+      {!isReadOnly && (
+        <Tooltip title={isPinned ? 'Unpin event' : 'Pin event'}>
+          <span>
+            <IconButton
+              size="small"
+              onClick={pinning ? undefined : handleTogglePin}
+              disabled={pinning}
+              sx={{
+                width: 28,
+                height: 28,
+                borderRadius: 1,
+                color: isPinned ? theme.palette.warning.main : theme.palette.text.secondary,
+                backgroundColor: isPinned
+                  ? alpha(theme.palette.warning.main, isDark ? 0.16 : 0.12)
+                  : 'transparent',
+                border: `1px solid ${
+                  isPinned
+                    ? alpha(theme.palette.warning.main, isDark ? 0.4 : 0.3)
+                    : hairline
+                }`,
+                '&:hover': {
+                  backgroundColor: isPinned
+                    ? alpha(theme.palette.warning.main, isDark ? 0.24 : 0.18)
+                    : surfaceInsetHover,
+                  color: isPinned ? theme.palette.warning.main : theme.palette.text.primary,
+                },
+                '&.Mui-disabled': {
+                  color: theme.palette.text.disabled,
+                  borderColor: hairline,
+                },
+              }}
+            >
+              {pinning ? (
+                <CircularProgress size={14} thickness={5} color="inherit" />
+              ) : isPinned ? (
+                <PinIcon sx={{ fontSize: 16 }} />
+              ) : (
+                <PinOutlinedIcon sx={{ fontSize: 16 }} />
+              )}
+            </IconButton>
+          </span>
+        </Tooltip>
+      )}
+    </Box>
+  );
 
-  // Dialog actions with gallery mode button
+  // ── header subtitle row: meta chips (currency, impact, time, session) ──
+  const subtitlePillSx = (color: string) => ({
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 0.5,
+    px: 0.85,
+    py: 0.2,
+    borderRadius: 999,
+    fontFamily: MONO_FONT,
+    fontSize: '0.68rem',
+    fontWeight: 600,
+    letterSpacing: '0.04em',
+    color,
+    backgroundColor: alpha(color, isDark ? 0.16 : 0.12),
+    border: `1px solid ${alpha(color, isDark ? 0.4 : 0.3)}`,
+    whiteSpace: 'nowrap' as const,
+  });
+
+  const dialogSubtitle = (
+    <Box
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 0.6,
+        flexWrap: 'wrap',
+        mt: 0.5,
+      }}
+    >
+      <Box sx={subtitlePillSx(violet)}>{event.currency}</Box>
+      <Box sx={subtitlePillSx(impactColor)}>
+        <Box
+          component="span"
+          sx={{
+            width: 5,
+            height: 5,
+            borderRadius: '50%',
+            backgroundColor: impactColor,
+          }}
+        />
+        {event.impact} impact
+      </Box>
+      {formattedDate && (
+        <Typography
+          sx={{
+            fontFamily: MONO_FONT,
+            fontSize: '0.7rem',
+            color: theme.palette.text.secondary,
+            fontWeight: 500,
+          }}
+        >
+          {formattedDate}
+          {formattedTime && ` · ${formattedTime}`}
+        </Typography>
+      )}
+      {eventSession && (
+        <Box sx={subtitlePillSx(SESSION_COLORS[eventSession] || theme.palette.info.main)}>
+          {eventSession}
+        </Box>
+      )}
+    </Box>
+  );
+
+  // ── footer actions ────────────────────────────────────────────────────
   const dialogActions = onOpenGalleryMode && eventTrades.length > 0 && !isReadOnly ? (
     <Button
       onClick={handleEventGalleryMode}
       variant="contained"
-      size="large"
-      startIcon={<GalleryIcon />}
+      startIcon={<GalleryIcon sx={{ fontSize: 16 }} />}
       sx={{
         textTransform: 'none',
         fontWeight: 600,
-        borderRadius: 1.5,
-        px: 3
+        fontSize: '0.85rem',
+        backgroundColor: violet,
+        color: '#fff',
+        borderRadius: 1.25,
+        px: 1.75,
+        py: 0.75,
+        boxShadow: 'none',
+        '&:hover': { backgroundColor: theme.palette.primary.dark, boxShadow: 'none' },
       }}
     >
-      Gallery View
+      Gallery view
     </Button>
   ) : undefined;
 
-  return (
-    <>
-      <BaseDialog
-        open={open}
-        onClose={handleClose}
+  // ── stat tile (compact, JetBrains Mono numbers) ───────────────────────
+  const StatTile: React.FC<{
+    label: string;
+    value: React.ReactNode;
+    accent?: string;
+  }> = ({ label, value, accent }) => (
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 0.5,
+        p: 1.25,
+        borderRadius: 1.5,
+        backgroundColor: surfaceInset,
+        border: `1px solid ${hairline}`,
+      }}
+    >
+      <Typography sx={{ ...monoLabelSx, fontSize: '0.6rem' }}>{label}</Typography>
+      <Typography
         sx={{
-          zIndex: Z_INDEX.ECONOMIC_CALENDAR_DETAIL
+          fontFamily: MONO_FONT,
+          fontWeight: 700,
+          fontSize: '1.05rem',
+          letterSpacing: '-0.01em',
+          color: accent || theme.palette.text.primary,
         }}
-        title={
-          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, width: '100%' }}>
-            {event.flag_url && (
-              <img
-                src={event.flag_url}
-                alt={event.currency}
-                style={{
-                  width: 24,
-                  height: 18,
-                  borderRadius: 3,
-                  objectFit: 'cover'
-                }}
-              />
-            )}
-            <Box sx={{ flex: 1 }}>
-              <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '1.1rem' }}>
-                {event.event_name}
-              </Typography>
-            </Box>
-            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-              <Chip
-                label={event.currency}
-                size="small"
-                sx={{
-                  height: 24,
-                  fontWeight: 600,
-                  fontSize: '0.75rem',
-                  backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                  color: 'primary.main'
-                }}
-              />
-              <Chip
-                label={event.impact}
-                size="small"
-                sx={{
-                  height: 24,
-                  fontWeight: 600,
-                  fontSize: '0.75rem',
-                  backgroundColor: alpha(getImpactColor(event.impact), 0.1),
-                  color: getImpactColor(event.impact)
-                }}
-              />
-              {eventSession && (
-                <Chip
-                  label={eventSession}
-                  size="small"
-                  sx={{
-                    height: 24,
-                    fontWeight: 600,
-                    fontSize: '0.75rem',
-                    backgroundColor: alpha(
-                      SESSION_COLORS[eventSession] || theme.palette.info.main,
-                      0.1
-                    ),
-                    color: SESSION_COLORS[eventSession] || theme.palette.info.main
-                  }}
-                />
-              )}
-              {!isReadOnly && (
-                <Tooltip title={isPinned ? "Unpin event" : "Pin event"}>
-                  <span>
-                    <IconButton
-                      size="small"
-                      onClick={pinning ? undefined : handleTogglePin}
-                      disabled={pinning}
-                      sx={{
-                        color: isPinned ? 'warning.main' : 'text.secondary',
-                        '&:hover': {
-                          backgroundColor: alpha(theme.palette.warning.main, 0.1)
-                        },
-                        '&.Mui-disabled': {
-                          color: 'text.disabled'
-                        }
-                      }}
-                    >
-                      {pinning ? (
-                        <CircularProgress size={18} color="inherit" />
-                      ) : (
-                        isPinned ? <PinIcon sx={{ fontSize: 20 }} /> : <PinOutlinedIcon sx={{ fontSize: 20 }} />
-                      )}
-                    </IconButton>
-                  </span>
-                </Tooltip>
-              )}
-            </Box>
-          </Box>
-        }
-        maxWidth="sm"
-        fullWidth
-        actions={dialogActions}
-        hideFooterCancelButton
       >
-        <Box>
-          {/* Stats Section with Ask AI Button */}
-          <Box sx={{
-            mb: 3,
-            mt: 3,
-            p: 2,
-            borderRadius: 2,
-            backgroundColor: theme.palette.background.paper,
-            border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-            position: 'relative' // For Ask AI button positioning if needed
-          }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: '0.875rem', color: 'text.secondary' }}>
-                Stats
+        {value}
+      </Typography>
+    </Box>
+  );
+
+  // Whether the event has actual/forecast/previous values worth showing
+  const hasReadings = !!(
+    event.actual_value ||
+    event.forecast_value ||
+    event.previous_value
+  );
+
+  return (
+    <BaseDialog
+      open={open}
+      onClose={handleClose}
+      sx={{ zIndex: Z_INDEX.ECONOMIC_CALENDAR_DETAIL }}
+      title={dialogTitle}
+      subtitle={dialogSubtitle}
+      headerIcon={<EventOutlined sx={{ fontSize: 18 }} />}
+      maxWidth="sm"
+      fullWidth
+      actions={dialogActions}
+      hideFooterCancelButton
+    >
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.25 }}>
+        {/* ── Description (if present) ─────────────────────────────── */}
+        {event.description && (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+            <Typography sx={monoLabelSx}>About</Typography>
+            <Box
+              sx={{
+                px: 1.5,
+                py: 1.25,
+                borderRadius: 1.5,
+                border: `1px solid ${hairline}`,
+                backgroundColor: surfaceInset,
+              }}
+            >
+              <Typography
+                sx={{
+                  fontSize: '0.82rem',
+                  color: theme.palette.text.secondary,
+                  lineHeight: 1.55,
+                }}
+              >
+                {event.description}
               </Typography>
-              {!aiAnalysis && (
-                <Button
-                  variant="text"
-                  size="small"
-                  startIcon={isAnalyzing ? <CircularProgress size={14} color="inherit" /> : <AutoAwesomeIcon sx={{ fontSize: 16 }} />}
-                  onClick={handleAskAI}
-                  disabled={isAnalyzing}
-                  sx={{
-                    fontSize: '0.75rem',
-                    color: theme.palette.primary.main,
-                    textTransform: 'none',
-                    minWidth: 'auto',
-                    padding: '4px 8px'
-                  }}
-                >
-                  {isAnalyzing ? 'Analyzing...' : 'Ask AI'}
-                </Button>
-              )}
-            </Box>
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(5, 1fr)' }, gap: 1.25 }}>
-              <Box sx={{ p: 1.25, borderRadius: 1, backgroundColor: theme.palette.background.paper, border: `1px solid ${alpha(theme.palette.divider, 0.15)}` }}>
-                <Typography variant="caption" color="text.secondary">Total Trades</Typography>
-                <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>{stats.total}</Typography>
-              </Box>
-              <Box sx={{ p: 1.25, borderRadius: 1, backgroundColor: alpha(theme.palette.success.main, 0.06), border: `1px solid ${alpha(theme.palette.success.main, 0.15)}` }}>
-                <Typography variant="caption" color="text.secondary">Wins</Typography>
-                <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'success.main' }}>{stats.wins}</Typography>
-              </Box>
-              <Box sx={{ p: 1.25, borderRadius: 1, backgroundColor: alpha(theme.palette.error.main, 0.06), border: `1px solid ${alpha(theme.palette.error.main, 0.15)}` }}>
-                <Typography variant="caption" color="text.secondary">Losses</Typography>
-                <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'error.main' }}>{stats.losses}</Typography>
-              </Box>
-              <Box sx={{ p: 1.25, borderRadius: 1, backgroundColor: alpha(theme.palette.warning.main, 0.06), border: `1px solid ${alpha(theme.palette.warning.main, 0.15)}` }}>
-                <Typography variant="caption" color="text.secondary">Breakeven</Typography>
-                <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'warning.main' }}>{stats.breakevens}</Typography>
-              </Box>
-              <Box sx={{ p: 1.25, borderRadius: 1, backgroundColor: alpha(theme.palette.primary.main, 0.06), border: `1px solid ${alpha(theme.palette.primary.main, 0.15)}` }}>
-                <Typography variant="caption" color="text.secondary">Win Rate</Typography>
-                <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'primary.main' }}>{`${stats.win_rate}%`}</Typography>
-              </Box>
             </Box>
           </Box>
+        )}
 
-          {/* AI Analysis Result */}
-          {aiAnalysis && (
-            <Box sx={{
-              mb: 3,
-              borderRadius: 2,
-              backgroundColor: alpha(theme.palette.primary.main, 0.05),
-              border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
-              overflow: 'hidden'
-            }}>
-              <Box
-                onClick={() => setAiAnalysisExpanded(!aiAnalysisExpanded)}
-                sx={{
-                  p: 2,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  cursor: 'pointer',
-                  '&:hover': {
-                    backgroundColor: alpha(theme.palette.primary.main, 0.08)
-                  }
-                }}
-              >
-                <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'primary.main', display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <AutoAwesomeIcon sx={{ fontSize: 16 }} />
-                  AI Analysis
-                </Typography>
-                <IconButton size="small" sx={{ color: 'primary.main' }}>
-                  {aiAnalysisExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                </IconButton>
-              </Box>
-
-              <Collapse in={aiAnalysisExpanded}>
-                <Box sx={{
-                  p: 2,
-                  pt: 0,
-                  typography: 'body2',
-                  '& p': { mb: 1, '&:last-child': { mb: 0 } },
-                  '& ul, & ol': { pl: 2, mb: 1, mt: 0 },
-                  '& li': { mb: 0.5 }
-                }}>
-                  <ReactMarkdown>{aiAnalysis}</ReactMarkdown>
-                </Box>
-              </Collapse>
-            </Box>
-          )}
-
-          {/* Notes Section - Only visible when pinned */}
-          {isPinned && (
-            <Box sx={{ mb: 3 }}>
-              <TextField
-                fullWidth
-                multiline
-                rows={3}
-                placeholder="Add notes about this event (max 250 characters)..."
-                value={notesText}
-                onChange={(e) => handleNotesChange(e.target.value)}
-                disabled={isReadOnly}
-                slotProps={{
-                  input: {
-                    sx: {
-                      backgroundColor: alpha(theme.palette.warning.main, 0.05),
-                      '&:hover': {
-                        backgroundColor: alpha(theme.palette.warning.main, 0.08)
-                      },
-                      '&.Mui-focused': {
-                        backgroundColor: alpha(theme.palette.warning.main, 0.08)
-                      }
-                    }
-                  }
-                }}
-                helperText={`${notesText.length}/250 characters${hasNotesChanged ? ' • Unsaved changes (saves on close)' : ''}`}
+        {/* ── Readings: Previous / Forecast / Actual ──────────────── */}
+        {hasReadings && (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+            <Typography sx={monoLabelSx}>Readings</Typography>
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: 1,
+              }}
+            >
+              <StatTile label="Previous" value={event.previous_value || '—'} />
+              <StatTile label="Forecast" value={event.forecast_value || '—'} />
+              <StatTile
+                label="Actual"
+                value={event.actual_value || '—'}
+                accent={
+                  event.actual_result_type === 'good'
+                    ? theme.palette.success.main
+                    : event.actual_result_type === 'bad'
+                      ? theme.palette.error.main
+                      : undefined
+                }
               />
             </Box>
-          )}
+          </Box>
+        )}
 
-          {/* Trades List */}
-          <Box>
-            {isLoadingTrades ? (
-              // Show shimmer loading state while fetching trades
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                {[1, 2, 3].map((index) => (
-                  <Box
-                    key={index}
-                    sx={{
-                      p: 2,
-                      borderRadius: 2,
-                      border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                      backgroundColor: theme.palette.background.paper,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 1
-                    }}
-                  >
-                    {/* Trade header shimmer */}
-                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                      <Shimmer width={60} height={24} borderRadius={4} intensity="medium" />
-                      <Shimmer width={80} height={24} borderRadius={4} intensity="medium" />
-                      <Box sx={{ flex: 1 }} />
-                      <Shimmer width={70} height={28} borderRadius={4} intensity="high" />
-                    </Box>
-                    {/* Trade details shimmer */}
-                    <Box sx={{ display: 'flex', gap: 1 }}>
-                      <Shimmer width="40%" height={20} borderRadius={4} intensity="low" />
-                      <Shimmer width="30%" height={20} borderRadius={4} intensity="low" />
-                    </Box>
-                    {/* Trade amount shimmer */}
-                    <Shimmer width="25%" height={20} borderRadius={4} intensity="low" />
-                  </Box>
-                ))}
-              </Box>
-            ) : eventTrades.length === 0 ? (
-              <Box
+        {/* ── Trading performance + Ask AI ─────────────────────────── */}
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 1,
+            }}
+          >
+            <Typography sx={monoLabelSx}>Your performance</Typography>
+            {!aiAnalysis && (
+              <Button
+                size="small"
+                onClick={handleAskAI}
+                disabled={isAnalyzing || stats.total === 0}
+                startIcon={
+                  isAnalyzing ? (
+                    <CircularProgress size={12} thickness={5} sx={{ color: 'inherit' }} />
+                  ) : (
+                    <AutoAwesomeIcon sx={{ fontSize: 14 }} />
+                  )
+                }
                 sx={{
-                  textAlign: 'center',
-                  py: 3,
-                  backgroundColor: theme.palette.background.paper,
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  fontSize: '0.78rem',
+                  color: violet,
+                  backgroundColor: violetSofter,
+                  border: `1px solid ${violetBorder}`,
                   borderRadius: 1,
-                  border: `1px dashed ${alpha(theme.palette.divider, 0.3)}`
+                  px: 1.1,
+                  py: 0.25,
+                  minHeight: 0,
+                  '&:hover': { backgroundColor: violetSoft },
+                  '&.Mui-disabled': {
+                    color: alpha(violet, 0.45),
+                    borderColor: alpha(violet, 0.18),
+                    backgroundColor: alpha(violet, 0.05),
+                  },
                 }}
               >
-                <Typography variant="body2" color="text.secondary">
-                  No trades found for this event
-                </Typography>
-              </Box>
-            ) : (
-              <TradeList
-                trades={eventTrades}
-                expandedTradeId={expandedTradeId}
-                onTradeClick={(id) => setExpandedTradeId(prev => prev === id ? null : id)}
-                hideActions={isReadOnly}
-                calendarsById={calendarsById}
-                tradeOperations={tradeOperations}
-              />
+                {isAnalyzing ? 'Analyzing…' : 'Ask Orion'}
+              </Button>
             )}
+          </Box>
+
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: {
+                xs: 'repeat(2, 1fr)',
+                sm: 'repeat(5, 1fr)',
+              },
+              gap: 1,
+            }}
+          >
+            <StatTile label="Trades" value={stats.total} />
+            <StatTile
+              label="Wins"
+              value={stats.wins}
+              accent={stats.wins > 0 ? theme.palette.success.main : undefined}
+            />
+            <StatTile
+              label="Losses"
+              value={stats.losses}
+              accent={stats.losses > 0 ? theme.palette.error.main : undefined}
+            />
+            <StatTile
+              label="Breakeven"
+              value={stats.breakevens}
+              accent={stats.breakevens > 0 ? theme.palette.warning.main : undefined}
+            />
+            <StatTile
+              label="Win rate"
+              value={`${stats.win_rate}%`}
+              accent={
+                stats.win_rate >= 50 && stats.total > 0
+                  ? theme.palette.success.main
+                  : stats.total > 0
+                    ? theme.palette.error.main
+                    : undefined
+              }
+            />
           </Box>
         </Box>
-      </BaseDialog>
 
-    </>
+        {/* ── AI Analysis Result ───────────────────────────────────── */}
+        {aiAnalysis && (
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              borderRadius: 1.5,
+              border: `1px solid ${violetBorder}`,
+              backgroundColor: violetSofter,
+              overflow: 'hidden',
+            }}
+          >
+            <Box
+              onClick={() => setAiAnalysisExpanded(!aiAnalysisExpanded)}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 1,
+                px: 1.5,
+                py: 1,
+                cursor: 'pointer',
+                '&:hover': { backgroundColor: violetSoft },
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                <AutoAwesomeIcon sx={{ fontSize: 14, color: violet }} />
+                <Typography sx={{ ...monoLabelSx, color: violet }}>
+                  Orion analysis
+                </Typography>
+              </Box>
+              <IconButton
+                size="small"
+                sx={{
+                  width: 24,
+                  height: 24,
+                  color: violet,
+                  '&:hover': { backgroundColor: alpha(violet, 0.2) },
+                }}
+              >
+                {aiAnalysisExpanded ? (
+                  <ExpandLessIcon sx={{ fontSize: 18 }} />
+                ) : (
+                  <ExpandMoreIcon sx={{ fontSize: 18 }} />
+                )}
+              </IconButton>
+            </Box>
+
+            <Collapse in={aiAnalysisExpanded}>
+              <Box
+                sx={{
+                  px: 1.5,
+                  pb: 1.25,
+                  pt: 0,
+                  fontSize: '0.85rem',
+                  lineHeight: 1.55,
+                  color: theme.palette.text.primary,
+                  '& p': { mb: 1, '&:last-child': { mb: 0 } },
+                  '& ul, & ol': { pl: 2.25, mb: 1, mt: 0 },
+                  '& li': { mb: 0.5 },
+                  '& strong': { fontWeight: 700 },
+                  '& code': {
+                    fontFamily: MONO_FONT,
+                    fontSize: '0.82em',
+                    px: 0.5,
+                    py: 0.1,
+                    borderRadius: 0.5,
+                    backgroundColor: alpha(violet, isDark ? 0.18 : 0.12),
+                  },
+                }}
+              >
+                <ReactMarkdown>{aiAnalysis}</ReactMarkdown>
+              </Box>
+            </Collapse>
+          </Box>
+        )}
+
+        {/* ── Notes (only when pinned) ─────────────────────────────── */}
+        {isPinned && (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 1,
+              }}
+            >
+              <Typography sx={monoLabelSx}>
+                <PinIcon sx={{ fontSize: 13, color: theme.palette.warning.main }} />
+                Pinned notes
+              </Typography>
+              <Typography
+                sx={{
+                  fontFamily: MONO_FONT,
+                  fontSize: '0.68rem',
+                  color: hasNotesChanged
+                    ? theme.palette.warning.main
+                    : alpha(theme.palette.text.secondary, 0.7),
+                  fontWeight: 600,
+                }}
+              >
+                {notesText.length}/250
+                {hasNotesChanged && ' · unsaved'}
+              </Typography>
+            </Box>
+            <TextField
+              fullWidth
+              multiline
+              rows={3}
+              placeholder="Capture your read on this event (saves on close)…"
+              value={notesText}
+              onChange={(e) => handleNotesChange(e.target.value)}
+              disabled={isReadOnly}
+              size="small"
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 1.5,
+                  backgroundColor: surfaceInset,
+                  '& fieldset': { borderColor: hairline },
+                  '&:hover fieldset': { borderColor: alpha(violet, 0.5) },
+                  '&.Mui-focused fieldset': { borderColor: violet, borderWidth: 1 },
+                },
+                '& .MuiOutlinedInput-input': {
+                  fontSize: '0.85rem',
+                  lineHeight: 1.5,
+                },
+              }}
+            />
+          </Box>
+        )}
+
+        {/* ── Related trades ───────────────────────────────────────── */}
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+          <Typography sx={monoLabelSx}>
+            Related trades
+            {!isLoadingTrades && eventTrades.length > 0 && (
+              <Box
+                component="span"
+                sx={{
+                  ml: 0.5,
+                  fontFamily: MONO_FONT,
+                  fontSize: '0.68rem',
+                  fontWeight: 700,
+                  color: theme.palette.text.primary,
+                }}
+              >
+                · {eventTrades.length}
+              </Box>
+            )}
+          </Typography>
+
+          {isLoadingTrades ? (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              {[1, 2, 3].map((index) => (
+                <Box
+                  key={index}
+                  sx={{
+                    p: 1.5,
+                    borderRadius: 1.5,
+                    border: `1px solid ${hairline}`,
+                    backgroundColor: surfaceInset,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 1,
+                  }}
+                >
+                  <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                    <Shimmer width={60} height={20} borderRadius={4} intensity="medium" />
+                    <Shimmer width={80} height={20} borderRadius={4} intensity="medium" />
+                    <Box sx={{ flex: 1 }} />
+                    <Shimmer width={70} height={24} borderRadius={4} intensity="high" />
+                  </Box>
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Shimmer width="40%" height={16} borderRadius={4} intensity="low" />
+                    <Shimmer width="30%" height={16} borderRadius={4} intensity="low" />
+                  </Box>
+                  <Shimmer width="25%" height={16} borderRadius={4} intensity="low" />
+                </Box>
+              ))}
+            </Box>
+          ) : eventTrades.length === 0 ? (
+            <Box
+              sx={{
+                textAlign: 'center',
+                py: 3,
+                px: 2,
+                borderRadius: 1.5,
+                border: `1px dashed ${hairline}`,
+                backgroundColor: surfaceInset,
+              }}
+            >
+              <Typography
+                sx={{
+                  fontFamily: MONO_FONT,
+                  fontSize: '0.78rem',
+                  color: alpha(theme.palette.text.secondary, 0.8),
+                  fontWeight: 500,
+                }}
+              >
+                No trades logged around this event yet
+              </Typography>
+            </Box>
+          ) : (
+            <TradeList
+              trades={eventTrades}
+              expandedTradeId={expandedTradeId}
+              onTradeClick={(id) => setExpandedTradeId(prev => prev === id ? null : id)}
+              hideActions={isReadOnly}
+              calendarsById={calendarsById}
+              tradeOperations={tradeOperations}
+            />
+          )}
+        </Box>
+      </Box>
+    </BaseDialog>
   );
 };
 
 export default EconomicEventDetailDialog;
-
-
