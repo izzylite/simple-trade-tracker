@@ -9,11 +9,6 @@ import {
   alpha,
   Chip,
   Tooltip,
-  Divider,
-  List,
-  ListItem,
-  ListItemButton,
-  Alert,
   CircularProgress
 } from '@mui/material';
 import {
@@ -21,17 +16,9 @@ import {
   ArrowBackIos as ArrowBackIcon,
   ArrowForwardIos as ArrowForwardIcon,
   CalendarToday as CalendarIcon,
-  ShowChart as TradeIcon,
   SmartToy as AssistantIcon,
-  History as HistoryIcon,
-  AddComment as NewChatIcon,
-  Delete as DeleteIcon,
-  ArrowBack as BackIcon,
-  Schedule as ScheduleIcon,
-  Edit as EditIcon,
   Slideshow as SlideshowIcon
 } from '@mui/icons-material';
-import { AIConversation } from '../types/aiChat';
 import { format } from 'date-fns';
 import { Trade, Calendar } from '../types/dualWrite';
 import { EconomicEvent } from '../types/economicCalendar';
@@ -39,9 +26,9 @@ import { Note } from '../types/note';
 import TradeDetailExpanded from './TradeDetailExpanded';
 import { scrollbarStyles } from '../styles/scrollbarStyles';
 import { TradeOperationsProps } from '../types/tradeOperations';
-import RoundedTabs, { TabPanel } from './common/RoundedTabs';
 import { useAIChat } from '../hooks/useAIChat';
-import AIChatInterface, { QuestionTemplate } from './aiChat/AIChatInterface';
+import { QuestionTemplate } from './aiChat/AIChatInterface';
+import OrionPanel from './aiChat/OrionPanel';
 import { useAuthState } from '../contexts/AuthStateContext';
 import Shimmer from './Shimmer';
 import EconomicEventDetailDialog from './economicCalendar/EconomicEventDetailDialog';
@@ -110,8 +97,10 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
   const theme = useTheme();
   const { user } = useAuthState();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  // In aiOnlyMode, always show Assistant tab (index 1)
-  const [activeTab, setActiveTab] = useState(aiOnlyMode ? 1 : 0);
+  // Orion side-panel — auto-open in aiOnlyMode (where the user explicitly
+  // launched the dialog into chat mode).
+  const [orionOpen, setOrionOpen] = useState(aiOnlyMode);
+  const [orionShowHistory, setOrionShowHistory] = useState(false);
 
   // Fetch mode state - used when trades array is empty and fetchYear is set
   const [internalTrades, setInternalTrades] = useState<Trade[]>([]);
@@ -283,9 +272,6 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
     }
   }, [tradeSync?.lastSyncEvent, open, calendarId, isFetchMode]);
 
-  // History sliding view state (like AIChatDrawer)
-  const [showHistoryView, setShowHistoryView] = useState(false);
-
   // Economic event detail dialog state
   const [selectedEvent, setSelectedEvent] = useState<EconomicEvent | null>(null);
   const [eventDetailDialogOpen, setEventDetailDialogOpen] = useState(false);
@@ -313,6 +299,7 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
     setViewerNoteId(null);
     setViewerLoading(false);
     setViewerOpen(true);
+    setOrionOpen(false); // Right slot is mutex — close Orion if it was up
   }, []);
 
   // Open immediately with shimmer; the panel fetches by id internally.
@@ -323,6 +310,7 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
     setViewerNoteId(noteId);
     setViewerLoading(false);
     setViewerOpen(true);
+    setOrionOpen(false);
   }, []);
 
   // Open immediately with shimmer; caller will populate via
@@ -335,11 +323,24 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
       setViewerNoteId(null);
       setViewerLoading(true);
       setViewerOpen(true);
+      setOrionOpen(false);
       if (opts?.emptyTitle) setViewerEmptyTitle(opts.emptyTitle);
       if (opts?.emptyMessage) setViewerEmptyMessage(opts.emptyMessage);
     },
     []
   );
+
+  // Opening Orion closes any open note. State for both sides is dialog-
+  // level (aiChat hook + viewerNote/viewerNoteId), so reopening either
+  // panel restores its previous content — no loss of conversation or
+  // viewed note across toggles.
+  const handleToggleOrion = useCallback(() => {
+    setOrionOpen((prev) => {
+      const next = !prev;
+      if (next) setViewerOpen(false);
+      return next;
+    });
+  }, []);
 
   const handleCloseNoteViewer = useCallback(() => {
     setViewerOpen(false);
@@ -358,19 +359,17 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
   // Track previous trade ID to detect trade changes
   const previousTradeIdRef = useRef<string | null>(null);
 
-  // Reset tab when navigating between trades
-  // In normal mode: reset to Trade tab (0)
-  // In aiOnlyMode: keep on Assistant tab (1)
+  // When navigating between trades, close transient panels whose
+  // contents were tied to the previous trade. Orion stays open (the
+  // conversation reset below keeps it scoped) but its history pager
+  // collapses back to the chat view.
   useEffect(() => {
-    setActiveTab(aiOnlyMode ? 1 : 0);
-    setShowHistoryView(false);
-    // Close note viewer panel — its content was tied to the
-    // previous trade's game plan / chat references.
+    setOrionShowHistory(false);
     setViewerOpen(false);
     setViewerNote(null);
     setViewerNoteId(null);
     setViewerLoading(false);
-  }, [safeCurrentIndex, aiOnlyMode]);
+  }, [safeCurrentIndex]);
 
   // Clear panel state whenever the dialog closes so it doesn't
   // re-appear stale on the next open with a different trade.
@@ -398,18 +397,17 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
     // If trade changed, reset the conversation
     if (previousTradeIdRef.current !== null && previousTradeIdRef.current !== currentTradeId) {
       aiChat.setMessages([]);
-      setShowHistoryView(false);
     }
 
     previousTradeIdRef.current = currentTradeId;
   }, [currentTrade?.id, aiChat.setMessages]);
 
-  // Load trade-specific conversations when switching to Assistant tab
+  // Load trade-specific conversations when Orion panel opens.
   useEffect(() => {
-    if (activeTab === 1 && currentTrade?.id && user?.uid) {
+    if (orionOpen && currentTrade?.id && user?.uid) {
       aiChat.loadConversations();
     }
-  }, [activeTab, currentTrade?.id, user?.uid, aiChat.loadConversations]);
+  }, [orionOpen, currentTrade?.id, user?.uid, aiChat.loadConversations]);
 
   // Single trade context for AI to focus on
   const tradeContext = useMemo(() => {
@@ -453,35 +451,8 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
     ];
   }, [currentTrade]);
 
-  // Handle tab change
-  const handleTabChange = useCallback((_: React.SyntheticEvent, newValue: number) => {
-    setActiveTab(newValue);
-    setShowHistoryView(false);
-  }, []);
-
-  // History handlers (sliding panel approach like AIChatDrawer)
-  const handleNewChat = useCallback(async () => {
-    await aiChat.startNewChat();
-    setShowHistoryView(false);
-  }, [aiChat.startNewChat]);
-
-  const handleSelectConversation = useCallback((conversation: AIConversation) => {
-    aiChat.selectConversation(conversation);
-    setShowHistoryView(false);
-  }, [aiChat.selectConversation]);
-
-  const handleDeleteConversation = useCallback(async (conversationId: string, event: React.MouseEvent) => {
-    event.stopPropagation();
-    await aiChat.deleteConversation(conversationId);
-  }, [aiChat.deleteConversation]);
-
-  const getPreviewText = useCallback((conversation: AIConversation): string => {
-    const firstUserMessage = conversation.messages.find(msg => msg.role === 'user');
-    if (firstUserMessage && firstUserMessage.content) {
-      return firstUserMessage.content.substring(0, 80) +
-        (firstUserMessage.content.length > 80 ? '...' : '');
-    }
-    return 'No messages';
+  const handleToggleOrionHistory = useCallback(() => {
+    setOrionShowHistory((prev) => !prev);
   }, []);
 
   // Navigation functions
@@ -773,56 +744,29 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
             </Tooltip>
           )}
 
-          <RoundedTabs
-            tabs={[
-              { label: 'Trade', icon: <TradeIcon sx={{ fontSize: 18 }} /> },
-              { label: 'Ask Orion', icon: <AssistantIcon sx={{ fontSize: 18 }} /> }
-            ]}
-            activeTab={activeTab}
-            onTabChange={handleTabChange}
-            size="small"
-          />
-
-          {/* History controls - only show when on Assistant tab */}
-          {activeTab === 1 && (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 1 }}>
-              <Tooltip
-                title="New Chat"
-                slotProps={{ popper: { sx: { zIndex: Z_INDEX.TOOLTIP } } }}
-              >
-                <span>
-                  <IconButton
-                    size="small"
-                    onClick={handleNewChat}
-                    disabled={aiChat.messages.length === 0}
-                    sx={{
-                      color: 'primary.main',
-                      '&:hover': { backgroundColor: alpha(theme.palette.primary.main, 0.1) },
-                      '&:disabled': { color: 'text.disabled' }
-                    }}
-                  >
-                    <NewChatIcon sx={{ fontSize: 18 }} />
-                  </IconButton>
-                </span>
-              </Tooltip>
-
-              <Tooltip
-                title={showHistoryView ? "Back to Chat" : "Conversation History"}
-                slotProps={{ popper: { sx: { zIndex: Z_INDEX.TOOLTIP } } }}
-              >
-                <IconButton
-                  size="small"
-                  onClick={() => setShowHistoryView(!showHistoryView)}
-                  sx={{
-                    color: showHistoryView ? 'primary.main' : 'text.secondary',
-                    '&:hover': { backgroundColor: alpha(theme.palette.action.hover, 0.5) }
-                  }}
-                >
-                  {showHistoryView ? <BackIcon sx={{ fontSize: 18 }} /> : <HistoryIcon sx={{ fontSize: 18 }} />}
-                </IconButton>
-              </Tooltip>
-            </Box>
-          )}
+          {/* Ask Orion toggle — opens the side panel. Active state when
+              the panel is currently open. */}
+          <Tooltip
+            title={orionOpen ? 'Close Orion' : 'Ask Orion about this trade'}
+            slotProps={{ popper: { sx: { zIndex: Z_INDEX.TOOLTIP } } }}
+          >
+            <IconButton
+              size="small"
+              onClick={handleToggleOrion}
+              sx={{
+                color: orionOpen ? 'primary.main' : 'text.secondary',
+                bgcolor: orionOpen
+                  ? alpha(theme.palette.primary.main, 0.12)
+                  : 'transparent',
+                '&:hover': {
+                  backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                  color: 'primary.main',
+                },
+              }}
+            >
+              <AssistantIcon sx={{ fontSize: 20 }} />
+            </IconButton>
+          </Tooltip>
         </Box>
 
         {/* Close Button */}
@@ -840,8 +784,10 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
         </IconButton>
       </Box>
 
-      {/* Body: flex row with main content (left) + slide-in note panel (right).
-          Header stays above this row at full width. */}
+      {/* Body: flex row with main content (left) + slide-in panels (right).
+          Orion and the note viewer share the right slot via mutex (one
+          open at a time), so both panels render as direct flex siblings
+          and only one ever has non-zero width. */}
       <Box sx={{
         display: 'flex',
         flexDirection: 'row',
@@ -858,18 +804,17 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
         overflow: 'hidden'
       }}>
 
-      {/* Tab Content */}
-      {/* Trade Details */}
-      <TabPanel value={activeTab} index={0} fullHeight>
-        <Box
-          ref={scrollContainerRef}
-          sx={{
-            flex: 1,
-            minHeight: 0,
-            overflow: 'auto',
-            ...scrollbarStyles(theme)
-          }}
-        >
+      {/* Trade detail — always rendered. Orion lives in the right
+          slide-in slot, not behind a tab. */}
+      <Box
+        ref={scrollContainerRef}
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          overflow: 'auto',
+          ...scrollbarStyles(theme)
+        }}
+      >
           {isInitialLoading ? (
             // Shimmer loading state matching TradeDetailExpanded structure
             <Box sx={{ p: 3, display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -1013,232 +958,49 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
             />
           ) : null}
         </Box>
-      </TabPanel>
-
-      <TabPanel value={activeTab} index={1} fullHeight>
-        {/* AI Assistant - Sliding Pager (Chat + History) */}
-        <Box
-          sx={{
-            flex: 1,
-            minHeight: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden',
-            position: 'relative'
-          }}
-        >
-          {/* Pager Container */}
-          <Box sx={{
-            display: 'flex',
-            width: '200%',
-            height: '100%',
-            transform: showHistoryView ? 'translateX(-50%)' : 'translateX(0)',
-            transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-          }}>
-            {/* Chat View */}
-            <Box sx={{
-              width: '50%',
-              height: '100%',
-              display: 'flex',
-              flexDirection: 'column',
-              overflow: 'hidden'
-            }}>
-              <AIChatInterface
-                {...aiChat}
-                userId={user?.uid}
-                calendar={calendar}
-                trades={tradeContext}
-                questionTemplates={tradeQuestionTemplates}
-                autoScroll={aiChat.messages.length > 0}
-                onTradeClick={(tradeId, contextTrades) => {
-                  // Navigate to the trade within the gallery
-                  const tradeIndex = effectiveTrades.findIndex(t => t.id === tradeId);
-                  if (tradeIndex >= 0 && effectiveTrades.length <= 5) {
-                    setCurrentIndex(tradeIndex);
-                    setActiveTab(0); // Switch to Trade tab
-                  } else if (onOpenGalleryMode) {
-                    // Trade not in current gallery, open new gallery
-                    onOpenGalleryMode(contextTrades, tradeId, 'AI Chat - Trade Gallery');
-                  } else {
-                    logger.log('Trade clicked but not found in gallery:', tradeId);
-                  }
-                }}
-                onEventClick={(event) => {
-                  logger.log('Economic event clicked:', event);
-                  setSelectedEvent(event);
-                  setEventDetailDialogOpen(true);
-                }}
-                onNoteClick={(noteId, note) => {
-                  logger.log('Note clicked:', noteId);
-                  if (note) {
-                    handleOpenNote(note);
-                  } else {
-                    // Conversations loaded from history don't carry
-                    // embeddedNotes — let the panel fetch and shimmer.
-                    handleOpenNoteById(noteId);
-                  }
-                }}
-                isReadOnly={isReadOnly}
-              />
-            </Box>
-
-            {/* History View */}
-            <Box sx={{
-              width: '50%',
-              height: '100%',
-              display: 'flex',
-              flexDirection: 'column',
-              overflow: 'hidden'
-            }}>
-              {/* History Header */}
-              <Box sx={{
-                p: 2,
-                borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                backgroundColor: theme.palette.background.paper
-              }}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                  Conversation History
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {aiChat.conversations.length} conversation{aiChat.conversations.length !== 1 ? 's' : ''} for this trade
-                </Typography>
-              </Box>
-
-              {/* History Content */}
-              <Box sx={{
-                flex: 1,
-                overflow: 'auto',
-                ...scrollbarStyles(theme)
-              }}>
-                {aiChat.loadingConversations ? (
-                  <List sx={{ p: 0 }}>
-                    {Array.from({ length: 5 }).map((_, index) => (
-                      <React.Fragment key={index}>
-                        <ListItem sx={{ py: 2, px: 2 }}>
-                          <Box sx={{ width: '100%' }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                              <Shimmer height={20} width="60%" borderRadius={4} variant="wave" intensity="medium" />
-                              <Shimmer height={20} width={60} borderRadius={10} variant="pulse" intensity="low" />
-                            </Box>
-                            <Shimmer height={16} width="90%" borderRadius={4} variant="default" intensity="low" sx={{ mb: 0.5 }} />
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                              <Shimmer height={14} width={120} borderRadius={4} variant="default" intensity="low" />
-                            </Box>
-                          </Box>
-                        </ListItem>
-                        {index < 4 && <Divider />}
-                      </React.Fragment>
-                    ))}
-                  </List>
-                ) : aiChat.conversations.length === 0 ? (
-                  <Box sx={{ p: 3 }}>
-                    <Alert severity="info">
-                      No conversation history yet. Start chatting with the AI to create your first conversation for this trade!
-                    </Alert>
-                  </Box>
-                ) : (
-                  <List sx={{ p: 0 }}>
-                    {aiChat.conversations.map((conversation, index) => (
-                      <React.Fragment key={conversation.id}>
-                        <ListItem disablePadding>
-                          <ListItemButton
-                            onClick={() => handleSelectConversation(conversation)}
-                            sx={{
-                              py: 2,
-                              px: 2,
-                              display: 'flex',
-                              alignItems: 'flex-start',
-                              gap: 1,
-                              '&:hover': {
-                                backgroundColor: alpha(theme.palette.primary.main, 0.08)
-                              }
-                            }}
-                          >
-                            <Box sx={{ flex: 1, minWidth: 0 }}>
-                              {/* Title and chip */}
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                                <Typography
-                                  variant="subtitle1"
-                                  sx={{
-                                    fontWeight: 600,
-                                    fontSize: '0.95rem',
-                                    flex: 1,
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    whiteSpace: 'nowrap'
-                                  }}
-                                >
-                                  {conversation.title}
-                                </Typography>
-                                <Chip
-                                  label={`${conversation.message_count} msgs`}
-                                  size="small"
-                                  sx={{
-                                    height: 20,
-                                    fontSize: '0.7rem',
-                                    backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                                    color: 'primary.main'
-                                  }}
-                                />
-                              </Box>
-
-                              {/* Preview text */}
-                              <Typography
-                                variant="body2"
-                                color="text.secondary"
-                                sx={{
-                                  fontSize: '0.85rem',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  display: '-webkit-box',
-                                  WebkitLineClamp: 2,
-                                  WebkitBoxOrient: 'vertical',
-                                  mb: 0.5
-                                }}
-                              >
-                                {getPreviewText(conversation)}
-                              </Typography>
-
-                              {/* Date */}
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                <ScheduleIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
-                                <Typography variant="caption" color="text.disabled">
-                                  {format(conversation.updated_at, 'MMM d, yyyy • h:mm a')}
-                                </Typography>
-                              </Box>
-                            </Box>
-
-                            {/* Delete button */}
-                            <IconButton
-                              onClick={(e) => handleDeleteConversation(conversation.id, e)}
-                              size="small"
-                              sx={{
-                                color: 'error.main',
-                                flexShrink: 0,
-                                mt: 0.5,
-                                '&:hover': {
-                                  backgroundColor: alpha(theme.palette.error.main, 0.1)
-                                }
-                              }}
-                            >
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
-                          </ListItemButton>
-                        </ListItem>
-                        {index < aiChat.conversations.length - 1 && <Divider />}
-                      </React.Fragment>
-                    ))}
-                  </List>
-                )}
-              </Box>
-            </Box>
-          </Box>
-        </Box>
-      </TabPanel>
       </Box>{/* /Main content column */}
 
-      {/* Inline Note Viewer Panel — slides in from the right and
-          shrinks the main content. Read-only. */}
+      {/* Orion side-panel — direct flex sibling so its % widths
+          resolve against the real flex-row width. */}
+      <OrionPanel
+        open={orionOpen}
+        onClose={() => setOrionOpen(false)}
+        aiChat={aiChat}
+        showHistory={orionShowHistory}
+        onToggleHistory={handleToggleOrionHistory}
+        userId={user?.uid}
+        calendar={calendar}
+        trades={tradeContext}
+        questionTemplates={tradeQuestionTemplates}
+        isReadOnly={isReadOnly}
+        onTradeClick={(tradeId, contextTrades) => {
+          const tradeIndex = effectiveTrades.findIndex((t) => t.id === tradeId);
+          if (tradeIndex >= 0 && effectiveTrades.length <= 5) {
+            setCurrentIndex(tradeIndex);
+          } else if (onOpenGalleryMode) {
+            onOpenGalleryMode(contextTrades, tradeId, 'AI Chat - Trade Gallery');
+          } else {
+            logger.log('Trade clicked but not found in gallery:', tradeId);
+          }
+        }}
+        onEventClick={(event) => {
+          setSelectedEvent(event);
+          setEventDetailDialogOpen(true);
+        }}
+        onNoteClick={(noteId, note) => {
+          if (note) {
+            handleOpenNote(note);
+          } else {
+            handleOpenNoteById(noteId);
+          }
+        }}
+      />
+
+      {/* NoteViewerPanel — direct flex sibling. The right slot is
+          mutex with Orion (handleOpenNote* + handleToggleOrion
+          enforce one-at-a-time) so no overlay is needed. Both
+          panels keep their content via dialog-level state, so
+          toggling between them is non-destructive. */}
       <NoteViewerPanel
         open={viewerOpen}
         onClose={handleCloseNoteViewer}
