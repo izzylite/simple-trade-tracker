@@ -281,10 +281,8 @@ const EconomicEventRow: React.FC<EconomicEventRowProps> = ({
       }}
       sx={{
         position: 'relative',
-        display: 'grid',
-        gridTemplateColumns: '52px 1fr auto auto',
-        gap: 1.5,
-        alignItems: 'flex-start',
+        display: 'flex',
+        flexDirection: 'column',
         px: 2.25,
         py: 1.75,
         borderTop: firstRow ? 'none' : `1px solid ${theme.palette.divider}`,
@@ -304,6 +302,14 @@ const EconomicEventRow: React.FC<EconomicEventRowProps> = ({
         ...nowDotSx,
       }}
     >
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: '52px 1fr auto auto',
+          gap: 1.5,
+          alignItems: 'flex-start',
+        }}
+      >
       <Box
         sx={{
           minWidth: 36,
@@ -410,103 +416,6 @@ const EconomicEventRow: React.FC<EconomicEventRowProps> = ({
           {event.event_name}
         </Typography>
 
-        {hasAnyValue && (
-          <Stack
-            direction="row"
-            spacing={0.875}
-            alignItems="center"
-            flexWrap="wrap"
-            sx={{ mt: 0.625, rowGap: 0.5 }}
-          >
-            {event.actual_value ? (
-              <ValuePill
-                label={`A: ${event.actual_value}`}
-                bg={actualStyle.bg}
-                border={actualStyle.border}
-                color={actualStyle.color}
-              />
-            ) : (
-              (event.forecast_value || event.previous_value) && (
-                <Stack direction="row" alignItems="center" spacing={0.5}>
-                  <Typography
-                    sx={{ fontSize: '0.7rem', fontWeight: 700, color: 'text.disabled' }}
-                  >
-                    A:
-                  </Typography>
-                  <HourglassEmptyIcon sx={{ fontSize: 12, color: 'warning.main' }} />
-                </Stack>
-              )
-            )}
-            {event.forecast_value && (
-              <ValuePill
-                label={`F: ${event.forecast_value}`}
-                bg={alpha(theme.palette.info.main, 0.1)}
-                border={alpha(theme.palette.info.main, 0.2)}
-                color={theme.palette.text.secondary}
-              />
-            )}
-            {event.previous_value && (
-              <ValuePill
-                label={`P: ${event.previous_value}`}
-                bg={alpha(theme.palette.grey[500], 0.1)}
-                border={alpha(theme.palette.grey[500], 0.2)}
-                color={theme.palette.text.disabled}
-              />
-            )}
-            {tradeCount > 0 && (
-              <Tooltip
-                title={`Traded ${tradeCount} time${tradeCount > 1 ? 's' : ''} across all calendars`}
-                placement="top"
-                arrow
-              >
-                <Box
-                  sx={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 0.375,
-                    px: 0.75,
-                    py: 0.25,
-                    borderRadius: 0.75,
-                    bgcolor: alpha(theme.palette.primary.main, 0.14),
-                    border: `1px solid ${alpha(theme.palette.primary.main, 0.28)}`,
-                    color: theme.palette.primary.main,
-                    fontSize: '0.68rem',
-                    fontWeight: 700,
-                    lineHeight: 1.4,
-                  }}
-                >
-                  {tradeCount}×
-                </Box>
-              </Tooltip>
-            )}
-          </Stack>
-        )}
-        {!hasAnyValue && tradeCount > 0 && (
-          <Tooltip
-            title={`Traded ${tradeCount} time${tradeCount > 1 ? 's' : ''} across all calendars`}
-            placement="top"
-            arrow
-          >
-            <Box
-              sx={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                mt: 0.5,
-                px: 0.75,
-                py: 0.25,
-                borderRadius: 0.75,
-                bgcolor: alpha(theme.palette.primary.main, 0.14),
-                border: `1px solid ${alpha(theme.palette.primary.main, 0.28)}`,
-                color: theme.palette.primary.main,
-                fontSize: '0.68rem',
-                fontWeight: 700,
-                lineHeight: 1.4,
-              }}
-            >
-              {tradeCount}×
-            </Box>
-          </Tooltip>
-        )}
       </Box>
 
       <Box sx={{ pt: 0.5 }}>
@@ -538,6 +447,91 @@ const EconomicEventRow: React.FC<EconomicEventRowProps> = ({
             </IconButton>
           </span>
         </Tooltip>
+      )}
+      </Box>
+
+      {(hasAnyValue || tradeCount > 0) && (
+        <Stack
+          direction="row"
+          spacing={0.875}
+          alignItems="center"
+          flexWrap="nowrap"
+          sx={{
+            mt: 0.875,
+            pl: '64px',
+            minWidth: 0,
+            overflowX: 'auto',
+            '&::-webkit-scrollbar': { display: 'none' },
+            scrollbarWidth: 'none',
+            '& > *': { flexShrink: 0 },
+          }}
+        >
+          {hasAnyValue && (
+            <>
+              {event.actual_value ? (
+                <ValuePill
+                  label={`A: ${event.actual_value}`}
+                  bg={actualStyle.bg}
+                  border={actualStyle.border}
+                  color={actualStyle.color}
+                />
+              ) : (
+                (event.forecast_value || event.previous_value) && (
+                  <Stack direction="row" alignItems="center" spacing={0.5}>
+                    <Typography
+                      sx={{ fontSize: '0.7rem', fontWeight: 700, color: 'text.disabled' }}
+                    >
+                      A:
+                    </Typography>
+                    <HourglassEmptyIcon sx={{ fontSize: 12, color: 'warning.main' }} />
+                  </Stack>
+                )
+              )}
+              {event.forecast_value && (
+                <ValuePill
+                  label={`F: ${event.forecast_value}`}
+                  bg={alpha(theme.palette.info.main, 0.1)}
+                  border={alpha(theme.palette.info.main, 0.2)}
+                  color={theme.palette.text.secondary}
+                />
+              )}
+              {event.previous_value && (
+                <ValuePill
+                  label={`P: ${event.previous_value}`}
+                  bg={alpha(theme.palette.grey[500], 0.1)}
+                  border={alpha(theme.palette.grey[500], 0.2)}
+                  color={theme.palette.text.disabled}
+                />
+              )}
+            </>
+          )}
+          {tradeCount > 0 && (
+            <Tooltip
+              title={`Traded ${tradeCount} time${tradeCount > 1 ? 's' : ''} across all calendars`}
+              placement="top"
+              arrow
+            >
+              <Box
+                sx={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 0.375,
+                  px: 0.75,
+                  py: 0.25,
+                  borderRadius: 0.75,
+                  bgcolor: alpha(theme.palette.primary.main, 0.14),
+                  border: `1px solid ${alpha(theme.palette.primary.main, 0.28)}`,
+                  color: theme.palette.primary.main,
+                  fontSize: '0.68rem',
+                  fontWeight: 700,
+                  lineHeight: 1.4,
+                }}
+              >
+                {tradeCount}×
+              </Box>
+            </Tooltip>
+          )}
+        </Stack>
       )}
     </Box>
   );
