@@ -1,25 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   Button,
-  Stepper,
-  Step,
-  StepLabel,
   Box,
   Typography,
   CircularProgress,
   Alert,
-  IconButton,
   Snackbar,
-  alpha
+  TextField,
+  alpha,
+  useTheme,
 } from '@mui/material';
 import {
-  Close,
   Save,
-  Folder
+  FolderOpenOutlined as FolderIcon,
+  UploadFileOutlined as UploadFileIcon,
+  CheckCircle as CheckCircleIcon,
 } from '@mui/icons-material';
 import { Trade } from '../../types/dualWrite';
 import {
@@ -30,20 +25,26 @@ import {
   MappingTarget,
   ImportPreviewRow,
   ValidationSummary as ValidationSummaryType,
-  ImportMappingTemplate
+  ImportMappingTemplate,
 } from '../../types/import';
 import { ColumnMapper } from './ColumnMapper';
 import { ImportPreview } from './ImportPreview';
 import { ValidationSummary } from './ValidationSummary';
 import { TypeConverterPanel } from './TypeConverterPanel';
 import { MappingTemplateManager } from './MappingTemplateManager';
-import { detectColumnMapping, validateRequiredFieldsMapped, validateAndCorrectMappings, isColumnCompatibleWithField } from '../../utils/columnDetection';
+import {
+  detectColumnMapping,
+  validateRequiredFieldsMapped,
+  validateAndCorrectMappings,
+  isColumnCompatibleWithField,
+} from '../../utils/columnDetection';
 import { validateImportData } from '../../utils/importValidation';
 import {
   findMatchingTemplate,
   saveMappingTemplate,
-  updateTemplateLastUsed
+  updateTemplateLastUsed,
 } from '../../utils/importMappingStorage';
+import BaseDialog from '../common/BaseDialog';
 // Lazy-load xlsx (~600KB) only when an .xlsx file is actually parsed.
 const loadXLSX = () => import('xlsx');
 
@@ -56,17 +57,80 @@ interface ImportMappingDialogProps {
 
 const STEPS = ['Upload & Parse', 'Map Columns', 'Preview & Validate'];
 
+const MONO_FONT = "'JetBrains Mono', ui-monospace, monospace";
+
 export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
   open,
   onClose,
   onImport,
-  file
+  file,
 }) => {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+
+  const violet = theme.palette.primary.main;
+  const violetSoft = alpha(violet, isDark ? 0.18 : 0.14);
+  const violetSofter = alpha(violet, isDark ? 0.12 : 0.10);
+  const violetBorder = alpha(violet, isDark ? 0.35 : 0.28);
+  const surfaceInset = isDark
+    ? 'rgba(255,255,255,0.03)'
+    : alpha(theme.palette.text.primary, 0.03);
+  const hairline = isDark ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
+
+  const monoLabelSx = {
+    fontFamily: MONO_FONT,
+    fontSize: '0.68rem',
+    fontWeight: 600,
+    letterSpacing: '0.12em',
+    textTransform: 'uppercase' as const,
+    color: theme.palette.text.secondary,
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 0.75,
+  };
+
+  const inputSx = {
+    '& .MuiOutlinedInput-root': {
+      borderRadius: 1.5,
+      backgroundColor: surfaceInset,
+      '& fieldset': { borderColor: hairline },
+      '&:hover fieldset': { borderColor: alpha(violet, 0.5) },
+      '&.Mui-focused fieldset': { borderColor: violet, borderWidth: 1 },
+    },
+    '& .MuiOutlinedInput-input, & .MuiSelect-select': {
+      py: 1.1,
+      fontSize: '0.88rem',
+      fontWeight: 500,
+    },
+  };
+
+  const ghostButtonSx = {
+    textTransform: 'none' as const,
+    fontWeight: 600,
+    fontSize: '0.8rem',
+    color: theme.palette.text.primary,
+    backgroundColor: surfaceInset,
+    border: `1px solid ${hairline}`,
+    borderRadius: 1.25,
+    px: 1.5,
+    py: 0.625,
+    minHeight: 0,
+    '&:hover': {
+      backgroundColor: alpha(theme.palette.text.primary, isDark ? 0.06 : 0.05),
+      borderColor: alpha(violet, 0.45),
+    },
+    '&.Mui-disabled': {
+      color: alpha(theme.palette.text.primary, 0.35),
+      borderColor: alpha(theme.palette.divider, 0.6),
+    },
+  };
+
   const [currentStep, setCurrentStep] = useState<number>(0);
   const [fileData, setFileData] = useState<ImportFileData | null>(null);
   const [columnMappings, setColumnMappings] = useState<ColumnMapping[]>([]);
   const [previewRows, setPreviewRows] = useState<ImportPreviewRow[]>([]);
-  const [validationSummary, setValidationSummary] = useState<ValidationSummaryType | null>(null);
+  const [validationSummary, setValidationSummary] =
+    useState<ValidationSummaryType | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showTemplateManager, setShowTemplateManager] = useState(false);
@@ -74,12 +138,14 @@ export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
   const [showSaveTemplate, setShowSaveTemplate] = useState(false);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
-  const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error'>('success');
+  const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error'>(
+    'success',
+  );
 
   const config: ImportConfig = {
     skipErrorRows: true,
     createTagsFromUnmapped: true,
-    numberFormat: 'us'
+    numberFormat: 'us',
   };
 
   // Parse file on open
@@ -109,7 +175,9 @@ export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
     setError(null);
 
     try {
-      const fileType = file.name.split('.').pop()?.toLowerCase() as 'xlsx' | 'csv';
+      const fileType = file.name.split('.').pop()?.toLowerCase() as
+        | 'xlsx'
+        | 'csv';
       let parsedData: ImportFileData;
 
       if (fileType === 'csv') {
@@ -124,16 +192,22 @@ export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
       const detectedMappings = detectColumnMapping(parsedData.columns);
 
       // Validate and auto-correct mappings based on actual data
-      const { correctedMappings, corrections } = validateAndCorrectMappings(detectedMappings, parsedData);
+      const { correctedMappings, corrections } = validateAndCorrectMappings(
+        detectedMappings,
+        parsedData,
+      );
 
       // Show warnings if any mappings were auto-corrected
       if (corrections.length > 0) {
-        const correctionMessages = corrections.map(c =>
-          `"${c.column}" cannot be mapped to "${c.originalTarget}": ${c.reason}`
-        ).join('\n');
+        const correctionMessages = corrections
+          .map(
+            (c) =>
+              `"${c.column}" cannot be mapped to "${c.originalTarget}": ${c.reason}`,
+          )
+          .join('\n');
 
         setSnackbarMessage(
-          `⚠️ Auto-corrected ${corrections.length} incompatible mapping(s):\n${correctionMessages}\n\nThese columns have been set to "Ignore".`
+          `⚠️ Auto-corrected ${corrections.length} incompatible mapping(s):\n${correctionMessages}\n\nThese columns have been set to "Ignore".`,
         );
         setSnackbarSeverity('error');
         setSnackbarOpen(true);
@@ -159,7 +233,9 @@ export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
           const data = new Uint8Array(e.target?.result as ArrayBuffer);
           const workbook = XLSX.read(data, { type: 'array' });
           const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-          const jsonData = XLSX.utils.sheet_to_json(worksheet) as Array<Record<string, any>>;
+          const jsonData = XLSX.utils.sheet_to_json(worksheet) as Array<
+            Record<string, any>
+          >;
 
           if (jsonData.length === 0) {
             throw new Error('No data found in file');
@@ -172,7 +248,7 @@ export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
             rows: jsonData,
             fileType: 'xlsx',
             fileName: file.name,
-            rowCount: jsonData.length
+            rowCount: jsonData.length,
           });
         } catch (err) {
           reject(err);
@@ -227,10 +303,12 @@ export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
       reader.onload = (e) => {
         try {
           const text = e.target?.result as string;
-          const lines = text.split('\n').filter(line => line.trim());
+          const lines = text.split('\n').filter((line) => line.trim());
 
           if (lines.length < 2) {
-            throw new Error('CSV file must have at least a header and one data row');
+            throw new Error(
+              'CSV file must have at least a header and one data row',
+            );
           }
 
           const headers = parseCSVLine(lines[0]);
@@ -252,7 +330,7 @@ export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
             rows,
             fileType: 'csv',
             fileName: file.name,
-            rowCount: rows.length
+            rowCount: rows.length,
           });
         } catch (err) {
           reject(err);
@@ -270,7 +348,7 @@ export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
     const { previewRows: rows, validationSummary: summary } = validateImportData(
       fileData.rows,
       columnMappings,
-      config
+      config,
     );
 
     setPreviewRows(rows);
@@ -281,14 +359,16 @@ export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
     // If target is a trade field (not 'ignore' or 'create_tag'), validate compatibility
     if (target !== 'ignore' && target !== 'create_tag' && fileData) {
       // Get sample values for this column
-      const sampleValues = fileData.rows.slice(0, 100).map(row => row[fileColumn]);
+      const sampleValues = fileData.rows
+        .slice(0, 100)
+        .map((row) => row[fileColumn]);
       const compatibility = isColumnCompatibleWithField(sampleValues, target);
 
       if (!compatibility.isCompatible) {
         // Show error and don't allow the mapping
         setSnackbarMessage(
           `❌ Cannot map "${fileColumn}" to "${target}": ${compatibility.reason}\n\n` +
-          `This column will remain set to "Ignore". Clean your data or choose a different field.`
+            `This column will remain set to "Ignore". Clean your data or choose a different field.`,
         );
         setSnackbarSeverity('error');
         setSnackbarOpen(true);
@@ -296,12 +376,12 @@ export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
       }
     }
 
-    setColumnMappings(prev =>
-      prev.map(m =>
+    setColumnMappings((prev) =>
+      prev.map((m) =>
         m.fileColumn === fileColumn
           ? { ...m, target, autoDetected: false }
-          : m
-      )
+          : m,
+      ),
     );
   };
 
@@ -310,27 +390,36 @@ export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
       // Validate required fields are mapped
       const validation = validateRequiredFieldsMapped(columnMappings);
       if (!validation.isValid) {
-        setError(`Required fields not mapped: ${validation.missingFields.join(', ')}`);
+        setError(
+          `Required fields not mapped: ${validation.missingFields.join(', ')}`,
+        );
         return;
       }
 
       // Check if any pair-related tags are mapped
       // Look for columns mapped to tags, or unmapped columns that will become tags
-      const hasPairColumn = fileData?.columns.some(col =>
-        col.toLowerCase().includes('pair') ||
-        col.toLowerCase().includes('symbol') ||
-        col.toLowerCase().includes('instrument')
+      const hasPairColumn = fileData?.columns.some(
+        (col) =>
+          col.toLowerCase().includes('pair') ||
+          col.toLowerCase().includes('symbol') ||
+          col.toLowerCase().includes('instrument'),
       );
 
       if (hasPairColumn) {
-        const pairColumnMapping = columnMappings.find(m => {
+        const pairColumnMapping = columnMappings.find((m) => {
           const colName = m.fileColumn.toLowerCase();
-          return (colName.includes('pair') || colName.includes('symbol') || colName.includes('instrument'));
+          return (
+            colName.includes('pair') ||
+            colName.includes('symbol') ||
+            colName.includes('instrument')
+          );
         });
 
         // If pair column exists but is mapped to 'ignore', warn user
         if (pairColumnMapping?.target === 'ignore') {
-          setSnackbarMessage('⚠️ Warning: Pair/Symbol column is set to "Ignore". Trades will not have economic events attached. Consider mapping it to "Tags" or "Create Tag".');
+          setSnackbarMessage(
+            '⚠️ Warning: Pair/Symbol column is set to "Ignore". Trades will not have economic events attached. Consider mapping it to "Tags" or "Create Tag".',
+          );
           setSnackbarSeverity('error');
           setSnackbarOpen(true);
           // Don't return - allow them to proceed with warning
@@ -341,12 +430,12 @@ export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
     }
 
     setError(null);
-    setCurrentStep(prev => prev + 1);
+    setCurrentStep((prev) => prev + 1);
   };
 
   const handleBack = () => {
     setError(null);
-    setCurrentStep(prev => prev - 1);
+    setCurrentStep((prev) => prev - 1);
   };
 
   const handleImport = () => {
@@ -354,8 +443,8 @@ export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
 
     // Get valid trades
     const validTrades = previewRows
-      .filter(row => row.isValid || !config.skipErrorRows)
-      .map(row => row.mappedData);
+      .filter((row) => row.isValid || !config.skipErrorRows)
+      .map((row) => row.mappedData);
 
     onImport(validTrades);
     onClose();
@@ -369,7 +458,7 @@ export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
         saveTemplateName.trim(),
         columnMappings,
         fileData.columns,
-        `Template for ${fileData.fileName}`
+        `Template for ${fileData.fileName}`,
       );
       setShowSaveTemplate(false);
       setSaveTemplateName('');
@@ -388,13 +477,13 @@ export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
 
     // Create a map of template mappings for quick lookup
     const templateMap = new Map(
-      template.columnMappings.map(m => [m.fileColumn, m])
+      template.columnMappings.map((m) => [m.fileColumn, m]),
     );
 
     // Merge template with current auto-detected mappings
     // For columns in template: use template mapping
     // For new columns (not in template): keep auto-detected mapping
-    const mergedMappings = columnMappings.map(currentMapping => {
+    const mergedMappings = columnMappings.map((currentMapping) => {
       const templateMapping = templateMap.get(currentMapping.fileColumn);
       if (templateMapping) {
         // Use template mapping for existing columns
@@ -411,71 +500,218 @@ export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
 
   const getMappedFields = () => {
     return columnMappings
-      .filter(m => m.target !== 'ignore' && m.target !== 'create_tag')
-      .map(m => m.target);
+      .filter((m) => m.target !== 'ignore' && m.target !== 'create_tag')
+      .map((m) => m.target);
   };
+
+  // --- Subtitle + primary CTA wiring for BaseDialog ---
+  const subtitle = (() => {
+    if (currentStep === 0) return 'Parsing your file…';
+    if (currentStep === 1) return 'Map your CSV columns to trade fields';
+    return 'Review and confirm before importing';
+  })();
+
+  const canGoNext =
+    currentStep < STEPS.length - 1 && !isProcessing && !!fileData;
+  const canImport =
+    currentStep === STEPS.length - 1 &&
+    !!validationSummary &&
+    validationSummary.validRows > 0;
+
+  const primaryButtonText =
+    currentStep === STEPS.length - 1
+      ? `Import ${validationSummary?.willImport || 0} trades`
+      : 'Next';
+  const primaryButtonAction = canImport
+    ? handleImport
+    : canGoNext
+      ? handleNext
+      : undefined;
+
+  // Chip-style step indicator
+  const StepIndicator: React.FC = () => (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+      {STEPS.map((label, idx) => {
+        const active = idx === currentStep;
+        const completed = idx < currentStep;
+        const numColor = completed
+          ? violet
+          : active
+            ? violet
+            : theme.palette.text.secondary;
+        return (
+          <React.Fragment key={label}>
+            <Box
+              sx={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 0.75,
+                px: 1.25,
+                py: 0.5,
+                borderRadius: 999,
+                border: `1px solid ${
+                  active || completed ? violetBorder : hairline
+                }`,
+                backgroundColor:
+                  active || completed ? violetSofter : surfaceInset,
+                fontFamily: MONO_FONT,
+                fontSize: '0.7rem',
+                fontWeight: 600,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase' as const,
+                color: active || completed ? violet : theme.palette.text.secondary,
+                transition: 'all 120ms ease',
+              }}
+            >
+              {completed ? (
+                <CheckCircleIcon sx={{ fontSize: 13, color: violet }} />
+              ) : (
+                <Box
+                  component="span"
+                  sx={{
+                    width: 16,
+                    height: 16,
+                    borderRadius: '50%',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '0.65rem',
+                    fontWeight: 700,
+                    color: numColor,
+                    backgroundColor: active
+                      ? alpha(violet, 0.22)
+                      : surfaceInset,
+                    border: `1px solid ${active ? violetBorder : hairline}`,
+                  }}
+                >
+                  {idx + 1}
+                </Box>
+              )}
+              {label}
+            </Box>
+            {idx < STEPS.length - 1 && (
+              <Box
+                sx={{
+                  width: 16,
+                  height: 1,
+                  backgroundColor:
+                    idx < currentStep ? violetBorder : hairline,
+                }}
+              />
+            )}
+          </React.Fragment>
+        );
+      })}
+    </Box>
+  );
+
+  const headerIcon = <UploadFileIcon sx={{ fontSize: 18 }} />;
 
   return (
     <>
-      <Dialog
+      <BaseDialog
         open={open}
         onClose={onClose}
+        title="Import trades"
+        subtitle={subtitle}
+        headerIcon={headerIcon}
         maxWidth="lg"
         fullWidth
-        PaperProps={{
-          sx: {
-            height: '90vh',
-            '& .MuiDialogContent-root': {
-              // Custom scrollbar styling to match app
-              '&::-webkit-scrollbar': {
-                width: '8px'
-              },
-              '&::-webkit-scrollbar-track': {
-                bgcolor: alpha('#000', 0.05),
-                borderRadius: 1
-              },
-              '&::-webkit-scrollbar-thumb': {
-                bgcolor: alpha('#000', 0.2),
-                borderRadius: 1,
+        primaryButtonText={primaryButtonText}
+        primaryButtonAction={primaryButtonAction}
+        isSubmitting={
+          (currentStep === STEPS.length - 1 && !canImport) ||
+          (currentStep < STEPS.length - 1 && !canGoNext)
+        }
+        actions={
+          currentStep > 0 ? (
+            <Button
+              onClick={handleBack}
+              sx={{
+                textTransform: 'none',
+                fontWeight: 600,
+                fontSize: '0.85rem',
+                color: theme.palette.text.primary,
+                backgroundColor: surfaceInset,
+                border: `1px solid ${hairline}`,
+                borderRadius: 1.25,
+                px: 1.5,
+                py: 0.625,
+                minHeight: 0,
                 '&:hover': {
-                  bgcolor: alpha('#000', 0.3)
-                }
-              }
-            }
-          }
+                  backgroundColor: alpha(
+                    theme.palette.text.primary,
+                    isDark ? 0.06 : 0.05,
+                  ),
+                  borderColor: alpha(violet, 0.45),
+                },
+              }}
+            >
+              Back
+            </Button>
+          ) : null
+        }
+        slotProps={{
+          paper: {
+            sx: {
+              borderRadius: 2,
+              border: `1px solid ${hairline}`,
+              boxShadow: theme.shadows[10],
+              backgroundImage: 'none',
+              height: '90vh',
+              overflow: 'hidden',
+            },
+          },
         }}
+        contentSx={{ px: 2.5, py: 2 }}
       >
-        <DialogTitle>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Typography variant="h6">
-              Import Trades
-            </Typography>
-            <IconButton onClick={onClose} size="small">
-              <Close />
-            </IconButton>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.25 }}>
+          {/* Step indicator */}
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 1,
+            }}
+          >
+            <Typography sx={monoLabelSx}>Progress</Typography>
+            <StepIndicator />
           </Box>
-        </DialogTitle>
-
-        <DialogContent dividers>
-          <Stepper activeStep={currentStep} sx={{ mb: 3 }}>
-            {STEPS.map((label) => (
-              <Step key={label}>
-                <StepLabel>{label}</StepLabel>
-              </Step>
-            ))}
-          </Stepper>
 
           {error && (
-            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+            <Alert
+              severity="error"
+              onClose={() => setError(null)}
+              sx={{
+                borderRadius: 1.5,
+                border: `1px solid ${alpha(theme.palette.error.main, 0.3)}`,
+                backgroundColor: alpha(theme.palette.error.main, 0.08),
+                '& .MuiAlert-message': { fontSize: '0.85rem' },
+              }}
+            >
               {error}
             </Alert>
           )}
 
           {isProcessing && (
-            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
-              <CircularProgress />
-              <Typography variant="body2" sx={{ ml: 2 }}>
-                Processing file...
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                py: 8,
+                gap: 1.5,
+              }}
+            >
+              <CircularProgress size={20} thickness={5} sx={{ color: violet }} />
+              <Typography
+                sx={{
+                  fontSize: '0.88rem',
+                  color: theme.palette.text.secondary,
+                  fontWeight: 500,
+                }}
+              >
+                Processing file…
               </Typography>
             </Box>
           )}
@@ -483,60 +719,143 @@ export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
           {!isProcessing && fileData && (
             <>
               {currentStep === 0 && (
-                <Box sx={{ py: 4, textAlign: 'center' }}>
-                  <Typography variant="h6" gutterBottom>
-                    File Loaded Successfully
+                <Box
+                  sx={{
+                    py: 5,
+                    px: 3,
+                    textAlign: 'center',
+                    borderRadius: 1.5,
+                    border: `1px solid ${hairline}`,
+                    backgroundColor: surfaceInset,
+                  }}
+                >
+                  <Box
+                    sx={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: 1.25,
+                      mx: 'auto',
+                      mb: 1.5,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: violetSoft,
+                      color: violet,
+                      border: `1px solid ${violetBorder}`,
+                    }}
+                  >
+                    <CheckCircleIcon sx={{ fontSize: 22 }} />
+                  </Box>
+                  <Typography
+                    sx={{
+                      fontWeight: 700,
+                      fontSize: '0.95rem',
+                      mb: 0.5,
+                      color: theme.palette.text.primary,
+                    }}
+                  >
+                    File loaded successfully
                   </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {fileData.fileName} - {fileData.rowCount} rows, {fileData.columns.length} columns
+                  <Typography
+                    sx={{
+                      fontSize: '0.82rem',
+                      color: theme.palette.text.secondary,
+                      fontFamily: MONO_FONT,
+                    }}
+                  >
+                    {fileData.fileName} · {fileData.rowCount} rows ·{' '}
+                    {fileData.columns.length} columns
                   </Typography>
                 </Box>
               )}
 
               {currentStep === 1 && (
-                <Box>
-                  <Box sx={{ mb: 2, display: 'flex', gap: 1 }}>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      startIcon={<Folder />}
-                      onClick={() => setShowTemplateManager(true)}
-                    >
-                      Load Template
-                    </Button>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      startIcon={<Save />}
-                      onClick={() => setShowSaveTemplate(!showSaveTemplate)}
-                    >
-                      Save as Template
-                    </Button>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 2,
+                  }}
+                >
+                  {/* Template actions */}
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 1,
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <Typography sx={monoLabelSx}>Mapping templates</Typography>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <Button
+                        size="small"
+                        startIcon={<FolderIcon sx={{ fontSize: 16 }} />}
+                        onClick={() => setShowTemplateManager(true)}
+                        sx={ghostButtonSx}
+                      >
+                        Load template
+                      </Button>
+                      <Button
+                        size="small"
+                        startIcon={<Save sx={{ fontSize: 16 }} />}
+                        onClick={() => setShowSaveTemplate(!showSaveTemplate)}
+                        sx={ghostButtonSx}
+                      >
+                        Save as template
+                      </Button>
+                    </Box>
                   </Box>
 
                   {showSaveTemplate && (
-                    <Box sx={{ mb: 2, p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
-                      <Typography variant="subtitle2" gutterBottom>
-                        Save Mapping Template
+                    <Box
+                      sx={{
+                        p: 1.5,
+                        borderRadius: 1.5,
+                        border: `1px solid ${hairline}`,
+                        backgroundColor: surfaceInset,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 1,
+                      }}
+                    >
+                      <Typography sx={monoLabelSx}>
+                        Save mapping template
                       </Typography>
                       <Box sx={{ display: 'flex', gap: 1 }}>
-                        <input
-                          type="text"
+                        <TextField
                           placeholder="Template name"
                           value={saveTemplateName}
                           onChange={(e) => setSaveTemplateName(e.target.value)}
-                          style={{
-                            flex: 1,
-                            padding: '8px',
-                            borderRadius: '4px',
-                            border: '1px solid #ccc'
-                          }}
+                          size="small"
+                          fullWidth
+                          sx={inputSx}
                         />
                         <Button
-                          variant="contained"
-                          size="small"
                           onClick={handleSaveTemplate}
                           disabled={!saveTemplateName.trim()}
+                          variant="contained"
+                          sx={{
+                            textTransform: 'none',
+                            fontWeight: 600,
+                            fontSize: '0.85rem',
+                            backgroundColor: violet,
+                            color: '#fff',
+                            borderRadius: 1.25,
+                            px: 1.75,
+                            py: 0.75,
+                            minHeight: 0,
+                            boxShadow: 'none',
+                            '&:hover': {
+                              backgroundColor: theme.palette.primary.dark,
+                              boxShadow: 'none',
+                            },
+                            '&.Mui-disabled': {
+                              backgroundColor: alpha(violet, 0.35),
+                              color: alpha('#fff', 0.7),
+                            },
+                          }}
                         >
                           Save
                         </Button>
@@ -544,120 +863,230 @@ export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
                     </Box>
                   )}
 
-                  <ColumnMapper
-                    fileColumns={fileData.columns}
-                    columnMappings={columnMappings}
-                    sampleData={fileData.rows.slice(0, 5)}
-                    onMappingChange={handleMappingChange}
-                  />
+                  {/* Columns section */}
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 1,
+                    }}
+                  >
+                    <Typography sx={monoLabelSx}>Columns</Typography>
+                    <ColumnMapper
+                      fileColumns={fileData.columns}
+                      columnMappings={columnMappings}
+                      sampleData={fileData.rows.slice(0, 5)}
+                      onMappingChange={handleMappingChange}
+                    />
+                  </Box>
                 </Box>
               )}
 
               {currentStep === 2 && validationSummary && (
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 2,
+                  }}
+                >
                   {/* Warning about deleting existing trades */}
-                  <Alert severity="warning" sx={{ mb: 1 }}>
-                    <Typography variant="body2" fontWeight={600} gutterBottom>
-                      ⚠️ Important: Importing will replace all existing trades
+                  <Alert
+                    severity="warning"
+                    sx={{
+                      borderRadius: 1.5,
+                      border: `1px solid ${alpha(
+                        theme.palette.warning.main,
+                        0.3,
+                      )}`,
+                      backgroundColor: alpha(theme.palette.warning.main, 0.08),
+                    }}
+                  >
+                    <Typography
+                      sx={{
+                        fontWeight: 700,
+                        fontSize: '0.85rem',
+                        mb: 0.5,
+                      }}
+                    >
+                      Importing will replace all existing trades
                     </Typography>
-                    <Typography variant="body2">
-                      All current trades in this calendar will be permanently deleted before importing the new trades.
-                      This action cannot be undone. Make sure you have a backup if needed.
+                    <Typography
+                      sx={{
+                        fontSize: '0.8rem',
+                        color: theme.palette.text.secondary,
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      All current trades in this calendar will be permanently
+                      deleted before importing the new trades. This action
+                      cannot be undone. Make sure you have a backup if needed.
                     </Typography>
                   </Alert>
 
                   <ValidationSummary summary={validationSummary} />
 
                   {validationSummary.conversions.length > 0 && (
-                    <TypeConverterPanel conversions={validationSummary.conversions} />
+                    <TypeConverterPanel
+                      conversions={validationSummary.conversions}
+                    />
                   )}
 
                   {/* Check if trades will have pair tags for economic events */}
                   {(() => {
-                    const hasPairTags = previewRows.some(row => {
+                    const hasPairTags = previewRows.some((row) => {
                       const tags = row.mappedData.tags || [];
-                      return tags.some((tag: string) => tag.toLowerCase().startsWith('pair:'));
+                      return tags.some((tag: string) =>
+                        tag.toLowerCase().startsWith('pair:'),
+                      );
                     });
 
-                    const hasSession = previewRows.some(row => row.mappedData.session);
+                    const hasSession = previewRows.some(
+                      (row) => row.mappedData.session,
+                    );
 
                     if (!hasPairTags) {
                       return (
-                        <Alert severity="warning" sx={{ mb: 1 }}>
-                          <Typography variant="body2" fontWeight={600} gutterBottom>
-                            Economic Events Not Available
+                        <Alert
+                          severity="warning"
+                          sx={{
+                            borderRadius: 1.5,
+                            border: `1px solid ${alpha(
+                              theme.palette.warning.main,
+                              0.3,
+                            )}`,
+                            backgroundColor: alpha(
+                              theme.palette.warning.main,
+                              0.08,
+                            ),
+                          }}
+                        >
+                          <Typography
+                            sx={{
+                              fontWeight: 700,
+                              fontSize: '0.85rem',
+                              mb: 0.5,
+                            }}
+                          >
+                            Economic events not available
                           </Typography>
-                          <Typography variant="caption">
-                            No pair tags detected in your import. Trades will be imported without economic events.
-                            To include economic events, ensure you have a "Pair" column (e.g., EURUSD, GBPJPY) mapped to "Tags" or "Create Tag".
+                          <Typography
+                            sx={{
+                              fontSize: '0.78rem',
+                              color: theme.palette.text.secondary,
+                              lineHeight: 1.5,
+                            }}
+                          >
+                            No pair tags detected in your import. Trades will be
+                            imported without economic events. To include
+                            economic events, ensure you have a "Pair" column
+                            (e.g., EURUSD, GBPJPY) mapped to "Tags" or "Create
+                            Tag".
                           </Typography>
                         </Alert>
                       );
                     } else if (!hasSession) {
                       return (
-                        <Alert severity="info" sx={{ mb: 1 }}>
-                          <Typography variant="body2" fontWeight={600} gutterBottom>
-                            Partial Economic Events
+                        <Alert
+                          severity="info"
+                          sx={{
+                            borderRadius: 1.5,
+                            border: `1px solid ${alpha(
+                              theme.palette.info.main,
+                              0.3,
+                            )}`,
+                            backgroundColor: alpha(
+                              theme.palette.info.main,
+                              0.08,
+                            ),
+                          }}
+                        >
+                          <Typography
+                            sx={{
+                              fontWeight: 700,
+                              fontSize: '0.85rem',
+                              mb: 0.5,
+                            }}
+                          >
+                            Partial economic events
                           </Typography>
-                          <Typography variant="caption">
-                            Pair tags detected, but no session information. Economic events will only be fetched for trades with a trading session (London, New York, Asian).
+                          <Typography
+                            sx={{
+                              fontSize: '0.78rem',
+                              color: theme.palette.text.secondary,
+                              lineHeight: 1.5,
+                            }}
+                          >
+                            Pair tags detected, but no session information.
+                            Economic events will only be fetched for trades
+                            with a trading session (London, New York, Asian).
                           </Typography>
                         </Alert>
                       );
                     } else {
                       return (
-                        <Alert severity="success" sx={{ mb: 1 }}>
-                          <Typography variant="body2" fontWeight={600} gutterBottom>
-                            Economic Events Will Be Fetched ✓
+                        <Alert
+                          severity="success"
+                          icon={
+                            <CheckCircleIcon sx={{ fontSize: 18 }} />
+                          }
+                          sx={{
+                            borderRadius: 1.5,
+                            border: `1px solid ${alpha(
+                              theme.palette.success.main,
+                              0.3,
+                            )}`,
+                            backgroundColor: alpha(
+                              theme.palette.success.main,
+                              0.08,
+                            ),
+                          }}
+                        >
+                          <Typography
+                            sx={{
+                              fontWeight: 700,
+                              fontSize: '0.85rem',
+                              mb: 0.5,
+                            }}
+                          >
+                            Economic events will be fetched
                           </Typography>
-                          <Typography variant="caption">
-                            Trades have pair tags and session information. Relevant economic events will be automatically attached during import.
+                          <Typography
+                            sx={{
+                              fontSize: '0.78rem',
+                              color: theme.palette.text.secondary,
+                              lineHeight: 1.5,
+                            }}
+                          >
+                            Trades have pair tags and session information.
+                            Relevant economic events will be automatically
+                            attached during import.
                           </Typography>
                         </Alert>
                       );
                     }
                   })()}
 
-                  <ImportPreview
-                    previewRows={previewRows}
-                    mappedFields={getMappedFields() as any}
-                    maxRows={10}
-                  />
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 1,
+                    }}
+                  >
+                    <Typography sx={monoLabelSx}>Preview</Typography>
+                    <ImportPreview
+                      previewRows={previewRows}
+                      mappedFields={getMappedFields() as any}
+                      maxRows={10}
+                    />
+                  </Box>
                 </Box>
               )}
             </>
           )}
-        </DialogContent>
-
-        <DialogActions>
-          <Button onClick={onClose}>
-            Cancel
-          </Button>
-          {currentStep > 0 && (
-            <Button onClick={handleBack}>
-              Back
-            </Button>
-          )}
-          {currentStep < STEPS.length - 1 && (
-            <Button
-              onClick={handleNext}
-              variant="contained"
-              disabled={isProcessing || !fileData}
-            >
-              Next
-            </Button>
-          )}
-          {currentStep === STEPS.length - 1 && (
-            <Button
-              onClick={handleImport}
-              variant="contained"
-              disabled={!validationSummary || validationSummary.validRows === 0}
-            >
-              Import {validationSummary?.willImport || 0} Trades
-            </Button>
-          )}
-        </DialogActions>
-      </Dialog>
+        </Box>
+      </BaseDialog>
 
       <MappingTemplateManager
         open={showTemplateManager}
