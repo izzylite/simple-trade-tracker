@@ -22,6 +22,7 @@ import {
 } from './tools.ts';
 import { fetchEmbeddedData, type EmbeddedData } from './embedDataFetcher.ts';
 import { appendUserMessage, appendAssistantMessage } from './conversationStore.ts';
+import { rehostChartUrlsInText } from './imageRehost.ts';
 import { validateReferenceIds, hasReferenceTags, type ValidationResult } from './idValidator.ts';
 import { buildSecureSystemPrompt, buildTemporalContext } from "./systemPrompt.ts";
 import { encodeBase64 } from "https://deno.land/std@0.208.0/encoding/base64.ts";
@@ -1564,10 +1565,27 @@ function handleStreamingRequest(
         };
         const persistTask = (async () => {
           const persistClient = createServiceClient();
+          // Rehost ephemeral QuickChart URLs into ai-chat-images so the
+          // persisted message keeps working after the source's short-URL TTL
+          // expires. The streamed UI already received the original URLs, so
+          // this only changes what gets stored.
+          const rehostCtx = {
+            userId,
+            conversationId,
+            messageId: assistantRecord.id,
+          };
+          const [rehostedContent, rehostedHtml] = await Promise.all([
+            rehostChartUrlsInText(persistClient, rehostCtx, assistantRecord.content),
+            rehostChartUrlsInText(persistClient, rehostCtx, assistantRecord.messageHtml),
+          ]);
           const assistantPersist = await appendAssistantMessage(persistClient, {
             conversationId,
             userId,
-            assistantMessage: assistantRecord,
+            assistantMessage: {
+              ...assistantRecord,
+              content: rehostedContent,
+              messageHtml: rehostedHtml || undefined,
+            },
           });
           if (!assistantPersist.ok && !assistantPersist.deleted) {
             log('Assistant message persist failed (streaming)', 'error', {
@@ -2653,10 +2671,25 @@ Deno.serve(async (req: Request) => {
       toolCalls: functionCalls.map(fc => ({ name: fc.name, label: fc.name })),
     };
     const persistTask = (async () => {
+      // Rehost ephemeral QuickChart URLs into ai-chat-images. See the
+      // streaming-path comment above for the rationale.
+      const rehostCtx = {
+        userId,
+        conversationId,
+        messageId: assistantRecord.id,
+      };
+      const rehostedContent = await rehostChartUrlsInText(
+        serviceClientForPersistence,
+        rehostCtx,
+        assistantRecord.content,
+      );
       const assistantPersist = await appendAssistantMessage(serviceClientForPersistence, {
         conversationId,
         userId,
-        assistantMessage: assistantRecord,
+        assistantMessage: {
+          ...assistantRecord,
+          content: rehostedContent,
+        },
       });
       if (!assistantPersist.ok && !assistantPersist.deleted) {
         log('Assistant message persist failed (non-streaming)', 'error', {
