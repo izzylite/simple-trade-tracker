@@ -764,58 +764,27 @@ const AIChatMentionInput = forwardRef<AIChatMentionInputHandle, AIChatMentionInp
                           sx={{
                             py: 0.875,
                             px: 1.25,
+                            display: 'block',
                             borderRadius: 1.25,
-                            display: 'flex',
-                            alignItems: 'flex-start',
-                            gap: 1,
                             '&.Mui-selected': {
                               backgroundColor: violetSoft,
                               color: violet,
-                              '& .slash-icon': {
-                                backgroundColor: violet,
-                                color: '#fff',
-                                borderColor: violet,
-                              },
                               '&:hover': { backgroundColor: violetSoft },
                             },
                             '&:hover': { backgroundColor: violetSofter },
                           }}
                         >
-                          <Box
-                            className="slash-icon"
-                            sx={{
-                              flexShrink: 0,
-                              width: 22,
-                              height: 22,
-                              borderRadius: 1,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontFamily: "'JetBrains Mono', ui-monospace, monospace",
-                              fontSize: '0.78rem',
-                              fontWeight: 700,
-                              backgroundColor: surfaceInset,
-                              color: theme.palette.text.secondary,
-                              border: `1px solid ${hairline}`,
-                              transition: 'none',
-                              mt: 0.125,
-                            }}
-                          >
-                            /
-                          </Box>
-                          <Box sx={{ minWidth: 0, flex: 1 }}>
-                            <Typography sx={{ fontSize: '0.85rem', fontWeight: 600 }} noWrap>
-                              {cmd.title}
+                          <Typography sx={{ fontSize: '0.85rem', fontWeight: 600 }} noWrap>
+                            {cmd.title}
+                          </Typography>
+                          {cmd.subtitle && (
+                            <Typography
+                              sx={{ fontSize: '0.74rem', color: theme.palette.text.secondary }}
+                              noWrap
+                            >
+                              {cmd.subtitle}
                             </Typography>
-                            {cmd.subtitle && (
-                              <Typography
-                                sx={{ fontSize: '0.74rem', color: theme.palette.text.secondary }}
-                                noWrap
-                              >
-                                {cmd.subtitle}
-                              </Typography>
-                            )}
-                          </Box>
+                          )}
                         </ListItemButton>
                       </ListItem>
                     ))}
@@ -839,11 +808,20 @@ const AIChatMentionInput = forwardRef<AIChatMentionInputHandle, AIChatMentionInp
                           gap: 0.5,
                         }}
                       >
-                        <NotesIcon sx={{ fontSize: 10 }} /> Notes
+                        {mention?.kind === 'slash' ? (
+                          <>
+                            <BoltIcon sx={{ fontSize: 10 }} /> Slash commands
+                          </>
+                        ) : (
+                          <>
+                            <NotesIcon sx={{ fontSize: 10 }} /> Notes
+                          </>
+                        )}
                       </Typography>
                     </ListItem>
                     {filteredNotes.map((note, idx) => {
                       const flatIdx = filteredSystemCommands.length + idx;
+                      const isSlashNote = mention?.kind === 'slash';
                       return (
                         <ListItem key={note.id} disablePadding sx={{ px: 0.5 }}>
                           <ListItemButton
@@ -855,14 +833,45 @@ const AIChatMentionInput = forwardRef<AIChatMentionInputHandle, AIChatMentionInp
                               py: 0.875,
                               px: 1.25,
                               borderRadius: 1.25,
+                              display: isSlashNote ? 'flex' : 'block',
+                              alignItems: isSlashNote ? 'center' : undefined,
+                              gap: isSlashNote ? 1 : undefined,
                               '&.Mui-selected': {
                                 backgroundColor: violetSoft,
                                 color: violet,
+                                '& .slash-icon': {
+                                  backgroundColor: violet,
+                                  color: '#fff',
+                                  borderColor: violet,
+                                },
                                 '&:hover': { backgroundColor: violetSoft },
                               },
                               '&:hover': { backgroundColor: violetSofter },
                             }}
                           >
+                            {isSlashNote && (
+                              <Box
+                                className="slash-icon"
+                                sx={{
+                                  flexShrink: 0,
+                                  width: 22,
+                                  height: 22,
+                                  borderRadius: 1,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                                  fontSize: '0.78rem',
+                                  fontWeight: 700,
+                                  backgroundColor: surfaceInset,
+                                  color: theme.palette.text.secondary,
+                                  border: `1px solid ${hairline}`,
+                                  transition: 'none',
+                                }}
+                              >
+                                /
+                              </Box>
+                            )}
                             <Typography sx={{ fontSize: '0.85rem' }} noWrap>
                               {note.title || 'Untitled'}
                             </Typography>
