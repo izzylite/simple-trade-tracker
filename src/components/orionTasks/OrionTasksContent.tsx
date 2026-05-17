@@ -473,7 +473,9 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
               <>
                 {groupedResults.map(([date, dateResults]) => (
                   <Box key={date} sx={{ mb: 2 }}>
-                    {/* Sticky mono uppercase date label with hairline divider */}
+                    {/* Sticky mono uppercase date label — borderBottom so
+                        content scrolling underneath reads as deliberately
+                        capped, not visually clipped. */}
                     <Box
                       sx={{
                         position: 'sticky',
@@ -483,8 +485,10 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
                         display: 'flex',
                         alignItems: 'center',
                         gap: 1,
+                        px: 0.25,
                         py: 0.75,
                         mb: 1,
+                        borderBottom: `1px solid ${hairline}`,
                       }}
                     >
                       <Typography
@@ -496,13 +500,6 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
                       >
                         {formatGroupDate(date)}
                       </Typography>
-                      <Box
-                        sx={{
-                          flex: 1,
-                          height: '1px',
-                          backgroundColor: hairline,
-                        }}
-                      />
                     </Box>
                     {dateResults.map((result) => (
                       <TaskResultCard

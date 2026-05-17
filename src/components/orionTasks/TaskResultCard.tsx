@@ -123,8 +123,10 @@ const TaskResultCard: React.FC<TaskResultCardProps> = ({
   const isUnread = !result.is_read;
   const taskColor = TASK_TYPE_COLORS[result.task_type];
 
-  // Inset-card style: surfaceInset bg, hairline border, hover → violetBorder.
-  // Unread cards get a violet left accent rail via box-shadow inset.
+  // Inset-card style: surfaceInset bg, hairline border on all 4 sides.
+  // Unread cards add a violet left accent rail via inset box-shadow — the rail
+  // is the only colored edge so the card doesn't read as a full violet outline.
+  // No hover lift: cards are click-to-expand, hover would imply navigation.
   const cardSx = {
     position: 'relative' as const,
     mb: 1.25,
@@ -135,27 +137,9 @@ const TaskResultCard: React.FC<TaskResultCardProps> = ({
       ? alpha(theme.palette.error.main, 0.05)
       : surfaceInset,
     border: `1px solid ${
-      isError
-        ? alpha(theme.palette.error.main, 0.45)
-        : isUnread
-          ? violetBorder
-          : hairline
+      isError ? alpha(theme.palette.error.main, 0.45) : hairline
     }`,
-    boxShadow: isUnread && !isError
-      ? `inset 3px 0 0 0 ${violet}`
-      : 'none',
-    transition: 'border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease',
-    '&:hover': {
-      borderColor: isError
-        ? alpha(theme.palette.error.main, 0.6)
-        : violetBorder,
-      backgroundColor: isError
-        ? alpha(theme.palette.error.main, 0.08)
-        : surfaceInset,
-      boxShadow: isUnread && !isError
-        ? `inset 3px 0 0 0 ${violet}, 0 2px 10px ${alpha(theme.palette.common.black, 0.08)}`
-        : `0 2px 10px ${alpha(theme.palette.common.black, 0.08)}`,
-    },
+    boxShadow: isUnread && !isError ? `inset 3px 0 0 0 ${violet}` : 'none',
   };
 
   return (

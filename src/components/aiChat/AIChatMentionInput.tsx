@@ -5,6 +5,7 @@ import { Tag as TagIcon, Notes as NotesIcon, Bolt as BoltIcon } from '@mui/icons
 import { getTagChipStyles, formatTagForDisplay, isGroupedTag, getTagGroup } from '../../utils/tagColors';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import { Z_INDEX } from '../../styles/zIndex';
+import { useDialogTokens } from '../../styles/dialogTokens';
 import type { MessageSegment } from '../../utils/chatMentions';
 import { detectMentionTrigger, extractSegments } from '../../utils/chatMentions';
 import { SLASH_COMMAND_TAG } from '../../types/note';
@@ -145,6 +146,11 @@ const AIChatMentionInput = forwardRef<AIChatMentionInputHandle, AIChatMentionInp
   systemCommands, onSystemCommand, maxRows = 4, sx
 }, ref) => {
   const theme = useTheme();
+  const {
+    violet, violetSoft, violetSofter, violetBorder,
+    surfaceInset, hairline,
+    paperSx, monoSectionLabelSx,
+  } = useDialogTokens();
   const editorRef = useRef<Editor>(null as any);
   const [editorState, setEditorState] = useState(() => EditorState.createWithContent(ContentState.createFromText(value || ''), createMentionDecorator()));
   const editorStateRef = useRef(editorState);
@@ -654,40 +660,69 @@ const AIChatMentionInput = forwardRef<AIChatMentionInputHandle, AIChatMentionInp
       >
         <Paper
           ref={popperRef}
-          elevation={8}
+          elevation={0}
           sx={{
-            maxHeight: 260,
-            minWidth: 260,
+            ...paperSx,
+            maxHeight: 280,
+            minWidth: 280,
             maxWidth: 420,
-            overflow: 'hidden',
-            border: '1px solid',
-            borderColor: 'divider'
+            mb: 0.75,
           }}
         >
+          {/* Header band: mono section label + count pill */}
           <Box
             sx={{
-              p: 1.5,
-              borderBottom: '1px solid',
-              borderColor: 'divider',
-              backgroundColor: alpha(theme.palette.primary.main, 0.04)
+              px: 1.5,
+              py: 1,
+              borderBottom: `1px solid ${hairline}`,
+              backgroundColor: surfaceInset,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 1,
             }}
           >
             <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ display: 'flex', alignItems: 'center', gap: 0.5, fontWeight: 500 }}
+              sx={{
+                ...monoSectionLabelSx,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 0.625,
+              }}
             >
-              <TagIcon sx={{ fontSize: 14 }} />{' '}
-              {mention?.kind === 'slash'
-                ? `Slash commands (${flatItems.length})`
-                : `Tags & notes (${flatItems.length})`}
+              {mention?.kind === 'slash' ? (
+                <BoltIcon sx={{ fontSize: 12 }} />
+              ) : (
+                <TagIcon sx={{ fontSize: 12 }} />
+              )}
+              {mention?.kind === 'slash' ? 'Slash commands' : 'Tags & notes'}
             </Typography>
+            <Box
+              sx={{
+                px: 0.875,
+                py: 0.125,
+                borderRadius: 999,
+                backgroundColor: violetSofter,
+                border: `1px solid ${violetBorder}`,
+                fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                fontSize: '0.65rem',
+                fontWeight: 600,
+                color: violet,
+                lineHeight: 1.4,
+              }}
+            >
+              {flatItems.length}
+            </Box>
           </Box>
-          <List ref={listRef} sx={{ maxHeight: 200, overflow: 'auto', p: 0, ...scrollbarStyles(theme) }}>
+
+          <List
+            ref={listRef}
+            sx={{ maxHeight: 220, overflow: 'auto', p: 0.5, ...scrollbarStyles(theme) }}
+          >
             {flatItems.length === 0 ? (
               <ListItem>
                 <Box sx={{ p: 2, textAlign: 'center', width: '100%' }}>
-                  <Typography variant="body2" color="text.secondary">
+                  <Typography sx={{ fontSize: '0.82rem', color: theme.palette.text.secondary }}>
                     {allTags.length === 0 && allNotes.length === 0 && !systemCommands?.length
                       ? 'No tags or notes available.'
                       : mention?.kind === 'slash'
@@ -703,34 +738,50 @@ const AIChatMentionInput = forwardRef<AIChatMentionInputHandle, AIChatMentionInp
                     <ListItem
                       sx={{
                         py: 0.5,
-                        px: 2,
-                        backgroundColor: alpha(theme.palette.warning.main, 0.06),
-                        borderBottom: '1px solid',
-                        borderColor: 'divider'
+                        px: 1.25,
+                        mt: 0.25,
                       }}
                     >
                       <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        sx={{ display: 'flex', alignItems: 'center', gap: 0.5, fontWeight: 600 }}
+                        sx={{
+                          ...monoSectionLabelSx,
+                          fontSize: '0.58rem',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 0.5,
+                        }}
                       >
-                        <BoltIcon sx={{ fontSize: 12 }} /> System
+                        <BoltIcon sx={{ fontSize: 10 }} /> System
                       </Typography>
                     </ListItem>
                     {filteredSystemCommands.map((cmd, idx) => (
-                      <ListItem key={cmd.id} disablePadding>
+                      <ListItem key={cmd.id} disablePadding sx={{ px: 0.5 }}>
                         <ListItemButton
                           data-mention-item="true"
                           selected={idx === selectedIndex}
                           onMouseDown={(e) => { e.preventDefault(); invokeSystemCommand(cmd.id); }}
                           onClick={(e) => { e.preventDefault(); invokeSystemCommand(cmd.id); }}
-                          sx={{ py: 1, px: 2, display: 'block' }}
+                          sx={{
+                            py: 0.875,
+                            px: 1.25,
+                            display: 'block',
+                            borderRadius: 1.25,
+                            '&.Mui-selected': {
+                              backgroundColor: violetSoft,
+                              color: violet,
+                              '&:hover': { backgroundColor: violetSoft },
+                            },
+                            '&:hover': { backgroundColor: violetSofter },
+                          }}
                         >
-                          <Typography variant="body2" sx={{ fontWeight: 500 }} noWrap>
+                          <Typography sx={{ fontSize: '0.85rem', fontWeight: 600 }} noWrap>
                             {cmd.title}
                           </Typography>
                           {cmd.subtitle && (
-                            <Typography variant="caption" color="text.secondary" noWrap>
+                            <Typography
+                              sx={{ fontSize: '0.74rem', color: theme.palette.text.secondary }}
+                              noWrap
+                            >
                               {cmd.subtitle}
                             </Typography>
                           )}
@@ -744,32 +795,44 @@ const AIChatMentionInput = forwardRef<AIChatMentionInputHandle, AIChatMentionInp
                     <ListItem
                       sx={{
                         py: 0.5,
-                        px: 2,
-                        backgroundColor: alpha(theme.palette.info.main, 0.04),
-                        borderBottom: '1px solid',
-                        borderColor: 'divider'
+                        px: 1.25,
+                        mt: filteredSystemCommands.length > 0 ? 0.5 : 0.25,
                       }}
                     >
                       <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        sx={{ display: 'flex', alignItems: 'center', gap: 0.5, fontWeight: 600 }}
+                        sx={{
+                          ...monoSectionLabelSx,
+                          fontSize: '0.58rem',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 0.5,
+                        }}
                       >
-                        <NotesIcon sx={{ fontSize: 12 }} /> Notes
+                        <NotesIcon sx={{ fontSize: 10 }} /> Notes
                       </Typography>
                     </ListItem>
                     {filteredNotes.map((note, idx) => {
                       const flatIdx = filteredSystemCommands.length + idx;
                       return (
-                        <ListItem key={note.id} disablePadding>
+                        <ListItem key={note.id} disablePadding sx={{ px: 0.5 }}>
                           <ListItemButton
                             data-mention-item="true"
                             selected={flatIdx === selectedIndex}
                             onMouseDown={(e) => { e.preventDefault(); insertNoteFromMention(note); }}
                             onClick={(e) => { e.preventDefault(); insertNoteFromMention(note); }}
-                            sx={{ py: 1, px: 2 }}
+                            sx={{
+                              py: 0.875,
+                              px: 1.25,
+                              borderRadius: 1.25,
+                              '&.Mui-selected': {
+                                backgroundColor: violetSoft,
+                                color: violet,
+                                '&:hover': { backgroundColor: violetSoft },
+                              },
+                              '&:hover': { backgroundColor: violetSofter },
+                            }}
                           >
-                            <Typography variant="body2" noWrap>
+                            <Typography sx={{ fontSize: '0.85rem' }} noWrap>
                               {note.title || 'Untitled'}
                             </Typography>
                           </ListItemButton>
@@ -783,30 +846,43 @@ const AIChatMentionInput = forwardRef<AIChatMentionInputHandle, AIChatMentionInp
                     <ListItem
                       sx={{
                         py: 0.5,
-                        px: 2,
-                        backgroundColor: alpha(theme.palette.primary.main, 0.04),
-                        borderBottom: '1px solid',
-                        borderColor: 'divider'
+                        px: 1.25,
+                        mt: (filteredSystemCommands.length > 0 || filteredNotes.length > 0)
+                          ? 0.5
+                          : 0.25,
                       }}
                     >
                       <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        sx={{ display: 'flex', alignItems: 'center', gap: 0.5, fontWeight: 600 }}
+                        sx={{
+                          ...monoSectionLabelSx,
+                          fontSize: '0.58rem',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 0.5,
+                        }}
                       >
-                        <TagIcon sx={{ fontSize: 12 }} /> Tags
+                        <TagIcon sx={{ fontSize: 10 }} /> Tags
                       </Typography>
                     </ListItem>
                     {filteredTags.map((tag, idx) => {
                       const flatIdx = filteredSystemCommands.length + filteredNotes.length + idx;
                       return (
-                        <ListItem key={tag} disablePadding>
+                        <ListItem key={tag} disablePadding sx={{ px: 0.5 }}>
                           <ListItemButton
                             data-mention-item="true"
                             selected={flatIdx === selectedIndex}
                             onMouseDown={(e) => { e.preventDefault(); insertTag(tag); }}
                             onClick={(e) => { e.preventDefault(); insertTag(tag); }}
-                            sx={{ py: 1, px: 2 }}
+                            sx={{
+                              py: 0.75,
+                              px: 1.25,
+                              borderRadius: 1.25,
+                              '&.Mui-selected': {
+                                backgroundColor: violetSoft,
+                                '&:hover': { backgroundColor: violetSoft },
+                              },
+                              '&:hover': { backgroundColor: violetSofter },
+                            }}
                           >
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
                               <Chip
@@ -815,7 +891,9 @@ const AIChatMentionInput = forwardRef<AIChatMentionInputHandle, AIChatMentionInp
                                 sx={{ ...getTagChipStyles(tag, theme), height: 20, fontSize: '0.7rem' }}
                               />
                               {isGroupedTag(tag) && (
-                                <Typography variant="caption" color="text.secondary">
+                                <Typography
+                                  sx={{ fontSize: '0.72rem', color: theme.palette.text.secondary }}
+                                >
                                   {getTagGroup(tag)}
                                 </Typography>
                               )}

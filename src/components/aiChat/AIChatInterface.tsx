@@ -1111,15 +1111,18 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
               aria-label="Stop generating"
               onClick={handleCancelRequest}
               size="small"
+              startIcon={<StopIcon sx={{ fontSize: 14 }} />}
               sx={{
                 ...destructiveButtonSx,
                 minWidth: 0,
-                px: 1,
-                py: 0.5,
+                px: 1.5,
+                py: 0.625,
                 height: 32,
+                gap: 0.25,
+                fontSize: '0.82rem',
+                '& .MuiButton-startIcon': { mr: 0.625 },
               }}
             >
-              <StopIcon sx={{ fontSize: 16, mr: 0.5 }} />
               Stop
             </Button>
           ) : (
@@ -1128,15 +1131,18 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
               onClick={handleSendMessage}
               disabled={(!inputMessage.trim() && attachedImages.length === 0) || isAtMessageLimit}
               size="small"
+              endIcon={<SendIcon sx={{ fontSize: 14, transform: 'rotate(-12deg)' }} />}
               sx={{
                 ...primaryButtonSx,
                 minWidth: 0,
-                px: 1,
-                py: 0.5,
+                px: 1.5,
+                py: 0.625,
                 height: 32,
+                gap: 0.25,
+                fontSize: '0.82rem',
+                '& .MuiButton-endIcon': { ml: 0.625 },
               }}
             >
-              <SendIcon sx={{ fontSize: 16, mr: 0.5 }} />
               Send
             </Button>
           )}
