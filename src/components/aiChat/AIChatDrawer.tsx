@@ -13,20 +13,26 @@ import {
   Typography,
   Tooltip,
   useTheme,
-  alpha
+  alpha,
+  Badge,
 } from '@mui/material';
-import { Close as CloseIcon } from '@mui/icons-material';
+import {
+  Close as CloseIcon,
+  ChatBubbleOutline as ChatIcon,
+  AssignmentOutlined as TasksIcon,
+} from '@mui/icons-material';
 import { format } from 'date-fns';
 import { v5 as uuidv5 } from 'uuid';
 import { Trade } from '../../types/trade';
 import { Calendar } from '../../types/calendar';
 import { TradeOperationsProps } from '../../types/tradeOperations';
 import { Z_INDEX } from '../../styles/zIndex';
+import { useDialogTokens } from '../../styles/dialogTokens';
 import AIChatContent from '../sidePanel/content/AIChatContent';
 import { UseAIChatReturn, useAIChat } from '../../hooks/useAIChat';
 import { ConversationRepository } from '../../services/repository/repositories/ConversationRepository';
 import { logger } from '../../utils/logger';
-import RoundedTabs, { TabPanel } from '../common/RoundedTabs';
+import { TabPanel } from '../common/RoundedTabs';
 import OrionTasksContent from '../orionTasks/OrionTasksContent';
 import type { AITasksBundle, OrionTaskResult } from '../../types/orionTask';
 import { TASK_TYPE_LABELS } from '../../types/orionTask';
@@ -96,6 +102,11 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
 }) => {
   const theme = useTheme();
   const { user } = useAuth();
+  const {
+    isDark,
+    violet, violetSoft, violetBorder,
+    surfaceInset, hairline,
+  } = useDialogTokens();
   const [activeTab, setActiveTab] = useState(0);
   const [chatSeedMessage, setChatSeedMessage] = useState<string>('');
 
@@ -284,16 +295,17 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
           maxWidth: {
             xs: '100%', sm: '480px', md: '540px', lg: '600px'
           },
-          borderTopLeftRadius: 12,
-          borderTopRightRadius: 12,
+          borderTopLeftRadius: 16,
+          borderTopRightRadius: 16,
           borderBottomLeftRadius: 0,
           borderBottomRightRadius: 0,
           backgroundColor: 'background.paper',
-          boxShadow: theme.palette.mode === 'dark'
-            ? '0 -8px 24px rgba(0,0,0,0.5)'
-            : '0 -8px 24px rgba(0,0,0,0.1)',
-          border: `1px solid ${theme.palette.divider}`,
+          boxShadow: isDark
+            ? '0 -12px 32px rgba(0,0,0,0.55)'
+            : '0 -12px 32px rgba(0,0,0,0.12)',
+          border: `1px solid ${hairline}`,
           borderBottom: 'none',
+          backgroundImage: 'none',
           transition: 'height 0.3s cubic-bezier(0.4, 0, 0.2, 1), '
             + 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
           transform: open ? 'translateY(0)' : 'translateY(100%)',
@@ -307,82 +319,161 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
           flexDirection: 'column',
           overflow: 'hidden'
         }}>
-          {/* Header — logo, title, close button */}
-          <Box sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '16px 20px',
-            borderBottom: `1px solid ${theme.palette.divider}`,
-            flexShrink: 0,
-          }}>
-            {/* Left side - Logo and Title */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <OrionIcon size={36} />
-              <Box>
-                <Typography variant="h6" sx={{
-                  fontWeight: 700,
-                  fontSize: '1.1rem',
-                  lineHeight: 1.2
-                }}>
-                  Orion
-                </Typography>
-                <Typography variant="caption" sx={{
-                  color: 'text.secondary',
-                  fontSize: '0.75rem'
-                }}>
-                  {calendar
-                    ? (() => {
-                        const totalTrades = calendar.year_stats
-                          ? Object.values(calendar.year_stats).reduce(
-                              (sum, ys) =>
-                                sum + (ys.total_trades || 0),
-                              0
-                            )
-                          : 0;
-                        return totalTrades > 0
-                          ? `${totalTrades} trade${totalTrades !== 1 ? 's' : ''} in ${calendar.name}`
-                          : `${calendar.name} - Ready for analysis`;
-                      })()
-                    : 'Ready for trading analysis across all calendars'
-                  }
-                </Typography>
-              </Box>
+          {/* Header — Orion avatar, title + subtitle, close icon */}
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1.5,
+              px: 2.5,
+              py: 1.75,
+              borderBottom: `1px solid ${hairline}`,
+              flexShrink: 0,
+            }}
+          >
+            {/* Violet icon avatar wrapping OrionIcon */}
+            <Box
+              sx={{
+                width: 36,
+                height: 36,
+                borderRadius: 1.25,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: violetSoft,
+                color: violet,
+                border: `1px solid ${violetBorder}`,
+                flexShrink: 0,
+                overflow: 'hidden',
+              }}
+            >
+              <OrionIcon size={26} />
             </Box>
 
-            {/* Right side - Close button */}
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <Tooltip title="Close">
-                <IconButton
-                  size="small"
-                  onClick={onClose}
-                  sx={{
-                    color: 'text.secondary',
-                    '&:hover': {
-                      backgroundColor: alpha(
-                        theme.palette.action.hover, 0.5
-                      )
-                    }
-                  }}
-                >
-                  <CloseIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Typography
+                sx={{ fontWeight: 700, fontSize: '0.95rem', lineHeight: 1.2 }}
+              >
+                Orion
+              </Typography>
+              <Typography
+                sx={{
+                  fontSize: '0.78rem',
+                  color: theme.palette.text.secondary,
+                  lineHeight: 1.3,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {calendar
+                  ? (() => {
+                      const totalTrades = calendar.year_stats
+                        ? Object.values(calendar.year_stats).reduce(
+                            (sum, ys) => sum + (ys.total_trades || 0),
+                            0,
+                          )
+                        : 0;
+                      return totalTrades > 0
+                        ? `${totalTrades} trade${totalTrades !== 1 ? 's' : ''} in ${calendar.name}`
+                        : `${calendar.name} · Ready for analysis`;
+                    })()
+                  : 'Ready for trading analysis across all calendars'}
+              </Typography>
             </Box>
+
+            <Tooltip title="Close">
+              <IconButton
+                size="small"
+                onClick={onClose}
+                sx={{ color: theme.palette.text.secondary }}
+              >
+                <CloseIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
           </Box>
 
-          {/* Tabs */}
-          <Box sx={{ px: 2, pt: 1, flexShrink: 0 }}>
-            <RoundedTabs
-              tabs={[
-                { label: 'Chat' },
-                { label: 'Tasks', badgeCount: aiTasks?.unreadCount ?? 0 },
-              ]}
-              activeTab={activeTab}
-              onTabChange={(_e, v) => setActiveTab(v)}
-              size="small"
-              fullWidth
-            />
+          {/* Chip-style segmented tabs */}
+          <Box
+            sx={{
+              px: 2.5,
+              pt: 1.5,
+              pb: 1,
+              flexShrink: 0,
+              display: 'flex',
+              justifyContent: 'flex-start',
+            }}
+          >
+            <Box
+              sx={{
+                display: 'inline-flex',
+                p: 0.375,
+                borderRadius: 999,
+                backgroundColor: surfaceInset,
+                border: `1px solid ${hairline}`,
+                gap: 0.25,
+              }}
+            >
+              {([
+                { label: 'Chat', icon: <ChatIcon sx={{ fontSize: 14 }} />, badge: 0 },
+                { label: 'Tasks', icon: <TasksIcon sx={{ fontSize: 14 }} />, badge: aiTasks?.unreadCount ?? 0 },
+              ] as const).map((tab, idx) => {
+                const selected = activeTab === idx;
+                return (
+                  <Box
+                    key={tab.label}
+                    onClick={() => setActiveTab(idx)}
+                    sx={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 0.625,
+                      px: 1.5,
+                      py: 0.625,
+                      borderRadius: 999,
+                      cursor: 'pointer',
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
+                      userSelect: 'none',
+                      transition: 'all 140ms ease',
+                      backgroundColor: selected ? violet : 'transparent',
+                      color: selected ? '#fff' : theme.palette.text.secondary,
+                      '&:hover': {
+                        backgroundColor: selected
+                          ? violet
+                          : alpha(theme.palette.text.primary, isDark ? 0.06 : 0.05),
+                        color: selected ? '#fff' : theme.palette.text.primary,
+                      },
+                    }}
+                  >
+                    {tab.icon}
+                    {tab.label}
+                    {tab.badge > 0 && (
+                      <Badge
+                        badgeContent={tab.badge}
+                        max={99}
+                        sx={{
+                          ml: 0.5,
+                          '& .MuiBadge-badge': {
+                            position: 'static',
+                            transform: 'none',
+                            backgroundColor: selected
+                              ? alpha('#fff', 0.25)
+                              : alpha(theme.palette.error.main, isDark ? 0.25 : 0.18),
+                            color: selected ? '#fff' : theme.palette.error.main,
+                            fontSize: '0.62rem',
+                            fontWeight: 700,
+                            height: 16,
+                            minWidth: 16,
+                            px: 0.5,
+                            borderRadius: 999,
+                          },
+                        }}
+                      />
+                    )}
+                  </Box>
+                );
+              })}
+            </Box>
           </Box>
 
           {/* Tab content */}
