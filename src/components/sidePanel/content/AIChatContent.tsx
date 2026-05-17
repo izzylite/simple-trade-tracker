@@ -19,11 +19,6 @@ import {
   ListItem,
   ListItemButton,
   Chip,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogContentText,
-  DialogActions,
   TextField,
   InputAdornment,
   CircularProgress,
@@ -59,6 +54,7 @@ import { useReminderScheduler } from '../../../hooks/useReminderScheduler';
 import EconomicEventDetailDialog
   from '../../economicCalendar/EconomicEventDetailDialog';
 import NoteEditorDialog from '../../notes/NoteEditorDialog';
+import ConfirmationDialog from '../../common/ConfirmationDialog';
 import RemindersPanel from '../../aiChat/RemindersPanel';
 import MemoryLogsPanel from '../../aiChat/MemoryLogsPanel';
 import { Note, SLASH_COMMAND_TAG, GUIDELINE_TAG } from '../../../types/note';
@@ -1191,34 +1187,16 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
       )}
 
       {/* Delete Confirmation Dialog */}
-      <Dialog
+      <ConfirmationDialog
         open={deleteDialogOpen}
-        onClose={handleCancelDelete}
-        maxWidth="xs"
-        fullWidth
-        sx={{ zIndex: Z_INDEX.DIALOG }}
-      >
-        <DialogTitle>Delete Conversation?</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Are you sure you want to delete this conversation?
-            This action cannot be undone.
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions sx={{ p: 2, pt: 1 }}>
-          <Button onClick={handleCancelDelete} color="inherit">
-            Cancel
-          </Button>
-          <Button
-            onClick={handleConfirmDelete}
-            color="error"
-            variant="contained"
-            autoFocus
-          >
-            Delete
-          </Button>
-        </DialogActions>
-      </Dialog>
+        title="Delete conversation?"
+        message="This permanently removes the conversation and its messages. This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        confirmColor="error"
+        onConfirm={handleConfirmDelete}
+        onCancel={handleCancelDelete}
+      />
 
       {/* Note Editor Dialog */}
       {noteEditorOpen && calendar && (selectedNote || newNoteInitialTags) && (

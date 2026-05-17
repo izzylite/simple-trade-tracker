@@ -14,11 +14,10 @@ import {
   MenuItem,
   FormControl,
   Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   Collapse,
 } from '@mui/material';
+import { dialogProps } from '../../../styles/dialogStyles';
+import { Z_INDEX } from '../../../styles/zIndex';
 import { scrollbarStyles } from '../../../styles/scrollbarStyles';
 import {
   Search as SearchIcon,
@@ -1272,86 +1271,212 @@ const TagManagementContent: React.FC<TagManagementContentProps> = ({
       />
 
       {/* Tag View Dialog */}
-      <Dialog
-        open={!!tagToView}
-        onClose={() => setTagToView(null)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle sx={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          pb: 1
-        }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <TagIcon sx={{ color: 'primary.main' }} />
-            <Typography variant="h6" component="span">
-              Tag Details
-            </Typography>
-          </Box>
-          <IconButton
-            onClick={() => setTagToView(null)}
-            size="small"
-            sx={{ color: 'text.secondary' }}
+      {(() => {
+        const isDarkTv = theme.palette.mode === 'dark';
+        const violet = theme.palette.primary.main;
+        const violetSoft = alpha(violet, isDarkTv ? 0.18 : 0.14);
+        const violetBorder = alpha(violet, isDarkTv ? 0.35 : 0.28);
+        const surfaceInset = isDarkTv
+          ? 'rgba(255,255,255,0.03)'
+          : alpha(theme.palette.text.primary, 0.03);
+        const hairline = isDarkTv ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
+        const MONO_FONT_TV = "'JetBrains Mono', ui-monospace, monospace";
+        const monoLabelSx = {
+          fontFamily: MONO_FONT_TV,
+          fontSize: '0.62rem',
+          fontWeight: 600,
+          letterSpacing: '0.12em',
+          textTransform: 'uppercase' as const,
+          color: alpha(theme.palette.text.secondary, 0.85),
+        };
+        return (
+          <Dialog
+            open={!!tagToView}
+            onClose={() => setTagToView(null)}
+            maxWidth="sm"
+            fullWidth
+            {...dialogProps}
+            sx={{ zIndex: Z_INDEX.DIALOG }}
+            slotProps={{
+              paper: {
+                sx: {
+                  borderRadius: 2,
+                  border: `1px solid ${hairline}`,
+                  boxShadow: theme.shadows[10],
+                  backgroundImage: 'none',
+                  overflow: 'hidden',
+                },
+              },
+            }}
           >
-            <CloseIcon />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent dividers sx={{ ...scrollbarStyles(theme) }}>
-          {tagToView && (
-            <Box>
-              <Box sx={{ mb: 3 }}>
-                <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
-                  Tag
-                </Typography>
-                <Chip
-                  label={formatTagForDisplay(tagToView, true)}
-                  sx={{
-                    ...getTagChipStyles(tagToView, theme),
-                    fontSize: '1rem',
-                    height: 36,
-                    '& .MuiChip-label': {
-                      px: 2
-                    }
-                  }}
-                />
-              </Box>
-              <Box>
-                <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
-                  Definition
-                </Typography>
-                <Typography
-                  variant="body1"
-                  sx={{
-                    whiteSpace: 'pre-wrap',
-                    color: tagDefinitions[tagToView] ? 'text.primary' : 'text.secondary',
-                    fontStyle: tagDefinitions[tagToView] ? 'normal' : 'italic'
-                  }}
-                >
-                  {tagDefinitions[tagToView] || 'No definition available for this tag.'}
-                </Typography>
-              </Box>
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setTagToView(null)}>
-            Close
-          </Button>
-          {!isReadOnly && tagToView && (
-            <Button
-              variant="contained"
-              onClick={() => {
-                setTagToEdit(tagToView);
-                setTagToView(null);
+            {/* Header */}
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5,
+                px: 2.5,
+                py: 1.75,
+                borderBottom: `1px solid ${hairline}`,
               }}
             >
-              Edit Tag
-            </Button>
-          )}
-        </DialogActions>
-      </Dialog>
+              <Box
+                sx={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 1.25,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: violetSoft,
+                  color: violet,
+                  border: `1px solid ${violetBorder}`,
+                  flexShrink: 0,
+                }}
+              >
+                <TagIcon sx={{ fontSize: 18 }} />
+              </Box>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography sx={{ fontWeight: 700, fontSize: '0.95rem', lineHeight: 1.2 }}>
+                  Tag details
+                </Typography>
+                <Typography
+                  sx={{
+                    fontSize: '0.78rem',
+                    color: theme.palette.text.secondary,
+                    lineHeight: 1.3,
+                  }}
+                >
+                  Read-only view of this tag and its definition
+                </Typography>
+              </Box>
+              <IconButton
+                onClick={() => setTagToView(null)}
+                size="small"
+                sx={{ color: theme.palette.text.secondary }}
+              >
+                <CloseIcon fontSize="small" />
+              </IconButton>
+            </Box>
+
+            {/* Body */}
+            <Box
+              sx={{
+                px: 2.5,
+                py: 2,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 2,
+                ...scrollbarStyles(theme),
+                overflowY: 'auto',
+                maxHeight: '70vh',
+              }}
+            >
+              {tagToView && (
+                <>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                    <Typography sx={monoLabelSx}>Tag</Typography>
+                    <Box>
+                      <Chip
+                        label={formatTagForDisplay(tagToView, true)}
+                        sx={{
+                          ...getTagChipStyles(tagToView, theme),
+                          fontSize: '0.95rem',
+                          height: 32,
+                          '& .MuiChip-label': { px: 1.75 },
+                        }}
+                      />
+                    </Box>
+                  </Box>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                    <Typography sx={monoLabelSx}>Definition</Typography>
+                    <Box
+                      sx={{
+                        px: 1.5,
+                        py: 1.25,
+                        borderRadius: 1.5,
+                        border: `1px solid ${hairline}`,
+                        backgroundColor: surfaceInset,
+                      }}
+                    >
+                      <Typography
+                        sx={{
+                          whiteSpace: 'pre-wrap',
+                          fontSize: '0.88rem',
+                          lineHeight: 1.55,
+                          color: tagDefinitions[tagToView]
+                            ? theme.palette.text.primary
+                            : alpha(theme.palette.text.secondary, 0.8),
+                          fontStyle: tagDefinitions[tagToView] ? 'normal' : 'italic',
+                        }}
+                      >
+                        {tagDefinitions[tagToView] || 'No definition available for this tag.'}
+                      </Typography>
+                    </Box>
+                  </Box>
+                </>
+              )}
+            </Box>
+
+            {/* Footer */}
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                gap: 1,
+                px: 2.5,
+                py: 1.5,
+                borderTop: `1px solid ${hairline}`,
+                backgroundColor: isDarkTv
+                  ? 'rgba(255,255,255,0.02)'
+                  : alpha(theme.palette.text.primary, 0.02),
+              }}
+            >
+              <Button
+                onClick={() => setTagToView(null)}
+                sx={{
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  fontSize: '0.85rem',
+                  color: theme.palette.text.secondary,
+                  '&:hover': {
+                    backgroundColor: alpha(theme.palette.text.primary, 0.04),
+                  },
+                }}
+              >
+                Close
+              </Button>
+              {!isReadOnly && tagToView && (
+                <Button
+                  onClick={() => {
+                    setTagToEdit(tagToView);
+                    setTagToView(null);
+                  }}
+                  variant="contained"
+                  sx={{
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    fontSize: '0.85rem',
+                    backgroundColor: violet,
+                    color: '#fff',
+                    borderRadius: 1.25,
+                    px: 1.75,
+                    py: 0.75,
+                    boxShadow: 'none',
+                    '&:hover': {
+                      backgroundColor: theme.palette.primary.dark,
+                      boxShadow: 'none',
+                    },
+                  }}
+                >
+                  Edit tag
+                </Button>
+              )}
+            </Box>
+          </Dialog>
+        );
+      })()}
     </Box>
   );
 };

@@ -8,21 +8,21 @@ import {
   ListItemText,
   CircularProgress,
   Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   Button,
   TextField,
   Box,
-  Typography
+  Typography,
+  alpha,
+  useTheme,
 } from '@mui/material';
 import {
   Share as ShareIcon,
   Link as LinkIcon,
   ContentCopy as CopyIcon,
   LinkOff as UnshareIcon,
-  Close as CloseIcon
+  Close as CloseIcon,
 } from '@mui/icons-material';
+import { dialogProps } from '../../styles/dialogStyles';
 import { Trade, Calendar } from '../../types/dualWrite';
 import { useAuthState } from '../../contexts/AuthStateContext';
 import { logger } from '../../utils/logger';
@@ -70,6 +70,7 @@ type ShareButtonProps = ShareTradeProps | ShareCalendarProps;
 const ShareButton: React.FC<ShareButtonProps> = (props) => {
   const { type, item, onUpdateItemProperty } = props;
   const { user } = useAuthState();
+  const theme = useTheme();
 
   // Trade-specific props
   const calendarId = type === 'trade' ? (props as ShareTradeProps).calendarId : undefined;
@@ -267,44 +268,193 @@ const ShareButton: React.FC<ShareButtonProps> = (props) => {
           )}
         </Menu>
 
-        {/* Share Link Dialog for Trade */}
-        <Dialog
-          open={shareDialogOpen}
-          onClose={() => setShareDialogOpen(false)}
-          onClick={(e) => e.stopPropagation()}
-          maxWidth="sm"
-          fullWidth
-          sx={{ zIndex: Z_INDEX.TOOLTIP }}
-        >
-          <DialogTitle>Share Trade</DialogTitle>
-          <DialogContent>
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="body2" color="text.secondary" gutterBottom>
-                {type === 'trade' ? 'Anyone with this link can view this trade in read-only mode.' : `Share this calendar with others. They'll be able to view your trades in read-only mode.`}
-              </Typography>
-              <TextField
-                fullWidth
-                value={shareLink}
-                slotProps={{
-                  input: {
-                    readOnly: true,
+        {/* Share Link Dialog */}
+        {(() => {
+          const isDarkSb = theme.palette.mode === 'dark';
+          const violet = theme.palette.primary.main;
+          const violetSoft = alpha(violet, isDarkSb ? 0.18 : 0.14);
+          const violetBorder = alpha(violet, isDarkSb ? 0.35 : 0.28);
+          const surfaceInset = isDarkSb
+            ? 'rgba(255,255,255,0.03)'
+            : alpha(theme.palette.text.primary, 0.03);
+          const hairline = isDarkSb ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
+          const MONO_FONT_SB = "'JetBrains Mono', ui-monospace, monospace";
+          const monoLabelSx = {
+            fontFamily: MONO_FONT_SB,
+            fontSize: '0.68rem',
+            fontWeight: 600,
+            letterSpacing: '0.12em',
+            textTransform: 'uppercase' as const,
+            color: theme.palette.text.secondary,
+          };
+          const titleText = type === 'trade' ? 'Share trade' : 'Share calendar';
+          const subtitleText = type === 'trade'
+            ? 'Anyone with this link can view the trade in read-only mode'
+            : "Anyone with this link can view your calendar's trades in read-only mode";
+
+          return (
+            <Dialog
+              open={shareDialogOpen}
+              onClose={() => setShareDialogOpen(false)}
+              onClick={(e) => e.stopPropagation()}
+              maxWidth="sm"
+              fullWidth
+              {...dialogProps}
+              sx={{ zIndex: Z_INDEX.TOOLTIP }}
+              slotProps={{
+                paper: {
+                  sx: {
+                    borderRadius: 2,
+                    border: `1px solid ${hairline}`,
+                    boxShadow: theme.shadows[10],
+                    backgroundImage: 'none',
+                    overflow: 'hidden',
                   },
+                },
+              }}
+            >
+              {/* Header */}
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1.5,
+                  px: 2.5,
+                  py: 1.75,
+                  borderBottom: `1px solid ${hairline}`,
                 }}
-                variant="outlined"
-                size="small"
-                sx={{ mt: 1 }}
-              />
-            </Box>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setShareDialogOpen(false)}>
-              Close
-            </Button>
-            <Button onClick={handleCopyLink} variant="contained" startIcon={<CopyIcon />}>
-              Copy Link
-            </Button>
-          </DialogActions>
-        </Dialog>
+              >
+                <Box
+                  sx={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 1.25,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: violetSoft,
+                    color: violet,
+                    border: `1px solid ${violetBorder}`,
+                    flexShrink: 0,
+                  }}
+                >
+                  <LinkIcon sx={{ fontSize: 18 }} />
+                </Box>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography sx={{ fontWeight: 700, fontSize: '0.95rem', lineHeight: 1.2 }}>
+                    {titleText}
+                  </Typography>
+                  <Typography
+                    sx={{
+                      fontSize: '0.78rem',
+                      color: theme.palette.text.secondary,
+                      lineHeight: 1.3,
+                    }}
+                  >
+                    {subtitleText}
+                  </Typography>
+                </Box>
+                <IconButton
+                  onClick={() => setShareDialogOpen(false)}
+                  size="small"
+                  sx={{ color: theme.palette.text.secondary }}
+                >
+                  <CloseIcon fontSize="small" />
+                </IconButton>
+              </Box>
+
+              {/* Body */}
+              <Box
+                sx={{
+                  px: 2.5,
+                  py: 2,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 0.75,
+                }}
+              >
+                <Typography sx={monoLabelSx}>Share URL</Typography>
+                <TextField
+                  fullWidth
+                  size="small"
+                  value={shareLink}
+                  slotProps={{
+                    input: {
+                      readOnly: true,
+                    },
+                  }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 1.5,
+                      backgroundColor: surfaceInset,
+                      '& fieldset': { borderColor: hairline },
+                      '&:hover fieldset': { borderColor: alpha(violet, 0.5) },
+                      '&.Mui-focused fieldset': { borderColor: violet, borderWidth: 1 },
+                    },
+                    '& .MuiOutlinedInput-input': {
+                      py: 1.1,
+                      fontSize: '0.82rem',
+                      fontFamily: MONO_FONT_SB,
+                    },
+                  }}
+                />
+              </Box>
+
+              {/* Footer */}
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'flex-end',
+                  gap: 1,
+                  px: 2.5,
+                  py: 1.5,
+                  borderTop: `1px solid ${hairline}`,
+                  backgroundColor: isDarkSb
+                    ? 'rgba(255,255,255,0.02)'
+                    : alpha(theme.palette.text.primary, 0.02),
+                }}
+              >
+                <Button
+                  onClick={() => setShareDialogOpen(false)}
+                  sx={{
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    fontSize: '0.85rem',
+                    color: theme.palette.text.secondary,
+                    '&:hover': {
+                      backgroundColor: alpha(theme.palette.text.primary, 0.04),
+                    },
+                  }}
+                >
+                  Close
+                </Button>
+                <Button
+                  onClick={handleCopyLink}
+                  variant="contained"
+                  startIcon={<CopyIcon sx={{ fontSize: 16 }} />}
+                  sx={{
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    fontSize: '0.85rem',
+                    backgroundColor: violet,
+                    color: '#fff',
+                    borderRadius: 1.25,
+                    px: 1.75,
+                    py: 0.75,
+                    boxShadow: 'none',
+                    '&:hover': {
+                      backgroundColor: theme.palette.primary.dark,
+                      boxShadow: 'none',
+                    },
+                  }}
+                >
+                  Copy link
+                </Button>
+              </Box>
+            </Dialog>
+          );
+        })()}
       </>
     );
    
