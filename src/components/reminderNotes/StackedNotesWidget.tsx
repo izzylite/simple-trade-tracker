@@ -14,6 +14,7 @@ import { Z_INDEX } from '../../styles/zIndex';
 import { Note } from '../../types/note';
 import { Calendar } from '../../types/calendar';
 import { useUserPinnedEvents } from '../../contexts/UserPinnedEventsContext';
+import { SIDE_NAV_WIDTH } from '../layout/SideNav';
 
 interface StackedNotesWidgetProps {
   calendarId: string;
@@ -81,7 +82,11 @@ const StackedNotesWidget: React.FC<StackedNotesWidgetProps> = ({
         sx={{
           position: 'fixed',
           bottom: { xs: 16, sm: 24 },
-          left: { xs: 16, sm: 24 },
+          // Below lg the SideNav rail collapses into a drawer so the widget
+          // can sit at the viewport edge. From lg up the rail is a fixed
+          // 92px column on the left — shift past it so the widget doesn't
+          // cover the "About" entry at the bottom of the rail.
+          left: { xs: 16, sm: 24, lg: SIDE_NAV_WIDTH + 16 },
           zIndex: Z_INDEX.FLOAT_NAVIGATION,
           cursor: 'pointer',
           // Container size to accommodate fanned cards
