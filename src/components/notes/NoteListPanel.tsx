@@ -90,6 +90,14 @@ interface NoteListPanelProps {
    */
   expandedId?: string | null;
   onExpandedIdChange?: React.Dispatch<React.SetStateAction<string | null>>;
+  /**
+   * Skip the inline expand/preview affordance — clicking a row fires
+   * `onNoteClick` directly. Used by the standalone /notes page where
+   * the full editor is the natural next step; the trade-calendar
+   * notes side-panel keeps the expand-preview because there is no
+   * dedicated note view to navigate to.
+   */
+  disableExpand?: boolean;
 }
 
 const TAG_COLOR_MAP: Record<string, string> = {
@@ -607,6 +615,7 @@ const NoteListPanel: React.FC<NoteListPanelProps> = ({
   showHeader = true,
   expandedId: expandedIdProp,
   onExpandedIdChange,
+  disableExpand = false,
 }) => {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
@@ -955,8 +964,16 @@ const NoteListPanel: React.FC<NoteListPanelProps> = ({
                   key={note.id}
                   note={note}
                   isLast={i === filteredNotes.length - 1}
-                  expanded={expandedId === note.id}
-                  onToggleExpand={() => handleRowToggle(note.id)}
+                  expanded={!disableExpand && expandedId === note.id}
+                  // In disable-expand mode, the row's primary click goes
+                  // straight to `onOpen` (e.g. /notes opens the editor).
+                  // Otherwise the click toggles the inline preview, and
+                  // an Open button inside the preview fires `onOpen`.
+                  onToggleExpand={
+                    disableExpand
+                      ? () => handleOpen(note)
+                      : () => handleRowToggle(note.id)
+                  }
                   onOpen={() => handleOpen(note)}
                   onTogglePin={onTogglePin ? () => onTogglePin(note) : undefined}
                   onToggleArchive={onToggleArchive ? () => onToggleArchive(note) : undefined}

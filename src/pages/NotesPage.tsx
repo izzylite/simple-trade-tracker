@@ -78,7 +78,7 @@ const NotesPage: React.FC = () => {
 
   // ─── Notes data ───────────────────────────────────────────────────────────
   const {
-    notes, loading, loadingMore, hasMore, total, hasLoaded,
+    notes, loading, loadingMore, hasMore, total, tabCounts, hasLoaded,
     updateNote, removeNote, addNote, loadMore,
   } = useNotes({
     userId: user?.uid,
@@ -305,11 +305,15 @@ const NotesPage: React.FC = () => {
           onNoteClick={handleNoteClick}
           onNewNote={handleNewNote}
           canCreateNote={canCreateNote}
+          onTogglePin={(note) => updateNote(note.id, { is_pinned: !note.is_pinned })}
+          onToggleArchive={(note) => updateNote(note.id, { is_archived: !note.is_archived })}
           tab={tab}
           onTabChange={setTab}
           pill={pillFilter}
           onPillChange={setPillFilter}
           total={total}
+          tabCounts={tabCounts}
+          disableExpand
         />
 
         {/* Center: note viewer or inline editor */}
