@@ -1,13 +1,18 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import {
   Box,
-  FormControl,
-  InputLabel,
   Select,
   MenuItem,
   Snackbar,
-  Alert
+  Alert,
+  Typography,
+  alpha,
+  useTheme,
 } from '@mui/material';
+import {
+  TrendingUp as TrendingUpIcon,
+  Edit as EditIcon,
+} from '@mui/icons-material';
 import { endOfDay, format, isSameDay } from 'date-fns';
 import { Trade, Calendar } from '../../types/dualWrite';
 import { BaseDialog } from '../common';
@@ -28,6 +33,8 @@ import { formatTagsWithCapitalizedGroups } from '../../utils/tagColors';
 import { Z_INDEX } from '../../styles/zIndex';
 import { TradeRepository } from '../../services/repository/repositories/TradeRepository';
 import { deriveTradeDateForSession } from '../../utils/sessionTimeUtils';
+
+const MONO_FONT = "'JetBrains Mono', ui-monospace, monospace";
 // Re-export pure helpers from the side-effect-free helper module so
 // callers can keep importing them from TradeFormDialog while
 // TradeOperationsContext (and tests) can import directly from
@@ -117,6 +124,40 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
   calendars,
   onCalendarChange
 }) => {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+
+  const violet = theme.palette.primary.main;
+  const violetSoft = alpha(violet, isDark ? 0.18 : 0.14);
+  const surfaceInset = isDark ? 'rgba(255,255,255,0.03)' : alpha(theme.palette.text.primary, 0.03);
+  const hairline = isDark ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
+
+  const monoLabelSx = {
+    fontFamily: MONO_FONT,
+    fontSize: '0.68rem',
+    fontWeight: 600,
+    letterSpacing: '0.12em',
+    textTransform: 'uppercase' as const,
+    color: theme.palette.text.secondary,
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 0.75,
+  };
+
+  const inputSx = {
+    '& .MuiOutlinedInput-root': {
+      borderRadius: 1.5,
+      backgroundColor: surfaceInset,
+      '& fieldset': { borderColor: hairline },
+      '&:hover fieldset': { borderColor: alpha(violet, 0.5) },
+      '&.Mui-focused fieldset': { borderColor: violet, borderWidth: 1 },
+    },
+    '& .MuiOutlinedInput-input, & .MuiSelect-select': {
+      py: 1.1,
+      fontSize: '0.88rem',
+      fontWeight: 500,
+    },
+  };
 
   // State
 
@@ -1251,6 +1292,22 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     }
   };
 
+  const isEdit = !!editingTrade;
+  const dialogTitle = isEdit ? 'Edit trade' : 'New trade';
+  const dialogSubtitle = isEdit
+    ? 'Refine the details, tags, and notes for this trade'
+    : `Log a trade for ${format(trade_date, 'EEEE, MMMM d')}`;
+
+  const primaryLabel = isEdit
+    ? (isSubmitting ? 'Saving…' : 'Save changes')
+    : (isCreatingEmptyTrade
+      ? 'Preparing…'
+      : isLoadingPrecalculatedValues
+        ? 'Calculating risk…'
+        : isSubmitting
+          ? 'Adding…'
+          : 'Add trade');
+
   return (
     <>
       <BaseDialog
@@ -1264,11 +1321,17 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
             onClose();
           }
         }}
-        title="Daily Trades"
+        title={dialogTitle}
+        subtitle={dialogSubtitle}
+        headerIcon={
+          isEdit
+            ? <EditIcon sx={{ fontSize: 18 }} />
+            : <TrendingUpIcon sx={{ fontSize: 18 }} />
+        }
         maxWidth="md"
         fullWidth
         hideCloseButton={isCreatingEmptyTrade || isLoadingPrecalculatedValues} // Disable close button when creating empty trade
-        primaryButtonText={(editingTrade ? 'Update Trade' : 'Add Trade')}
+        primaryButtonText={primaryLabel}
         primaryButtonAction={(editingTrade ?
           (e?: React.FormEvent) => handleEditSubmit(e) :
           (e?: React.FormEvent) => handleSubmit(e)
@@ -1283,32 +1346,77 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
         }}
         hideFooterCancelButton={false}
         sx={{ zIndex: Z_INDEX.DIALOG_POPUP }} // Higher z-index to appear above TradeGalleryDialog
+        contentSx={{ px: 2.5, py: 2 }}
       >
-        <Box sx={{ p: 3 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.25 }}>
 
           {/* Calendar Selection Dropdown (only shown when calendars prop is provided) */}
           {isCalendarSelectionMode && (
-            <Box sx={{ mb: 3 }}>
-              <FormControl fullWidth required>
-                <InputLabel id="trade-calendar-select-label">Calendar</InputLabel>
-                <Select
-                  labelId="trade-calendar-select-label"
-                  id="trade-calendar-select"
-                  value={calendar?.id || ''}
-                  label="Calendar"
-                  onChange={(e) => onCalendarChange?.(e.target.value)}
-                  disabled={isSubmitting || isCreatingEmptyTrade}
-                  MenuProps={{
-                    sx: { zIndex: Z_INDEX.DIALOG_POPUP }
-                  }}
-                >
-                  {calendars?.map((calendar) => (
-                    <MenuItem key={calendar.id} value={calendar.id}>
-                      {calendar.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+              <Typography sx={monoLabelSx}>
+                Calendar
+                <Box component="span" sx={{ color: theme.palette.error.main, fontFamily: 'inherit' }}>*</Box>
+              </Typography>
+              <Select
+                id="trade-calendar-select"
+                value={calendar?.id || ''}
+                onChange={(e) => onCalendarChange?.(e.target.value)}
+                disabled={isSubmitting || isCreatingEmptyTrade}
+                displayEmpty
+                fullWidth
+                size="small"
+                MenuProps={{
+                  sx: { zIndex: Z_INDEX.DIALOG_POPUP },
+                  PaperProps: {
+                    sx: {
+                      borderRadius: 1.5,
+                      border: `1px solid ${hairline}`,
+                      boxShadow: theme.shadows[8],
+                      backgroundImage: 'none',
+                      mt: 0.5,
+                    },
+                  },
+                }}
+                sx={inputSx}
+                renderValue={(value) => {
+                  if (!value) {
+                    return (
+                      <Typography
+                        component="span"
+                        sx={{
+                          fontSize: '0.88rem',
+                          color: theme.palette.text.disabled,
+                        }}
+                      >
+                        Select a calendar…
+                      </Typography>
+                    );
+                  }
+                  const selected = calendars?.find(c => c.id === value);
+                  return selected?.name ?? '';
+                }}
+              >
+                {calendars?.map((cal) => (
+                  <MenuItem
+                    key={cal.id}
+                    value={cal.id}
+                    sx={{
+                      fontSize: '0.88rem',
+                      fontWeight: 500,
+                      borderRadius: 1,
+                      mx: 0.5,
+                      my: 0.25,
+                      '&.Mui-selected': {
+                        backgroundColor: violetSoft,
+                        color: violet,
+                        '&:hover': { backgroundColor: violetSoft },
+                      },
+                    }}
+                  >
+                    {cal.name}
+                  </MenuItem>
+                ))}
+              </Select>
             </Box>
           )}
 
