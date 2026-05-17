@@ -252,7 +252,14 @@ const OrionPanel: React.FC<OrionPanelProps> = ({
               transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
             }}
           >
-            {/* Chat View */}
+            {/* Chat View. AIChatInterface was sized for a full-width
+                drawer; in this 380px-wide focus panel the default type
+                scale dominates the message column. The selectors below
+                trim the message body, input, helper text, template
+                chips, and inline buttons down a tier so the chat reads
+                comfortably in the narrower slot. Scoped via descendant
+                selectors so AIChatInterface stays unchanged for other
+                hosts (AIChatDrawer, etc.). */}
             <Box
               sx={{
                 width: '50%',
@@ -260,6 +267,23 @@ const OrionPanel: React.FC<OrionPanelProps> = ({
                 display: 'flex',
                 flexDirection: 'column',
                 overflow: 'hidden',
+                '& .MuiTypography-body1': { fontSize: '0.82rem', lineHeight: 1.45 },
+                '& .MuiTypography-body2': { fontSize: '0.76rem', lineHeight: 1.4 },
+                '& .MuiTypography-caption': { fontSize: '0.65rem', lineHeight: 1.35 },
+                '& .MuiTypography-h6': { fontSize: '0.92rem' },
+                '& .MuiTypography-subtitle1': { fontSize: '0.85rem' },
+                '& .MuiTypography-subtitle2': { fontSize: '0.78rem' },
+                '& .MuiInputBase-input': { fontSize: '0.82rem' },
+                '& .MuiButton-root': { fontSize: '0.74rem' },
+                '& .MuiChip-label': { fontSize: '0.7rem' },
+                // The message-input editor is Draft.js, not an MUI input
+                // — these selectors target the editable content and the
+                // placeholder string so the chat input matches the rest
+                // of the compact panel.
+                '& .public-DraftEditor-content, & .public-DraftEditorPlaceholder-root': {
+                  fontSize: '0.8rem',
+                  lineHeight: 1.4,
+                },
               }}
             >
               <AIChatInterface

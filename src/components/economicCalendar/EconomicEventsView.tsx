@@ -28,12 +28,8 @@ import {
   ChevronLeft as ChevronLeftIcon,
   ChevronRight as ChevronRightIcon,
   Close as CloseIcon,
-  PushPin as PinIcon,
-  PushPinOutlined as UnpinIcon,
   EventNote as EventsIcon,
   CalendarMonth as DateRangeIcon,
-  Check as CheckIcon,
-  HourglassEmpty as HourglassEmptyIcon,
   Notifications as NotificationsIcon,
   NotificationsOff as NotificationsOffIcon,
 } from '@mui/icons-material';
@@ -42,7 +38,6 @@ import {
   addDays,
   addWeeks,
   format,
-  isAfter,
   isSameDay,
   parseISO,
   endOfWeek,
@@ -63,6 +58,7 @@ import {
 } from '../../hooks/useEconomicCalendarFilters';
 import EconomicEventShimmer from './EconomicEventShimmer';
 import EconomicEventDetailDialog from './EconomicEventDetailDialog';
+import EconomicEventRow, { impactColor } from './EconomicEventRow';
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
@@ -113,100 +109,14 @@ const HUB_TABS: Array<{ value: HubTab; label: string }> = [
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-export const formatTime = (timeUtc: string): string => {
-  try {
-    return format(parseISO(timeUtc), 'h:mm a');
-  } catch {
-    return '--:--';
-  }
-};
-
-interface TimeInfo {
-  countdown: string | null;
-  isUpcoming: boolean;
-  isImminent: boolean;
-  isPassed: boolean;
-}
-
-export const computeTimeInfo = (timeUtc: string, currentTime: Date): TimeInfo => {
-  try {
-    const target = parseISO(timeUtc);
-    if (!isAfter(target, currentTime)) {
-      return { countdown: null, isUpcoming: false, isImminent: false, isPassed: true };
-    }
-    const totalSeconds = Math.floor((target.getTime() - currentTime.getTime()) / 1000);
-    const minutesDiff = Math.floor(totalSeconds / 60);
-    const hoursDiff = Math.floor(totalSeconds / 3600);
-    const daysDiff = Math.floor(hoursDiff / 24);
-    let countdown = '';
-    let isImminent = false;
-    if (minutesDiff < 60) {
-      isImminent = true;
-      if (minutesDiff < 5) {
-        const remM = Math.floor(totalSeconds / 60);
-        const remS = totalSeconds % 60;
-        countdown = remM > 0 ? `${remM}m ${remS}s` : `${remS}s`;
-      } else {
-        countdown = `${minutesDiff} min`;
-      }
-    } else if (hoursDiff < 24) {
-      countdown = `${hoursDiff}h`;
-    } else if (daysDiff === 1) {
-      countdown = '1 day';
-    } else {
-      countdown = `${daysDiff} days`;
-    }
-    return { countdown, isUpcoming: true, isImminent, isPassed: false };
-  } catch {
-    return { countdown: null, isUpcoming: false, isImminent: false, isPassed: false };
-  }
-};
-
-const getActualResultStyle = (
-  actualResultType: string | undefined,
-  theme: Theme
-): { bg: string; border: string; color: string } => {
-  switch (actualResultType) {
-    case 'good':
-      return {
-        bg: alpha(theme.palette.success.main, 0.15),
-        border: alpha(theme.palette.success.main, 0.3),
-        color: theme.palette.success.light,
-      };
-    case 'bad':
-      return {
-        bg: alpha(theme.palette.error.main, 0.15),
-        border: alpha(theme.palette.error.main, 0.3),
-        color: theme.palette.error.light,
-      };
-    case 'neutral':
-      return {
-        bg: alpha(theme.palette.info.main, 0.1),
-        border: alpha(theme.palette.info.main, 0.2),
-        color: theme.palette.info.light,
-      };
-    default:
-      return {
-        bg: alpha(theme.palette.success.main, 0.1),
-        border: alpha(theme.palette.success.main, 0.2),
-        color: theme.palette.text.primary,
-      };
-  }
-};
+// `formatTime` and `computeTimeInfo` live in EconomicEventRow now —
+// keeping them here too caused a circular import (Row imports them from
+// View, View imports Row). Re-exported for any future external caller.
+export { formatTime, computeTimeInfo } from './EconomicEventRow';
 
 /** A "release" is an event whose actual figure has already published. */
 export const isReleaseEvent = (e: EconomicEvent): boolean =>
   Boolean(e.actual_value && e.actual_value.trim() !== '');
-
-const impactColor = (impact: ImpactLevel, theme: Theme): string => {
-  switch (impact) {
-    case 'High': return theme.palette.error.main;
-    case 'Medium': return theme.palette.warning.main;
-    case 'Low': return theme.palette.success.main;
-    default: return theme.palette.text.secondary;
-  }
-};
 
 // ─── FilterPill ───────────────────────────────────────────────────────────────
 
@@ -640,296 +550,14 @@ export const DayRail: React.FC<{
   );
 };
 
-// ─── ValuePill / ImpactBars ───────────────────────────────────────────────────
-
-const ValuePill: React.FC<{ label: string; bg: string; border: string; color: string }> = ({
-  label, bg, border, color,
-}) => (
-  <Box
-    sx={{
-      px: 0.875, py: 0.25, borderRadius: 0.75,
-      bgcolor: bg, border: `1px solid ${border}`, color,
-      fontSize: '0.7rem', fontWeight: 700,
-      fontFeatureSettings: "'tnum' on, 'lnum' on",
-      lineHeight: 1.4,
-    }}
-  >
-    {label}
-  </Box>
-);
-
-const ImpactBars: React.FC<{ impact: ImpactLevel; theme: Theme }> = ({ impact, theme }) => {
-  const filledCount = impact === 'High' ? 3 : impact === 'Medium' ? 2 : impact === 'Low' ? 1 : 0;
-  const filledColor =
-    impact === 'High'
-      ? theme.palette.error.main
-      : impact === 'Medium'
-        ? theme.palette.warning.main
-        : impact === 'Low'
-          ? theme.palette.success.main
-          : alpha(theme.palette.text.primary, 0.18);
-  const dim = alpha(theme.palette.text.primary, 0.12);
-  return (
-    <Stack direction="row" spacing={0.375} aria-label={`${impact} impact`}>
-      {[0, 1, 2].map((i) => (
-        <Box
-          key={i}
-          sx={{
-            width: 6, height: 12, borderRadius: '1.5px',
-            bgcolor: i < filledCount ? filledColor : dim,
-          }}
-        />
-      ))}
-    </Stack>
-  );
-};
 
 // ─── EventRow ─────────────────────────────────────────────────────────────────
+// Layout extracted to EconomicEventRow.tsx so other surfaces (e.g. the
+// trade-gallery Events panel) can share one canonical event row. The
+// local alias keeps EventList's existing call sites unchanged.
 
-const EventRow: React.FC<{
-  event: EconomicEvent;
-  firstRow: boolean;
-  isNow: boolean;
-  pinned: boolean;
-  busy: boolean;
-  tradeCount: number;
-  currentTime: Date;
-  onTogglePin: (e: React.MouseEvent) => void;
-  onClick: () => void;
-  theme: Theme;
-}> = ({
-  event, firstRow, isNow, pinned, busy, tradeCount, currentTime, onTogglePin, onClick, theme,
-}) => {
-  const timeInfo = useMemo(
-    () => computeTimeInfo(event.time_utc, currentTime),
-    [event.time_utc, currentTime]
-  );
-  const actualStyle = getActualResultStyle(event.actual_result_type, theme);
-  const hasAnyValue = Boolean(event.actual_value || event.forecast_value || event.previous_value);
+const EventRow = EconomicEventRow;
 
-  const nowDotSx = isNow
-    ? {
-        '&::before': {
-          content: '""', position: 'absolute',
-          left: 6, top: '50%', transform: 'translateY(-50%)',
-          width: 6, height: 6, borderRadius: '50%',
-          bgcolor: theme.palette.primary.main,
-          boxShadow: `0 0 8px ${alpha(theme.palette.primary.main, 0.8)}`,
-          animation: 'eventNowPulse 2.4s ease-in-out infinite',
-        },
-        '@keyframes eventNowPulse': {
-          '0%, 100%': { opacity: 1 },
-          '50%': { opacity: 0.5 },
-        },
-        '@media (prefers-reduced-motion: reduce)': {
-          '&::before': { animation: 'none' },
-        },
-      }
-    : {};
-
-  const imminentBg = timeInfo.isImminent ? alpha(impactColor(event.impact, theme), 0.12) : null;
-
-  return (
-    <Box
-      onClick={onClick}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onClick();
-        }
-      }}
-      sx={{
-        position: 'relative',
-        display: 'grid',
-        gridTemplateColumns: '52px 1fr auto auto',
-        gap: 1.5,
-        alignItems: 'flex-start',
-        px: 2.25, py: 1.75,
-        borderTop: firstRow ? 'none' : `1px solid ${theme.palette.divider}`,
-        bgcolor: isNow
-          ? alpha(theme.palette.primary.main, 0.16)
-          : imminentBg ?? 'transparent',
-        opacity: timeInfo.isPassed ? 0.62 : 1,
-        cursor: 'pointer',
-        transition: 'background 180ms, opacity 180ms',
-        '&:hover': {
-          bgcolor: isNow
-            ? alpha(theme.palette.primary.main, 0.2)
-            : alpha(theme.palette.primary.main, 0.04),
-        },
-        ...nowDotSx,
-      }}
-    >
-      <Box
-        sx={{
-          minWidth: 36, mt: 0.25,
-          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5,
-        }}
-      >
-        {event.flag_url ? (
-          <Box
-            component="img"
-            src={event.flag_url}
-            alt={event.country || event.currency || ''}
-            sx={{
-              width: 22, height: 16, borderRadius: 0.375, objectFit: 'cover',
-              border: `1px solid ${alpha(theme.palette.divider, 0.4)}`,
-            }}
-          />
-        ) : (
-          <Box
-            sx={{
-              width: 22, height: 16, borderRadius: 0.375,
-              bgcolor: alpha(theme.palette.text.primary, 0.06),
-            }}
-          />
-        )}
-        <Typography
-          sx={{
-            fontSize: '0.66rem', fontWeight: 700, letterSpacing: '0.02em',
-            color: 'text.primary', lineHeight: 1,
-          }}
-        >
-          {event.currency}
-        </Typography>
-      </Box>
-
-      <Box sx={{ minWidth: 0 }}>
-        <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
-          <Typography
-            sx={{
-              fontSize: '0.78rem', fontWeight: 600,
-              color: timeInfo.isUpcoming ? 'text.primary' : 'text.secondary',
-              fontFeatureSettings: "'tnum' on",
-            }}
-          >
-            {event.is_all_day ? 'All day' : formatTime(event.time_utc)}
-          </Typography>
-          {timeInfo.isPassed ? (
-            <CheckIcon sx={{ fontSize: 14, color: 'success.main' }} />
-          ) : timeInfo.countdown ? (
-            <Typography
-              sx={{
-                fontSize: '0.66rem', fontWeight: 700,
-                color: timeInfo.isImminent ? 'error.main' : 'warning.main',
-                animation: timeInfo.isImminent ? 'eventCountdownPulse 1s infinite' : 'none',
-                '@keyframes eventCountdownPulse': {
-                  '0%, 100%': { opacity: 1 },
-                  '50%': { opacity: 0.7 },
-                },
-                '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
-              }}
-            >
-              {timeInfo.countdown}
-            </Typography>
-          ) : null}
-        </Stack>
-
-        <Typography
-          sx={{
-            fontSize: '0.92rem', fontWeight: 600, letterSpacing: '-0.01em',
-            color: 'text.primary',
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          }}
-        >
-          {event.event_name}
-        </Typography>
-
-        {hasAnyValue && (
-          <Stack direction="row" spacing={0.875} alignItems="center" flexWrap="wrap"
-            sx={{ mt: 0.625, rowGap: 0.5 }}>
-            {event.actual_value ? (
-              <ValuePill label={`A: ${event.actual_value}`} bg={actualStyle.bg}
-                border={actualStyle.border} color={actualStyle.color} />
-            ) : (
-              (event.forecast_value || event.previous_value) && (
-                <Stack direction="row" alignItems="center" spacing={0.5}>
-                  <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: 'text.disabled' }}>A:</Typography>
-                  <HourglassEmptyIcon sx={{ fontSize: 12, color: 'warning.main' }} />
-                </Stack>
-              )
-            )}
-            {event.forecast_value && (
-              <ValuePill label={`F: ${event.forecast_value}`}
-                bg={alpha(theme.palette.info.main, 0.1)}
-                border={alpha(theme.palette.info.main, 0.2)}
-                color={theme.palette.text.secondary} />
-            )}
-            {event.previous_value && (
-              <ValuePill label={`P: ${event.previous_value}`}
-                bg={alpha(theme.palette.grey[500], 0.1)}
-                border={alpha(theme.palette.grey[500], 0.2)}
-                color={theme.palette.text.disabled} />
-            )}
-            {tradeCount > 0 && (
-              <Tooltip title={`Traded ${tradeCount} time${tradeCount > 1 ? 's' : ''} across all calendars`} placement="top" arrow>
-                <Box
-                  sx={{
-                    display: 'inline-flex', alignItems: 'center', gap: 0.375,
-                    px: 0.75, py: 0.25, borderRadius: 0.75,
-                    bgcolor: alpha(theme.palette.primary.main, 0.14),
-                    border: `1px solid ${alpha(theme.palette.primary.main, 0.28)}`,
-                    color: theme.palette.primary.main,
-                    fontSize: '0.68rem', fontWeight: 700, lineHeight: 1.4,
-                  }}
-                >
-                  {tradeCount}×
-                </Box>
-              </Tooltip>
-            )}
-          </Stack>
-        )}
-        {!hasAnyValue && tradeCount > 0 && (
-          <Tooltip title={`Traded ${tradeCount} time${tradeCount > 1 ? 's' : ''} across all calendars`} placement="top" arrow>
-            <Box
-              sx={{
-                display: 'inline-flex', alignItems: 'center',
-                mt: 0.5, px: 0.75, py: 0.25, borderRadius: 0.75,
-                bgcolor: alpha(theme.palette.primary.main, 0.14),
-                border: `1px solid ${alpha(theme.palette.primary.main, 0.28)}`,
-                color: theme.palette.primary.main,
-                fontSize: '0.68rem', fontWeight: 700, lineHeight: 1.4,
-              }}
-            >
-              {tradeCount}×
-            </Box>
-          </Tooltip>
-        )}
-      </Box>
-
-      <Box sx={{ pt: 0.5 }}>
-        <ImpactBars impact={event.impact} theme={theme} />
-      </Box>
-
-      <Tooltip title={pinned ? 'Unpin event' : 'Pin event'} placement="left">
-        <span>
-          <IconButton
-            size="small"
-            onClick={onTogglePin}
-            disabled={busy}
-            sx={{
-              color: pinned ? 'primary.main' : 'text.disabled',
-              '&:hover': {
-                color: 'primary.main',
-                bgcolor: alpha(theme.palette.primary.main, 0.08),
-              },
-            }}
-          >
-            {busy ? (
-              <CircularProgress size={14} />
-            ) : pinned ? (
-              <PinIcon sx={{ fontSize: 16 }} />
-            ) : (
-              <UnpinIcon sx={{ fontSize: 16 }} />
-            )}
-          </IconButton>
-        </span>
-      </Tooltip>
-    </Box>
-  );
-};
 
 // ─── EventList ────────────────────────────────────────────────────────────────
 
@@ -941,6 +569,9 @@ export const EventList: React.FC<{
   currentTime: Date;
   isPinned: (e: EconomicEvent) => boolean;
   getTradeCount: (e: EconomicEvent) => number;
+  /** Optional — surfaces user notes attached to a pinned event as a
+   *  tooltip-icon in the row's time stack. */
+  getPinnedNotes?: (e: EconomicEvent) => string | undefined;
   pinningEventId: string | null;
   onPin: (e: EconomicEvent) => Promise<void> | void;
   onUnpin: (e: EconomicEvent) => Promise<void> | void;
@@ -948,7 +579,7 @@ export const EventList: React.FC<{
   theme: Theme;
   compact?: boolean;
 }> = ({
-  label, events, loading, error, currentTime, isPinned, getTradeCount,
+  label, events, loading, error, currentTime, isPinned, getTradeCount, getPinnedNotes,
   pinningEventId, onPin, onUnpin, onClickRow, theme, compact = false,
 }) => {
   const highCount = events.filter((e) => e.impact === 'High').length;
@@ -1057,6 +688,7 @@ export const EventList: React.FC<{
               pinned={pinned}
               busy={busy}
               tradeCount={getTradeCount(ev)}
+              pinnedNotes={getPinnedNotes?.(ev)}
               currentTime={currentTime}
               onTogglePin={(e) => {
                 e.stopPropagation();
@@ -1188,6 +820,13 @@ const EconomicEventsView: React.FC<EconomicEventsViewProps> = ({
   const { getCountForEvent } = useUserTradeEventCounts();
 
   const isPinnedFor = useCallback((ev: EconomicEvent) => isEventPinned(ev, userPins), [userPins]);
+  const getPinnedNotesFor = useCallback(
+    (ev: EconomicEvent) =>
+      userPins.find((p) =>
+        p.event_id ? p.event_id === ev.id : p.event.toLowerCase() === ev.event_name.toLowerCase(),
+      )?.notes,
+    [userPins],
+  );
 
   const eventsByDate = useMemo(() => {
     const map = new Map<string, EconomicEvent[]>();
@@ -1381,6 +1020,7 @@ const EconomicEventsView: React.FC<EconomicEventsViewProps> = ({
           currentTime={currentTime}
           isPinned={isPinnedFor}
           getTradeCount={getCountForEvent}
+          getPinnedNotes={getPinnedNotesFor}
           pinningEventId={pinningEventId}
           onPin={pin}
           onUnpin={unpin}

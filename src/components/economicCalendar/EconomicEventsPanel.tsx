@@ -11,31 +11,30 @@
  * TradeDetailExpanded so the trade detail body stays focused on the
  * trade itself — events are now exposed only via the gallery header.
  *
+ * Renders rows via the shared EconomicEventRow so the layout matches
+ * every other events surface in the app (page, side panel, here).
+ *
  * Parent must mount this inside a `display:flex; flex-direction:row`
  * container.
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Box,
   Button,
   Chip,
-  CircularProgress,
-  Divider,
   IconButton,
   Stack,
   TextField,
   Toolbar,
-  Tooltip,
   Typography,
   alpha,
   useTheme,
 } from '@mui/material';
-import type { Theme } from '@mui/material/styles';
 import {
   Close as CloseIcon,
+  EventNote as EventIcon,
   FilterList as FilterIcon,
-  TrendingUp as EconomicIcon,
 } from '@mui/icons-material';
 import { isToday, parseISO } from 'date-fns';
 
@@ -53,30 +52,19 @@ import { economicCalendarService } from '../../services/economicCalendarService'
 import { tradeEconomicEventService } from '../../services/tradeEconomicEventService';
 import { useEventPinning } from '../../hooks/useEventPinning';
 import { useUserPinnedEvents } from '../../contexts/UserPinnedEventsContext';
+import { useEventCountdownTime } from '../../hooks/useCurrentTime';
 import { useRealtimeSubscription } from '../../hooks/useRealtimeSubscription';
+import { isEventPinned } from '../../utils/eventNameUtils';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import { formatCount } from '../../utils/formatters';
 import { logger } from '../../utils/logger';
-import { Z_INDEX } from '../../styles/zIndex';
-import EconomicEventListItem from './EconomicEventListItem';
+import EconomicEventShimmer from './EconomicEventShimmer';
+import EconomicEventRow, { impactColor } from './EconomicEventRow';
 
 // Same width tier as NoteViewerPanel / OrionPanel — keeps the slide-in
 // slot consistent when the three panels share the right rail.
 const PANEL_WIDTH = { xs: '100%', sm: 'min(45%, 380px)' } as const;
 const INNER_WIDTH = { xs: '100%', sm: 'min(45vw, 380px)' } as const;
-
-const getImpactColor = (impact: ImpactLevel, theme: Theme): string => {
-  switch (impact) {
-    case 'High':
-      return theme.palette.error.main;
-    case 'Medium':
-      return theme.palette.warning.main;
-    case 'Low':
-      return theme.palette.success.main;
-    default:
-      return theme.palette.text.secondary;
-  }
-};
 
 interface EconomicEventsPanelProps {
   open: boolean;
@@ -104,6 +92,16 @@ const EconomicEventsPanel: React.FC<EconomicEventsPanelProps> = ({
   const [selectedImpacts, setSelectedImpacts] = useState<ImpactLevel[]>([
     'High',
   ]);
+  // Monotonic token for the in-flight fetch — a late resolution whose
+  // token no longer matches is dropped. Without this, navigating to a
+  // new trade (or closing the panel) before the previous fetch resolves
+  // would write stale data into state.
+  const fetchTokenRef = useRef(0);
+
+  // Live ticking time for the row countdown / passed / imminent states.
+  // The hook adapts its interval based on the nearest event so we don't
+  // re-render every second when nothing's about to fire.
+  const { currentTime } = useEventCountdownTime(events, open);
 
   // Stable trade-date string keeps the fetch effect from re-firing on
   // unrelated trade prop renders.
@@ -122,6 +120,7 @@ const EconomicEventsPanel: React.FC<EconomicEventsPanelProps> = ({
   const fetchEvents = useCallback(async () => {
     if (!trade || !trade.trade_date) return;
 
+    const token = ++fetchTokenRef.current;
     try {
       setLoading(true);
       setError(null);
@@ -143,29 +142,35 @@ const EconomicEventsPanel: React.FC<EconomicEventsPanelProps> = ({
         },
       );
 
+      // Drop stale resolutions — token mismatch means the trade
+      // changed, the panel closed, or the user retried since.
+      if (token !== fetchTokenRef.current) return;
+
       const sorted = fetched.sort(
         (a, b) =>
           new Date(a.time_utc).getTime() - new Date(b.time_utc).getTime(),
       );
       setAllEvents(sorted);
     } catch (err) {
+      if (token !== fetchTokenRef.current) return;
       logger.error('Error fetching economic events:', err);
       setError('Failed to load economic events');
     } finally {
-      setLoading(false);
+      if (token === fetchTokenRef.current) setLoading(false);
     }
-  }, [
-    trade,
-    filterSettings.currencies,
-    filterSettings.impacts,
-  ]);
+  }, [trade, filterSettings.currencies, filterSettings.impacts]);
 
-  // Fetch on open + when trade changes.
+  // Fetch on open + when trade changes. The cleanup bumps the token so
+  // any in-flight fetch from the previous (open, trade, session) is
+  // ignored on resolve.
   useEffect(() => {
     if (!open) return;
     setAllEvents([]);
     setError(null);
     fetchEvents();
+    return () => {
+      fetchTokenRef.current += 1;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, trade?.id, tradeDateString, trade?.session]);
 
@@ -240,7 +245,7 @@ const EconomicEventsPanel: React.FC<EconomicEventsPanelProps> = ({
             alignItems="center"
             sx={{ flex: 1, minWidth: 0 }}
           >
-            <EconomicIcon
+            <EventIcon
               sx={{ fontSize: 18, color: 'text.secondary', flexShrink: 0 }}
             />
             <Typography variant="h6" noWrap>
@@ -261,12 +266,7 @@ const EconomicEventsPanel: React.FC<EconomicEventsPanelProps> = ({
           }}
         >
           {loading ? (
-            <Box sx={{ p: 3, textAlign: 'center' }}>
-              <CircularProgress size={28} sx={{ mb: 2, color: 'primary.main' }} />
-              <Typography variant="body2" color="text.secondary">
-                Loading economic events...
-              </Typography>
-            </Box>
+            <EconomicEventShimmer count={10} />
           ) : error ? (
             <Box sx={{ p: 3, textAlign: 'center' }}>
               <Typography
@@ -331,7 +331,7 @@ const EconomicEventsPanel: React.FC<EconomicEventsPanelProps> = ({
                       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                         {filterSettings.impacts.map((impact: ImpactLevel) => {
                           const selected = selectedImpacts.includes(impact);
-                          const impactColor = getImpactColor(impact, theme);
+                          const color = impactColor(impact, theme);
                           return (
                             <Chip
                               key={impact}
@@ -350,17 +350,15 @@ const EconomicEventsPanel: React.FC<EconomicEventsPanelProps> = ({
                                 height: 24,
                                 fontWeight: 600,
                                 borderRadius: 1.5,
-                                backgroundColor: selected
-                                  ? impactColor
-                                  : 'transparent',
-                                color: selected ? 'white' : impactColor,
-                                borderColor: impactColor,
+                                backgroundColor: selected ? color : 'transparent',
+                                color: selected ? 'white' : color,
+                                borderColor: color,
                                 borderWidth: selected ? 0 : 1.5,
                                 '& .MuiChip-label': { px: 1 },
                                 '&:hover': {
                                   backgroundColor: selected
-                                    ? alpha(impactColor, 0.8)
-                                    : alpha(impactColor, 0.08),
+                                    ? alpha(color, 0.8)
+                                    : alpha(color, 0.08),
                                 },
                               }}
                             />
@@ -383,7 +381,7 @@ const EconomicEventsPanel: React.FC<EconomicEventsPanelProps> = ({
 
               {events.length === 0 ? (
                 <Box sx={{ p: 4, textAlign: 'center' }}>
-                  <EconomicIcon
+                  <EventIcon
                     sx={{
                       fontSize: 40,
                       color: 'text.disabled',
@@ -403,38 +401,34 @@ const EconomicEventsPanel: React.FC<EconomicEventsPanelProps> = ({
                 </Box>
               ) : (
                 <Box>
-                  {events.map((event, index) => (
-                    <React.Fragment key={`${event.id}-${event.time_utc}-${index}`}>
-                      <Box
-                        sx={{
-                          px: 1.5,
-                          py: 1,
-                          '&:hover': {
-                            backgroundColor: alpha(theme.palette.action.hover, 0.04),
-                          },
-                          transition: 'background-color 0.2s ease-in-out',
+                  {events.map((event, idx) => {
+                    const pinned = isEventPinned(event, userPinnedEvents);
+                    const busy = pinningEventId === event.id;
+                    const pinnedNotes = pinned
+                      ? userPinnedEvents.find((p) =>
+                          p.event_id
+                            ? p.event_id === event.id
+                            : p.event.toLowerCase() === event.event_name.toLowerCase(),
+                        )?.notes
+                      : undefined;
+                    return (
+                      <EconomicEventRow
+                        key={`${event.id}-${event.time_utc}-${idx}`}
+                        event={event}
+                        firstRow={idx === 0}
+                        pinned={pinned}
+                        busy={busy}
+                        pinnedNotes={pinnedNotes}
+                        currentTime={currentTime}
+                        theme={theme}
+                        onTogglePin={(e) => {
+                          e.stopPropagation();
+                          if (pinned) handleUnpinEvent(event);
+                          else handlePinEvent(event);
                         }}
-                      >
-                        <EconomicEventListItem
-                          px={0}
-                          py={0}
-                          event={event}
-                          pinnedEvents={userPinnedEvents}
-                          onPinEvent={handlePinEvent}
-                          onUnpinEvent={handleUnpinEvent}
-                          isPinning={pinningEventId === event.id}
-                        />
-                      </Box>
-                      {index < events.length - 1 && (
-                        <Divider
-                          sx={{
-                            mx: 1.5,
-                            borderColor: alpha(theme.palette.divider, 0.1),
-                          }}
-                        />
-                      )}
-                    </React.Fragment>
-                  ))}
+                      />
+                    );
+                  })}
                 </Box>
               )}
             </>

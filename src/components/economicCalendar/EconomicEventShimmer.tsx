@@ -7,8 +7,8 @@ interface EconomicEventShimmerProps {
 }
 
 /**
- * Reusable shimmer loading component for economic events
- * Matches the structure of EconomicEventListItem
+ * Reusable shimmer loading component for economic events.
+ * Matches the structure of EconomicEventRow.
  */
 const EconomicEventShimmer: React.FC<EconomicEventShimmerProps> = ({ count = 8 }) => {
   return (

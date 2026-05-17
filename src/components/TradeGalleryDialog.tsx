@@ -19,7 +19,7 @@ import {
   SmartToy as AssistantIcon,
   Slideshow as SlideshowIcon,
   StickyNote2 as GamePlanIcon,
-  TrendingUp as EconomicIcon
+  EventNote as EconomicIcon
 } from '@mui/icons-material';
 import { format, parseISO } from 'date-fns';
 import { Trade, Calendar } from '../types/dualWrite';
@@ -118,6 +118,10 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
   // routes the resolved note into the existing NoteViewerPanel flow.
   const [loadingGamePlan, setLoadingGamePlan] = useState(false);
   const [gamePlanCache, setGamePlanCache] = useState<Record<string, Note[]>>({});
+  // Token for the in-flight game-plan fetch. Reset by trade nav or by
+  // opening another panel so a slow fetch can't force the note viewer
+  // open after the user has moved on.
+  const gamePlanRequestRef = useRef<string | null>(null);
 
   // Fetch mode state - used when trades array is empty and fetchYear is set
   const [internalTrades, setInternalTrades] = useState<Trade[]>([]);
@@ -360,6 +364,7 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
       if (next) {
         setViewerOpen(false);
         setEventsOpen(false);
+        gamePlanRequestRef.current = null; // cancel any in-flight game-plan fetch
       }
       return next;
     });
@@ -371,6 +376,7 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
       if (next) {
         setOrionOpen(false);
         setViewerOpen(false);
+        gamePlanRequestRef.current = null;
       }
       return next;
     });
@@ -388,7 +394,8 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
 
   // Game plan: opens NoteViewerPanel with the day's reminder note(s).
   // Cached per trade.id so toggling the panel after the first open is
-  // instant — no re-fetch flicker.
+  // instant — no re-fetch flicker. The token-ref race guard above
+  // makes a stale resolution a no-op while still populating the cache.
   const handleOpenGamePlan = useCallback(async () => {
     if (!currentTrade?.trade_date) return;
     const tradeId = currentTrade.id;
@@ -408,6 +415,8 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
       emptyMessage: 'No game plan available for this day.',
     });
 
+    const requestToken = tradeId;
+    gamePlanRequestRef.current = requestToken;
     setLoadingGamePlan(true);
     try {
       const date =
@@ -432,14 +441,20 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
         (note, idx, arr) => arr.findIndex((n) => n.id === note.id) === idx,
       );
 
+      // Always cache so a later open is instant, even if this resolution
+      // is stale w.r.t. the open panel.
       setGamePlanCache((prev) => ({ ...prev, [tradeId]: unique }));
+      if (gamePlanRequestRef.current !== requestToken) return;
       if (unique.length > 0) handleOpenNote(unique[0]);
       else handleOpenNote(null);
     } catch (err) {
       logger.error('Error fetching game plan notes:', err);
-      handleOpenNote(null);
+      if (gamePlanRequestRef.current === requestToken) handleOpenNote(null);
     } finally {
-      setLoadingGamePlan(false);
+      if (gamePlanRequestRef.current === requestToken) {
+        gamePlanRequestRef.current = null;
+        setLoadingGamePlan(false);
+      }
     }
   }, [currentTrade, calendarId, gamePlanCache, handleOpenNote, handleOpenNoteLoading]);
 
@@ -454,7 +469,9 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
   // contents were tied to the previous trade. Orion stays open (the
   // conversation reset below keeps it scoped) but its history pager
   // collapses back to the chat view. Events panel closes because its
-  // session-window fetch is trade-scoped.
+  // session-window fetch is trade-scoped. Any in-flight game-plan
+  // fetch is invalidated so its resolution doesn't pop the viewer
+  // back open on the new trade.
   useEffect(() => {
     setOrionShowHistory(false);
     setViewerOpen(false);
@@ -462,6 +479,7 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
     setViewerNoteId(null);
     setViewerLoading(false);
     setEventsOpen(false);
+    gamePlanRequestRef.current = null;
   }, [safeCurrentIndex]);
 
   // Clear panel state whenever the dialog closes so it doesn't
@@ -1079,18 +1097,6 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
                   {[140, 180, 100, 160, 80, 100, 80, 120].map((width, i) => (
                     <Shimmer key={i} height={28} width={width} borderRadius={14} variant="wave" intensity="medium" />
                   ))}
-                </Box>
-              </Box>
-
-              {/* Economic Events Section */}
-              <Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                  <Shimmer height={16} width={16} borderRadius={4} variant="wave" intensity="low" />
-                  <Shimmer height={16} width={180} borderRadius={4} variant="wave" intensity="low" />
-                </Box>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                  <Shimmer height={40} width="100%" borderRadius={8} variant="wave" intensity="low" />
-                  <Shimmer height={40} width="100%" borderRadius={8} variant="wave" intensity="low" />
                 </Box>
               </Box>
             </Box>
