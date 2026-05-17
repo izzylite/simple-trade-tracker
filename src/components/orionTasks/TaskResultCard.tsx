@@ -123,23 +123,33 @@ const TaskResultCard: React.FC<TaskResultCardProps> = ({
   const isUnread = !result.is_read;
   const taskColor = TASK_TYPE_COLORS[result.task_type];
 
-  // Inset-card style: surfaceInset bg, hairline border on all 4 sides.
-  // Unread cards add a violet left accent rail via inset box-shadow — the rail
-  // is the only colored edge so the card doesn't read as a full violet outline.
-  // No hover lift: cards are click-to-expand, hover would imply navigation.
+  // Inset-card style: surfaceInset bg, no border. Unread cards get a violet
+  // left accent rail via inset box-shadow — the rail is the only colored edge.
+  // Borderless reads cleaner; the surfaceInset tint already separates the card
+  // from the panel background. Error state keeps a soft red tint via bg only.
+  //
+  // Hover overrides: MUI Card has a theme-level hover (translateY + shadow lift)
+  // that's wrong here since the card is click-to-expand, not navigation. Pin
+  // transform / boxShadow to neutral so the theme override doesn't kick in.
   const cardSx = {
     position: 'relative' as const,
     mb: 1.25,
     borderRadius: 1.5,
     cursor: 'pointer',
     overflow: 'hidden',
+    border: 'none',
     backgroundColor: isError
-      ? alpha(theme.palette.error.main, 0.05)
+      ? alpha(theme.palette.error.main, 0.08)
       : surfaceInset,
-    border: `1px solid ${
-      isError ? alpha(theme.palette.error.main, 0.45) : hairline
-    }`,
     boxShadow: isUnread && !isError ? `inset 3px 0 0 0 ${violet}` : 'none',
+    transition: 'none',
+    '&:hover': {
+      backgroundColor: isError
+        ? alpha(theme.palette.error.main, 0.08)
+        : surfaceInset,
+      boxShadow: isUnread && !isError ? `inset 3px 0 0 0 ${violet}` : 'none',
+      transform: 'none',
+    },
   };
 
   return (
