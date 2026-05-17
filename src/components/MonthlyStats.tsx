@@ -1,3 +1,11 @@
+/**
+ * MonthlyStats — current-month performance card.
+ *
+ * 2x3 grid of identical-footprint stat tiles. Sized to fit the side panel
+ * (450px) without clipping; the page variant can scale up via container
+ * width inheritance.
+ */
+
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelectedCalendar } from '../contexts/SelectedCalendarContext';
@@ -10,8 +18,7 @@ import {
   alpha,
   Tooltip,
   useTheme,
-  useMediaQuery,
-  Skeleton
+  Skeleton,
 } from '@mui/material';
 import {
   TrendingUp,
@@ -22,11 +29,7 @@ import {
 } from '@mui/icons-material';
 import { Trade, Calendar } from '../types/dualWrite';
 import { formatCurrency } from '../utils/formatters';
-
 import { calculateTargetProgress } from '../utils/statsUtils';
-import { error } from '../utils/logger';
-
-
 
 interface MonthlyStatsProps {
   trades: Trade[];
@@ -34,124 +37,145 @@ interface MonthlyStatsProps {
   onDeleteTrade?: (id: string) => void;
   currentDate?: Date;
   monthlyTarget?: number;
-  // Read-only mode for shared calendars
   isReadOnly?: boolean;
-  // Gallery mode handler
-  onOpenGalleryMode?: (trades: Trade[], initialTradeId?: string, title?: string) => void;
-  // Performance charts props
+  onOpenGalleryMode?: (
+    trades: Trade[],
+    initialTradeId?: string,
+    title?: string,
+  ) => void;
   calendarId?: string;
   dynamicRiskSettings?: import('../utils/dynamicRiskUtils').DynamicRiskSettings;
-  onUpdateTradeProperty?: (tradeId: string, updateCallback: (trade: Trade) => Trade) => Promise<Trade | undefined>;
-  onUpdateCalendarProperty?: (calendarId: string, updateCallback: (calendar: import('../types/dualWrite').Calendar) => import('../types/dualWrite').Calendar) => Promise<import('../types/dualWrite').Calendar | undefined>;
+  onUpdateTradeProperty?: (
+    tradeId: string,
+    updateCallback: (trade: Trade) => Trade,
+  ) => Promise<Trade | undefined>;
+  onUpdateCalendarProperty?: (
+    calendarId: string,
+    updateCallback: (calendar: Calendar) => Calendar,
+  ) => Promise<Calendar | undefined>;
   onEditTrade?: (trade: Trade) => void;
-  economicFilter?: (calendarId: string) => import('../hooks/useEconomicCalendarFilters').EconomicCalendarFilterSettings;
+  economicFilter?: (
+    calendarId: string,
+  ) => import('../hooks/useEconomicCalendarFilters').EconomicCalendarFilterSettings;
   maxDailyDrawdown?: number;
   pnlBeforeMonth?: number;
   isPnlLoading?: boolean;
   calendar?: Calendar;
 }
 
+const TNUM = "'tnum' on, 'lnum' on";
+
+const EYEBROW_SX = {
+  fontSize: '0.62rem',
+  fontWeight: 700,
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase' as const,
+  color: 'text.secondary',
+  lineHeight: 1.2,
+};
 
 const MonthlyStats: React.FC<MonthlyStatsProps> = ({
   trades,
   accountBalance,
-  onDeleteTrade,
   currentDate = new Date(),
   monthlyTarget,
-  isReadOnly = false,
   onOpenGalleryMode,
   calendarId,
-  dynamicRiskSettings,
-  onUpdateTradeProperty,
-  onUpdateCalendarProperty,
-  onEditTrade,
-  economicFilter,
-  maxDailyDrawdown,
   pnlBeforeMonth,
   isPnlLoading = false,
-  calendar,
 }) => {
   const navigate = useNavigate();
   const { setCalendarId } = useSelectedCalendar();
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+
+  const hairline = isDark ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
+  const surfaceInset = isDark
+    ? 'rgba(255,255,255,0.03)'
+    : alpha(theme.palette.text.primary, 0.03);
 
   const handleOpenPerformancePage = () => {
     if (calendarId) setCalendarId(calendarId);
     navigate('/performance');
   };
 
-  const theme = useTheme();
-  const isXs = useMediaQuery(theme.breakpoints.down('sm'));
-
-  const monthTrades = trades.filter(trade =>
-    new Date(trade.trade_date).getMonth() === currentDate.getMonth() &&
-    new Date(trade.trade_date).getFullYear() === currentDate.getFullYear()
+  // ── Derived metrics ────────────────────────────────────────────────────
+  const monthTrades = trades.filter(
+    (t) =>
+      new Date(t.trade_date).getMonth() === currentDate.getMonth() &&
+      new Date(t.trade_date).getFullYear() === currentDate.getFullYear(),
   );
 
-  // Calculate monthly values from the filtered trades
-  const netAmountForThisMonth = monthTrades.reduce((sum, trade) => sum + trade.amount, 0);
-  const winCount = monthTrades.filter(trade => trade.trade_type === 'win').length;
-  const lossCount = monthTrades.filter(trade => trade.trade_type === 'loss').length;
-  const winRate = monthTrades.length > 0 ? (winCount / monthTrades.length * 100).toFixed(1) : '0';
+  const netAmountForThisMonth = monthTrades.reduce((sum, t) => sum + t.amount, 0);
+  const winCount = monthTrades.filter((t) => t.trade_type === 'win').length;
+  const lossCount = monthTrades.filter((t) => t.trade_type === 'loss').length;
+  const winRate =
+    monthTrades.length > 0 ? (winCount / monthTrades.length) * 100 : 0;
 
-  // Additional useful statistics
-  const totalWinAmount = monthTrades.filter(trade => trade.trade_type === 'win').reduce((sum, trade) => sum + trade.amount, 0);
-  const totalLossAmount = Math.abs(monthTrades.filter(trade => trade.trade_type === 'loss').reduce((sum, trade) => sum + trade.amount, 0));
-  const profitFactor = totalLossAmount > 0 ? (totalWinAmount / totalLossAmount).toFixed(2) : totalWinAmount > 0 ? '∞' : '0';
-  const averageTradeSize = monthTrades.length > 0 ? (Math.abs(netAmountForThisMonth) / monthTrades.length).toFixed(0) : '0';
-  const averageWin = winCount > 0 ? (totalWinAmount / winCount).toFixed(0) : '0';
-  const averageLoss = lossCount > 0 ? (totalLossAmount / lossCount).toFixed(0) : '0';
+  const totalWinAmount = monthTrades
+    .filter((t) => t.trade_type === 'win')
+    .reduce((sum, t) => sum + t.amount, 0);
+  const totalLossAmount = Math.abs(
+    monthTrades
+      .filter((t) => t.trade_type === 'loss')
+      .reduce((sum, t) => sum + t.amount, 0),
+  );
+  const profitFactor =
+    totalLossAmount > 0
+      ? (totalWinAmount / totalLossAmount).toFixed(2)
+      : totalWinAmount > 0
+        ? '∞'
+        : '0';
 
-  // Best and worst day calculations
+  // Best/worst day
   const dailyPnL = new Map<string, number>();
-  monthTrades.forEach(trade => {
-    const dateKey = new Date(trade.trade_date).toDateString();
-    dailyPnL.set(dateKey, (dailyPnL.get(dateKey) || 0) + trade.amount);
+  monthTrades.forEach((t) => {
+    const dateKey = new Date(t.trade_date).toDateString();
+    dailyPnL.set(dateKey, (dailyPnL.get(dateKey) || 0) + t.amount);
   });
-
   let bestDay = 0;
   let bestDayDate = '';
-  let worstDay = 0;
-  let worstDayDate = '';
-
   if (dailyPnL.size > 0) {
     const entries = Array.from(dailyPnL.entries());
-    const bestEntry = entries.reduce((max, current) => current[1] > max[1] ? current : max);
-    const worstEntry = entries.reduce((min, current) => current[1] < min[1] ? current : min);
-
+    const bestEntry = entries.reduce((max, current) =>
+      current[1] > max[1] ? current : max,
+    );
     bestDay = bestEntry[1];
     bestDayDate = format(new Date(bestEntry[0]), 'EEE d');
-    worstDay = worstEntry[1];
-    worstDayDate = format(new Date(worstEntry[0]), 'EEE d');
   }
 
-  // Calculate account value at start of month
-  // pnlBeforeMonth here is the cumulative PnL before this month (pre-computed by caller)
-  const startOfCurrentMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-  const accountValueAtStartOfMonth = pnlBeforeMonth !== undefined
-    ? accountBalance + pnlBeforeMonth
-    : (() => {
-        const tradesBeforeMonth = trades.filter(
-          trade => new Date(trade.trade_date) < startOfCurrentMonth
-        );
-        return accountBalance + tradesBeforeMonth.reduce(
-          (sum, trade) => sum + trade.amount, 0
-        );
-      })();
+  // Start-of-month account value (for growth & target denominator)
+  const startOfCurrentMonth = new Date(
+    currentDate.getFullYear(),
+    currentDate.getMonth(),
+    1,
+  );
+  const accountValueAtStartOfMonth =
+    pnlBeforeMonth !== undefined
+      ? accountBalance + pnlBeforeMonth
+      : accountBalance +
+        trades
+          .filter((t) => new Date(t.trade_date) < startOfCurrentMonth)
+          .reduce((sum, t) => sum + t.amount, 0);
 
-  // Calculate growth percentage relative to start-of-month value
-  const growthPercentage = accountValueAtStartOfMonth > 0
-    ? ((netAmountForThisMonth / accountValueAtStartOfMonth) * 100).toFixed(1)
-    : '0';
+  const growthPercentage =
+    accountValueAtStartOfMonth > 0
+      ? (netAmountForThisMonth / accountValueAtStartOfMonth) * 100
+      : 0;
 
+  const targetProgressValue =
+    monthlyTarget && monthlyTarget > 0
+      ? calculateTargetProgress(
+          monthTrades,
+          accountValueAtStartOfMonth,
+          monthlyTarget,
+        )
+      : 0;
+  const isTargetMet = monthlyTarget ? growthPercentage >= monthlyTarget : false;
 
-  // Calculate monthly target progress using start-of-month value as baseline
-  const targetProgressValue = monthlyTarget && monthlyTarget > 0
-    ? calculateTargetProgress(monthTrades, accountValueAtStartOfMonth, monthlyTarget)
-    : 0;
-  const targetProgress = targetProgressValue.toFixed(0);
-  const isTargetMet = monthlyTarget ? parseFloat(growthPercentage) >= monthlyTarget : false;
+  const monthActivePercent =
+    monthTrades.length > 0 ? ((monthTrades.length / 30) * 100).toFixed(0) : '0';
 
-  // Handle gallery mode
   const handleMonthlyGalleryMode = () => {
     if (monthTrades.length > 0 && onOpenGalleryMode) {
       const monthName = format(currentDate, 'MMMM yyyy');
@@ -160,323 +184,337 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
     }
   };
 
+  // ── PnL color signal ───────────────────────────────────────────────────
+  const pnlColor =
+    netAmountForThisMonth > 0
+      ? theme.palette.success.main
+      : netAmountForThisMonth < 0
+        ? theme.palette.error.main
+        : theme.palette.text.primary;
+
+  // ── Action button shared styling ───────────────────────────────────────
+  const actionBtnSx = {
+    width: 26,
+    height: 26,
+    borderRadius: '8px',
+    color: 'text.secondary',
+    border: `1px solid ${hairline}`,
+    bgcolor: surfaceInset,
+    '&:hover': {
+      color: 'primary.main',
+      borderColor: alpha(theme.palette.primary.main, 0.4),
+      bgcolor: alpha(theme.palette.primary.main, 0.08),
+    },
+  };
+
   return (
-    <>
-      <Paper
-        elevation={0}
+    <Paper
+      elevation={0}
+      sx={{
+        p: 1.75,
+        borderRadius: '12px',
+        bgcolor: 'background.paper',
+        border: `1px solid ${hairline}`,
+        boxShadow: isDark
+          ? '0 2px 8px rgba(0,0,0,0.3)'
+          : '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 1.25,
+      }}
+    >
+      {/* ── Header ──────────────────────────────────────────────────── */}
+      <Box
         sx={{
-          p: { xs: 1.5, sm: 2 },
-          borderRadius: '12px',
-          position: 'relative',
-          width: '100%',
-          pb: { xs: 4, sm: 2.5 },
-          overflow: 'hidden',
-          height: '100%', 
-          bgcolor: 'background.paper',
-          boxShadow: theme => theme.palette.mode === 'dark'
-            ? '0 2px 8px rgba(0,0,0,0.3)'
-            : '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)'
-        }}
-      >
-        <Box sx={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-        }}>
-          <Typography sx={{ mb: { xs: 0.5, sm: 1 }, fontWeight: 600, pl: 0.5, fontSize: { xs: '0.875rem', sm: '0.9375rem' } }}>
-            Monthly Performance
-          </Typography>
-
-
-          <Box sx={{
-            position: 'static',
-            display: 'flex',
-            gap: 1,
-            justifyContent: 'flex-end',
-            mb: 2,
-            flex: 1,
-            alignItems: 'center'
-          }}>
-            {/* View Details Stats Button */}
-            {calendarId && (
-              <Tooltip title="Open performance page" arrow>
-                <IconButton
-                  onClick={handleOpenPerformancePage}
-                  size="small"
-                  sx={{
-                    color: 'primary.main',
-                    bgcolor: 'background.paper',
-                    border: '1px solid',
-                    borderColor: alpha(theme.palette.primary.main, 0.3),
-                    '&:hover': {
-                      bgcolor: alpha(theme.palette.primary.main, 0.1),
-                      color: 'primary.main',
-                      borderColor: 'primary.main'
-                    }
-                  }}
-                >
-                  <Analytics />
-                </IconButton>
-              </Tooltip>
-            )}
-            {/* Gallery Button - Moved from TradeCalendarPage */}
-            {monthTrades.length > 0 && onOpenGalleryMode && (
-              <Tooltip title="View all trades for this month in gallery mode" arrow>
-                <IconButton
-                  onClick={handleMonthlyGalleryMode}
-                  size="small"
-                  sx={{
-                    color: 'primary.main',
-                    bgcolor: 'background.paper',
-                    border: '1px solid',
-                    borderColor: alpha(theme.palette.primary.main, 0.3),
-                    '&:hover': {
-                      bgcolor: alpha(theme.palette.primary.main, 0.1),
-                      color: 'primary.main',
-                      borderColor: 'primary.main'
-                    }
-                  }}
-                >
-                  <GalleryIcon />
-                </IconButton>
-              </Tooltip>
-            )}
-          </Box>
+          gap: 1,
+        }}
+      >
+        <Typography sx={EYEBROW_SX}>Monthly performance</Typography>
+        <Box sx={{ display: 'flex', gap: 0.5 }}>
+          {calendarId && (
+            <Tooltip title="Open performance page" arrow>
+              <IconButton size="small" onClick={handleOpenPerformancePage} sx={actionBtnSx}>
+                <Analytics sx={{ fontSize: 14 }} />
+              </IconButton>
+            </Tooltip>
+          )}
+          {monthTrades.length > 0 && onOpenGalleryMode && (
+            <Tooltip title="View this month's trades in gallery mode" arrow>
+              <IconButton size="small" onClick={handleMonthlyGalleryMode} sx={actionBtnSx}>
+                <GalleryIcon sx={{ fontSize: 14 }} />
+              </IconButton>
+            </Tooltip>
+          )}
         </Box>
+      </Box>
 
-        <Box sx={{
+      {/* ── 2×3 grid of stat tiles ──────────────────────────────────── */}
+      <Box
+        sx={{
           display: 'grid',
-          gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' },
-          gap: { xs: 1, sm: 1.25, md: 1.5 },
-        }}>
-          {/* Monthly P&L Card */}
-          <Box sx={{
-            p: { xs: 1, sm: 1.25 },
-            borderRadius: '8px',
-            bgcolor: 'background.default',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 0.25
-          }}>
-            <Box sx={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 0.75,
-              mb: 0.25
-            }}>
-              <TrendingUp sx={{ fontSize: '0.95rem', color: netAmountForThisMonth > 0 ? 'success.main' : netAmountForThisMonth < 0 ? 'error.main' : 'text.secondary' }} />
-              <Typography sx={{ fontWeight: 600, color: 'text.secondary', fontSize: '0.75rem', letterSpacing: '0.02em', textTransform: 'uppercase' }}>
-                Monthly P&L
-              </Typography>
-            </Box>
-            <Typography
-              sx={{
-                fontWeight: 700,
-                fontSize: '1.125rem',
-                color: netAmountForThisMonth > 0 ? 'success.main' : netAmountForThisMonth < 0 ? 'error.main' : 'text.primary',
-                display: 'flex',
-                alignItems: 'baseline',
-                gap: 0.5,
-                fontFeatureSettings: "'tnum' on, 'lnum' on",
-              }}
-            >
+          gridTemplateColumns: 'repeat(2, 1fr)',
+          gap: 1,
+        }}
+      >
+        {/* Monthly P&L */}
+        <StatTile
+          icon={<TrendingUp sx={{ fontSize: 14, color: pnlColor }} />}
+          label="Monthly P&L"
+          value={
+            <>
               {formatCurrency(netAmountForThisMonth)}
-              {isPnlLoading ? (
-                <Skeleton variant="text" width={50} sx={{ fontSize: '0.75rem', display: 'inline-block', ml: 0.25 }} />
-              ) : (
+              {!isPnlLoading && (
                 <Tooltip
-                  title={`Percentage based on account value at start of ${format(currentDate, 'MMMM')}: ${formatCurrency(accountValueAtStartOfMonth)}`}
+                  title={`Percentage based on account value at start of ${format(
+                    currentDate,
+                    'MMMM',
+                  )}: ${formatCurrency(accountValueAtStartOfMonth)}`}
                   placement="top"
+                  arrow
                 >
-                  <Typography
+                  <Box
                     component="span"
                     sx={{
-                      fontSize: '0.75rem',
-                      color: netAmountForThisMonth > 0 ? 'success.main' : netAmountForThisMonth < 0 ? 'error.main' : 'text.primary',
+                      fontSize: '0.7rem',
                       fontWeight: 600,
-                      cursor: 'help'
+                      color: pnlColor,
+                      cursor: 'help',
+                      ml: 0.5,
                     }}
                   >
-                    ({growthPercentage}%)
-                  </Typography>
+                    ({growthPercentage >= 0 ? '+' : ''}
+                    {growthPercentage.toFixed(1)}%)
+                  </Box>
                 </Tooltip>
               )}
-            </Typography>
-
-            {monthlyTarget && (
-              <Box sx={{ width: '100%', mt: 1 }}>
-                <Box sx={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  mb: 0.25
-                }}>
-                  <Typography sx={{ fontWeight: 500, color: 'text.secondary', fontSize: '0.6875rem' }}>
-                    Target Progress
+              {isPnlLoading && (
+                <Skeleton
+                  variant="text"
+                  width={40}
+                  sx={{ fontSize: '0.75rem', display: 'inline-block', ml: 0.5 }}
+                />
+              )}
+            </>
+          }
+          valueColor={pnlColor}
+          footer={
+            monthlyTarget ? (
+              <Box>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    mb: 0.375,
+                  }}
+                >
+                  <Typography
+                    sx={{
+                      fontSize: '0.62rem',
+                      color: 'text.disabled',
+                      fontWeight: 600,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.04em',
+                    }}
+                  >
+                    Target
                   </Typography>
-                  <Typography sx={{
-                    fontWeight: 600,
-                    color: isTargetMet ? 'success.main' : 'primary.main',
-                    fontSize: '0.6875rem'
-                  }}>
-                    {targetProgress}%
+                  <Typography
+                    sx={{
+                      fontSize: '0.62rem',
+                      fontWeight: 700,
+                      color: isTargetMet ? 'success.main' : 'primary.main',
+                      fontFeatureSettings: TNUM,
+                    }}
+                  >
+                    {targetProgressValue.toFixed(0)}%
                   </Typography>
                 </Box>
-                <Box sx={{
-                  width: '100%',
-                  height: '5px',
-                  bgcolor: theme => alpha(theme.palette.divider, 0.5),
-                  borderRadius: '3px',
-                  overflow: 'hidden'
-                }}>
-                  <Box sx={{
-                    width: `${Math.max(Math.min(parseFloat(targetProgress), 100), 0)}%`,
-                    height: '100%',
-                    bgcolor: isTargetMet ? 'success.main' : 'primary.main',
-                    transition: 'width 0.3s ease'
-                  }} />
+                <Box
+                  sx={{
+                    width: '100%',
+                    height: 4,
+                    bgcolor: alpha(theme.palette.divider, 0.5),
+                    borderRadius: 2,
+                    overflow: 'hidden',
+                  }}
+                >
+                  <Box
+                    sx={{
+                      width: `${Math.max(Math.min(targetProgressValue, 100), 0)}%`,
+                      height: '100%',
+                      bgcolor: isTargetMet ? 'success.main' : 'primary.main',
+                      transition: 'width 0.3s ease',
+                    }}
+                  />
                 </Box>
               </Box>
-            )}
-          </Box>
+            ) : undefined
+          }
+        />
 
-          {/* Win Rate Card */}
-          <Box sx={{
-            p: { xs: 1, sm: 1.25 },
-            borderRadius: '8px',
-            bgcolor: 'background.default',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 0.25
-          }}>
-            <Box sx={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 0.75,
-              mb: 0.25
-            }}>
-              <EmojiEvents sx={{ fontSize: '0.95rem', color: parseFloat(winRate) > 50 ? 'success.main' : 'text.secondary' }} />
-              <Typography sx={{ fontWeight: 600, color: 'text.secondary', fontSize: '0.75rem', letterSpacing: '0.02em', textTransform: 'uppercase' }}>
-                Win Rate
-              </Typography>
-            </Box>
-            <Typography sx={{ fontWeight: 700, fontSize: '1.125rem', color: parseFloat(winRate) > 50 ? 'success.main' : 'text.primary', fontFeatureSettings: "'tnum' on, 'lnum' on" }}>
-              {winRate}%
-            </Typography>
-            <Typography sx={{ fontWeight: 500, color: 'text.secondary', mt: 0.25, fontSize: '0.75rem' }}>
-              {winCount} Wins / {lossCount} Losses
-            </Typography>
-            <Box sx={{
-              display: 'flex',
-              alignItems: 'center',
-              mt: 0.75,
-              gap: 0.5
-            }}>
-              <Box sx={{
-                height: '5px',
-                bgcolor: 'success.main',
-                borderRadius: '3px',
-                flex: winCount || 1
-              }} />
-              <Box sx={{
-                height: '5px',
-                bgcolor: 'error.main',
-                borderRadius: '3px',
-                flex: lossCount || 1
-              }} />
-            </Box>
-          </Box>
+        {/* Win Rate */}
+        <StatTile
+          icon={
+            <EmojiEvents
+              sx={{
+                fontSize: 14,
+                color: winRate > 50 ? 'success.main' : 'text.secondary',
+              }}
+            />
+          }
+          label="Win rate"
+          value={`${winRate.toFixed(1)}%`}
+          valueColor={
+            winRate > 50 ? theme.palette.success.main : theme.palette.text.primary
+          }
+          subtitle={`${winCount}W · ${lossCount}L`}
+          footer={
+            (winCount > 0 || lossCount > 0) && (
+              <Box sx={{ display: 'flex', gap: 0.5 }}>
+                <Box
+                  sx={{
+                    height: 4,
+                    bgcolor: 'success.main',
+                    borderRadius: 2,
+                    flex: winCount || 0.01,
+                    minWidth: winCount ? 4 : 0,
+                  }}
+                />
+                <Box
+                  sx={{
+                    height: 4,
+                    bgcolor: 'error.main',
+                    borderRadius: 2,
+                    flex: lossCount || 0.01,
+                    minWidth: lossCount ? 4 : 0,
+                  }}
+                />
+              </Box>
+            )
+          }
+        />
 
-          {/* Total Trades Card */}
-          <Box sx={{
-            p: { xs: 1, sm: 1.25 },
-            borderRadius: '8px',
-            bgcolor: 'background.default',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 0.25
-          }}>
-            <Box sx={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 0.75,
-              mb: 0.25
-            }}>
-              <CalendarMonth sx={{ fontSize: '0.95rem', color: 'text.secondary' }} />
-              <Typography sx={{ fontWeight: 600, color: 'text.secondary', fontSize: '0.75rem', letterSpacing: '0.02em', textTransform: 'uppercase' }}>
-                Trading Activity
-              </Typography>
-            </Box>
-            <Typography sx={{ fontWeight: 700, fontSize: '1.125rem', color: 'text.primary', fontFeatureSettings: "'tnum' on, 'lnum' on" }}>
-              {monthTrades.length} Trade{monthTrades.length === 1 ? '' : 's'}
-            </Typography>
-            <Typography sx={{ fontWeight: 500, color: 'text.secondary', mt: 0.25, fontSize: '0.75rem' }}>
-              {monthTrades.length > 0 ? (monthTrades.length / 30 * 100).toFixed(0) : 0}% of Month Active
-            </Typography>
-          </Box>
+        {/* Trades */}
+        <StatTile
+          icon={<CalendarMonth sx={{ fontSize: 14, color: 'text.secondary' }} />}
+          label="Trades"
+          value={`${monthTrades.length}`}
+          subtitle={`${monthActivePercent}% of month`}
+        />
 
-          {/* Starting Capital Card */}
-          <Box sx={{
-            p: { xs: 0.875, sm: 1 },
-            borderRadius: '8px',
-            bgcolor: 'background.default',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 0.125
-          }}>
-            <Typography sx={{ fontWeight: 600, color: 'text.secondary', fontSize: '0.6875rem', letterSpacing: '0.02em', textTransform: 'uppercase' }}>
-              Started With
-            </Typography>
-            {isPnlLoading ? (
-              <Skeleton variant="text" width={100} sx={{ fontSize: '0.9375rem' }} />
+        {/* Started With */}
+        <StatTile
+          label="Started with"
+          value={
+            isPnlLoading ? (
+              <Skeleton variant="text" width={90} sx={{ fontSize: '0.95rem' }} />
             ) : (
-              <Typography sx={{ fontWeight: 700, color: 'text.primary', fontSize: '0.9375rem', fontFeatureSettings: "'tnum' on, 'lnum' on" }}>
-                {formatCurrency(accountValueAtStartOfMonth)}
-              </Typography>
-            )}
-          </Box>
+              formatCurrency(accountValueAtStartOfMonth)
+            )
+          }
+        />
 
-          {/* Best Day Card */}
-          <Box sx={{
-            p: { xs: 0.875, sm: 1 },
-            borderRadius: '8px',
-            bgcolor: 'background.default',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 0.125
-          }}>
-            <Typography sx={{ fontWeight: 600, color: 'text.secondary', fontSize: '0.6875rem', letterSpacing: '0.02em', textTransform: 'uppercase' }}>
-              Best Day {bestDayDate && (
-                <Typography component="span" sx={{ color: 'secondary.main', fontWeight: 700, fontSize: '0.625rem' }}>
-                  {bestDayDate}
-                </Typography>
-              )}
-            </Typography>
-            <Typography sx={{ fontWeight: 700, color: 'success.main', fontSize: '0.9375rem', fontFeatureSettings: "'tnum' on, 'lnum' on" }}>
-              {bestDay > 0 ? formatCurrency(bestDay) : 'No trades'}
-            </Typography>
-          </Box>
+        {/* Best Day */}
+        <StatTile
+          label="Best day"
+          value={bestDay > 0 ? formatCurrency(bestDay) : '—'}
+          valueColor={bestDay > 0 ? theme.palette.success.main : undefined}
+          subtitle={bestDayDate || undefined}
+        />
 
-          {/* Profit Factor Card */}
-          <Box sx={{
-            p: { xs: 0.875, sm: 1 },
-            borderRadius: '8px',
-            bgcolor: 'background.default',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 0.125
-          }}>
-            <Typography sx={{ fontWeight: 600, color: 'text.secondary', fontSize: '0.6875rem', letterSpacing: '0.02em', textTransform: 'uppercase' }}>
-              Profit Factor
-            </Typography>
-            <Typography sx={{ fontWeight: 700, color: parseFloat(profitFactor) > 1 ? 'success.main' : 'text.primary', fontSize: '0.9375rem', fontFeatureSettings: "'tnum' on, 'lnum' on" }}>
-              {profitFactor}
-            </Typography>
-          </Box>
-        </Box>
+        {/* Profit Factor */}
+        <StatTile
+          label="Profit factor"
+          value={profitFactor}
+          valueColor={
+            parseFloat(profitFactor) > 1
+              ? theme.palette.success.main
+              : theme.palette.text.primary
+          }
+        />
+      </Box>
+    </Paper>
+  );
+};
 
-      </Paper>
+// ─── StatTile ──────────────────────────────────────────────────────────────
+// Single tile in the monthly performance grid. All tiles share the same
+// height behavior so the grid stays aligned regardless of which optional
+// slots are populated.
 
-    </>
+interface StatTileProps {
+  icon?: React.ReactNode;
+  label: string;
+  value: React.ReactNode;
+  valueColor?: string;
+  subtitle?: string;
+  footer?: React.ReactNode;
+}
+
+const StatTile: React.FC<StatTileProps> = ({
+  icon,
+  label,
+  value,
+  valueColor,
+  subtitle,
+  footer,
+}) => {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  const surfaceInset = isDark
+    ? 'rgba(255,255,255,0.03)'
+    : alpha(theme.palette.text.primary, 0.03);
+  return (
+    <Box
+      sx={{
+        p: 1.125,
+        borderRadius: '10px',
+        bgcolor: surfaceInset,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 0.375,
+        minWidth: 0,
+      }}
+    >
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0 }}>
+        {icon}
+        <Typography sx={EYEBROW_SX}>{label}</Typography>
+      </Box>
+      <Typography
+        sx={{
+          fontSize: '1rem',
+          fontWeight: 700,
+          color: valueColor ?? 'text.primary',
+          fontFeatureSettings: TNUM,
+          letterSpacing: '-0.01em',
+          lineHeight: 1.25,
+          display: 'flex',
+          alignItems: 'baseline',
+          flexWrap: 'wrap',
+          rowGap: 0.25,
+          minWidth: 0,
+          wordBreak: 'break-word',
+        }}
+      >
+        {value}
+      </Typography>
+      {subtitle && (
+        <Typography
+          sx={{
+            fontSize: '0.68rem',
+            color: 'text.disabled',
+            fontWeight: 500,
+            fontFeatureSettings: TNUM,
+          }}
+        >
+          {subtitle}
+        </Typography>
+      )}
+      {footer && <Box sx={{ mt: 0.5 }}>{footer}</Box>}
+    </Box>
   );
 };
 

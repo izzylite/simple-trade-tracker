@@ -515,7 +515,8 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
   return (
     <Box
       sx={{
-        p: { xs: 1, sm: 2 },
+        px: 0,
+        py: { xs: 1, sm: 2 },
         minHeight: { xs: 'auto', sm: 500 },
         '& .MuiPaper-root': {
           backgroundColor: theme.palette.background.paper,

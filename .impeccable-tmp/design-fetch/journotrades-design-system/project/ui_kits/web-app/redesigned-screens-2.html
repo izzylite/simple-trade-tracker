@@ -1,0 +1,843 @@
+<!doctype html>
+<html data-theme="dark"><head>
+<meta charset="utf-8">
+<title>JournoTrades — Redesigned screens (set 2)</title>
+<link rel="stylesheet" href="../../colors_and_type.css">
+<style>
+  :root { --bg:#080808; --bg-alt:#0a0a0a; --bg-paper:#101013; --rule:rgba(255,255,255,0.14); --hair:rgba(255,255,255,0.08); --violet:#7c3aed; --violet-deep:#6d28d9; --violet-soft:rgba(124,58,237,0.16); --win:#22c55e; --loss:#ef4444; --amber:#f59e0b; --fg:#f1f5f9; --fg-mute:rgba(255,255,255,0.62); --fg-low:rgba(255,255,255,0.38); }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font-family: 'DM Sans', sans-serif; -webkit-font-smoothing: antialiased; }
+  .tnum { font-feature-settings: 'tnum' on, 'lnum' on; }
+  .eyebrow { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--violet); }
+
+  /* Tabs */
+  .tabs { position: sticky; top: 0; z-index: 50; background: rgba(8,8,8,0.85); backdrop-filter: blur(20px) saturate(160%); border-bottom: 1px solid var(--hair); padding: 14px 24px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .tabs .word { font-weight: 700; margin-right: 16px; letter-spacing: -0.01em; display:flex; align-items:center; gap:10px; }
+  .tabs .word::before { content:""; width:8px; height:8px; border-radius:2px; background: var(--violet); box-shadow: 0 0 12px rgba(124,58,237,0.7); }
+  .tabs button { background: transparent; border: 0; color: var(--fg-mute); font-family: inherit; font-weight: 600; font-size: 0.85rem; padding: 8px 14px; border-radius: 8px; cursor: pointer; transition: color 150ms, background 150ms; }
+  .tabs button:hover { color: var(--fg); }
+  .tabs button.active { background: var(--violet); color: var(--fg); }
+
+  .screen { display: none; padding: 32px; min-height: calc(100vh - 60px); }
+  .screen.active { display: block; }
+
+  .page { max-width: 1080px; margin: 0 auto; }
+  .page-head { display: flex; align-items: end; justify-content: space-between; margin-bottom: 24px; gap: 16px; flex-wrap: wrap; }
+  .page-head h1 { font-weight: 800; font-size: 1.85rem; letter-spacing: -0.025em; margin: 6px 0 0; }
+  .page-head p { color: var(--fg-mute); font-size: 0.92rem; margin: 4px 0 0; }
+  .filter-pill { display: inline-flex; gap: 4px; padding: 4px; border-radius: 10px; border: 1px solid var(--hair); background: var(--bg-alt); }
+  .filter-pill button { background: transparent; border: 0; color: var(--fg-mute); font-weight: 600; font-size: 0.8rem; padding: 7px 13px; border-radius: 7px; cursor: pointer; font-family: inherit; transition: color 150ms, background 150ms; }
+  .filter-pill button:hover { color: var(--fg); }
+  .filter-pill button.active { background: var(--violet); color: var(--fg); }
+
+  .card { background: var(--bg-alt); border: 1px solid var(--hair); border-radius: 16px; }
+  .card-head { padding: 14px 18px; border-bottom: 1px solid var(--hair); display: flex; align-items: center; gap: 10px; }
+  .card-head .mark { width: 26px; height: 26px; border-radius: 8px; background: var(--violet-soft); color: var(--violet); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; }
+  .card-head .ttl { font-weight: 600; font-size: 0.95rem; }
+  .card-head .sub { font-size: 0.75rem; color: var(--fg-low); margin-left: auto; font-feature-settings: 'tnum' on; }
+
+  /* ────────────────────────────────────────
+     PERFORMANCE PAGE
+     ──────────────────────────────────────── */
+  .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+  @media (max-width: 880px) { .stat-grid { grid-template-columns: repeat(2, 1fr); } }
+  .stat { background: var(--bg-alt); border: 1px solid var(--hair); border-radius: 14px; padding: 16px; }
+  .stat .label { font-size: 0.72rem; color: var(--fg-low); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+  .stat .val { font-size: 1.65rem; font-weight: 800; letter-spacing: -0.025em; margin-top: 6px; font-feature-settings: 'tnum' on, 'lnum' on; }
+  .stat .val.win { color: var(--win); } .stat .val.loss { color: var(--loss); }
+  .stat .delta { font-size: 0.72rem; color: var(--fg-mute); margin-top: 4px; font-feature-settings: 'tnum' on; }
+  .stat .delta.up::before { content:"▲ "; color: var(--win); } .stat .delta.dn::before { content:"▼ "; color: var(--loss); }
+
+  .perf-grid { display: grid; grid-template-columns: 1fr 360px; gap: 20px; }
+  @media (max-width: 980px) { .perf-grid { grid-template-columns: 1fr; } }
+
+  .equity { padding: 22px 24px; }
+  .equity .head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 16px; }
+  .equity .head h3 { margin: 0; font-weight: 700; font-size: 1.05rem; letter-spacing: -0.01em; }
+  .equity .head .total { font-feature-settings: 'tnum' on; font-weight: 700; font-size: 1.15rem; color: var(--win); }
+  .equity svg { width: 100%; height: 220px; display: block; }
+  .equity .footer { display: flex; gap: 18px; padding-top: 14px; margin-top: 10px; border-top: 1px solid var(--hair); font-size: 0.8rem; color: var(--fg-low); font-feature-settings: 'tnum' on; }
+  .equity .footer span strong { color: var(--fg); font-weight: 700; }
+
+  .breakdown { padding: 0; }
+  .br-row { display: grid; grid-template-columns: 90px 1fr 70px; gap: 12px; align-items: center; padding: 12px 18px; border-top: 1px solid var(--hair); font-size: 0.86rem; }
+  .br-row:first-of-type { border-top: 0; }
+  .br-row .name { font-weight: 600; }
+  .br-row .bar { height: 8px; border-radius: 4px; background: rgba(255,255,255,0.05); overflow: hidden; position: relative; }
+  .br-row .bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; background: var(--win); }
+  .br-row.dn .bar i { background: var(--loss); }
+  .br-row .pct { text-align: right; font-feature-settings: 'tnum' on; font-weight: 600; color: var(--fg-mute); }
+
+  .day-bars { padding: 18px 22px; display: flex; gap: 10px; align-items: flex-end; height: 140px; }
+  .day-bars .col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .day-bars .col .b { width: 100%; max-width: 36px; border-radius: 4px 4px 2px 2px; background: var(--win); transition: opacity 150ms; }
+  .day-bars .col .b.dn { background: var(--loss); }
+  .day-bars .col .b:hover { opacity: 0.8; }
+  .day-bars .col .l { font-size: 0.72rem; color: var(--fg-low); font-weight: 600; }
+
+  /* ────────────────────────────────────────
+     ECONOMIC HUB (tabbed)
+     ──────────────────────────────────────── */
+  .hub-tabs { display: flex; gap: 6px; padding: 4px; border-radius: 12px; border: 1px solid var(--hair); background: var(--bg-alt); margin-bottom: 22px; width: fit-content; }
+  .hub-tabs button { background: transparent; border: 0; color: var(--fg-mute); font-family: inherit; font-weight: 600; font-size: 0.85rem; padding: 8px 16px; border-radius: 8px; cursor: pointer; transition: color 150ms, background 150ms; }
+  .hub-tabs button:hover { color: var(--fg); }
+  .hub-tabs button.active { background: var(--violet); color: var(--fg); }
+
+  .hub-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; align-items: start; }
+  @media (max-width: 980px) { .hub-grid { grid-template-columns: 1fr; } }
+
+  .ev-row { position: relative; display: grid; grid-template-columns: 64px 1fr auto auto; gap: 14px; align-items: center; padding: 14px 18px; border-top: 1px solid var(--hair); transition: background 180ms; cursor: pointer; }
+  .ev-row:first-of-type { border-top: 0; }
+  .ev-row:hover { background: rgba(124,58,237,0.04); }
+  .ev-row .time { font-feature-settings: 'tnum' on; font-size: 0.78rem; color: var(--fg-low); font-weight: 600; }
+  .ev-row .body .name { font-weight: 600; font-size: 0.92rem; letter-spacing: -0.01em; }
+  .ev-row .body .meta { font-size: 0.74rem; color: var(--fg-low); margin-top: 3px; font-feature-settings: 'tnum' on; }
+  .ev-row .imp { display: inline-flex; gap: 3px; }
+  .ev-row .imp i { width: 6px; height: 12px; border-radius: 1.5px; background: rgba(255,255,255,0.12); }
+  .ev-row.high .imp i { background: var(--loss); }
+  .ev-row.med .imp i:nth-child(-n+2) { background: var(--amber); }
+  .ev-row.low .imp i:nth-child(1) { background: var(--win); }
+  .ev-row.now { background: var(--violet-soft); }
+  .ev-row.now::before { content:""; position: absolute; left: 6px; top: 50%; transform: translateY(-50%); width:6px; height:6px; border-radius:50%; background: var(--violet); box-shadow: 0 0 8px rgba(124,58,237,0.8); animation: pulse 2.4s ease-in-out infinite; }
+  .ev-row .pin { color: var(--fg-low); font-size: 14px; padding: 4px 6px; border-radius: 6px; transition: color 150ms, background 150ms; }
+  .ev-row .pin:hover { color: var(--violet); background: rgba(255,255,255,0.04); }
+  .ev-row .pin.on { color: var(--violet); }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+  .day-section { padding: 12px 18px 4px; font-size: 0.72rem; color: var(--fg-low); font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; border-top: 1px solid var(--hair); background: rgba(255,255,255,0.015); }
+  .day-section:first-of-type { border-top: 0; }
+
+  .impact-card { padding: 18px 20px; }
+  .impact-card .ttl { font-weight: 700; font-size: 0.85rem; letter-spacing: -0.005em; margin-bottom: 12px; }
+  .impact-bars { display: flex; flex-direction: column; gap: 10px; }
+  .ib { display: grid; grid-template-columns: 60px 1fr 30px; gap: 10px; align-items: center; font-size: 0.82rem; }
+  .ib .n { font-weight: 600; color: var(--fg-mute); font-size: 0.78rem; }
+  .ib .bar { height: 6px; border-radius: 3px; background: rgba(255,255,255,0.05); overflow: hidden; }
+  .ib .bar i { display: block; height: 100%; border-radius: 3px; }
+  .ib.high .bar i { background: var(--loss); }
+  .ib.med .bar i { background: var(--amber); }
+  .ib.low .bar i { background: var(--win); }
+  .ib .c { font-feature-settings: 'tnum' on; font-weight: 600; text-align: right; color: var(--fg); }
+
+  /* ────────────────────────────────────────
+     TAG PANEL (slide-in)
+     ──────────────────────────────────────── */
+  .panel-stage { position: relative; min-height: 600px; background: radial-gradient(circle at 30% 20%, rgba(124,58,237,0.06), transparent 60%); border: 1px solid var(--hair); border-radius: 16px; overflow: hidden; }
+  .panel-stage .ghost-bg { position: absolute; inset: 20px 380px 20px 20px; background: repeating-linear-gradient(transparent 0 24px, rgba(255,255,255,0.025) 24px 25px), repeating-linear-gradient(90deg, transparent 0 24px, rgba(255,255,255,0.025) 24px 25px); border-radius: 12px; opacity: 0.5; }
+  .panel-stage .label { position: absolute; top: 14px; left: 22px; font-size: 0.7rem; color: var(--fg-low); font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; }
+  .side-panel { position: absolute; top: 0; right: 0; bottom: 0; width: 360px; background: var(--bg-paper); border-left: 1px solid var(--hair); display: flex; flex-direction: column; }
+  .side-panel .head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--hair); }
+  .side-panel .head .t { font-weight: 700; font-size: 1rem; letter-spacing: -0.01em; }
+  .side-panel .head .x { color: var(--fg-low); font-size: 16px; cursor: pointer; padding: 4px 8px; border-radius: 6px; }
+  .side-panel .head .x:hover { color: var(--fg); background: rgba(255,255,255,0.04); }
+  .side-panel .body { padding: 18px 20px; flex: 1; overflow-y: auto; }
+  .side-panel .foot { padding: 14px 20px; border-top: 1px solid var(--hair); display: flex; gap: 8px; justify-content: flex-end; }
+
+  .tag-add { display: flex; gap: 6px; margin-bottom: 16px; }
+  .tag-add input { flex: 1; background: rgba(255,255,255,0.03); border: 1px solid var(--hair); color: var(--fg); border-radius: 8px; padding: 8px 12px; font-family: inherit; font-size: 0.85rem; outline: none; transition: border-color 150ms, box-shadow 150ms; }
+  .tag-add input:focus { border-color: var(--violet); box-shadow: 0 0 0 3px var(--violet-soft); }
+  .tag-add button { background: var(--violet); color: var(--fg); border: 0; padding: 0 12px; border-radius: 8px; font-family: inherit; font-weight: 600; font-size: 0.82rem; cursor: pointer; }
+
+  .tag-section { margin-top: 18px; }
+  .tag-section .h { font-size: 0.68rem; color: var(--fg-low); font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; margin-bottom: 10px; }
+  .tag-cloud { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tag-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 11px; border-radius: 999px; background: rgba(255,255,255,0.04); border: 1px solid var(--hair); color: var(--fg-mute); font-size: 0.78rem; font-weight: 500; cursor: pointer; transition: all 150ms; font-family: inherit; }
+  .tag-chip:hover { color: var(--fg); border-color: rgba(124,58,237,0.4); }
+  .tag-chip.on { background: var(--violet-soft); border-color: rgba(124,58,237,0.45); color: #ede9fe; }
+  .tag-chip.on .n { color: var(--violet); }
+  .tag-chip .n { font-feature-settings: 'tnum' on; color: var(--fg-low); font-size: 0.72rem; font-weight: 600; }
+
+  .tag-stats { background: rgba(255,255,255,0.02); border: 1px solid var(--hair); border-radius: 10px; padding: 14px; margin-top: 18px; }
+  .tag-stats .row { display: flex; justify-content: space-between; font-size: 0.82rem; padding: 4px 0; }
+  .tag-stats .row .k { color: var(--fg-mute); }
+  .tag-stats .row .v { font-weight: 700; font-feature-settings: 'tnum' on; }
+  .tag-stats .row .v.win { color: var(--win); } .tag-stats .row .v.loss { color: var(--loss); }
+
+  .btn-ghost { background: transparent; border: 1px solid var(--hair); color: var(--fg-mute); padding: 8px 14px; border-radius: 8px; font-family: inherit; font-weight: 600; font-size: 0.82rem; cursor: pointer; transition: color 150ms, border-color 150ms; }
+  .btn-ghost:hover { color: var(--fg); border-color: rgba(255,255,255,0.18); }
+  .btn-primary { background: var(--violet); border: 0; color: var(--fg); padding: 8px 14px; border-radius: 8px; font-family: inherit; font-weight: 600; font-size: 0.82rem; cursor: pointer; transition: background 150ms; }
+  .btn-primary:hover { background: var(--violet-deep); }
+
+  /* ────────────────────────────────────────
+     SEARCH PANEL (command palette)
+     ──────────────────────────────────────── */
+  .palette-stage { position: relative; min-height: 640px; background: radial-gradient(circle at 30% 20%, rgba(124,58,237,0.06), transparent 60%); border: 1px solid var(--hair); border-radius: 16px; overflow: hidden; }
+  .palette-stage .ghost-bg { position: absolute; inset: 20px; background: repeating-linear-gradient(transparent 0 24px, rgba(255,255,255,0.025) 24px 25px), repeating-linear-gradient(90deg, transparent 0 24px, rgba(255,255,255,0.025) 24px 25px); border-radius: 12px; opacity: 0.4; }
+  .palette-stage .scrim { position: absolute; inset: 0; background: rgba(0,0,0,0.55); backdrop-filter: blur(8px); }
+  .palette { position: absolute; left: 50%; top: 88px; transform: translateX(-50%); width: 600px; max-width: calc(100% - 40px); background: var(--bg-paper); border: 1px solid var(--hair); border-radius: 14px; box-shadow: 0 30px 80px -20px rgba(0,0,0,0.7), 0 0 0 1px rgba(124,58,237,0.18); overflow: hidden; }
+  .palette .input-row { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--hair); }
+  .palette .input-row .ic { color: var(--fg-low); font-size: 16px; }
+  .palette input { flex: 1; background: transparent; border: 0; outline: none; color: var(--fg); font-family: inherit; font-size: 1rem; }
+  .palette input::placeholder { color: var(--fg-low); }
+  .palette .esc { color: var(--fg-low); font-size: 0.7rem; padding: 3px 7px; border-radius: 5px; border: 1px solid var(--hair); font-feature-settings: 'tnum' on; font-weight: 600; }
+  .palette .group { padding: 8px 4px 4px; }
+  .palette .group .h { padding: 6px 16px; font-size: 0.66rem; color: var(--fg-low); font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
+  .palette .row { display: grid; grid-template-columns: 28px 1fr auto; gap: 12px; align-items: center; padding: 9px 16px; cursor: pointer; transition: background 100ms; }
+  .palette .row:hover, .palette .row.on { background: var(--violet-soft); }
+  .palette .row .icn { width: 24px; height: 24px; border-radius: 6px; background: rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: center; color: var(--fg-mute); font-size: 12px; }
+  .palette .row.on .icn, .palette .row:hover .icn { background: var(--violet); color: var(--fg); }
+  .palette .row .lbl { font-size: 0.9rem; }
+  .palette .row .lbl .sub { font-size: 0.74rem; color: var(--fg-low); margin-top: 1px; }
+  .palette .row .lbl em { font-style: normal; background: rgba(124,58,237,0.32); color: #ede9fe; padding: 0 3px; border-radius: 3px; }
+  .palette .row .meta { font-size: 0.72rem; color: var(--fg-low); font-feature-settings: 'tnum' on; }
+  .palette .row .meta.win { color: var(--win); }
+  .palette .row .meta.loss { color: var(--loss); }
+  .palette .foot { display: flex; justify-content: space-between; align-items: center; padding: 8px 16px; border-top: 1px solid var(--hair); font-size: 0.72rem; color: var(--fg-low); }
+  .palette .foot .keys { display: flex; gap: 12px; }
+  .palette .foot .keys span { display: inline-flex; align-items: center; gap: 4px; }
+  .palette .foot .keys kbd { font-family: inherit; font-size: 0.66rem; padding: 2px 5px; border-radius: 4px; border: 1px solid var(--hair); background: rgba(255,255,255,0.03); color: var(--fg-mute); font-weight: 600; }
+
+  /* ────────────────────────────────────────
+     PINNED PANEL (right rail)
+     ──────────────────────────────────────── */
+  .pinned-list { display: flex; flex-direction: column; }
+  .pin-item { padding: 14px 18px; border-top: 1px solid var(--hair); cursor: pointer; transition: background 150ms; }
+  .pin-item:first-child { border-top: 0; }
+  .pin-item:hover { background: rgba(255,255,255,0.02); }
+  .pin-item .row1 { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .pin-item .ki { width: 22px; height: 22px; border-radius: 6px; background: rgba(255,255,255,0.05); color: var(--fg-mute); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; }
+  .pin-item .kind { font-size: 0.66rem; color: var(--fg-low); font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
+  .pin-item .when { margin-left: auto; font-size: 0.7rem; color: var(--fg-low); font-feature-settings: 'tnum' on; }
+  .pin-item .body { font-size: 0.86rem; line-height: 1.5; color: var(--fg); }
+  .pin-item .body strong { font-weight: 700; }
+  .pin-item.trade .ki { background: rgba(34,197,94,0.16); color: var(--win); }
+  .pin-item.trade.loss .ki { background: rgba(239,68,68,0.16); color: var(--loss); }
+  .pin-item.event .ki { background: var(--violet-soft); color: var(--violet); }
+  .pin-item.note .ki { background: rgba(245,158,11,0.16); color: var(--amber); }
+  .pin-item .pnl { font-feature-settings: 'tnum' on; font-weight: 700; font-size: 0.92rem; margin-left: 6px; }
+  .pin-item .pnl.win { color: var(--win); } .pin-item .pnl.loss { color: var(--loss); }
+
+  /* ────────────────────────────────────────
+     GALLERY DIALOG
+     ──────────────────────────────────────── */
+  .modal-stage { position: relative; min-height: 720px; background: radial-gradient(circle at 30% 20%, rgba(124,58,237,0.06), transparent 60%); border: 1px solid var(--hair); border-radius: 16px; overflow: hidden; }
+  .modal-stage .ghost-bg { position: absolute; inset: 20px; background: repeating-linear-gradient(transparent 0 24px, rgba(255,255,255,0.025) 24px 25px), repeating-linear-gradient(90deg, transparent 0 24px, rgba(255,255,255,0.025) 24px 25px); border-radius: 12px; opacity: 0.4; }
+  .modal-stage .scrim { position: absolute; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(10px); }
+  .dialog { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 920px; max-width: calc(100% - 32px); max-height: calc(100% - 60px); background: var(--bg-paper); border: 1px solid var(--hair); border-radius: 16px; box-shadow: 0 30px 80px -20px rgba(0,0,0,0.7); display: flex; flex-direction: column; overflow: hidden; }
+  .dialog .head { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--hair); }
+  .dialog .head .t { font-weight: 700; font-size: 1rem; letter-spacing: -0.01em; }
+  .dialog .head .sub { font-size: 0.76rem; color: var(--fg-low); margin-left: auto; font-feature-settings: 'tnum' on; }
+  .dialog .head .x { color: var(--fg-low); font-size: 16px; cursor: pointer; padding: 4px 8px; border-radius: 6px; margin-left: 12px; }
+  .dialog .head .x:hover { color: var(--fg); background: rgba(255,255,255,0.04); }
+  .dialog .body { display: grid; grid-template-columns: 1fr 240px; gap: 0; flex: 1; overflow: hidden; }
+  @media (max-width: 880px) { .dialog .body { grid-template-columns: 1fr; } }
+
+  .gal-main { padding: 24px; display: flex; flex-direction: column; gap: 14px; align-items: center; justify-content: center; background: rgba(0,0,0,0.3); position: relative; min-height: 360px; }
+  .gal-main .canvas { width: 100%; height: 380px; border-radius: 12px; background: linear-gradient(135deg, #0a0e1a, #0a0a14); border: 1px solid rgba(255,255,255,0.06); position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+  .gal-main .canvas::before { content:""; position: absolute; inset: 0; background:
+    repeating-linear-gradient(transparent 0 19px, rgba(255,255,255,0.025) 19px 20px),
+    repeating-linear-gradient(90deg, transparent 0 19px, rgba(255,255,255,0.025) 19px 20px);
+    opacity: 0.6; }
+  .gal-main .canvas svg { position: relative; width: 90%; height: 80%; }
+  .gal-main .nav-btn { position: absolute; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; border-radius: 50%; background: rgba(0,0,0,0.5); border: 1px solid var(--hair); color: var(--fg); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; transition: background 150ms, border-color 150ms; }
+  .gal-main .nav-btn:hover { background: var(--violet); border-color: var(--violet); }
+  .gal-main .nav-btn.left { left: 36px; }
+  .gal-main .nav-btn.right { right: 36px; }
+  .gal-main .meta { font-size: 0.78rem; color: var(--fg-low); font-feature-settings: 'tnum' on; }
+  .gal-side { border-left: 1px solid var(--hair); display: flex; flex-direction: column; overflow: hidden; }
+  .gal-side .h { padding: 12px 16px; font-size: 0.7rem; color: var(--fg-low); font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; border-bottom: 1px solid var(--hair); }
+  .gal-thumbs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 14px; overflow-y: auto; }
+  .gal-thumb { aspect-ratio: 4/3; border-radius: 8px; background: linear-gradient(135deg, #0a0e1a, #0a0a14); border: 2px solid transparent; cursor: pointer; position: relative; overflow: hidden; }
+  .gal-thumb.on { border-color: var(--violet); }
+  .gal-thumb::after { content: attr(data-l); position: absolute; bottom: 4px; left: 6px; font-size: 0.62rem; color: var(--fg-low); font-weight: 600; font-feature-settings: 'tnum' on; }
+
+  /* ────────────────────────────────────────
+     TRADELIST DIALOG
+     ──────────────────────────────────────── */
+  .tl-dialog { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 980px; max-width: calc(100% - 32px); max-height: calc(100% - 60px); background: var(--bg-paper); border: 1px solid var(--hair); border-radius: 16px; box-shadow: 0 30px 80px -20px rgba(0,0,0,0.7); display: flex; flex-direction: column; overflow: hidden; }
+  .tl-dialog .head { display: flex; align-items: center; gap: 14px; padding: 16px 20px; border-bottom: 1px solid var(--hair); }
+  .tl-dialog .head .t { font-weight: 700; font-size: 1.05rem; letter-spacing: -0.015em; }
+  .tl-dialog .head .crumb { font-size: 0.78rem; color: var(--fg-low); margin-left: 8px; font-feature-settings: 'tnum' on; }
+  .tl-dialog .head .x { color: var(--fg-low); font-size: 16px; cursor: pointer; padding: 4px 8px; border-radius: 6px; margin-left: auto; }
+  .tl-dialog .head .x:hover { color: var(--fg); background: rgba(255,255,255,0.04); }
+
+  .tl-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; padding: 0; border-bottom: 1px solid var(--hair); }
+  .tl-summary .s { padding: 14px 20px; border-right: 1px solid var(--hair); }
+  .tl-summary .s:last-child { border-right: 0; }
+  .tl-summary .s .l { font-size: 0.7rem; color: var(--fg-low); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+  .tl-summary .s .v { font-size: 1.15rem; font-weight: 800; letter-spacing: -0.02em; margin-top: 4px; font-feature-settings: 'tnum' on; }
+  .tl-summary .s .v.win { color: var(--win); }
+  .tl-summary .s .v.loss { color: var(--loss); }
+
+  .tl-table { flex: 1; overflow-y: auto; }
+  .tl-row { display: grid; grid-template-columns: 90px 80px 90px 1fr 100px 110px; gap: 14px; align-items: center; padding: 12px 20px; border-top: 1px solid var(--hair); font-size: 0.86rem; cursor: pointer; transition: background 150ms; }
+  .tl-row:first-of-type { border-top: 0; }
+  .tl-row:hover { background: rgba(124,58,237,0.04); }
+  .tl-row .d { font-feature-settings: 'tnum' on; color: var(--fg-mute); font-size: 0.8rem; }
+  .tl-row .sym { font-weight: 700; }
+  .tl-row .side { font-size: 0.74rem; padding: 2px 8px; border-radius: 4px; font-weight: 700; letter-spacing: 0.05em; width: fit-content; }
+  .tl-row .side.long { background: rgba(34,197,94,0.16); color: var(--win); }
+  .tl-row .side.short { background: rgba(239,68,68,0.16); color: var(--loss); }
+  .tl-row .tags { display: flex; gap: 4px; flex-wrap: wrap; }
+  .tl-row .tags span { font-size: 0.7rem; padding: 2px 7px; border-radius: 999px; background: rgba(255,255,255,0.04); color: var(--fg-mute); font-weight: 500; }
+  .tl-row .r { font-feature-settings: 'tnum' on; text-align: right; color: var(--fg-mute); font-size: 0.82rem; }
+  .tl-row .pnl { font-feature-settings: 'tnum' on; text-align: right; font-weight: 700; }
+  .tl-row .pnl.win { color: var(--win); }
+  .tl-row .pnl.loss { color: var(--loss); }
+
+  .tl-thead { display: grid; grid-template-columns: 90px 80px 90px 1fr 100px 110px; gap: 14px; padding: 10px 20px; border-bottom: 1px solid var(--hair); background: rgba(255,255,255,0.015); font-size: 0.68rem; color: var(--fg-low); font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
+  .tl-thead .r { text-align: right; }
+
+</style>
+</head>
+<body>
+
+<nav class="tabs">
+  <span class="word">JournoTrades</span>
+  <button data-screen="performance" class="active">Performance</button>
+  <button data-screen="economic">Economic Hub</button>
+  <button data-screen="tag-panel">Tag panel</button>
+  <button data-screen="search">Search palette</button>
+  <button data-screen="pinned">Pinned panel</button>
+  <button data-screen="gallery">Gallery dialog</button>
+  <button data-screen="tradelist">Tradelist dialog</button>
+</nav>
+
+<!-- ─────────── PERFORMANCE ─────────── -->
+<section class="screen active" id="performance">
+  <div class="page">
+    <div class="page-head">
+      <div>
+        <div class="eyebrow">Performance</div>
+        <h1>April 2026</h1>
+        <p>Strategy 1A · Eval · 47 trades · 21 sessions</p>
+      </div>
+      <div class="filter-pill">
+        <button>Week</button>
+        <button class="active">Month</button>
+        <button>Quarter</button>
+        <button>YTD</button>
+        <button>All</button>
+      </div>
+    </div>
+
+    <div class="stat-grid">
+      <div class="stat"><div class="label">Net P&amp;L</div><div class="val win">+$7,238.55</div><div class="delta up">+$1,420 vs March</div></div>
+      <div class="stat"><div class="label">Win rate</div><div class="val">63.8%</div><div class="delta up">+4.2 pts</div></div>
+      <div class="stat"><div class="label">Profit factor</div><div class="val">2.41</div><div class="delta up">+0.18</div></div>
+      <div class="stat"><div class="label">Avg R</div><div class="val">+0.82R</div><div class="delta dn">−0.05R</div></div>
+    </div>
+
+    <div class="perf-grid">
+      <div class="card equity">
+        <div class="head"><h3>Equity curve</h3><div class="total tnum">+$7,238.55</div></div>
+        <svg viewBox="0 0 600 220" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="eq" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#7c3aed" stop-opacity="0.35"/>
+              <stop offset="100%" stop-color="#7c3aed" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <g stroke="rgba(255,255,255,0.05)" stroke-width="1">
+            <line x1="0" y1="40" x2="600" y2="40"/><line x1="0" y1="100" x2="600" y2="100"/><line x1="0" y1="160" x2="600" y2="160"/>
+          </g>
+          <path d="M0 180 L40 175 L80 162 L120 168 L160 150 L200 145 L240 130 L280 138 L320 110 L360 95 L400 90 L440 75 L480 80 L520 60 L560 50 L600 40 L600 220 L0 220 Z" fill="url(#eq)"/>
+          <path d="M0 180 L40 175 L80 162 L120 168 L160 150 L200 145 L240 130 L280 138 L320 110 L360 95 L400 90 L440 75 L480 80 L520 60 L560 50 L600 40" stroke="#7c3aed" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="600" cy="40" r="4" fill="#7c3aed"/>
+          <circle cx="600" cy="40" r="9" fill="#7c3aed" fill-opacity="0.18"/>
+        </svg>
+        <div class="footer">
+          <span><strong>Max DD</strong> −$1,840 · Apr 8</span>
+          <span><strong>Best day</strong> +$1,420 · Apr 22</span>
+          <span><strong>Avg trade</strong> +$154</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><div class="mark">⊞</div><div class="ttl">By tag</div><div class="sub">Top 5</div></div>
+        <div class="breakdown">
+          <div class="br-row"><div class="name">A+ Setup</div><div class="bar"><i style="width: 92%"></i></div><div class="pct">+$3,420</div></div>
+          <div class="br-row"><div class="name">VWAP reclaim</div><div class="bar"><i style="width: 68%"></i></div><div class="pct">+$2,180</div></div>
+          <div class="br-row"><div class="name">ORB breakout</div><div class="bar"><i style="width: 51%"></i></div><div class="pct">+$1,640</div></div>
+          <div class="br-row dn"><div class="name">FOMO</div><div class="bar"><i style="width: 42%"></i></div><div class="pct" style="color:var(--loss)">−$880</div></div>
+          <div class="br-row dn"><div class="name">Late entry</div><div class="bar"><i style="width: 28%"></i></div><div class="pct" style="color:var(--loss)">−$420</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:20px">
+      <div class="card-head"><div class="mark">▦</div><div class="ttl">By weekday</div><div class="sub">Net P&amp;L</div></div>
+      <div class="day-bars">
+        <div class="col"><div class="b" style="height:62%"></div><div class="l">Mon</div></div>
+        <div class="col"><div class="b dn" style="height:38%"></div><div class="l">Tue</div></div>
+        <div class="col"><div class="b" style="height:78%"></div><div class="l">Wed</div></div>
+        <div class="col"><div class="b" style="height:90%"></div><div class="l">Thu</div></div>
+        <div class="col"><div class="b" style="height:48%"></div><div class="l">Fri</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────── ECONOMIC HUB ─────────── -->
+<section class="screen" id="economic">
+  <div class="page">
+    <div class="page-head">
+      <div>
+        <div class="eyebrow">Economic</div>
+        <h1>Macro &amp; events</h1>
+        <p>All economic data feeding your calendar · 28 events this week · 6 high-impact</p>
+      </div>
+      <div class="filter-pill">
+        <button class="active">High</button>
+        <button>Med</button>
+        <button>Low</button>
+        <button>All</button>
+      </div>
+    </div>
+
+    <div class="hub-tabs">
+      <button class="active">Calendar</button>
+      <button>Releases</button>
+      <button>Central banks</button>
+      <button>Earnings</button>
+      <button>Holidays</button>
+    </div>
+
+    <div class="hub-grid">
+      <div class="card">
+        <div class="card-head"><div class="mark">⚑</div><div class="ttl">This week</div><div class="sub">May 5 – May 11</div></div>
+
+        <div class="day-section">Mon, May 5</div>
+        <div class="ev-row med">
+          <div class="time">04:00</div>
+          <div class="body"><div class="name">Eurozone Sentix · 🇪🇺</div><div class="meta">Forecast −7.3 · Prior −9.5</div></div>
+          <div class="imp"><i></i><i></i><i></i></div>
+          <div class="pin">⚑</div>
+        </div>
+        <div class="ev-row low">
+          <div class="time">10:00</div>
+          <div class="body"><div class="name">ISM Services PMI · 🇺🇸</div><div class="meta">Forecast 51.8 · Prior 51.4</div></div>
+          <div class="imp"><i></i><i></i><i></i></div>
+          <div class="pin">⚑</div>
+        </div>
+
+        <div class="day-section">Wed, May 7 · today</div>
+        <div class="ev-row low">
+          <div class="time">06:30</div>
+          <div class="body"><div class="name">Trade Balance · 🇨🇭</div><div class="meta">Forecast 3.8B · Prior 4.7B</div></div>
+          <div class="imp"><i></i><i></i><i></i></div>
+          <div class="pin">⚑</div>
+        </div>
+        <div class="ev-row med">
+          <div class="time">08:30</div>
+          <div class="body"><div class="name">Initial Jobless Claims · 🇺🇸</div><div class="meta">Forecast 220K · Prior 215K</div></div>
+          <div class="imp"><i></i><i></i><i></i></div>
+          <div class="pin">⚑</div>
+        </div>
+        <div class="ev-row high now">
+          <div class="time">10:00</div>
+          <div class="body"><div class="name">FOMC Rate Decision · 🇺🇸</div><div class="meta">Forecast 4.50% · Prior 4.50% · ES tag: avoid</div></div>
+          <div class="imp"><i></i><i></i><i></i></div>
+          <div class="pin on">⚑</div>
+        </div>
+        <div class="ev-row high">
+          <div class="time">10:30</div>
+          <div class="body"><div class="name">Fed Press Conference · Powell</div><div class="meta">Live tape · Vol expected</div></div>
+          <div class="imp"><i></i><i></i><i></i></div>
+          <div class="pin">⚑</div>
+        </div>
+
+        <div class="day-section">Fri, May 9</div>
+        <div class="ev-row high">
+          <div class="time">08:30</div>
+          <div class="body"><div class="name">Nonfarm Payrolls · 🇺🇸</div><div class="meta">Forecast 175K · Prior 142K</div></div>
+          <div class="imp"><i></i><i></i><i></i></div>
+          <div class="pin">⚑</div>
+        </div>
+        <div class="ev-row high">
+          <div class="time">08:30</div>
+          <div class="body"><div class="name">Unemployment Rate · 🇺🇸</div><div class="meta">Forecast 4.1% · Prior 4.1%</div></div>
+          <div class="imp"><i></i><i></i><i></i></div>
+          <div class="pin">⚑</div>
+        </div>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:16px">
+        <div class="card impact-card">
+          <div class="ttl">Impact distribution · this week</div>
+          <div class="impact-bars">
+            <div class="ib high"><div class="n">High</div><div class="bar"><i style="width: 100%"></i></div><div class="c">6</div></div>
+            <div class="ib med"><div class="n">Medium</div><div class="bar"><i style="width: 70%"></i></div><div class="c">9</div></div>
+            <div class="ib low"><div class="n">Low</div><div class="bar"><i style="width: 50%"></i></div><div class="c">13</div></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><div class="mark">🔔</div><div class="ttl">Pinned to calendar</div><div class="sub">3</div></div>
+          <div class="ev-row high"><div class="time">10:00</div><div class="body"><div class="name">FOMC · Wed May 7</div><div class="meta">In 2h 18m</div></div><div class="imp"><i></i><i></i><i></i></div><div class="pin on">⚑</div></div>
+          <div class="ev-row high"><div class="time">08:30</div><div class="body"><div class="name">NFP · Fri May 9</div><div class="meta">In 2 days</div></div><div class="imp"><i></i><i></i><i></i></div><div class="pin on">⚑</div></div>
+          <div class="ev-row med"><div class="time">10:00</div><div class="body"><div class="name">CPI · Wed May 14</div><div class="meta">Next week</div></div><div class="imp"><i></i><i></i><i></i></div><div class="pin on">⚑</div></div>
+        </div>
+
+        <div class="card impact-card">
+          <div class="ttl">My historical edge</div>
+          <div style="display:flex; flex-direction:column; gap:10px; font-size: 0.85rem">
+            <div style="display:flex; justify-content:space-between"><span style="color:var(--fg-mute)">Trades around FOMC</span><span class="tnum" style="color:var(--loss); font-weight:700">−0.6R avg</span></div>
+            <div style="display:flex; justify-content:space-between"><span style="color:var(--fg-mute)">Trades around NFP</span><span class="tnum" style="color:var(--win); font-weight:700">+1.3R avg</span></div>
+            <div style="display:flex; justify-content:space-between"><span style="color:var(--fg-mute)">Trades around CPI</span><span class="tnum" style="color:var(--fg); font-weight:700">+0.1R avg</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────── TAG PANEL ─────────── -->
+<section class="screen" id="tag-panel">
+  <div class="page">
+    <div class="page-head"><div><div class="eyebrow">Tag panel</div><h1>Tag this trade</h1><p>Slide-in from the right of any trade dialog or detail view.</p></div></div>
+    <div class="panel-stage">
+      <div class="ghost-bg"></div>
+      <div class="label">Trade detail · Apr 22 · ES · LONG</div>
+
+      <aside class="side-panel">
+        <div class="head"><div class="t">Tags</div><div class="x">✕</div></div>
+        <div class="body">
+          <div class="tag-add">
+            <input placeholder="New tag…" value="">
+            <button>Add</button>
+          </div>
+
+          <div class="tag-section">
+            <div class="h">Applied to this trade</div>
+            <div class="tag-cloud">
+              <button class="tag-chip on">A+ Setup <span class="n">·</span></button>
+              <button class="tag-chip on">VWAP reclaim <span class="n">·</span></button>
+              <button class="tag-chip on">Plan followed <span class="n">·</span></button>
+            </div>
+          </div>
+
+          <div class="tag-section">
+            <div class="h">Setups</div>
+            <div class="tag-cloud">
+              <button class="tag-chip on">A+ Setup <span class="n">12</span></button>
+              <button class="tag-chip">B Setup <span class="n">28</span></button>
+              <button class="tag-chip">C Setup <span class="n">9</span></button>
+              <button class="tag-chip">ORB breakout <span class="n">14</span></button>
+              <button class="tag-chip on">VWAP reclaim <span class="n">21</span></button>
+              <button class="tag-chip">Range fade <span class="n">7</span></button>
+              <button class="tag-chip">Trend pullback <span class="n">19</span></button>
+            </div>
+          </div>
+
+          <div class="tag-section">
+            <div class="h">Mistakes</div>
+            <div class="tag-cloud">
+              <button class="tag-chip">FOMO <span class="n">11</span></button>
+              <button class="tag-chip">Late entry <span class="n">8</span></button>
+              <button class="tag-chip">Cut winner <span class="n">5</span></button>
+              <button class="tag-chip">Held loser <span class="n">7</span></button>
+              <button class="tag-chip">No stop <span class="n">2</span></button>
+              <button class="tag-chip">Revenge <span class="n">6</span></button>
+            </div>
+          </div>
+
+          <div class="tag-section">
+            <div class="h">Process</div>
+            <div class="tag-cloud">
+              <button class="tag-chip on">Plan followed <span class="n">22</span></button>
+              <button class="tag-chip">Plan broken <span class="n">14</span></button>
+              <button class="tag-chip">Journaled <span class="n">31</span></button>
+              <button class="tag-chip">Reviewed <span class="n">18</span></button>
+            </div>
+          </div>
+
+          <div class="tag-stats">
+            <div class="row"><span class="k">With these tags · 12 trades</span></div>
+            <div class="row"><span class="k">Win rate</span><span class="v">75.0%</span></div>
+            <div class="row"><span class="k">Avg P&amp;L</span><span class="v win">+$284</span></div>
+            <div class="row"><span class="k">Profit factor</span><span class="v">3.1</span></div>
+          </div>
+        </div>
+        <div class="foot">
+          <button class="btn-ghost">Cancel</button>
+          <button class="btn-primary">Save tags</button>
+        </div>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────── SEARCH PALETTE ─────────── -->
+<section class="screen" id="search">
+  <div class="page">
+    <div class="page-head"><div><div class="eyebrow">Search</div><h1>Command palette · ⌘K</h1><p>Search trades, notes, events, tags — and run actions — from anywhere.</p></div></div>
+    <div class="palette-stage">
+      <div class="ghost-bg"></div>
+      <div class="scrim"></div>
+      <div class="palette">
+        <div class="input-row">
+          <span class="ic">🔎</span>
+          <input value="vwap recl" placeholder="Search trades, notes, events, tags…">
+          <span class="esc">esc</span>
+        </div>
+
+        <div class="group">
+          <div class="h">Trades · 14 matches</div>
+          <div class="row on">
+            <div class="icn">↑</div>
+            <div class="lbl">ES · LONG · <em>VWAP recl</em>aim · A+ Setup<div class="sub">Apr 22 · 9:54 AM · 2 contracts</div></div>
+            <div class="meta win tnum">+$340</div>
+          </div>
+          <div class="row">
+            <div class="icn">↑</div>
+            <div class="lbl">NQ · LONG · <em>VWAP recl</em>aim<div class="sub">Apr 18 · 10:21 AM · 1 contract</div></div>
+            <div class="meta win tnum">+$185</div>
+          </div>
+          <div class="row">
+            <div class="icn" style="background:rgba(239,68,68,0.16); color:var(--loss)">↓</div>
+            <div class="lbl">ES · SHORT · <em>VWAP recl</em>aim<div class="sub">Apr 11 · 2:08 PM · 2 contracts</div></div>
+            <div class="meta loss tnum">−$120</div>
+          </div>
+        </div>
+
+        <div class="group">
+          <div class="h">Tags · 1</div>
+          <div class="row">
+            <div class="icn">#</div>
+            <div class="lbl"><em>VWAP recl</em>aim<div class="sub">21 trades · +$2,180 net</div></div>
+            <div class="meta">Tag</div>
+          </div>
+        </div>
+
+        <div class="group">
+          <div class="h">Notes · 2</div>
+          <div class="row">
+            <div class="icn">✎</div>
+            <div class="lbl">Apr 30 · Idea<div class="sub"><em>VWAP recl</em>aim into prior-day high seems to fire on Wednesdays…</div></div>
+            <div class="meta tnum">Apr 30</div>
+          </div>
+        </div>
+
+        <div class="group">
+          <div class="h">Actions</div>
+          <div class="row">
+            <div class="icn">＋</div>
+            <div class="lbl">New trade tagged "<em>VWAP recl</em>aim"<div class="sub">Open create dialog</div></div>
+            <div class="meta">↵</div>
+          </div>
+        </div>
+
+        <div class="foot">
+          <div class="keys">
+            <span><kbd>↑</kbd><kbd>↓</kbd> navigate</span>
+            <span><kbd>↵</kbd> open</span>
+            <span><kbd>⌘</kbd><kbd>↵</kbd> in new tab</span>
+          </div>
+          <span>14 results</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────── PINNED PANEL ─────────── -->
+<section class="screen" id="pinned">
+  <div class="page">
+    <div class="page-head"><div><div class="eyebrow">Pinned panel</div><h1>Pinned</h1><p>Quick access to trades, events, and notes you've pinned across the app.</p></div></div>
+    <div class="panel-stage" style="min-height: 720px">
+      <div class="ghost-bg"></div>
+      <div class="label">Calendar context</div>
+
+      <aside class="side-panel">
+        <div class="head"><div class="t">Pinned · 7</div><div class="x">✕</div></div>
+        <div class="body" style="padding: 0">
+          <div class="filter-pill" style="margin: 16px 16px 8px">
+            <button class="active">All</button>
+            <button>Trades</button>
+            <button>Events</button>
+            <button>Notes</button>
+          </div>
+          <div class="pinned-list">
+            <div class="pin-item event">
+              <div class="row1"><div class="ki">⚑</div><div class="kind">Event · High</div><div class="when">In 2h 18m</div></div>
+              <div class="body">FOMC Rate Decision · <strong>10:00 AM</strong></div>
+            </div>
+            <div class="pin-item trade">
+              <div class="row1"><div class="ki">↑</div><div class="kind">Trade · LONG</div><div class="when">Apr 22</div></div>
+              <div class="body">ES · A+ Setup, VWAP reclaim<span class="pnl win">+$340</span></div>
+            </div>
+            <div class="pin-item note">
+              <div class="row1"><div class="ki">✎</div><div class="kind">Note · Idea</div><div class="when">Apr 30</div></div>
+              <div class="body">VWAP-reclaim into prior-day high seems to fire on Wednesdays…</div>
+            </div>
+            <div class="pin-item event">
+              <div class="row1"><div class="ki">⚑</div><div class="kind">Event · High</div><div class="when">Fri</div></div>
+              <div class="body">Nonfarm Payrolls · <strong>8:30 AM</strong></div>
+            </div>
+            <div class="pin-item trade loss">
+              <div class="row1"><div class="ki">↓</div><div class="kind">Trade · SHORT</div><div class="when">Apr 15</div></div>
+              <div class="body">NQ · FOMO, Revenge<span class="pnl loss">−$220</span></div>
+            </div>
+            <div class="pin-item note">
+              <div class="row1"><div class="ki">✎</div><div class="kind">Note · Plan</div><div class="when">May 5</div></div>
+              <div class="body">FOMC week. Avoid Wed 9:50–10:30. Backtest shows −0.6R avg in window.</div>
+            </div>
+            <div class="pin-item trade">
+              <div class="row1"><div class="ki">↑</div><div class="kind">Trade · LONG</div><div class="when">May 1</div></div>
+              <div class="body">ES · ORB breakout<span class="pnl win">+$1,420</span></div>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────── GALLERY DIALOG ─────────── -->
+<section class="screen" id="gallery">
+  <div class="page">
+    <div class="page-head"><div><div class="eyebrow">Gallery</div><h1>Chart screenshots</h1><p>Modal viewer for trade attachments — entry/exit, plan, post-mortem.</p></div></div>
+    <div class="modal-stage">
+      <div class="ghost-bg"></div>
+      <div class="scrim"></div>
+      <div class="dialog">
+        <div class="head">
+          <div class="t">ES · Apr 22 · LONG · A+ Setup</div>
+          <div class="sub tnum">2 / 4</div>
+          <div class="x">✕</div>
+        </div>
+        <div class="body">
+          <div class="gal-main">
+            <div class="canvas">
+              <svg viewBox="0 0 600 360" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="ch" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#22c55e" stop-opacity="0.25"/>
+                    <stop offset="100%" stop-color="#22c55e" stop-opacity="0"/>
+                  </linearGradient>
+                </defs>
+                <path d="M0 280 L60 270 L120 290 L180 240 L240 220 L300 230 L360 180 L420 160 L480 140 L540 110 L600 90 L600 360 L0 360 Z" fill="url(#ch)"/>
+                <path d="M0 280 L60 270 L120 290 L180 240 L240 220 L300 230 L360 180 L420 160 L480 140 L540 110 L600 90" stroke="#22c55e" stroke-width="2" fill="none"/>
+                <line x1="0" y1="240" x2="600" y2="240" stroke="#7c3aed" stroke-width="1" stroke-dasharray="4 4"/>
+                <text x="8" y="234" fill="#7c3aed" font-size="11" font-family="DM Sans" font-weight="600">VWAP</text>
+                <circle cx="180" cy="240" r="6" fill="#22c55e" stroke="#0a0a14" stroke-width="2"/>
+                <text x="190" y="232" fill="#22c55e" font-size="11" font-family="DM Sans" font-weight="700">ENTRY · 5,832.25</text>
+                <circle cx="540" cy="110" r="6" fill="#7c3aed" stroke="#0a0a14" stroke-width="2"/>
+                <text x="450" y="100" fill="#7c3aed" font-size="11" font-family="DM Sans" font-weight="700">EXIT · 5,847.50</text>
+              </svg>
+            </div>
+            <div class="nav-btn left">‹</div>
+            <div class="nav-btn right">›</div>
+            <div class="meta">Entry — 9:54 AM · 5-min · ES</div>
+          </div>
+          <div class="gal-side">
+            <div class="h">4 attachments</div>
+            <div class="gal-thumbs">
+              <div class="gal-thumb" data-l="01 · Plan"></div>
+              <div class="gal-thumb on" data-l="02 · Entry"></div>
+              <div class="gal-thumb" data-l="03 · Mid"></div>
+              <div class="gal-thumb" data-l="04 · Exit"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────── TRADELIST DIALOG ─────────── -->
+<section class="screen" id="tradelist">
+  <div class="page">
+    <div class="page-head"><div><div class="eyebrow">Tradelist</div><h1>Trades · drill-down dialog</h1><p>Opens when you click any cell on the calendar, any tag in stats, or any bar in a chart.</p></div></div>
+    <div class="modal-stage" style="min-height: 760px">
+      <div class="ghost-bg"></div>
+      <div class="scrim"></div>
+      <div class="tl-dialog">
+        <div class="head">
+          <div class="t">Trades</div>
+          <div class="crumb">Wed, Apr 22 · 5 trades</div>
+          <div class="x">✕</div>
+        </div>
+        <div class="tl-summary">
+          <div class="s"><div class="l">Net P&amp;L</div><div class="v win">+$1,420.00</div></div>
+          <div class="s"><div class="l">Win rate</div><div class="v">80.0%</div></div>
+          <div class="s"><div class="l">Avg R</div><div class="v">+1.45R</div></div>
+          <div class="s"><div class="l">Best / worst</div><div class="v"><span class="tnum" style="color:var(--win)">+$890</span> <span style="color:var(--fg-low); font-weight: 500"> / </span><span class="tnum" style="color:var(--loss)">−$120</span></div></div>
+        </div>
+        <div class="tl-thead">
+          <div>Time</div>
+          <div>Symbol</div>
+          <div>Side</div>
+          <div>Tags</div>
+          <div class="r">R</div>
+          <div class="r">P&amp;L</div>
+        </div>
+        <div class="tl-table">
+          <div class="tl-row">
+            <div class="d">9:32 AM</div>
+            <div class="sym">ES</div>
+            <div><span class="side long">LONG</span></div>
+            <div class="tags"><span>A+ Setup</span><span>ORB breakout</span></div>
+            <div class="r">+2.1R</div>
+            <div class="pnl win">+$420.00</div>
+          </div>
+          <div class="tl-row">
+            <div class="d">9:54 AM</div>
+            <div class="sym">ES</div>
+            <div><span class="side long">LONG</span></div>
+            <div class="tags"><span>A+ Setup</span><span>VWAP reclaim</span><span>Plan followed</span></div>
+            <div class="r">+1.7R</div>
+            <div class="pnl win">+$340.00</div>
+          </div>
+          <div class="tl-row">
+            <div class="d">10:48 AM</div>
+            <div class="sym">NQ</div>
+            <div><span class="side long">LONG</span></div>
+            <div class="tags"><span>B Setup</span><span>Trend pullback</span></div>
+            <div class="r">−0.6R</div>
+            <div class="pnl loss">−$120.00</div>
+          </div>
+          <div class="tl-row">
+            <div class="d">12:14 PM</div>
+            <div class="sym">ES</div>
+            <div><span class="side short">SHORT</span></div>
+            <div class="tags"><span>A+ Setup</span><span>Range fade</span></div>
+            <div class="r">+1.5R</div>
+            <div class="pnl win">+$290.00</div>
+          </div>
+          <div class="tl-row">
+            <div class="d">2:32 PM</div>
+            <div class="sym">CL</div>
+            <div><span class="side long">LONG</span></div>
+            <div class="tags"><span>A+ Setup</span><span>Trend pullback</span><span>Plan followed</span></div>
+            <div class="r">+4.4R</div>
+            <div class="pnl win">+$890.00</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  document.querySelectorAll('.tabs button').forEach(b => {
+    b.addEventListener('click', () => {
+      document.querySelectorAll('.tabs button').forEach(x => x.classList.remove('active'));
+      document.querySelectorAll('.screen').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      document.getElementById(b.dataset.screen).classList.add('active');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  });
+  // Generic filter pills
+  document.querySelectorAll('.filter-pill, .hub-tabs').forEach(p => {
+    p.addEventListener('click', (e) => {
+      const b = e.target.closest('button'); if (!b) return;
+      p.querySelectorAll('button').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+    });
+  });
+  // Tag chip toggle
+  document.querySelectorAll('.tag-chip').forEach(c => {
+    c.addEventListener('click', () => c.classList.toggle('on'));
+  });
+  // Gallery thumb selector
+  document.querySelectorAll('.gal-thumb').forEach(t => {
+    t.addEventListener('click', () => {
+      document.querySelectorAll('.gal-thumb').forEach(x => x.classList.remove('on'));
+      t.classList.add('on');
+    });
+  });
+</script>
+</body></html>

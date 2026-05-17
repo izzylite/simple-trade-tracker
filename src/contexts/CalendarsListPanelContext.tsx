@@ -8,6 +8,9 @@ import { Calendar } from '../types/calendar';
  */
 export interface CalendarsListPanelActions {
   onCalendarClick: (id: string) => void;
+  /** Opens the create-calendar dialog. Optional so providers without create
+   *  access (e.g. signed-out routes) can still wire the panel. */
+  onCreateCalendar?: () => void;
   onEditCalendar: (cal: Calendar) => void;
   onDuplicateCalendar: (cal: Calendar) => void;
   onLinkCalendar: (cal: Calendar) => void;

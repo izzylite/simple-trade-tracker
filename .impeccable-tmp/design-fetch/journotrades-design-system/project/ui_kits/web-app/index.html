@@ -1,0 +1,254 @@
+<!doctype html>
+<html data-theme="dark"><head>
+<meta charset="utf-8">
+<title>JournoTrades — App Shell</title>
+<link rel="stylesheet" href="../../colors_and_type.css">
+<style>
+  body { margin: 0; }
+  .shell { display: grid; grid-template-columns: 92px 1fr; min-height: 100vh; }
+
+  /* App header */
+  .app-header {
+    grid-column: 1 / -1;
+    height: 64px;
+    background: var(--bg-paper);
+    border-bottom: 1px solid var(--divider);
+    display: flex; align-items: center;
+    padding: 0 24px;
+    gap: 16px;
+    position: sticky; top: 0; z-index: 10;
+  }
+  .wordmark { font-weight: 700; font-size: 18px; letter-spacing: -0.02em; }
+  .header-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; color: var(--fg-secondary); font-size: 14px; }
+  .avatar { width: 32px; height: 32px; border-radius: 50%; background: rgba(124,58,237,0.18); color: var(--violet-primary); display: flex; align-items: center; justify-content: center; font-weight: 600; }
+
+  /* Side nav */
+  .rail {
+    background: var(--bg-paper);
+    border-right: 1px solid var(--divider);
+    display: flex; flex-direction: column;
+    align-items: center;
+    padding: 12px 0;
+    position: sticky; top: 64px; height: calc(100vh - 64px);
+  }
+  .tile-btn { background: none; border: 0; padding: 6px 0; display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; width: 100%; transition: transform 180ms var(--easing); color: inherit; }
+  .tile-btn:active { transform: scale(0.96); }
+  .tile { width: 44px; height: 44px; border-radius: 16px; display: flex; align-items: center; justify-content: center; transition: background 180ms var(--easing), color 180ms var(--easing); color: var(--fg-secondary); }
+  .tile-btn:hover .tile { background: rgba(255,255,255,0.04); color: var(--fg-primary); }
+  .tile.create { background: var(--bg-tint-violet); color: var(--violet-primary); }
+  .tile-btn:hover .tile.create { background: var(--bg-tint-violet-hover); }
+  .tile.active { background: var(--violet-primary); color: var(--fg-on-violet); }
+  .tile-btn:hover .tile.active { background: var(--violet-deep); }
+  .tile-label { font-size: 11px; font-weight: 500; line-height: 1.1; color: var(--fg-primary); }
+  .tile-label.active { color: var(--violet-primary); font-weight: 600; }
+  .rail .sep { width: 60px; height: 1px; background: var(--divider); margin: 8px 0; }
+  .rail .util { margin-top: auto; }
+
+  /* Main */
+  main { padding: 24px 32px 48px; }
+
+  /* Calendar selector bar */
+  .selector-bar { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; background: var(--bg-paper); border: 1px solid var(--divider); border-radius: var(--radius-lg); margin-bottom: 24px; }
+  .selector { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+  .cal-avatar { width: 32px; height: 32px; border-radius: 50%; background: rgba(124,58,237,0.18); color: var(--violet-primary); display: flex; align-items: center; justify-content: center; font-size: 14px; }
+  .cal-name { font-size: 18px; font-weight: 600; letter-spacing: -0.015em; }
+  .chev { color: var(--fg-secondary); transition: transform 180ms var(--easing); }
+  .selector.open .chev { transform: rotate(180deg); }
+  .header-actions-cal { display: flex; gap: 4px; color: var(--fg-secondary); }
+  .header-actions-cal button { background: transparent; border: 0; padding: 6px 8px; border-radius: 6px; color: var(--fg-secondary); cursor: pointer; }
+  .header-actions-cal button:hover { background: rgba(255,255,255,0.04); color: var(--fg-primary); }
+
+  /* Selector menu */
+  .menu { position: absolute; min-width: 320px; max-width: 380px; background: var(--bg-paper); border: 1px solid var(--divider); border-radius: 12px; box-shadow: var(--shadow-lg); padding: 8px; margin-top: 8px; display: none; }
+  .selector.open ~ .menu { display: block; }
+  .menu-head { display: flex; justify-content: space-between; align-items: center; padding: 6px 8px 10px; }
+  .menu-head .lbl { font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--fg-secondary); }
+  .menu-head .all { font-size: 12px; color: var(--violet-soft); cursor: pointer; }
+  .menu-item { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 8px; cursor: pointer; }
+  .menu-item:hover { background: rgba(255,255,255,0.04); }
+  .menu-item.selected { background: var(--bg-tint-violet); }
+  .menu-item.selected:hover { background: var(--bg-tint-violet-hover); }
+  .menu-item .name { flex: 1; font-size: 14px; font-weight: 500; }
+  .menu-item .meta { font-size: 11px; color: var(--fg-secondary); }
+  .menu-item .pnl { font-size: 13px; font-weight: 700; font-feature-settings: 'tnum' on, 'lnum' on; }
+
+  /* Stats row */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+  .stat { background: var(--bg-paper); border-radius: 12px; padding: 16px 18px; box-shadow: var(--shadow-md); transition: transform 180ms var(--easing), box-shadow 180ms var(--easing); }
+  .stat:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+  .stat .lbl { font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--fg-secondary); margin-bottom: 8px; }
+  .stat .num { font-size: 28px; font-weight: 700; line-height: 1.1; font-feature-settings: 'tnum' on, 'lnum' on; letter-spacing: -0.015em; }
+  .stat .sub { font-size: 12px; color: var(--fg-secondary); margin-top: 6px; }
+
+  /* Calendar grid */
+  .calendar { background: var(--bg-paper); border: 1px solid var(--divider); border-radius: 12px; padding: 16px; }
+  .cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .cal-month { font-size: 18px; font-weight: 600; letter-spacing: -0.015em; }
+  .cal-nav { display: flex; gap: 4px; color: var(--fg-secondary); }
+  .cal-nav button { background: transparent; border: 0; color: inherit; padding: 6px 10px; border-radius: 6px; cursor: pointer; }
+  .cal-nav button:hover { background: rgba(255,255,255,0.04); color: var(--fg-primary); }
+  .weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-bottom: 8px; }
+  .wd { text-align: center; padding: 8px; font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--fg-secondary); }
+  .days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+  .day { background: var(--bg-page); border-radius: 8px; min-height: 72px; padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; cursor: pointer; transition: background 150ms; position: relative; }
+  .day:hover { background: rgba(255,255,255,0.02); }
+  .day.muted { opacity: 0.3; }
+  .day .d { font-size: 12px; color: var(--fg-secondary); font-weight: 500; }
+  .day .pnl { margin-top: auto; font-size: 13px; font-weight: 700; font-feature-settings: 'tnum' on, 'lnum' on; }
+  .day .pnl.win { color: var(--win-green); }
+  .day .pnl.loss { color: var(--loss-red); }
+  .day .ct { font-size: 10px; color: var(--fg-tertiary); }
+
+  /* Orion drawer launcher */
+  .orion { position: fixed; right: 24px; bottom: 24px; display: flex; align-items: center; gap: 8px; padding: 10px 16px 10px 12px; background: var(--bg-paper); border: 1px solid var(--divider); border-radius: 999px; box-shadow: var(--shadow-lg); cursor: pointer; transition: transform 180ms var(--easing), box-shadow 180ms var(--easing); }
+  .orion:hover { transform: translateY(-1px); box-shadow: var(--shadow-xl); }
+  .orion img { width: 22px; height: 22px; }
+  .orion .lbl { font-size: 13px; font-weight: 600; }
+  .orion .kbd { font-size: 11px; color: var(--fg-secondary); background: rgba(255,255,255,0.04); padding: 2px 6px; border-radius: 4px; font-feature-settings: 'tnum' on; }
+</style>
+</head>
+<body>
+<div class="shell">
+  <header class="app-header">
+    <span class="wordmark">JournoTrades</span>
+    <span class="t-label" style="color:var(--fg-tertiary);font-weight:500">Logbook</span>
+    <div class="header-actions">
+      <span style="cursor:pointer">⌘K</span>
+      <div class="avatar">RT</div>
+    </div>
+  </header>
+
+  <aside class="rail">
+    <button class="tile-btn"><div class="tile create" id="orion-icon">＋</div><div class="tile-label">Create</div></button>
+    <div class="sep"></div>
+    <button class="tile-btn" data-route="home"><div class="tile active">⌂</div><div class="tile-label active">Home</div></button>
+    <button class="tile-btn" data-route="perf"><div class="tile">∥</div><div class="tile-label">Performance</div></button>
+    <button class="tile-btn" data-route="assist"><div class="tile">✦</div><div class="tile-label">Assistant</div></button>
+    <button class="tile-btn" data-route="notes"><div class="tile">≡</div><div class="tile-label">Notes</div></button>
+    <div class="util">
+      <div class="sep"></div>
+      <button class="tile-btn"><div class="tile">i</div><div class="tile-label">About</div></button>
+    </div>
+  </aside>
+
+  <main>
+    <div style="position:relative">
+      <div class="selector-bar">
+        <div class="selector" id="sel">
+          <div class="cal-avatar">📅</div>
+          <div class="cal-name">Strategy 1A · Eval</div>
+          <div class="chev">▾</div>
+        </div>
+        <div class="header-actions-cal">
+          <button title="Edit">✎</button>
+          <button title="Share">↗</button>
+          <button title="Help">?</button>
+        </div>
+      </div>
+
+      <div class="menu" id="menu">
+        <div class="menu-head">
+          <span class="lbl">Calendars</span>
+          <span class="all">View all</span>
+        </div>
+        <div class="menu-item selected">
+          <div class="cal-avatar">📅</div>
+          <div><div class="name">Strategy 1A · Eval</div><div class="meta">476 trades</div></div>
+          <div class="pnl" style="margin-left:auto;color:var(--win-green)">+$12,840</div>
+        </div>
+        <div class="menu-item">
+          <div class="cal-avatar" style="background:rgba(34,197,94,0.18);color:var(--win-green)">FT</div>
+          <div><div class="name">Funded Account · Topstep</div><div class="meta">211 trades</div></div>
+          <div class="pnl" style="margin-left:auto;color:var(--win-green)">+$3,217</div>
+        </div>
+        <div class="menu-item">
+          <div class="cal-avatar" style="background:rgba(239,68,68,0.18);color:var(--loss-red)">B</div>
+          <div><div class="name">Backtest · Q2</div><div class="meta">82 trades</div></div>
+          <div class="pnl" style="margin-left:auto;color:var(--loss-red)">−$417</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat">
+        <div class="lbl">Net P&amp;L · May</div>
+        <div class="num" style="color:var(--win-green)">+$12,840.00</div>
+        <div class="sub">↑ +4.2% vs start of month</div>
+      </div>
+      <div class="stat">
+        <div class="lbl">Trades</div>
+        <div class="num">38</div>
+        <div class="sub">23 wins · 15 losses</div>
+      </div>
+      <div class="stat">
+        <div class="lbl">Win rate</div>
+        <div class="num">60.5<span style="font-size:18px;color:var(--fg-secondary)">%</span></div>
+        <div class="sub">Profit factor 2.18</div>
+      </div>
+      <div class="stat">
+        <div class="lbl">Best day</div>
+        <div class="num" style="color:var(--win-green)">+$3,460</div>
+        <div class="sub">Thu 16 · 4 trades</div>
+      </div>
+    </div>
+
+    <div class="calendar">
+      <div class="cal-header">
+        <div class="cal-month">May 2026</div>
+        <div class="cal-nav">
+          <button>‹</button>
+          <button>Today</button>
+          <button>›</button>
+        </div>
+      </div>
+      <div class="weekdays">
+        <div class="wd">Mon</div><div class="wd">Tue</div><div class="wd">Wed</div><div class="wd">Thu</div><div class="wd">Fri</div><div class="wd">Sat</div><div class="wd">Sun</div>
+      </div>
+      <div class="days" id="days"></div>
+    </div>
+  </main>
+</div>
+
+<button class="orion" id="orion">
+  <img src="../../assets/orion-icon.svg" alt="">
+  <span class="lbl">Ask Orion</span>
+  <span class="kbd">⌘O</span>
+</button>
+
+<script>
+  // Build a fake May 2026 with random P&L for visual richness
+  const days = document.getElementById('days');
+  const data = [
+    [null,null,null,null,1,2,3],
+    [4,5,6,7,8,9,10],
+    [11,12,13,14,15,16,17],
+    [18,19,20,21,22,23,24],
+    [25,26,27,28,29,30,31],
+  ];
+  const pnls = {1:1247.5,2:null,3:null,4:-540.2,5:2180.4,6:340.7,7:3460.1,8:890.75,11:-1200,12:680,13:1100,14:0,15:2200,18:430,19:-820,20:1980,21:-330,22:760,25:1450,26:-210,27:520,28:980,29:1800};
+  data.flat().forEach(d => {
+    const el = document.createElement('div');
+    el.className = 'day' + (d == null ? ' muted' : '');
+    if (d != null) {
+      const p = pnls[d];
+      let pnl = '';
+      if (p != null && p !== 0) {
+        const cls = p >= 0 ? 'win' : 'loss';
+        const sign = p >= 0 ? '+' : '−';
+        const val = Math.abs(p).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+        pnl = `<div class="pnl ${cls}">${sign}$${val}</div>`;
+      }
+      const ct = p != null && p !== 0 ? `<div class="ct">${Math.floor(Math.random()*4)+1} trades</div>` : '';
+      el.innerHTML = `<div class="d">${d}</div>${pnl}${ct}`;
+    }
+    days.appendChild(el);
+  });
+
+  // Selector menu toggle
+  document.getElementById('sel').addEventListener('click', e => {
+    e.stopPropagation();
+    document.getElementById('sel').classList.toggle('open');
+  });
+  document.addEventListener('click', () => document.getElementById('sel').classList.remove('open'));
+</script>
+</body></html>

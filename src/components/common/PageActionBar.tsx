@@ -1,6 +1,6 @@
 // src/components/common/PageActionBar.tsx
 import React from 'react';
-import { Box, Stack, useTheme, alpha } from '@mui/material';
+import { Box, Stack } from '@mui/material';
 
 interface PageActionBarProps {
   /** Optional inline actions rendered on the left (after where the selector used to sit). */
@@ -16,7 +16,6 @@ interface PageActionBarProps {
  * spacing/border treatment so the visual transition is invisible to users.
  */
 const PageActionBar: React.FC<PageActionBarProps> = ({ inlineActions, rightContent }) => {
-  const theme = useTheme();
   return (
     <Box
       sx={{
@@ -25,7 +24,6 @@ const PageActionBar: React.FC<PageActionBarProps> = ({ inlineActions, rightConte
         gap: 1.5,
         px: { xs: 2, sm: 3 },
         py: 1.25,
-        borderBottom: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
         bgcolor: 'background.paper',
         minHeight: 56,
       }}

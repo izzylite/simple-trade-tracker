@@ -24,7 +24,7 @@ const StatsDrawer: React.FC<StatsDrawerProps> = ({
     <UnifiedDrawer
       open={open}
       onClose={onClose}
-      title="Stats"
+      title="Overview"
       icon={<StatsIcon />}
       width={{ xs: '100%', sm: 540 }}
       keepMounted={false}

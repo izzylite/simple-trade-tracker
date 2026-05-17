@@ -248,35 +248,52 @@ export const FormField = styled(Box)(({ theme }) => ({
 }));
 
 // Trade list item styled component
+//
+// Two-layer shadow gives the row real thickness. Resting shadow uses a
+// hairline base (1px) + a wider ambient drop so the card looks lifted off
+// the surface without floating. Hover steps one tier up per the DESIGN.md
+// Hover Lift Rule (-2px max, single shadow step up).
 export const TradeListItem = styled(Box, {
   shouldForwardProp: (prop) => prop !== '$type'
-})<{ $type?: 'win' | 'loss' | 'breakeven' }>(({ theme, $type }) => ({
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  padding: theme.spacing(1.5),
-  borderRadius: theme.shape.borderRadius,
-  backgroundColor: $type === 'win'
-    ? 'rgba(34, 197, 94, 0.08)'
-    : $type === 'loss'
-      ? 'rgba(239, 68, 68, 0.08)'
-      : $type === 'breakeven'
-        ? 'rgba(100, 116, 139, 0.08)'
-        : theme.palette.background.paper,
-  border: '1px solid',
-  borderColor: $type === 'win'
-    ? 'rgba(34, 197, 94, 0.2)'
-    : $type === 'loss'
-      ? 'rgba(239, 68, 68, 0.2)'
-      : $type === 'breakeven'
-        ? 'rgba(100, 116, 139, 0.2)'
-        : theme.palette.divider,
-  transition: 'all 0.2s ease-in-out',
-  '&:hover': {
-    transform: 'translateY(-1px)',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
-  }
-}));
+})<{ $type?: 'win' | 'loss' | 'breakeven' }>(({ theme, $type }) => {
+  const isDark = theme.palette.mode === 'dark';
+
+  const restingShadow = isDark
+    ? '0 1px 2px rgba(0,0,0,0.45), 0 6px 14px rgba(0,0,0,0.32), 0 2px 4px rgba(0,0,0,0.20)'
+    : '0 1px 2px rgba(15,23,42,0.06), 0 4px 12px rgba(15,23,42,0.08), 0 2px 4px rgba(15,23,42,0.04)';
+
+  const hoverShadow = isDark
+    ? '0 2px 4px rgba(0,0,0,0.55), 0 12px 28px rgba(0,0,0,0.45), 0 4px 8px rgba(0,0,0,0.28)'
+    : '0 2px 4px rgba(15,23,42,0.08), 0 10px 24px rgba(15,23,42,0.14), 0 4px 8px rgba(15,23,42,0.06)';
+
+  return {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: theme.spacing(1.5),
+    borderRadius: 12,
+    backgroundColor: $type === 'win'
+      ? (isDark ? 'rgba(34, 197, 94, 0.10)' : 'rgba(34, 197, 94, 0.08)')
+      : $type === 'loss'
+        ? (isDark ? 'rgba(239, 68, 68, 0.10)' : 'rgba(239, 68, 68, 0.08)')
+        : $type === 'breakeven'
+          ? (isDark ? 'rgba(100, 116, 139, 0.10)' : 'rgba(100, 116, 139, 0.08)')
+          : theme.palette.background.paper,
+    border: '1px solid',
+    borderColor: $type === 'win'
+      ? 'rgba(34, 197, 94, 0.22)'
+      : $type === 'loss'
+        ? 'rgba(239, 68, 68, 0.22)'
+        : $type === 'breakeven'
+          ? 'rgba(100, 116, 139, 0.22)'
+          : theme.palette.divider,
+    boxShadow: restingShadow,
+    transition: 'box-shadow 180ms ease-out, transform 180ms ease-out, border-color 180ms ease-out',
+    '&:hover': {
+      boxShadow: hoverShadow,
+    },
+  };
+});
 
 // Trade info styled component
 export const TradeInfo = styled(Box)(({ theme }) => ({

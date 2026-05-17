@@ -1,0 +1,214 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+JournoTrades is a React-based trading journal application that allows traders to track their trades, analyze performance, and manage trading calendars. The project uses Supabase, TypeScript, Material-UI, and includes Supabase edge functions for backend operations.
+
+
+## Core Development Philosophy
+
+Follow KISS, YAGNI, and SOLID principles. Fail fast — check for errors early and raise exceptions immediately.
+
+## 🧱 Code Structure & Modularity
+
+### File and Function Limits
+
+- **Never create a file longer than 500 lines of code**. If approaching this limit, refactor by splitting into modules.
+- **Functions should be under 50 lines** with a single, clear responsibility.
+- **Classes should be under 100 lines** and represent a single concept or entity.
+- **Organize code into clearly separated modules**, grouped by feature or responsibility.
+- **Line length should be max 100 characters** (ESLint configured)
+
+
+## Specialized Subagents
+
+This project uses specialized AI subagents for specific domains. Claude Code should **proactively** invoke these agents when working on related tasks:
+
+
+### Supabase Backend Expert (`supabase-backend-expert`)
+**When to use:**
+- Database schema design, table creation, or migrations
+- Implementing Row Level Security (RLS) policies
+- Creating or deploying Supabase Edge Functions
+- Setting up authentication, real-time subscriptions, or storage buckets
+- Security audits or performance optimization for database queries
+- Any Supabase-specific operations (must use MCP tools)
+
+**Example triggers:**
+- User mentions "Supabase", "database", "RLS", "edge function"
+- Working in `supabase/` directory or with database migrations
+- API endpoint changes that affect database schema
+- Security or performance concerns with data access
+
+
+### Context Engineering Specialist (`context-engineer`)
+**When to use:**
+- Designing or improving system prompts for AI agents
+- Building RAG pipelines or knowledge retrieval systems
+- Implementing memory systems for stateful AI agents
+- Optimizing context window utilization
+- Debugging AI agent failures (often context issues)
+- Designing tool definitions and orchestration
+- Structuring multi-agent communication
+- Improving AI response quality through better context
+
+**Example triggers:**
+- User mentions "system prompt", "context", "RAG", "memory"
+- Working with AI service files or edge functions that call LLMs
+- Designing prompts for AI features
+- Agent performance or accuracy issues
+- Token optimization or context window concerns
+
+**Key techniques:**
+- Context pruning and compression
+- Hierarchical instruction structuring
+- Few-shot example injection
+- Schema-based output definitions
+- Memory system design (short-term, long-term, episodic)
+
+
+## Commands
+
+### Frontend Development
+- `npm start` - Start the React development server
+- `npm run build` - Build the production application
+- `npm test` - Run Jest tests
+- `npm run eject` - Eject from Create React App
+
+### Database Migration and Setup
+- `npm run migrate-events` - Run trade event migration script using ts-node
+- `npm run migrate-trade-events` - Run trade events migration using Node.js
+
+### Deployment
+- `npm run deploy` - Deploy to GitHub Pages (runs build first)
+
+## High-Level Architecture
+
+### Frontend Structure
+- **React SPA**: Built with Create React App and TypeScript
+- **UI Framework**: Material-UI (MUI) v7 with custom theming
+- **Routing**: React Router v7 for navigation
+- **State Management**: React Context (AuthContext) with local component state
+- **Rich Text**: Draft.js for trade notes with custom toolbar
+- **Charts**: Recharts for performance visualization
+
+### Data Layer
+- **Primary Database**: Supabase PostgreSQL
+- **Authentication**: Supabase Auth
+- **File Storage**: Supabase Storage
+- **Data Structure**: Year-based subcollections for trade organization
+
+### Backend Services
+- **Edge Functions**: Supabase Edge Functions (Deno-based) in `/supabase/functions/`
+- **Economic Calendar**: Automated scraping and processing of economic events
+- **Trade Sharing**: On-demand share link generation
+- **Tag Management**: Bulk tag updates across trades
+- **Background Tasks**: Cleanup and maintenance operations
+
+### Source Directory Structure
+- `src/components/` - React UI components
+- `src/config/` - App configuration
+- `src/contexts/` - React Context providers (AuthContext, etc.)
+- `src/hooks/` - Custom React hooks
+- `src/pages/` - Route-level page components
+- `src/services/` - Data and API service layer
+- `src/styles/` - Global styles and theme
+- `src/types/` - TypeScript type definitions
+- `src/utils/` - Utility functions
+- `src/workers/` - Web workers
+
+### Key Service Files
+- `src/services/calendarService.ts` - Core trade and calendar operations with Supabase
+- `src/services/supabaseStorageService.ts` - File upload/download with Supabase Storage
+- `src/services/supabaseAIChatService.ts` - AI chat service with Supabase edge functions
+- `src/services/performanceCalculationService.ts` - Trade performance metrics
+- `src/services/economicCalendarService.ts` - Economic event data
+- `src/services/tagService.ts` - Tag management
+- `src/services/notesService.ts` - Trade notes
+- `src/services/sharingService.ts` - Calendar/trade sharing
+
+## Architecture Patterns
+
+### Trade Data Organization
+- Calendars contain years as subcollections
+- Each year document stores an array of trades
+- Statistics calculated at calendar level and cached
+- Transactions used for consistency in multi-document operations
+
+### File Management
+- Trade images stored in Supabase Storage with signed URLs
+- Image optimization performed client-side before upload
+- Progress tracking for uploads using XMLHttpRequest
+- User-scoped file paths: `users/{userId}/trade-images/{filename}`
+
+### UI Patterns
+- Drawer-based navigation with toolbar integration
+- Dialog components with cancel buttons and close icons
+- Shimmer loading states for better UX
+- Responsive design with mobile-first approach
+- Rich text editor with 1024 character limit
+
+### Data Synchronization
+- Supabase postgres_changes subscriptions for real-time updates
+- Calendar statistics recalculation on trade changes
+- Background processing with user feedback
+
+## Development Guidelines
+
+### Code Style and Conventions
+- TypeScript strict mode enabled
+- Prefer service layer calculations over UI calculations
+- Use transactions for database operations
+- Extract reusable components, especially complex ones
+- Store numeric values as numbers, not strings
+- Use Unix timestamps for publishedAt/updatedAt fields
+
+### Reuse Before Creating
+- **Always check `src/utils/` before writing a new utility function.** Search for existing helpers by keyword (e.g. `compressImage`, `validateFile`, `formatDate`) before adding new ones.
+- **Also check `src/services/` and `src/hooks/`** for existing logic that covers the same need.
+- If a similar function exists but has a different return type or signature, prefer extending or wrapping it over duplicating it.
+- New utility functions belong in `src/utils/` in the most relevant existing file (e.g. image helpers → `fileValidation.ts`, formatters → `formatters.ts`).
+- **Extract shared logic within components too.** When 2+ event handlers, style objects, or render patterns repeat the same structure with different parameters, extract a reusable helper function or constant immediately — don't duplicate then refactor later. Example: a `togglePanel(viewId, drawerSetter)` instead of repeating the same panel open/close logic for every button.
+
+### UI/UX Preferences
+- Rounded tab styling and curved cards
+- Tooltips for calculations and complex UI elements
+- Immediate dialog closures with background processing
+- Full-width components with reduced border radius
+- Hero images spanning full screen with overlaying components
+- Maximum component height of 350px for information displays
+
+### Risk Management
+- Dynamic risk adjustment based on performance
+- Risk per trade field with balance calculations
+- Required tag groups validation
+- Granular update functions for specific properties
+
+### Testing and Quality
+- Run tests with `npm test`
+- Use React Testing Library for component tests
+- Test edge functions with Deno test framework
+- Verify database operations with transactions
+
+### Security - NEVER Commit Secrets
+⚠️ **CRITICAL**: Never commit API keys, service keys, or secrets to the repository.
+
+- **Never hardcode** Supabase service role keys, anon keys, or any API keys in code
+- **Always use environment variables** for sensitive configuration
+- **Check before committing**: Review any new `.js`, `.ts`, or `.sh` files for hardcoded credentials
+- **Patterns to avoid**:
+  - `const supabaseKey = 'eyJ...'` (JWT tokens)
+  - `const apiKey = '...'`
+  - Any file named `apply-migration*.js`, `test-*.ts`, `*-env-setup.sh`
+- **If you need a utility script** that requires secrets, use `process.env.VARIABLE_NAME` and document required env vars
+- Files matching these patterns are gitignored: `apply-migration*.js`, `test-*.ts`, `*-env-setup.sh`
+
+## Important Files and Patterns
+
+### Configuration Files
+- `supabase/config.toml` - Supabase configuration
+- `supabase/migrations/` - Database schema and migrations
+- `tsconfig.json` - TypeScript configuration (strict mode)
+- `.gitignore` - Ignores `scripts/`, `demos/`, `.claude/`, `.env*`

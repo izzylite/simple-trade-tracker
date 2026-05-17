@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, alpha, useTheme } from '@mui/material';
+import { Box, useTheme } from '@mui/material';
 import Shimmer from './Shimmer';
 
 interface TradeCardShimmerProps {
@@ -10,50 +10,70 @@ interface TradeCardShimmerProps {
 }
 
 /**
- * Reusable shimmer loading component for trade cards.
- * Displays skeleton cards that match the TradeCard component layout.
+ * Skeleton placeholder mirroring the TradeCard layout:
+ * title + PnL row, tag chips, hairline, meta footer.
  */
 const TradeCardShimmer: React.FC<TradeCardShimmerProps> = ({
   count = 3,
-  containerSx = {}
+  containerSx = {},
 }) => {
   const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  const hairline = isDark ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
+  const restingShadow = isDark
+    ? '0 2px 8px rgba(0,0,0,0.30)'
+    : '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)';
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, ...containerSx }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25, ...containerSx }}>
       {Array.from({ length: count }, (_, index) => (
         <Box
           key={index}
           sx={{
-            p: 2,
-            borderRadius: 2,
-            bgcolor: alpha(theme.palette.background.paper, 0.6),
-            border: `1px solid ${alpha(theme.palette.divider, 0.1)}`
+            bgcolor: 'background.paper',
+            border: `1px solid ${hairline}`,
+            borderRadius: '12px',
+            boxShadow: restingShadow,
+            overflow: 'hidden',
           }}
         >
-          {/* Header - Name and Amount */}
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
-            <Shimmer height={20} width="40%" borderRadius={4} variant="wave" intensity="medium" />
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Shimmer height={16} width={16} borderRadius="50%" variant="wave" intensity="medium" />
-              <Shimmer height={20} width={80} borderRadius={4} variant="wave" intensity="medium" />
+          <Box sx={{ px: 1.75, py: 1.25 }}>
+            {/* Title + PnL */}
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 1.5,
+                mb: 0.875,
+              }}
+            >
+              <Shimmer height={12} width="55%" borderRadius={3} variant="wave" intensity="medium" />
+              <Shimmer height={14} width={84} borderRadius={4} variant="wave" intensity="medium" />
             </Box>
-          </Box>
 
-          {/* Info Icons Row */}
-          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 1 }}>
-            <Shimmer height={14} width={14} borderRadius="50%" variant="wave" intensity="low" />
-            <Shimmer height={14} width={14} borderRadius="50%" variant="wave" intensity="low" />
-            <Shimmer height={12} width={80} borderRadius={4} variant="wave" intensity="low" />
-            <Shimmer height={14} width={14} borderRadius="50%" variant="wave" intensity="low" />
-            <Shimmer height={12} width={60} borderRadius={4} variant="wave" intensity="low" />
-          </Box>
+            {/* Tag chips */}
+            <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mb: 0.875 }}>
+              <Shimmer height={20} width={64} borderRadius={6} variant="wave" intensity="low" />
+              <Shimmer height={20} width={48} borderRadius={6} variant="wave" intensity="low" />
+              <Shimmer height={20} width={56} borderRadius={6} variant="wave" intensity="low" />
+            </Box>
 
-          {/* Tags Row */}
-          <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-            <Shimmer height={20} width={80} borderRadius={10} variant="wave" intensity="medium" />
-            <Shimmer height={20} width={60} borderRadius={10} variant="wave" intensity="medium" />
-            <Shimmer height={20} width={70} borderRadius={10} variant="wave" intensity="medium" />
+            {/* Meta footer (R:R · date · session · icons) */}
+            <Box
+              sx={{
+                pt: 0.875,
+                borderTop: `1px solid ${hairline}`,
+                display: 'flex',
+                gap: 1,
+                alignItems: 'center',
+              }}
+            >
+              <Shimmer height={10} width={48} borderRadius={3} variant="wave" intensity="low" />
+              <Shimmer height={10} width={38} borderRadius={3} variant="wave" intensity="low" />
+              <Shimmer height={10} width={48} borderRadius={3} variant="wave" intensity="low" />
+              <Shimmer height={12} width={12} borderRadius="50%" variant="wave" intensity="low" />
+            </Box>
           </Box>
         </Box>
       ))}

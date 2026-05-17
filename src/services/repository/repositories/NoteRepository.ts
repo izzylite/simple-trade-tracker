@@ -355,6 +355,56 @@ export class NoteRepository extends AbstractBaseRepository<Note> {
     }
   }
 
+  /**
+   * Lightweight HEAD-count for tab badges. Runs three parallel count-only
+   * queries (all / pinned / archived) sharing the same scope filters so the
+   * panel can show counts without selecting each tab.
+   */
+  async countTabs(
+    scope: { userId: string; calendarId?: string },
+    opts: { byAssistant?: boolean; searchQuery?: string } = {},
+  ): Promise<{ all: number; pinned: number; archived: number }> {
+    const { userId, calendarId } = scope;
+    const { byAssistant, searchQuery } = opts;
+
+    const buildBase = () => {
+      let q = supabase
+        .from("notes")
+        .select("id", { count: "exact", head: true })
+        .not("tags", "cs", `{${AGENT_MEMORY_TAG}}`);
+
+      if (calendarId) {
+        q = q.or(`calendar_id.eq.${calendarId},calendar_id.is.null`);
+      } else {
+        q = q.eq("user_id", userId);
+      }
+      if (byAssistant !== undefined) q = q.eq("by_assistant", byAssistant);
+      if (searchQuery && searchQuery.trim() !== "") {
+        q = q.or(
+          `title.ilike.%${searchQuery}%,content.ilike.%${searchQuery}%`,
+        );
+      }
+      return q;
+    };
+
+    try {
+      const [allRes, pinnedRes, archivedRes] = await Promise.all([
+        buildBase().eq("is_archived", false),
+        buildBase().eq("is_pinned", true).eq("is_archived", false),
+        buildBase().eq("is_archived", true),
+      ]);
+
+      return {
+        all: allRes.count ?? 0,
+        pinned: pinnedRes.count ?? 0,
+        archived: archivedRes.count ?? 0,
+      };
+    } catch (error) {
+      logger.error("Exception counting note tabs:", error);
+      return { all: 0, pinned: 0, archived: 0 };
+    }
+  }
+
   async findAll(): Promise<Note[]> {
     try {
       const { data, error } = await supabase

@@ -4,6 +4,7 @@ import { SmartToy as AIIcon } from '@mui/icons-material';
 import { useLocation } from 'react-router-dom';
 import { useAuthState } from '../../contexts/AuthStateContext';
 import { useAIChat } from '../../contexts/AIChatContext';
+import { useAnyPanelOpen } from '../../contexts/PanelMutexContext';
 
 /**
  * Floating "Open Orion" button mounted once at App level. Shows on every
@@ -21,9 +22,11 @@ const GlobalAIChatFab: React.FC = () => {
   const { user } = useAuthState();
   const { open, aiTasks } = useAIChat();
   const location = useLocation();
+  const anyPanelOpen = useAnyPanelOpen();
 
   if (!user) return null;
   if (HIDDEN_PREFIXES.some((p) => location.pathname.startsWith(p))) return null;
+  if (anyPanelOpen) return null;
   // Landing route at exactly "/" is auth-gated to LandingPage when no user;
   // when user is present "/" redirects through HomeRouteResolver to a
   // calendar route, so it's safe to render here.

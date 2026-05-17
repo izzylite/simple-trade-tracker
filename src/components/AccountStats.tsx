@@ -1,3 +1,21 @@
+/**
+ * AccountStats — Account balance + risk telemetry card.
+ *
+ * Layout (compact, panel-friendly):
+ *  ┌─────────────────────────────────────────────┐
+ *  │ ACCOUNT BALANCE              $10,000.00     │
+ *  │ ┌────────────────┬────────────────┐         │
+ *  │ │ CURRENT P&L    │ TOTAL VALUE    │         │
+ *  │ │ +$7,552,661    │ $7,562,661     │         │
+ *  │ │ +75,526.61%    │                │         │
+ *  │ ├────────────────┼────────────────┤         │
+ *  │ │ 🛡 RISK 1%     │ 📉 DAILY DD 1% │         │
+ *  │ │ $75,626        │ $75,626        │         │
+ *  │ └────────────────┴────────────────┘         │
+ *  │ DYNAMIC RISK  ● Using actual amounts   ⓘ    │
+ *  └─────────────────────────────────────────────┘
+ */
+
 import React, { useMemo } from 'react';
 import {
   Box,
@@ -5,21 +23,18 @@ import {
   Paper,
   alpha,
   Switch,
-  FormControlLabel,
   Tooltip,
-  useTheme
+  useTheme,
 } from '@mui/material';
 import {
   Security as SecurityIcon,
   InfoOutlined as InfoIcon,
-  TrendingDown as DrawdownIcon
+  TrendingDown as DrawdownIcon,
 } from '@mui/icons-material';
 import { Trade } from '../types/dualWrite';
 import { DynamicRiskSettings } from '../utils/dynamicRiskUtils';
 
-
-
-interface AccountBalanceProps {
+interface AccountStatsProps {
   balance: number;
   totalProfit: number;
   trades: Trade[];
@@ -28,47 +43,82 @@ interface AccountBalanceProps {
   dynamicRiskSettings?: DynamicRiskSettings;
   onToggleDynamicRisk?: (useActualAmounts: boolean) => void;
   isDynamicRiskToggled?: boolean;
-  // Read-only mode for shared calendars
   isReadOnly?: boolean;
   max_daily_drawdown?: number;
 }
 
+// Tabular numerics used throughout so columns don't jitter.
+const TNUM = "'tnum' on, 'lnum' on";
 
-const AccountBalance: React.FC<AccountBalanceProps> = ({
+const EYEBROW_SX = {
+  fontSize: '0.66rem',
+  fontWeight: 700,
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase' as const,
+  color: 'text.secondary',
+};
+
+const AccountStats: React.FC<AccountStatsProps> = ({
   balance,
   trades,
   totalProfit,
-  onPerformanceClick,
   risk_per_trade,
   dynamicRiskSettings,
   onToggleDynamicRisk,
-  isDynamicRiskToggled = true, // Default to true (using actual amounts)
+  isDynamicRiskToggled = true,
   isReadOnly = false,
-  max_daily_drawdown
+  max_daily_drawdown,
 }) => {
-
   const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
 
-  // Profit percentage calculation - should be based on original account balance for threshold comparison
-  const profitPercentage = trades.length > 0 && balance > 0 ? (totalProfit / balance * 100).toFixed(2) : '0';
+  const profitPercentage =
+    trades.length > 0 && balance > 0 ? (totalProfit / balance) * 100 : 0;
 
-  // Calculate the effective risk percentage based on dynamic risk settings
   const effectiveRiskPercentage = useMemo(() => {
     if (!risk_per_trade) return undefined;
-
-    if (dynamicRiskSettings?.dynamic_risk_enabled &&
+    if (
+      dynamicRiskSettings?.dynamic_risk_enabled &&
       dynamicRiskSettings.increased_risk_percentage &&
       dynamicRiskSettings.profit_threshold_percentage &&
-      parseFloat(profitPercentage) >= dynamicRiskSettings.profit_threshold_percentage) {
+      profitPercentage >= dynamicRiskSettings.profit_threshold_percentage
+    ) {
       return dynamicRiskSettings.increased_risk_percentage;
     }
-
     return risk_per_trade;
   }, [risk_per_trade, dynamicRiskSettings, profitPercentage]);
 
-  // Calculate total account value
   const totalAccountValue = balance + totalProfit;
 
+  const hairline = isDark ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
+  const surfaceInset = isDark
+    ? 'rgba(255,255,255,0.03)'
+    : alpha(theme.palette.text.primary, 0.03);
+
+  // PnL color signals — green/red/neutral
+  const pnlColor =
+    totalProfit > 0
+      ? theme.palette.success.main
+      : totalProfit < 0
+        ? theme.palette.error.main
+        : theme.palette.text.secondary;
+  const totalValueColor =
+    totalAccountValue > balance
+      ? theme.palette.success.main
+      : totalAccountValue < balance
+        ? theme.palette.error.main
+        : theme.palette.text.secondary;
+
+  const riskActive = !!risk_per_trade;
+  const ddActive = !!max_daily_drawdown;
+  const dynamicConfigured =
+    !!dynamicRiskSettings?.dynamic_risk_enabled &&
+    !!dynamicRiskSettings.profit_threshold_percentage &&
+    !!dynamicRiskSettings.increased_risk_percentage;
+  const dynamicActive =
+    dynamicConfigured &&
+    profitPercentage >=
+      (dynamicRiskSettings?.profit_threshold_percentage ?? Infinity);
 
   return (
     <Paper
@@ -76,105 +126,104 @@ const AccountBalance: React.FC<AccountBalanceProps> = ({
       sx={{
         display: 'flex',
         flexDirection: 'column',
-        gap: 1.5,
-        p: 2,
+        gap: 1.25,
+        p: 1.75,
         borderRadius: '12px',
         bgcolor: 'background.paper',
-        border: '1px solid',
-        borderColor: 'divider',
-        position: 'relative',
-        overflow: 'hidden',
-        height: '100%',
-        minHeight: '320px',
-        boxShadow: theme.palette.mode === 'dark'
+        border: `1px solid ${hairline}`,
+        boxShadow: isDark
           ? '0 2px 8px rgba(0,0,0,0.3)'
-          : '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)'
+          : '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)',
       }}
     >
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography variant="h6" sx={{ color: 'text.primary', fontWeight: 600, pl: 1 }}>
-            Account Balance
-          </Typography>
-        </Box>
+      {/* ── Title + balance ─────────────────────────────────────────── */}
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 1.5,
+        }}
+      >
+        <Typography sx={EYEBROW_SX}>Account balance</Typography>
         <Typography
           sx={{
-            fontSize: '1.5rem',
+            fontSize: '1.15rem',
             fontWeight: 700,
             color: 'text.primary',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 0.5
+            display: 'inline-flex',
+            alignItems: 'baseline',
+            gap: 0.25,
+            fontFeatureSettings: TNUM,
+            letterSpacing: '-0.01em',
           }}
         >
-          <Box component="span" sx={{ fontSize: '1.1rem', color: 'text.secondary', fontWeight: 500 }}>$</Box>
+          <Box component="span" sx={{ fontSize: '0.8rem', color: 'text.disabled', fontWeight: 500 }}>
+            $
+          </Box>
           {balance.toLocaleString()}
         </Typography>
       </Box>
 
-      <Box sx={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        backgroundColor: 'background.default',
-        p: 1.5,
-        borderRadius: 1.5,
-        mt: 0.5
-      }}>
-        <Box>
+      {/* ── P&L + Total Value ───────────────────────────────────────── */}
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          bgcolor: surfaceInset,
+          borderRadius: '10px',
+          overflow: 'hidden',
+        }}
+      >
+        <Box sx={{ p: 1.25 }}>
+          <Typography sx={{ ...EYEBROW_SX, fontSize: '0.62rem' }}>Current P&L</Typography>
           <Typography
-            variant="body2"
             sx={{
-              color: 'text.secondary',
-              mb: 0.5,
-              fontWeight: 500
+              mt: 0.375,
+              fontSize: '1.05rem',
+              fontWeight: 700,
+              color: pnlColor,
+              fontFeatureSettings: TNUM,
+              letterSpacing: '-0.01em',
+              lineHeight: 1.2,
+              wordBreak: 'break-word',
             }}
           >
-            Current P&L
+            {trades.length > 0 ? (totalProfit >= 0 ? '+' : '−') : ''}$
+            {trades.length > 0 ? Math.abs(totalProfit).toLocaleString() : '0'}
           </Typography>
           <Typography
-            variant="h6"
             sx={{
-              fontSize: '1.2rem',
-              color: totalProfit > 0 ? 'success.main' : totalProfit < 0 ? 'error.main' : 'text.secondary',
-              fontWeight: 700,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 0.5
+              mt: 0.125,
+              fontSize: '0.7rem',
+              fontWeight: 600,
+              color: pnlColor,
+              fontFeatureSettings: TNUM,
             }}
           >
-            ${trades.length > 0 ? Math.abs(totalProfit).toLocaleString() : '0'}
-            <Typography
-              component="span"
-              sx={{
-                fontSize: '0.9rem',
-                color: totalProfit > 0 ? 'success.main' : totalProfit < 0 ? 'error.main' : 'text.secondary',
-                fontWeight: 600
-              }}
-            >
-              ({profitPercentage}%)
-            </Typography>
+            {trades.length > 0
+              ? `${totalProfit >= 0 ? '+' : '−'}${Math.abs(profitPercentage).toFixed(2)}%`
+              : '—'}
           </Typography>
         </Box>
-
-        <Box>
+        <Box
+          sx={{
+            p: 1.25,
+            borderLeft: `1px solid ${hairline}`,
+            textAlign: 'right',
+          }}
+        >
+          <Typography sx={{ ...EYEBROW_SX, fontSize: '0.62rem' }}>Total value</Typography>
           <Typography
-            variant="body2"
             sx={{
-              color: 'text.secondary',
-              mb: 0.5,
-              fontWeight: 500,
-              textAlign: 'right'
-            }}
-          >
-            Total Value
-          </Typography>
-          <Typography
-            variant="h6"
-            sx={{
-              fontSize: '1.2rem',
-              color: totalAccountValue > balance ? 'success.main' : totalAccountValue < balance ? 'error.main' : 'text.secondary',
-              fontWeight: 700
+              mt: 0.375,
+              fontSize: '1.05rem',
+              fontWeight: 700,
+              color: totalValueColor,
+              fontFeatureSettings: TNUM,
+              letterSpacing: '-0.01em',
+              lineHeight: 1.2,
+              wordBreak: 'break-word',
             }}
           >
             ${totalAccountValue.toLocaleString()}
@@ -182,197 +231,231 @@ const AccountBalance: React.FC<AccountBalanceProps> = ({
         </Box>
       </Box>
 
-      {/* Risk Per Trade Section - Always visible but disabled when not configured */}
-      <Box sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 1,
-        pointerEvents: risk_per_trade ? 'auto' : 'none',
-      }}>
-        <Box sx={{
-          display: 'flex',
-          flexDirection: { xs: 'column', sm: 'row' },
-          gap: 1,
-          width: '100%'
-        }}>
-          {/* Risk Per Trade Box */}
-          <Box sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            backgroundColor: theme => alpha(theme.palette.primary.main, risk_per_trade ? 0.08 : 0.03),
-            p: 1.5,
-            borderRadius: 1.5,
-            flex: 1,
-            pointerEvents: risk_per_trade ? 'auto' : 'none',
-          }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <SecurityIcon sx={{ fontSize: '1rem', color: risk_per_trade ? 'primary.main' : 'text.disabled' }} />
-              <Typography
-                variant="body2"
-                sx={{
-                  color: risk_per_trade ? 'text.secondary' : 'text.disabled',
-                  fontWeight: 500,
-                  fontSize: { xs: '0.75rem', md: '0.8125rem' }
-                }}
-              >
-                Risk ({effectiveRiskPercentage || 0}%)
-                {risk_per_trade && dynamicRiskSettings?.dynamic_risk_enabled && effectiveRiskPercentage !== risk_per_trade && (
-                  <Box component="span" sx={{ ml: 0.5, color: 'success.main', fontSize: '0.65rem', fontWeight: 700 }}>
-                    UP
-                  </Box>
-                )}
-                {!risk_per_trade && (
-                  <Box component="span" sx={{ ml: 1, color: 'text.disabled', fontSize: '0.65rem', fontWeight: 600 }}>
-                    (N/A)
-                  </Box>
-                )}
-              </Typography>
-            </Box>
-            <Typography
-              variant="body1"
-              sx={{
-                fontWeight: 600,
-                color: risk_per_trade ? 'primary.main' : 'text.disabled',
-                fontSize: { xs: '0.9rem', md: '1rem' }
-              }}
-            >
-              ${effectiveRiskPercentage ? ((totalAccountValue * effectiveRiskPercentage) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
-            </Typography>
-          </Box>
-
-          {/* Daily Drawdown Box */}
-          <Box sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            backgroundColor: theme => alpha(theme.palette.error.main, max_daily_drawdown ? 0.08 : 0.03),
-            p: 1.5,
-            borderRadius: 1.5,
-            flex: 1,
-            pointerEvents: max_daily_drawdown ? 'auto' : 'none',
-          }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <DrawdownIcon sx={{ fontSize: '1rem', color: max_daily_drawdown ? 'error.main' : 'text.disabled' }} />
-              <Typography
-                variant="body2"
-                sx={{
-                  color: max_daily_drawdown ? 'text.secondary' : 'text.disabled',
-                  fontWeight: 500,
-                  fontSize: { xs: '0.75rem', md: '0.8125rem' }
-                }}
-              >
-                Daily DD ({max_daily_drawdown || 0}%)
-                {!max_daily_drawdown && (
-                  <Box component="span" sx={{ ml: 1, color: 'text.disabled', fontSize: '0.65rem', fontWeight: 600 }}>
-                    (N/A)
-                  </Box>
-                )}
-              </Typography>
-            </Box>
-            <Typography
-              variant="body1"
-              sx={{
-                fontWeight: 600,
-                color: max_daily_drawdown ? 'error.main' : 'text.disabled',
-                fontSize: { xs: '0.9rem', md: '1rem' }
-              }}
-            >
-              ${max_daily_drawdown ? ((totalAccountValue * max_daily_drawdown) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
-            </Typography>
-          </Box>
-        </Box>
+      {/* ── Risk / Drawdown row ─────────────────────────────────────── */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
+        <RiskTile
+          icon={<SecurityIcon sx={{ fontSize: 14 }} />}
+          label="Risk"
+          accent={theme.palette.primary.main}
+          active={riskActive}
+          percent={effectiveRiskPercentage}
+          amount={
+            effectiveRiskPercentage
+              ? (totalAccountValue * effectiveRiskPercentage) / 100
+              : 0
+          }
+          boosted={
+            riskActive &&
+            !!dynamicRiskSettings?.dynamic_risk_enabled &&
+            effectiveRiskPercentage !== risk_per_trade
+          }
+        />
+        <RiskTile
+          icon={<DrawdownIcon sx={{ fontSize: 14 }} />}
+          label="Daily DD"
+          accent={theme.palette.error.main}
+          active={ddActive}
+          percent={max_daily_drawdown}
+          amount={
+            max_daily_drawdown ? (totalAccountValue * max_daily_drawdown) / 100 : 0
+          }
+        />
       </Box>
 
-
-      {/* Dynamic Risk Section - Always visible but disabled when not configured */}
-      <Box sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 1,
-        backgroundColor: 'background.default',
-        p: 1,
-        mt: 1,
-        borderRadius: 1.5,
-        fontSize: '0.75rem',
-        opacity: (dynamicRiskSettings?.dynamic_risk_enabled && dynamicRiskSettings.profit_threshold_percentage && dynamicRiskSettings.increased_risk_percentage) ? 1 : 0.5,
-        pointerEvents: (dynamicRiskSettings?.dynamic_risk_enabled && dynamicRiskSettings.profit_threshold_percentage && dynamicRiskSettings.increased_risk_percentage) ? 'auto' : 'none',
-      }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Typography variant="caption" sx={{ color: dynamicRiskSettings?.dynamic_risk_enabled ? 'text.secondary' : 'text.disabled' }}>
-            Dynamic Risk: {dynamicRiskSettings?.dynamic_risk_enabled && dynamicRiskSettings.profit_threshold_percentage && parseFloat(profitPercentage) >= dynamicRiskSettings.profit_threshold_percentage ?
-              <Box component="span" sx={{ color: 'success.main', fontWeight: 600 }}>Active</Box> :
-              dynamicRiskSettings?.dynamic_risk_enabled ?
-                <Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>Inactive</Box> :
-                <Box component="span" sx={{ color: 'text.disabled', fontWeight: 600 }}>Not Configured</Box>}
-          </Typography>
-          <Typography variant="caption" sx={{ color: dynamicRiskSettings?.dynamic_risk_enabled ? 'text.secondary' : 'text.disabled' }}>
-            Threshold: {dynamicRiskSettings?.profit_threshold_percentage || 0}% profit
-          </Typography>
+      {/* ── Dynamic Risk strip ──────────────────────────────────────── */}
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1,
+          flexWrap: 'wrap',
+          rowGap: 0.5,
+          px: 1,
+          py: 0.875,
+          borderRadius: '10px',
+          bgcolor: surfaceInset,
+          opacity: dynamicConfigured ? 1 : 0.55,
+        }}
+      >
+        <Typography sx={{ ...EYEBROW_SX, fontSize: '0.6rem' }}>Dynamic risk</Typography>
+        <Box
+          component="span"
+          sx={{
+            fontSize: '0.68rem',
+            fontWeight: 700,
+            color: dynamicActive
+              ? 'success.main'
+              : dynamicConfigured
+                ? 'text.secondary'
+                : 'text.disabled',
+            textTransform: 'uppercase',
+            letterSpacing: '0.04em',
+          }}
+        >
+          {dynamicActive ? 'Active' : dynamicConfigured ? 'Inactive' : 'Off'}
         </Box>
 
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <FormControlLabel
-            control={
-              <Switch
-                checked={isDynamicRiskToggled}
-                onChange={isReadOnly ? undefined : (e) => {
-                  if (onToggleDynamicRisk) {
-                    onToggleDynamicRisk(e.target.checked);
-                  }
-                }}
-                disabled={isReadOnly || !dynamicRiskSettings?.dynamic_risk_enabled}
-                size="small"
-                color="primary"
-              />
+        {dynamicConfigured && (
+          <Box
+            component="span"
+            sx={{
+              fontSize: '0.66rem',
+              color: 'text.disabled',
+              fontFeatureSettings: TNUM,
+              ml: 0.25,
+            }}
+          >
+            · Threshold {dynamicRiskSettings?.profit_threshold_percentage}%
+          </Box>
+        )}
+
+        <Box sx={{ flex: 1 }} />
+
+        <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+          <Switch
+            checked={isDynamicRiskToggled}
+            onChange={
+              isReadOnly
+                ? undefined
+                : (e) => onToggleDynamicRisk?.(e.target.checked)
             }
-            label={
-              <Typography variant="caption" sx={{ color: dynamicRiskSettings?.dynamic_risk_enabled ? 'text.secondary' : 'text.disabled' }}>
-                {isDynamicRiskToggled ? "Using actual trade amounts" : "Using calculated amounts"}
-              </Typography>
-            }
-            sx={{ m: 0 }}
+            disabled={isReadOnly || !dynamicConfigured}
+            size="small"
+            color="primary"
           />
+          <Typography
+            sx={{
+              fontSize: '0.7rem',
+              color: dynamicConfigured ? 'text.secondary' : 'text.disabled',
+              fontWeight: 500,
+            }}
+          >
+            {isDynamicRiskToggled ? 'Actual amounts' : 'Calculated amounts'}
+          </Typography>
           <Tooltip
             title={
-              <Box>
-                <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 1 }}>
-                  🎯 Why This Tool Matters
+              <Box sx={{ maxWidth: 280 }}>
+                <Typography variant="body2" sx={{ fontWeight: 700, mb: 0.75 }}>
+                  Why this matters
                 </Typography>
-                <Typography variant="body2" sx={{ mb: 1 }}>
-                  <strong>Discover your true potential:</strong> See how much more profitable you could be with consistent risk management
-                </Typography>
-                <Typography variant="body2" sx={{ mb: 1 }}>
-                  <strong>Identify position sizing issues:</strong> Compare your actual trades vs. what optimal risk sizing would look like
-                </Typography>
-                <Typography variant="body2" sx={{ mb: 1 }}>
-                  <strong>Improve your discipline:</strong> Understand the impact of inconsistent position sizes on your overall performance
-                </Typography>
-                <Typography variant="body2" sx={{ color: 'success.main', fontWeight: 'bold' }}>
-                  💰 Many traders discover they could be 20-50% more profitable with better risk management!
+                <Typography variant="caption" sx={{ display: 'block', mb: 0.5 }}>
+                  Compare your real trade outcomes against what optimal risk-based
+                  position sizing would have produced — surfaces sizing discipline
+                  gaps and shows your true profit potential.
                 </Typography>
               </Box>
             }
             arrow
             placement="top"
             enterDelay={300}
-            leaveDelay={200}
           >
             <InfoIcon
               sx={{
-                fontSize: 16,
-                color: dynamicRiskSettings?.dynamic_risk_enabled ? 'text.secondary' : 'text.disabled',
+                fontSize: 14,
+                color: dynamicConfigured ? 'text.secondary' : 'text.disabled',
                 cursor: 'help',
-                '&:hover': dynamicRiskSettings?.dynamic_risk_enabled ? {
-                  color: 'primary.main'
-                } : {}
+                '&:hover': dynamicConfigured ? { color: 'primary.main' } : {},
               }}
             />
           </Tooltip>
         </Box>
       </Box>
-    </Paper >
+    </Paper>
   );
 };
 
-export default React.memo(AccountBalance);
+// ─── RiskTile ──────────────────────────────────────────────────────────────
+// Compact, identical-footprint tile used for both Risk and Daily Drawdown so
+// the two cells line up consistently.
+
+interface RiskTileProps {
+  icon: React.ReactNode;
+  label: string;
+  accent: string;
+  active: boolean;
+  percent: number | undefined;
+  amount: number;
+  boosted?: boolean;
+}
+
+const RiskTile: React.FC<RiskTileProps> = ({
+  icon,
+  label,
+  accent,
+  active,
+  percent,
+  amount,
+  boosted,
+}) => {
+  const theme = useTheme();
+  return (
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 0.25,
+        px: 1.125,
+        py: 1,
+        borderRadius: '10px',
+        bgcolor: alpha(accent, active ? 0.08 : 0.03),
+        border: `1px solid ${alpha(accent, active ? 0.25 : 0.1)}`,
+      }}
+    >
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+        <Box sx={{ display: 'inline-flex', color: active ? accent : 'text.disabled' }}>
+          {icon}
+        </Box>
+        <Typography
+          sx={{
+            ...EYEBROW_SX,
+            fontSize: '0.6rem',
+            color: active ? 'text.secondary' : 'text.disabled',
+          }}
+        >
+          {label}
+        </Typography>
+        <Typography
+          sx={{
+            fontSize: '0.62rem',
+            fontWeight: 700,
+            color: active ? accent : 'text.disabled',
+            fontFeatureSettings: TNUM,
+          }}
+        >
+          {percent ? `${percent}%` : 'N/A'}
+        </Typography>
+        {boosted && (
+          <Box
+            component="span"
+            sx={{
+              fontSize: '0.58rem',
+              fontWeight: 700,
+              color: 'success.main',
+              ml: 'auto',
+              letterSpacing: '0.04em',
+            }}
+          >
+            UP
+          </Box>
+        )}
+      </Box>
+      <Typography
+        sx={{
+          fontSize: '0.92rem',
+          fontWeight: 700,
+          color: active ? accent : theme.palette.text.disabled,
+          fontFeatureSettings: TNUM,
+          letterSpacing: '-0.01em',
+          lineHeight: 1.2,
+        }}
+      >
+        ${amount.toLocaleString(undefined, {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })}
+      </Typography>
+    </Box>
+  );
+};
+
+export default React.memo(AccountStats);

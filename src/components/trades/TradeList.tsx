@@ -199,6 +199,9 @@ interface TradeListProps {
   expandedTradeId: string | null;
   onTradeClick: (tradeId: string) => void;
   hideActions?: boolean;
+  /** Hide the internal "X Trades" header + bulk-select controls. The caller
+   *  is expected to render its own results heading. */
+  hideHeader?: boolean;
   enableBulkSelection?: boolean;
   sx?: SxProps<Theme>;
   initialPageSize?: number;
@@ -221,6 +224,7 @@ const TradeList: React.FC<TradeListProps> = ({
   expandedTradeId,
   onTradeClick,
   hideActions = false,
+  hideHeader = false,
   enableBulkSelection = false,
   sx,
   initialPageSize = 20,
@@ -332,50 +336,52 @@ const TradeList: React.FC<TradeListProps> = ({
 
   return (
     <Box sx={{ mt: 2, ...sx }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          <Typography variant="subtitle1" sx={{ mr: 1 }}>
-           {displayedCount < tradesLength ? `${formatCount(displayedCount)} of ${formatCount(tradesLength)}` : formatCount(tradesLength)} Trades
-          </Typography>
-        
-          {enableBulkSelection && selectedTradeIds.length > 0 && (
-            <Chip
-              label={`${formatCount(selectedTradeIds.length)} selected`}
-              size="small"
-              color="secondary"
-              sx={{
-                height: 20,
-                ml: 1,
-                '& .MuiChip-label': { px: 1, fontSize: '0.75rem' }
-              }}
-            />
-          )}
-        </Box>
+      {!hideHeader && (
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <Typography variant="subtitle1" sx={{ mr: 1 }}>
+             {displayedCount < tradesLength ? `${formatCount(displayedCount)} of ${formatCount(tradesLength)}` : formatCount(tradesLength)} Trades
+            </Typography>
 
-        {enableBulkSelection && displayedTrades.length > 0 && (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Button
-              size="small"
-              startIcon={<SelectAllIcon />}
-              onClick={handleSelectAll}
-              sx={{ minWidth: 'auto', fontSize: '0.75rem' }}
-            >
-              {selectedTradeIds.length === displayedTrades.length ? 'None' : 'All'}
-            </Button>
-            {selectedTradeIds.length > 0 && (
-              <Button
+            {enableBulkSelection && selectedTradeIds.length > 0 && (
+              <Chip
+                label={`${formatCount(selectedTradeIds.length)} selected`}
                 size="small"
-                color="error"
-                startIcon={<DeleteMultipleIcon />}
-                onClick={handleBulkDelete}
-                sx={{ minWidth: 'auto', fontSize: '0.75rem' }}
-              >
-                Delete ({formatCount(selectedTradeIds.length)})
-              </Button>
+                color="secondary"
+                sx={{
+                  height: 20,
+                  ml: 1,
+                  '& .MuiChip-label': { px: 1, fontSize: '0.75rem' }
+                }}
+              />
             )}
           </Box>
-        )}
-      </Box>
+
+          {enableBulkSelection && displayedTrades.length > 0 && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Button
+                size="small"
+                startIcon={<SelectAllIcon />}
+                onClick={handleSelectAll}
+                sx={{ minWidth: 'auto', fontSize: '0.75rem' }}
+              >
+                {selectedTradeIds.length === displayedTrades.length ? 'None' : 'All'}
+              </Button>
+              {selectedTradeIds.length > 0 && (
+                <Button
+                  size="small"
+                  color="error"
+                  startIcon={<DeleteMultipleIcon />}
+                  onClick={handleBulkDelete}
+                  sx={{ minWidth: 'auto', fontSize: '0.75rem' }}
+                >
+                  Delete ({formatCount(selectedTradeIds.length)})
+                </Button>
+              )}
+            </Box>
+          )}
+        </Box>
+      )}
 
       {tradesLength === 0 ? (
         <Box

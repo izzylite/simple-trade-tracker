@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-05-07T12:00:00.000Z",
+  "generatedAt": "2026-05-16T08:30:00.000Z",
   "title": "Design System: JournoTrades",
   "extensions": {
     "colorMeta": {
@@ -213,7 +213,8 @@
       "Do vary spacing for rhythm: page-level sections at 32–48 px apart, related elements at 8–16 px.",
       "Do write copy in trader voice. \"476 trades, +$6,814,311.00\", not \"Your amazing trading journey\".",
       "Do keep AppHeader and SideNav mounted across navigation; loading states render below the chrome.",
-      "Do use primary.dark (Violet Deep) for any 'darker violet' need other than primary-button hover; reserve Violet Hover (#6d28d9) for that one override."
+      "Do use primary.dark (Violet Deep) for any 'darker violet' need other than primary-button hover; reserve Violet Hover (#6d28d9) for that one override.",
+      "Do earn every element. Newer-trader scaffolding belongs in clearer empty states and obvious next actions, not in extra chrome."
     ],
     "donts": [
       "Don't use generic SaaS purple gradients. Trader Violet is solid; it never gradients into pink, blue, or itself. (Two legacy linear-gradient decorations in ImagePickerDialog and ImageUploadDialog are violations awaiting cleanup, not a precedent.)",
@@ -225,7 +226,8 @@
       "Don't use a border-left greater than 1 px as a colored accent stripe on cards, list items, or alerts. The calendar-dropdown selected item used to carry a 3 px ::before accent bar; it was removed in favor of a 12% alpha tint and that pattern should not come back.",
       "Don't introduce glassmorphism (frosted blurs) as decoration. Reserve backdrop-filter for the calendar-lock backdrop and the calendar-switching spinner overlay.",
       "Don't use #000 or #fff anywhere except the documented light-mode paper. Off-black #080808 and tinted paper are the system's true neutrals.",
-      "Don't introduce new violet hex values. The palette has four (primary, soft, deep, hover) and that's the budget."
+      "Don't introduce new violet hex values. The palette has four (primary, soft, deep, hover) and that's the budget.",
+      "Don't soften copy for newer traders. Onboarding clarity comes from flow, not from warmer prose."
     ]
   }
 }

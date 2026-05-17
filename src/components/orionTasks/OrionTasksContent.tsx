@@ -485,10 +485,9 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
                         display: 'flex',
                         alignItems: 'center',
                         gap: 1,
-                        px: 0.25,
+                        px: 1,
                         py: 0.75,
-                        mb: 1,
-                        borderBottom: `1px solid ${hairline}`,
+                        mb: 1
                       }}
                     >
                       <Typography

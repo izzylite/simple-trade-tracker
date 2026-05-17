@@ -44,6 +44,21 @@ export const queryUserNotes = async (
 };
 
 /**
+ * Lightweight HEAD-count for tab badges (all / pinned / archived).
+ */
+export const countNoteTabs = async (
+  scope: { userId: string; calendarId?: string },
+  opts: { byAssistant?: boolean; searchQuery?: string } = {},
+): Promise<{ all: number; pinned: number; archived: number }> => {
+  try {
+    return await noteRepository.countTabs(scope, opts);
+  } catch (error) {
+    logger.error("Error counting note tabs:", error);
+    return { all: 0, pinned: 0, archived: 0 };
+  }
+};
+
+/**
  * Get notes by tag for a user
  */
 export const getNotesByTag = async (

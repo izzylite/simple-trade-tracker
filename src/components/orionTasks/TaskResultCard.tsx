@@ -140,14 +140,12 @@ const TaskResultCard: React.FC<TaskResultCardProps> = ({
     border: 'none',
     backgroundColor: isError
       ? alpha(theme.palette.error.main, 0.08)
-      : surfaceInset,
-    boxShadow: isUnread && !isError ? `inset 3px 0 0 0 ${violet}` : 'none',
+      : surfaceInset, 
     transition: 'none',
     '&:hover': {
       backgroundColor: isError
         ? alpha(theme.palette.error.main, 0.08)
-        : surfaceInset,
-      boxShadow: isUnread && !isError ? `inset 3px 0 0 0 ${violet}` : 'none',
+        : surfaceInset, 
       transform: 'none',
     },
   };

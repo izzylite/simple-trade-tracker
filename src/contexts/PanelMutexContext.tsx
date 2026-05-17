@@ -30,11 +30,15 @@ export type PanelSourceId =
 interface PanelMutexContextValue {
   registerCloser: (id: PanelSourceId, close: () => void) => () => void;
   signalOpened: (id: PanelSourceId) => void;
+  setPanelOpen: (id: PanelSourceId, isOpen: boolean) => void;
+  openPanels: ReadonlySet<PanelSourceId>;
 }
 
 const PanelMutexContext = createContext<PanelMutexContextValue>({
   registerCloser: () => () => {},
   signalOpened: () => {},
+  setPanelOpen: () => {},
+  openPanels: new Set(),
 });
 
 export const PanelMutexProvider: React.FC<{ children: React.ReactNode }> = ({
@@ -66,9 +70,24 @@ export const PanelMutexProvider: React.FC<{ children: React.ReactNode }> = ({
     });
   }, []);
 
+  const [openPanels, setOpenPanels] = useState<ReadonlySet<PanelSourceId>>(
+    () => new Set()
+  );
+
+  const setPanelOpen = useCallback((id: PanelSourceId, isOpen: boolean) => {
+    setOpenPanels((prev) => {
+      const has = prev.has(id);
+      if (isOpen === has) return prev;
+      const next = new Set(prev);
+      if (isOpen) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }, []);
+
   const value = useMemo<PanelMutexContextValue>(
-    () => ({ registerCloser, signalOpened }),
-    [registerCloser, signalOpened]
+    () => ({ registerCloser, signalOpened, setPanelOpen, openPanels }),
+    [registerCloser, signalOpened, setPanelOpen, openPanels]
   );
 
   return (
@@ -91,7 +110,8 @@ export const usePanelMutexSlot = (
   isOpen: boolean,
   close: () => void
 ): void => {
-  const { registerCloser, signalOpened } = useContext(PanelMutexContext);
+  const { registerCloser, signalOpened, setPanelOpen } =
+    useContext(PanelMutexContext);
 
   useEffect(() => {
     const unregister = registerCloser(sourceId, close);
@@ -105,4 +125,30 @@ export const usePanelMutexSlot = (
     }
     prevOpenRef.current = isOpen;
   }, [isOpen, sourceId, signalOpened]);
+
+  useEffect(() => {
+    setPanelOpen(sourceId, isOpen);
+  }, [setPanelOpen, sourceId, isOpen]);
+
+  useEffect(() => {
+    return () => {
+      setPanelOpen(sourceId, false);
+    };
+  }, [setPanelOpen, sourceId]);
+};
+
+/**
+ * Subscribe to whether any panel surface is currently open. Pass `exclude`
+ * to ignore specific sources (e.g. the ai-chat slot when used from the FAB).
+ */
+export const useAnyPanelOpen = (
+  exclude: ReadonlyArray<PanelSourceId> = []
+): boolean => {
+  const { openPanels } = useContext(PanelMutexContext);
+  const excludeSet = useMemo(() => new Set(exclude), [exclude]);
+  let anyOpen = false;
+  openPanels.forEach((id) => {
+    if (!excludeSet.has(id)) anyOpen = true;
+  });
+  return anyOpen;
 };

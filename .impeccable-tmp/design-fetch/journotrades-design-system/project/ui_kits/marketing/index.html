@@ -1,0 +1,188 @@
+<!doctype html>
+<html data-theme="dark"><head>
+<meta charset="utf-8">
+<title>JournoTrades — Landing</title>
+<link rel="stylesheet" href="../../colors_and_type.css">
+<style>
+  :root { --bg: #080808; --rule: rgba(255,255,255,0.14); --hair: rgba(255,255,255,0.08); }
+  body { margin: 0; background: var(--bg); color: #f1f5f9; font-family: 'DM Sans', sans-serif; }
+  .container { max-width: 880px; margin: 0 auto; padding: 0 24px; }
+
+  /* Nav */
+  nav.lp { position: fixed; inset: 0 0 auto 0; z-index: 999; padding: 16px 48px; display: flex; align-items: center; justify-content: space-between; transition: backdrop-filter 200ms, background 200ms, border-color 200ms; border-bottom: 1px solid transparent; }
+  nav.lp.scrolled { backdrop-filter: blur(20px) saturate(160%); background: rgba(8,8,8,0.85); border-bottom-color: rgba(255,255,255,0.08); }
+  nav.lp .word { font-weight: 700; font-size: 16px; letter-spacing: -0.01em; }
+  nav.lp .links { display: flex; gap: 24px; margin-right: 12px; }
+  nav.lp .links a { color: rgba(255,255,255,0.55); font-size: 13.6px; font-weight: 500; text-decoration: none; transition: color 150ms; }
+  nav.lp .links a:hover { color: #f1f5f9; }
+  nav.lp .right { display: flex; gap: 8px; align-items: center; }
+  nav.lp .login { background: transparent; border: 0; color: rgba(255,255,255,0.65); font-weight: 600; font-size: 13.6px; cursor: pointer; padding: 4px 12px; }
+  nav.lp .login:hover { color: #f1f5f9; }
+  nav.lp .cta { background: #7c3aed; color: #f1f5f9; border: 0; font-weight: 600; font-size: 13.6px; padding: 5px 16px; border-radius: 8px; cursor: pointer; transition: background 150ms; }
+  nav.lp .cta:hover { background: #6d28d9; }
+  @media (max-width: 760px) { nav.lp .links { display: none; } nav.lp { padding: 16px 24px; } }
+
+  /* Hero */
+  .hero { padding: 160px 0 96px; }
+  .hero h1 { text-align: center; font-weight: 900; font-size: clamp(2.6rem, 5.5vw, 5rem); line-height: 1.02; letter-spacing: -0.04em; margin: 0 0 56px; }
+  .hero h1 .lede { display: block; font-weight: 400; font-size: clamp(2.1rem, 4vw, 3.75rem); color: rgba(255,255,255,0.5); letter-spacing: -0.03em; margin-bottom: 4px; }
+  .hero .lede-text { max-width: 640px; margin: 0 auto; text-align: center; color: rgba(255,255,255,0.72); font-size: 1.05rem; line-height: 1.8; }
+
+  /* Sample week */
+  .sw { padding-bottom: 96px; }
+  .sw .head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
+  .sw .eyebrow { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: #7c3aed; }
+  .sw .total { font-feature-settings: 'tnum' on, 'lnum' on; font-size: 1.15rem; font-weight: 700; color: #22c55e; letter-spacing: -0.015em; }
+  .sw .grid { display: grid; grid-template-columns: repeat(5, 1fr); border-top: 1px solid var(--rule); border-bottom: 1px solid var(--hair); }
+  .sw .day { padding: 12px 16px 12px 0; border-left: 1px solid rgba(255,255,255,0.08); }
+  .sw .day:first-child { border-left: 0; padding-left: 0; }
+  .sw .day .lbl { font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(255,255,255,0.45); margin-bottom: 8px; }
+  .sw .day .pnl { font-feature-settings: 'tnum' on, 'lnum' on; font-weight: 700; font-size: 1.15rem; letter-spacing: -0.01em; line-height: 1.2; }
+  .sw .day .pnl.win { color: #22c55e; }
+  .sw .day .pnl.loss { color: #ef4444; }
+  .sw .day .ct { font-feature-settings: 'tnum' on, 'lnum' on; font-size: 0.72rem; color: rgba(255,255,255,0.45); margin-top: 4px; }
+  .sw .foot { display: flex; justify-content: space-between; padding-top: 16px; font-feature-settings: 'tnum' on, 'lnum' on; font-size: 0.85rem; color: rgba(255,255,255,0.6); }
+  .sw .disclaim { font-size: 0.78rem; color: rgba(255,255,255,0.35); margin-top: 24px; }
+  @media (max-width: 760px) { .sw .grid { grid-template-columns: 1fr; } .sw .day { border-left: 0; border-top: 1px solid rgba(255,255,255,0.08); padding: 12px 0; } .sw .day:first-child { border-top: 0; } }
+
+  /* Methodology */
+  .method { padding-bottom: 56px; }
+  .method .h-eyebrow { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: #7c3aed; margin-bottom: 12px; }
+  .method h2 { font-weight: 800; font-size: clamp(1.7rem, 3vw, 2.1rem); letter-spacing: -0.025em; line-height: 1.18; max-width: 620px; margin: 0; }
+  .method .sub { font-weight: 500; font-size: 1.2rem; color: rgba(255,255,255,0.55); letter-spacing: -0.015em; line-height: 1.4; max-width: 620px; margin-top: 8px; }
+  .entry { display: grid; grid-template-columns: 120px 1fr; gap: 40px; padding: 40px 0; border-top: 1px solid var(--hair); }
+  .entry .sec { font-weight: 600; font-size: 0.7rem; color: #7c3aed; letter-spacing: 0.18em; line-height: 1; text-transform: uppercase; }
+  .entry .t { font-weight: 700; font-size: 1.3rem; letter-spacing: -0.02em; line-height: 1.3; margin: 0 0 10px; }
+  .entry .b { font-size: 0.95rem; color: rgba(255,255,255,0.6); line-height: 1.75; max-width: 580px; margin: 0; }
+  @media (max-width: 760px) { .entry { grid-template-columns: 1fr; gap: 12px; padding: 32px 0; } }
+
+  /* CTA */
+  .cta-section { padding: 96px 0 80px; text-align: center; }
+  .cta-section h2 { font-weight: 800; font-size: clamp(2rem, 4vw, 2.8rem); letter-spacing: -0.03em; line-height: 1.1; margin: 0 0 16px; }
+  .cta-section h2 .muted { color: rgba(255,255,255,0.55); display: block; }
+  .cta-section .copy { color: rgba(255,255,255,0.55); font-size: 0.95rem; line-height: 1.7; max-width: 480px; margin: 0 auto 32px; }
+  .cta-section .start { background: #7c3aed; color: #f1f5f9; border: 0; font-weight: 700; font-size: 0.95rem; padding: 12px 28px; border-radius: 8px; cursor: pointer; transition: background 150ms; display: inline-flex; align-items: center; gap: 8px; }
+  .cta-section .start:hover { background: #6d28d9; }
+
+  /* Colophon */
+  .cph { border-top: 1px solid var(--hair); padding: 40px 0; }
+  .cph .row { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+  .cph .word { font-weight: 700; font-size: 0.9rem; color: rgba(255,255,255,0.7); }
+  .cph .copy { font-size: 0.78rem; color: rgba(255,255,255,0.4); }
+</style>
+</head>
+<body>
+
+<nav class="lp" id="nav">
+  <div class="word">JournoTrades</div>
+  <div class="right">
+    <div class="links">
+      <a href="#features">Methodology</a>
+      <a href="#about">About</a>
+    </div>
+    <button class="login">Log in</button>
+    <button class="cta">Start your logbook</button>
+  </div>
+</nav>
+
+<section class="hero">
+  <div class="container">
+    <h1>
+      <span class="lede">The trading journal</span>
+      that finds your edge.
+    </h1>
+    <p class="lede-text">
+      A structured logbook for traders who keep one open every session.
+      Calendars by strategy or eval account, trades logged into a monthly grid,
+      notes and screenshots filed alongside each fill, and an in-app assistant
+      that reads your history out loud when you ask. The numbers are the product.
+      The rest of this page is a sample.
+    </p>
+  </div>
+</section>
+
+<section class="sw">
+  <div class="container">
+    <div class="head">
+      <span class="eyebrow">Sample week · Wk 18</span>
+      <span class="total">+$7,238.55</span>
+    </div>
+    <div class="grid">
+      <div class="day"><div class="lbl">Mon</div><div class="pnl win">+$1,247.50</div><div class="ct">3 trades</div></div>
+      <div class="day"><div class="lbl">Tue</div><div class="pnl loss">−$540.20</div><div class="ct">5 trades</div></div>
+      <div class="day"><div class="lbl">Wed</div><div class="pnl win">+$2,180.40</div><div class="ct">2 trades</div></div>
+      <div class="day"><div class="lbl">Thu</div><div class="pnl win">+$3,460.10</div><div class="ct">4 trades</div></div>
+      <div class="day"><div class="lbl">Fri</div><div class="pnl win">+$890.75</div><div class="ct">3 trades</div></div>
+    </div>
+    <div class="foot">
+      <span>17 trades · 12 wins · 5 losses</span>
+      <span>Edge · 70.6% win rate · 1.84 R/R</span>
+    </div>
+    <div class="disclaim">Figures are illustrative. Your calendar shows your numbers, not these.</div>
+  </div>
+</section>
+
+<section class="method" id="features">
+  <div class="container">
+    <div class="h-eyebrow">Methodology</div>
+    <h2>Four parts of the workspace.</h2>
+    <p class="sub">No card grid. No tabs. Just the work.</p>
+
+    <div style="margin-top: 24px;">
+      <div class="entry">
+        <div class="sec">Calendar</div>
+        <div>
+          <h3 class="t">The calendar is home.</h3>
+          <p class="b">Each calendar represents one strategy, one eval account, or one funded firm. Open the calendar, log a trade into the day, and the month's grid colors itself by P&amp;L. The active calendar is the page you keep open; everything else supports it.</p>
+        </div>
+      </div>
+      <div class="entry">
+        <div class="sec">Performance</div>
+        <div>
+          <h3 class="t">Performance is read, not advertised.</h3>
+          <p class="b">Equity curve, tag analysis, session distribution, score tracking. The same numbers your broker gives you, organised by the dimensions that actually move your edge: setup, session, mistake, emotion. No vanity metrics.</p>
+        </div>
+      </div>
+      <div class="entry">
+        <div class="sec">Assistant</div>
+        <div>
+          <h3 class="t">The assistant reads your history.</h3>
+          <p class="b">Ask the in-app assistant about a tag, a week, a particular session. It answers from your trades, with citations. No pattern recognition theatre — just your own data, summarised the way you would summarise it if you had time.</p>
+        </div>
+      </div>
+      <div class="entry">
+        <div class="sec">Notes</div>
+        <div>
+          <h3 class="t">Notes live alongside the trades.</h3>
+          <p class="b">A rich-text journal that the calendar can link into. Daily plans, post-session reviews, screenshots filed against the relevant day. The journal is part of the trade, not a separate document.</p>
+        </div>
+      </div>
+      <div style="border-bottom: 1px solid var(--hair);"></div>
+    </div>
+  </div>
+</section>
+
+<section class="cta-section">
+  <div class="container">
+    <h2>Open one calendar.<span class="muted">Then start logging.</span></h2>
+    <p class="copy">Free to start. One calendar to begin, more when you need them.</p>
+    <button class="start">Start your logbook <span aria-hidden="true">→</span></button>
+  </div>
+</section>
+
+<footer class="cph">
+  <div class="container">
+    <div class="row">
+      <div class="word">JournoTrades</div>
+      <div class="copy">© 2026 · Built for traders who take it seriously.</div>
+    </div>
+  </div>
+</footer>
+
+<script>
+  const nav = document.getElementById('nav');
+  const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 30);
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+</script>
+</body></html>

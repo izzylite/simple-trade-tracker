@@ -401,6 +401,7 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
         endDate?: Date | null;
       };
       tradeTypes?: ('win' | 'loss' | 'breakeven')[];
+      pinnedOnly?: boolean;
       page?: number;
       pageSize?: number;
     } = {}
@@ -417,6 +418,7 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
         selectedTags = [],
         dateFilter = { type: 'all' },
         tradeTypes = [],
+        pinnedOnly = false,
         page = 1,
         pageSize = 20
       } = options;
@@ -492,6 +494,11 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
       // Apply trade type filtering
       if (tradeTypes.length > 0) {
         query = query.in('trade_type', tradeTypes);
+      }
+
+      // Apply pinned-only filtering
+      if (pinnedOnly) {
+        query = query.eq('is_pinned', true);
       }
 
       // Apply sorting (newest first)
