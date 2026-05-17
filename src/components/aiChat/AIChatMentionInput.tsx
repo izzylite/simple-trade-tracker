@@ -163,7 +163,9 @@ const AIChatMentionInput = forwardRef<AIChatMentionInputHandle, AIChatMentionInp
     blockKey: string;
   } | null>(null);
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  // -1 = no selection. First ArrowDown/ArrowUp moves it onto an item.
+  // Enter does nothing while idx === -1 — user must explicitly navigate first.
+  const [selectedIndex, setSelectedIndex] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
   const popperRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
@@ -386,7 +388,7 @@ const AIChatMentionInput = forwardRef<AIChatMentionInputHandle, AIChatMentionInp
       blockKey,
     });
     setAnchorEl(containerRef.current);
-    setSelectedIndex(0);
+    setSelectedIndex(-1);
   }
 
   function handleChange(state: EditorState) {
@@ -397,9 +399,20 @@ const AIChatMentionInput = forwardRef<AIChatMentionInputHandle, AIChatMentionInp
 
   function handleKeyDownLocal(e: React.KeyboardEvent) {
     if (mention?.open) {
-      if (e.key === 'ArrowDown') { e.preventDefault(); setSelectedIndex((i) => Math.min(i + 1, flatItems.length - 1)); return; }
-      if (e.key === 'ArrowUp') { e.preventDefault(); setSelectedIndex((i) => Math.max(i - 1, 0)); return; }
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedIndex((i) => (i < 0 ? 0 : Math.min(i + 1, flatItems.length - 1)));
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedIndex((i) => (i < 0 ? flatItems.length - 1 : Math.max(i - 1, 0)));
+        return;
+      }
       if (e.key === 'Enter') {
+        // No-op when nothing is selected — Enter falls through to send the message
+        // (or just inserts a newline) so users aren't forced to commit a slash.
+        if (selectedIndex < 0) return;
         e.preventDefault();
         const item = flatItems[selectedIndex];
         if (item) {
