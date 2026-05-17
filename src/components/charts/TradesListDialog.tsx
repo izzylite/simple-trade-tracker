@@ -1,29 +1,53 @@
-import React, { useState, useMemo, useEffect } from 'react';
+/**
+ * TradesListDialog
+ *
+ * Drill-in viewer used by performance charts and calendar grid affordances
+ * to show a filtered list of trades + their day-of-week stats.
+ *
+ * Follows the tag-dialog viewer style:
+ *   BaseDialog chrome (header avatar + subtitle + close)
+ *   sticky summary card just below the header
+ *   scrollable body — optional day-of-week chart card + trade list
+ *   close-only footer (Gallery action surfaced via `actions` when available)
+ */
+
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Typography,
   Box,
   Button,
   Tooltip,
+  alpha,
   useTheme,
-  Paper
 } from '@mui/material';
 import {
-  ViewCarousel as GalleryIcon
+  ViewCarousel as GalleryIcon,
+  FormatListBulleted as TradesIcon,
+  TrendingUp as PnLIcon,
+  Percent as WinRateIcon,
 } from '@mui/icons-material';
-import { Trade, Calendar } from '../../types/dualWrite';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  ResponsiveContainer,
+  XAxis,
+  YAxis,
+  Tooltip as RechartsTooltip,
+} from 'recharts';
+
+import { Trade } from '../../types/dualWrite';
 import TradeList from '../trades/TradeList';
-import { BaseDialog } from '../common';
-import DayHeader from '../trades/DayHeader';
 import { startOfNextDay } from '../trades/TradeFormDialog';
 import { calculateCumulativePnLToDateAsync } from '../../utils/dynamicRiskUtils';
-import { Bar, BarChart, CartesianGrid, Cell, Legend, ResponsiveContainer, XAxis, YAxis, Tooltip as RechartsTooltip } from 'recharts';
 import { logger } from '../../utils/logger';
 import { formatCurrency, formatCount } from '../../utils/formatters';
 import { getTagDayOfWeekChartData } from '../../utils/chartDataUtils';
 import { TradeOperationsProps } from '../../types/tradeOperations';
+import { BaseDialog } from '../common';
 
 interface TradesDialogProps {
-  // Component-specific props
   open: boolean;
   trades: Trade[];
   title: string;
@@ -33,10 +57,11 @@ interface TradesDialogProps {
   onClose: () => void;
   onTradeExpand: (tradeId: string) => void;
   account_balance: number;
-
-  // Trade operations - required
   tradeOperations: TradeOperationsProps;
 }
+
+const MONO_FONT = "'JetBrains Mono', ui-monospace, monospace";
+const TNUM = "'tnum' on, 'lnum' on";
 
 const TradesListDialog: React.FC<TradesDialogProps> = ({
   open,
@@ -48,49 +73,59 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
   onClose,
   onTradeExpand,
   account_balance,
-  tradeOperations
+  tradeOperations,
 }) => {
-  // Destructure from tradeOperations (isTradeUpdating now comes from TradeSyncContext)
   const {
-    onZoomImage,
-    onUpdateTradeProperty,
     onEditTrade,
     onDeleteTrade,
     onDeleteMultipleTrades,
     onOpenGalleryMode,
-    calendarId,
-    economicFilter,
-    calendar
+    calendar,
   } = tradeOperations;
 
   const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
 
-  // State for cumulative P&L
-  const [cumulativePnL, setCumulativePnL] = useState<number>(0);
+  // ── design tokens ────────────────────────────────────────────────────────
+  const violet = theme.palette.primary.main;
+  const violetSoft = alpha(violet, isDark ? 0.18 : 0.14);
+  const violetBorder = alpha(violet, isDark ? 0.35 : 0.28);
+  const surfaceInset = isDark
+    ? 'rgba(255,255,255,0.03)'
+    : alpha(theme.palette.text.primary, 0.03);
+  const hairline = isDark ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
+
+  const monoLabelSx = {
+    fontFamily: MONO_FONT,
+    fontSize: '0.68rem',
+    fontWeight: 600,
+    letterSpacing: '0.12em',
+    textTransform: 'uppercase' as const,
+    color: theme.palette.text.secondary,
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 0.75,
+  };
+
+  // ── Cumulative P&L for the most-recent trade date ────────────────────────
+  const [cumulativePnL, setCumulativePnL] = useState(0);
   const [isBalanceLoading, setIsBalanceLoading] = useState(false);
-  const [selectedMetric, setSelectedMetric] = useState<'winRate' | 'pnl'>('winRate');
 
-  // Fetch cumulative P&L when dialog opens or trades change
   useEffect(() => {
     let cancelled = false;
     const fetchCumulativePnL = async () => {
       if (!open || !calendar || !trades || trades.length === 0) return;
       setIsBalanceLoading(true);
-
       try {
-        // Use the most recent trade's date to calculate cumulative P&L
         const mostRecentTrade = trades.reduce((latest, trade) =>
-          new Date(trade.trade_date) > new Date(latest.trade_date) ? trade : latest
+          new Date(trade.trade_date) > new Date(latest.trade_date) ? trade : latest,
         );
-
-        // Validate the trade date before proceeding
         const targetDate = startOfNextDay(mostRecentTrade.trade_date);
         if (isNaN(targetDate.getTime())) {
           logger.warn('Invalid trade date, skipping cumulative P&L calculation');
           if (!cancelled) setCumulativePnL(0);
           return;
         }
-
         const pnl = await calculateCumulativePnLToDateAsync(targetDate, calendar);
         if (!cancelled) setCumulativePnL(pnl);
       } catch (error) {
@@ -100,15 +135,17 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
         if (!cancelled) setIsBalanceLoading(false);
       }
     };
-
     fetchCumulativePnL();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [open, trades, calendar]);
-  // Format data for the chart based on selected metric
-  const [chartData, setChartData] = React.useState<any[] | undefined>(undefined);
 
+  // ── Day-of-week breakdown chart ──────────────────────────────────────────
+  const [selectedMetric, setSelectedMetric] = useState<'winRate' | 'pnl'>('winRate');
+  const [chartData, setChartData] = useState<any[] | undefined>(undefined);
 
-  const tradeStats = React.useMemo(() => {
+  const tradeStats = useMemo(() => {
     let containWins = false;
     let containLosses = false;
     (trades || []).forEach((trade) => {
@@ -118,212 +155,389 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
     return {
       containWins,
       containLosses,
-      containBoth: containWins && containLosses
+      containBoth: containWins && containLosses,
     };
   }, [trades]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     let isMounted = true;
-
     const fetchChartData = async () => {
       if (!trades || trades.length === 0) {
         if (isMounted) setChartData(undefined);
         return;
       }
-
-      // If getTagDayOfWeekChartData is async, await it; otherwise, wrap in Promise.resolve
       const result = await Promise.resolve(
-        getTagDayOfWeekChartData(trades, theme, selectedMetric === "winRate" && tradeStats.containBoth)
+        getTagDayOfWeekChartData(
+          trades,
+          theme,
+          selectedMetric === 'winRate' && tradeStats.containBoth,
+        ),
       );
-
       if (isMounted) {
-        // Sum all totalTrades values
         const totalTradesSum = Array.isArray(result)
           ? result.reduce((sum, item) => sum + (item.total_trades > 0 ? 1 : 0), 0)
           : 0;
         setChartData(totalTradesSum > 1 ? result : undefined);
       }
     };
-
     fetchChartData();
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedMetric, showChartInfo, trades, theme, tradeStats.containBoth]);
 
-    return () => { isMounted = false; };
-  }, [selectedMetric, showChartInfo, trades, theme]);
+  // ── Total P&L across this view ───────────────────────────────────────────
+  const totalPnL = useMemo(
+    () => (trades || []).reduce((acc, trade) => acc + trade.amount, 0),
+    [trades],
+  );
+  const totalPnLColor =
+    totalPnL > 0
+      ? theme.palette.success.main
+      : totalPnL < 0
+        ? theme.palette.error.main
+        : theme.palette.text.secondary;
 
+  const tradesLength = trades?.length || 0;
+  const accountBalanceForDisplay = account_balance + cumulativePnL;
 
+  // ── Best day insight (when chart present) ────────────────────────────────
+  const bestDayInsight = useMemo(() => {
+    if (!chartData || !chartData.some((d) => d.total_trades > 0)) return null;
+    if (tradeStats.containBoth && selectedMetric === 'winRate') {
+      const best = chartData.reduce(
+        (best, day) =>
+          day.total_trades > 0 && day.win_rate > best.win_rate ? day : best,
+        { win_rate: 0, fullDay: 'None' as string },
+      );
+      return `Best day for selected strategies: ${best.fullDay}`;
+    }
+    const best = chartData.reduce(
+      (best, day) =>
+        day.total_trades > 0 && day.pnl > best.pnl ? day : best,
+      { pnl: -Infinity, fullDay: 'None' as string },
+    );
+    return `Most profitable / unprofitable day: ${best.fullDay}`;
+  }, [chartData, selectedMetric, tradeStats.containBoth]);
 
-  // Gallery mode handler
+  // ── Gallery handler ──────────────────────────────────────────────────────
   const handleGalleryModeClick = () => {
     if (onOpenGalleryMode && trades && trades.length > 0) {
-      onOpenGalleryMode(trades, expandedTradeId || trades[0].id,
-        `${title} - ${formatCount(trades.length)} Trade${trades.length > 1 ? 's' : ''}`);
-      onClose(); // Close the dialog when opening gallery mode
+      onOpenGalleryMode(
+        trades,
+        expandedTradeId || trades[0].id,
+        `${title} - ${formatCount(tradesLength)} Trade${tradesLength > 1 ? 's' : ''}`,
+      );
+      onClose();
     }
   };
 
-  // Calculate total PnL from trades
-  const [total_pnl, setTotalPnL] = React.useState<number>(0);
+  // ── Header / subtitle copy ───────────────────────────────────────────────
+  const headerTitle = `${formatCount(tradesLength)} ${tradesLength === 1 ? 'Trade' : 'Trades'}`;
+  const headerSubtitle = title
+    ? `${title}${subtitle ? ` · ${subtitle}` : ''}`
+    : subtitle || '';
 
-  React.useEffect(() => {
-    let isMounted = true;
-    const calculateTotalPnL = async () => {
-      // Simulate async calculation, replace with real async logic if needed
-      const sum = (trades || []).reduce((acc, trade) => acc + trade.amount, 0);
-      if (isMounted) setTotalPnL(sum);
-    };
-    calculateTotalPnL();
-    return () => { isMounted = false; };
-  }, [trades]);
-
-  const tradesLength = trades?.length || 0;
-  const dialogTitle = (
-    <>
-      <Typography variant="h6">
-        {formatCount(tradesLength)} {tradesLength === 1 ? 'Trade' : 'Trades'}{title ? ` for ${title.toLowerCase()}` : ''}
-      </Typography>
-
-    </>
-
-  );
-
-  // Custom actions for the dialog
-  const dialogActions = onOpenGalleryMode && tradesLength > 0 ? (
-    <Tooltip title="View trades in gallery mode">
-      <Button
-        variant="contained"
-        size="large"
-        startIcon={<GalleryIcon />}
-        onClick={handleGalleryModeClick}
-        sx={{
-          textTransform: 'none',
-          fontWeight: 600,
-          borderRadius: 1.5,
-          px: 3
-        }}
-      >
-        Gallery View
-      </Button>
-    </Tooltip>
-  ) : undefined;
+  // ── Footer actions — Gallery surfaced only when a handler + trades exist
+  const galleryAction =
+    onOpenGalleryMode && tradesLength > 0 ? (
+      <Tooltip title="Open every trade in the gallery viewer" arrow>
+        <Button
+          onClick={handleGalleryModeClick}
+          variant="contained"
+          startIcon={<GalleryIcon sx={{ fontSize: 16 }} />}
+          sx={{
+            textTransform: 'none',
+            fontWeight: 600,
+            fontSize: '0.85rem',
+            backgroundColor: violet,
+            color: '#fff',
+            borderRadius: 1.25,
+            px: 1.75,
+            py: 0.75,
+            boxShadow: 'none',
+            '&:hover': {
+              backgroundColor: theme.palette.primary.dark,
+              boxShadow: 'none',
+            },
+          }}
+        >
+          Gallery view
+        </Button>
+      </Tooltip>
+    ) : null;
 
   return (
     <BaseDialog
       open={open}
       onClose={onClose}
-      maxWidth="sm"
+      title={headerTitle}
+      subtitle={headerSubtitle || undefined}
+      headerIcon={<TradesIcon sx={{ fontSize: 18 }} />}
+      maxWidth="md"
       fullWidth
-      title={dialogTitle}
-      actions={dialogActions}
+      cancelButtonText="Close"
+      actions={galleryAction}
+      contentSx={{ px: 0, py: 0, display: 'flex', flexDirection: 'column' }}
     >
-      <Box sx={{ p: 2 }}>
-        {/* DayHeader with navigation buttons hidden */}
-        <DayHeader
-          title={subtitle || ''}
-          account_balance={account_balance + cumulativePnL}
-          formInputVisible={true} // Set to true to hide navigation buttons
-          total_pnl={total_pnl}
-          onPrevDay={() => { }} // Empty function since we're hiding the buttons
-          onNextDay={() => { }} // Empty function since we're hiding the buttons
-          loading={isBalanceLoading}
-        />
+      {/* ── Sticky summary bar ─────────────────────────────────────────── */}
+      <Box
+        sx={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 1,
+          px: 2.5,
+          py: 1.5,
+          borderBottom: `1px solid ${hairline}`,
+          backgroundColor: theme.palette.background.paper,
+        }}
+      >
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            bgcolor: surfaceInset,
+            border: `1px solid ${hairline}`,
+            borderRadius: 1.5,
+            overflow: 'hidden',
+          }}
+        >
+          <Box sx={{ p: 1.5 }}>
+            <Typography sx={{ ...monoLabelSx, fontSize: '0.62rem' }}>
+              Account balance
+            </Typography>
+            <Typography
+              sx={{
+                mt: 0.5,
+                fontSize: '1.05rem',
+                fontWeight: 700,
+                color: 'text.primary',
+                fontFeatureSettings: TNUM,
+                letterSpacing: '-0.01em',
+                opacity: isBalanceLoading ? 0.5 : 1,
+              }}
+            >
+              {formatCurrency(accountBalanceForDisplay)}
+            </Typography>
+          </Box>
+          <Box
+            sx={{
+              p: 1.5,
+              borderLeft: `1px solid ${hairline}`,
+              textAlign: 'right',
+            }}
+          >
+            <Typography
+              sx={{ ...monoLabelSx, fontSize: '0.62rem', justifyContent: 'flex-end' }}
+            >
+              Total P&L
+            </Typography>
+            <Typography
+              sx={{
+                mt: 0.5,
+                fontSize: '1.05rem',
+                fontWeight: 700,
+                color: totalPnLColor,
+                fontFeatureSettings: TNUM,
+                letterSpacing: '-0.01em',
+              }}
+            >
+              {totalPnL >= 0 ? '+' : '−'}
+              {formatCurrency(Math.abs(totalPnL))}
+            </Typography>
+          </Box>
+        </Box>
+      </Box>
 
-        {chartData &&
-          <>
-            {tradeStats.containBoth &&
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                <Button
-                  variant={selectedMetric === 'winRate' ? 'contained' : 'outlined'}
-                  size="small"
-                  onClick={() => setSelectedMetric('winRate')}
-                  sx={{ textTransform: 'none' }}
-                >
-                  Win Rate
-                </Button>
-                <Button
-                  variant={selectedMetric === 'pnl' ? 'contained' : 'outlined'}
-                  size="small"
-                  onClick={() => setSelectedMetric('pnl')}
-                  sx={{ textTransform: 'none' }}
-                >
-                  P&L
-                </Button>
+      {/* ── Scrollable list region ─────────────────────────────────────── */}
+      <Box
+        sx={{
+          px: 2.5,
+          py: 2,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 2,
+        }}
+      >
+        {/* Day-of-week chart card */}
+        {chartData && (
+          <Box
+            sx={{
+              border: `1px solid ${hairline}`,
+              borderRadius: 1.5,
+              backgroundColor: surfaceInset,
+              p: 1.5,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 1,
+            }}
+          >
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 1,
+                flexWrap: 'wrap',
+              }}
+            >
+              <Typography sx={monoLabelSx}>Day of week</Typography>
 
-              </Box>}
-            {chartData.some(data => data.total_trades > 0) ? (
-              <Typography variant="body2" color="primary" sx={{ mt: 1, fontWeight: 500 }}>
-                {tradeStats.containBoth && selectedMetric === 'winRate'
-                  ? `Best day for selected strategies: ${chartData.reduce((best, day) => day.total_trades > 0 && day.win_rate > best.win_rate ? day : best, { win_rate: 0, fullDay: 'None' }).fullDay}`
-                  : `Most profitable/un-profitable day: ${chartData.reduce((best, day) => day.total_trades > 0 && day.pnl > best.pnl ? day : best, { pnl: -Infinity, fullDay: 'None' }).fullDay}`
-                }
+              {tradeStats.containBoth && (
+                <Box
+                  sx={{
+                    display: 'flex',
+                    backgroundColor: theme.palette.background.paper,
+                    border: `1px solid ${hairline}`,
+                    borderRadius: 1.5,
+                    padding: '3px',
+                    gap: '3px',
+                  }}
+                >
+                  {(
+                    [
+                      { value: 'winRate', label: 'Win rate', Icon: WinRateIcon },
+                      { value: 'pnl', label: 'P&L', Icon: PnLIcon },
+                    ] as const
+                  ).map((opt) => {
+                    const selected = selectedMetric === opt.value;
+                    return (
+                      <Box
+                        key={opt.value}
+                        component="button"
+                        onClick={() => setSelectedMetric(opt.value)}
+                        sx={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 0.5,
+                          px: 1,
+                          py: 0.5,
+                          backgroundColor: selected ? violetSoft : 'transparent',
+                          border: `1px solid ${
+                            selected ? violetBorder : 'transparent'
+                          }`,
+                          borderRadius: 1.25,
+                          color: selected ? violet : theme.palette.text.secondary,
+                          font: 'inherit',
+                          fontSize: '0.74rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          transition: 'all 120ms ease',
+                          '&:hover': {
+                            color: selected ? violet : theme.palette.text.primary,
+                          },
+                        }}
+                      >
+                        <opt.Icon sx={{ fontSize: 12 }} />
+                        {opt.label}
+                      </Box>
+                    );
+                  })}
+                </Box>
+              )}
+            </Box>
+
+            {bestDayInsight && (
+              <Typography
+                sx={{
+                  fontSize: '0.78rem',
+                  color: 'primary.main',
+                  fontWeight: 600,
+                }}
+              >
+                {bestDayInsight}
               </Typography>
-            ) : null}
+            )}
 
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={240}>
               <BarChart
                 data={chartData}
-                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                maxBarSize={50}
+                margin={{ top: 12, right: 12, left: 0, bottom: 0 }}
+                maxBarSize={42}
               >
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  vertical={false}
+                  stroke={hairline}
+                />
                 <XAxis
                   dataKey="day"
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fill: theme.palette.text.secondary, fontSize: 12 }}
+                  tick={{ fill: theme.palette.text.secondary, fontSize: 11 }}
                 />
                 <YAxis
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fill: theme.palette.text.secondary, fontSize: 12 }}
+                  tick={{ fill: theme.palette.text.secondary, fontSize: 11 }}
                   domain={tradeStats.containBoth ? [0, 100] : ['auto', 'auto']}
-                  tickFormatter={tradeStats.containBoth && selectedMetric === "winRate"
-                    ? (value) => `${value}%`
-                    : (value) => formatCurrency(value).replace('$', '')}
+                  tickFormatter={
+                    tradeStats.containBoth && selectedMetric === 'winRate'
+                      ? (value) => `${value}%`
+                      : (value) => formatCurrency(value).replace('$', '')
+                  }
                 />
-
-                <Legend />
-                <RechartsTooltip content={({ active, payload, label }: any) => {
-                  if (active && payload && payload.length) {
+                <RechartsTooltip
+                  cursor={{ fill: alpha(theme.palette.text.primary, 0.04) }}
+                  content={({ active, payload }: any) => {
+                    if (!active || !payload?.length) return null;
                     const data = payload[0].payload;
                     return (
-                      <Paper sx={{ p: 1.5, bgcolor: 'background.paper' }}>
-                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                      <Box
+                        sx={{
+                          p: 1.25,
+                          bgcolor: 'background.paper',
+                          border: `1px solid ${hairline}`,
+                          borderRadius: 1.25,
+                          boxShadow: theme.shadows[6],
+                          minWidth: 140,
+                        }}
+                      >
+                        <Typography
+                          sx={{ fontWeight: 700, fontSize: '0.82rem', mb: 0.5 }}
+                        >
                           {data.fullDay}
                         </Typography>
-                        <Typography variant="body2">
-                          Total Trades: {formatCount(data.total_trades)}
-                        </Typography>
-                        {tradeStats.containWins &&
-                          <Typography variant="body2" sx={{ color: theme.palette.success.main }}>
-                            Wins: {formatCount(data.winTrades)}
-                          </Typography>
-                        }
-
-                        {tradeStats.containLosses &&
-                          <Typography variant="body2" sx={{ color: theme.palette.error.main }}>
-                            Losses: {formatCount(data.lossTrades)}
-                          </Typography>
-                        }
-
-                        {tradeStats.containBoth &&
-                          <Typography variant="body2">
-                            Win Rate: {data.win_rate.toFixed(1)}%
-                          </Typography>}
-
-                        <Typography variant="body2">
-                          P&L: {formatCurrency(data.pnl)}
-                        </Typography>
-                      </Paper>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
+                          <TooltipRow
+                            label="Trades"
+                            value={formatCount(data.total_trades)}
+                          />
+                          {tradeStats.containWins && (
+                            <TooltipRow
+                              label="Wins"
+                              value={formatCount(data.winTrades)}
+                              color={theme.palette.success.main}
+                            />
+                          )}
+                          {tradeStats.containLosses && (
+                            <TooltipRow
+                              label="Losses"
+                              value={formatCount(data.lossTrades)}
+                              color={theme.palette.error.main}
+                            />
+                          )}
+                          {tradeStats.containBoth && (
+                            <TooltipRow
+                              label="Win rate"
+                              value={`${data.win_rate.toFixed(1)}%`}
+                            />
+                          )}
+                          <TooltipRow label="P&L" value={formatCurrency(data.pnl)} />
+                        </Box>
+                      </Box>
                     );
-                  }
-                  return null;
-                }} />
+                  }}
+                />
                 <Bar
                   dataKey="value"
-                  name={tradeStats.containBoth && selectedMetric === "winRate" ? 'Win Rate' : 'P&L'}
+                  name={
+                    tradeStats.containBoth && selectedMetric === 'winRate'
+                      ? 'Win rate'
+                      : 'P&L'
+                  }
                   fill={theme.palette.primary.main}
                   radius={[4, 4, 0, 0]}
-
                   style={{ cursor: 'pointer' }}
                 >
                   {chartData.map((entry, index) => (
@@ -332,22 +546,81 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
+          </Box>
+        )}
 
-          </>
-        }
-
-        <TradeList
-          sx={{ mt: 0 }}
-          trades={trades}
-          expandedTradeId={expandedTradeId}
-          onTradeClick={onTradeExpand}
-          hideActions={!onEditTrade && !onDeleteTrade}
-          enableBulkSelection={tradesLength > 1 && !!onDeleteMultipleTrades}
-          tradeOperations={tradeOperations}
-        />
+        {/* Trade list section */}
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <Typography sx={monoLabelSx}>Trades</Typography>
+          {tradesLength === 0 ? (
+            <Box
+              sx={{
+                border: `1px dashed ${hairline}`,
+                borderRadius: 1.5,
+                backgroundColor: surfaceInset,
+                px: 2,
+                py: 3,
+                textAlign: 'center',
+              }}
+            >
+              <Typography
+                sx={{
+                  ...monoLabelSx,
+                  fontSize: '0.66rem',
+                  color: theme.palette.text.secondary,
+                  justifyContent: 'center',
+                }}
+              >
+                No trades in this view
+              </Typography>
+            </Box>
+          ) : (
+            <TradeList
+              sx={{ mt: 0 }}
+              trades={trades}
+              expandedTradeId={expandedTradeId}
+              onTradeClick={onTradeExpand}
+              hideActions={!onEditTrade && !onDeleteTrade}
+              enableBulkSelection={tradesLength > 1 && !!onDeleteMultipleTrades}
+              tradeOperations={tradeOperations}
+            />
+          )}
+        </Box>
       </Box>
     </BaseDialog>
   );
 };
+
+// ─── TooltipRow ──────────────────────────────────────────────────────────
+// Compact key:value row used inside the recharts tooltip.
+
+const TooltipRow: React.FC<{ label: string; value: string; color?: string }> = ({
+  label,
+  value,
+  color,
+}) => (
+  <Box
+    sx={{
+      display: 'flex',
+      justifyContent: 'space-between',
+      gap: 1.5,
+      fontSize: '0.75rem',
+    }}
+  >
+    <Box component="span" sx={{ color: 'text.secondary' }}>
+      {label}
+    </Box>
+    <Box
+      component="span"
+      sx={{
+        color: color ?? 'text.primary',
+        fontWeight: 600,
+        fontFeatureSettings: TNUM,
+      }}
+    >
+      {value}
+    </Box>
+  </Box>
+);
 
 export default TradesListDialog;
