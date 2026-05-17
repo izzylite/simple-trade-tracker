@@ -147,6 +147,18 @@ const TagSuggestionReviewDialog: React.FC<TagSuggestionReviewDialogProps> = ({
   const hairline = isDark ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
   const surfaceInset = isDark ? 'rgba(255,255,255,0.03)' : alpha(theme.palette.text.primary, 0.03);
 
+  const monoLabelSx = {
+    fontFamily: MONO_FONT,
+    fontSize: '0.68rem',
+    fontWeight: 600,
+    letterSpacing: '0.12em',
+    textTransform: 'uppercase' as const,
+    color: theme.palette.text.secondary,
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 0.75,
+  };
+
   const acceptedCount = rows.filter((r) => r.accepted && r.definition.trim() !== '').length;
 
   return (
@@ -162,6 +174,7 @@ const TagSuggestionReviewDialog: React.FC<TagSuggestionReviewDialogProps> = ({
           sx: {
             borderRadius: 2,
             border: `1px solid ${hairline}`,
+            boxShadow: theme.shadows[10],
             backgroundImage: 'none',
             overflow: 'hidden',
           },
@@ -325,10 +338,11 @@ const TagSuggestionReviewDialog: React.FC<TagSuggestionReviewDialogProps> = ({
                       sx={{
                         display: 'inline-flex',
                         alignItems: 'center',
+                        gap: 0.75,
                         px: 1,
-                        py: 0.25,
-                        borderRadius: 1,
-                        mb: 0.75,
+                        py: 0.3,
+                        borderRadius: 999,
+                        mb: 0.9,
                         fontFamily: MONO_FONT,
                         fontSize: '0.74rem',
                         fontWeight: 600,
@@ -337,6 +351,16 @@ const TagSuggestionReviewDialog: React.FC<TagSuggestionReviewDialogProps> = ({
                         border: `1px solid ${alpha(tagColor, isDark ? 0.4 : 0.32)}`,
                       }}
                     >
+                      <Box
+                        component="span"
+                        sx={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: '50%',
+                          backgroundColor: tagColor,
+                          flexShrink: 0,
+                        }}
+                      />
                       {formatTagForDisplay(row.tag, true)}
                     </Box>
                     {empty ? (
@@ -350,37 +374,42 @@ const TagSuggestionReviewDialog: React.FC<TagSuggestionReviewDialogProps> = ({
                         AI couldn't draft a definition for this tag.
                       </Typography>
                     ) : (
-                      <TextField
-                        value={row.definition}
-                        onChange={(e) =>
-                          setRows((prev) =>
-                            prev.map((r, i) =>
-                              i === idx ? { ...r, definition: e.target.value } : r
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                        <Typography sx={{ ...monoLabelSx, fontSize: '0.62rem' }}>
+                          Definition
+                        </Typography>
+                        <TextField
+                          value={row.definition}
+                          onChange={(e) =>
+                            setRows((prev) =>
+                              prev.map((r, i) =>
+                                i === idx ? { ...r, definition: e.target.value } : r
+                              )
                             )
-                          )
-                        }
-                        fullWidth
-                        multiline
-                        minRows={2}
-                        maxRows={5}
-                        disabled={saving || !row.accepted}
-                        inputProps={{ maxLength: 2024 }}
-                        sx={{
-                          '& .MuiOutlinedInput-root': {
-                            borderRadius: 1,
-                            backgroundColor: isDark
-                              ? 'rgba(0,0,0,0.15)'
-                              : alpha(theme.palette.background.paper, 0.6),
-                            '& fieldset': { borderColor: hairline },
-                            '&:hover fieldset': { borderColor: alpha(violet, 0.5) },
-                            '&.Mui-focused fieldset': { borderColor: violet, borderWidth: 1 },
-                          },
-                          '& .MuiOutlinedInput-input': {
-                            fontSize: '0.82rem',
-                            lineHeight: 1.5,
-                          },
-                        }}
-                      />
+                          }
+                          fullWidth
+                          multiline
+                          minRows={2}
+                          maxRows={5}
+                          disabled={saving || !row.accepted}
+                          inputProps={{ maxLength: 2024 }}
+                          sx={{
+                            '& .MuiOutlinedInput-root': {
+                              borderRadius: 1.5,
+                              backgroundColor: isDark
+                                ? 'rgba(0,0,0,0.18)'
+                                : alpha(theme.palette.background.paper, 0.7),
+                              '& fieldset': { borderColor: hairline },
+                              '&:hover fieldset': { borderColor: alpha(violet, 0.5) },
+                              '&.Mui-focused fieldset': { borderColor: violet, borderWidth: 1 },
+                            },
+                            '& .MuiOutlinedInput-input': {
+                              fontSize: '0.82rem',
+                              lineHeight: 1.5,
+                            },
+                          }}
+                        />
+                      </Box>
                     )}
                   </Box>
                 </Box>
@@ -440,6 +469,11 @@ const TagSuggestionReviewDialog: React.FC<TagSuggestionReviewDialogProps> = ({
             onClick={handleSave}
             disabled={saving || loading || !!error || acceptedCount === 0}
             variant="contained"
+            endIcon={
+              saving ? (
+                <CircularProgress size={14} thickness={5} sx={{ color: 'inherit' }} />
+              ) : undefined
+            }
             sx={{
               textTransform: 'none',
               fontWeight: 600,
@@ -448,6 +482,7 @@ const TagSuggestionReviewDialog: React.FC<TagSuggestionReviewDialogProps> = ({
               color: '#fff',
               borderRadius: 1.25,
               px: 1.75,
+              py: 0.75,
               boxShadow: 'none',
               '&:hover': { backgroundColor: theme.palette.primary.dark, boxShadow: 'none' },
               '&.Mui-disabled': {
