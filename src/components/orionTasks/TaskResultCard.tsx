@@ -4,7 +4,6 @@ import {
   Button,
   Card,
   CardContent,
-  Chip,
   CircularProgress,
   Typography,
   useTheme,
@@ -14,7 +13,7 @@ import {
 } from '@mui/material';
 import {
   Circle as UnreadIcon,
-  ChatBubbleOutline as ChatIcon,
+  AutoAwesome as AutoAwesomeIcon,
   ErrorOutline as ErrorIcon,
   Close as CloseIcon,
   NoteAddOutlined as NoteAddIcon,
@@ -24,6 +23,7 @@ import Collapse from '@mui/material/Collapse';
 import { format } from 'date-fns';
 import type { OrionTaskResult, Significance } from '../../types/orionTask';
 import { TASK_TYPE_LABELS, TASK_TYPE_COLORS } from '../../types/orionTask';
+import { useDialogTokens, MONO_FONT } from '../../styles/dialogTokens';
 import CitationsSection from '../aiChat/CitationsSection';
 import HtmlMessageRenderer from '../aiChat/HtmlMessageRenderer';
 import ToolUsageChip, { type ToolUsageEntry } from '../aiChat/ToolUsageChip';
@@ -79,6 +79,17 @@ const TaskResultCard: React.FC<TaskResultCardProps> = ({
   isReadOnly,
 }) => {
   const theme = useTheme();
+  const {
+    violet,
+    violetSoft,
+    violetSofter,
+    violetBorder,
+    surfaceInset,
+    hairline,
+    monoLabelSx,
+    monoSectionLabelSx,
+  } = useDialogTokens();
+
   const [isSaving, setIsSaving] = useState(false);
   // Read cards start collapsed; unread start expanded
   const [expanded, setExpanded] = useState(!result.is_read);
@@ -107,103 +118,188 @@ const TaskResultCard: React.FC<TaskResultCardProps> = ({
     }
   };
 
-  const accentColor = isError
-    ? theme.palette.error.main
-    : theme.palette.primary.main;
-
+  const accentColor = isError ? theme.palette.error.main : violet;
   const canOpenDialogs = !!calendar && !!tradeOperations;
+  const isUnread = !result.is_read;
+  const taskColor = TASK_TYPE_COLORS[result.task_type];
+
+  // Inset-card style: surfaceInset bg, hairline border, hover → violetBorder.
+  // Unread cards get a violet left accent rail via box-shadow inset.
+  const cardSx = {
+    position: 'relative' as const,
+    mb: 1.25,
+    borderRadius: 1.5,
+    cursor: 'pointer',
+    overflow: 'hidden',
+    backgroundColor: isError
+      ? alpha(theme.palette.error.main, 0.05)
+      : surfaceInset,
+    border: `1px solid ${
+      isError
+        ? alpha(theme.palette.error.main, 0.45)
+        : isUnread
+          ? violetBorder
+          : hairline
+    }`,
+    boxShadow: isUnread && !isError
+      ? `inset 3px 0 0 0 ${violet}`
+      : 'none',
+    transition: 'border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease',
+    '&:hover': {
+      borderColor: isError
+        ? alpha(theme.palette.error.main, 0.6)
+        : violetBorder,
+      backgroundColor: isError
+        ? alpha(theme.palette.error.main, 0.08)
+        : surfaceInset,
+      boxShadow: isUnread && !isError
+        ? `inset 3px 0 0 0 ${violet}, 0 2px 10px ${alpha(theme.palette.common.black, 0.08)}`
+        : `0 2px 10px ${alpha(theme.palette.common.black, 0.08)}`,
+    },
+  };
 
   return (
-    <Card
-      onClick={() => setExpanded((v) => !v)}
-      sx={{
-        mb: 1.5,
-        borderRadius: '10px',
-        cursor: 'pointer',
-        border: `1px solid ${isError
-          ? alpha(theme.palette.error.main, 0.45)
-          : result.is_read
-            ? theme.palette.divider
-            : alpha(theme.palette.primary.main, 0.3)
-          }`,
-        backgroundColor: isError
-          ? alpha(theme.palette.error.main, 0.05)
-          : result.is_read
-            ? 'background.paper'
-            : alpha(theme.palette.primary.main, 0.03),
-        transition: 'all 0.2s ease',
-        '&:hover': {
-          transform: 'none',
-          backgroundColor: isError
-            ? alpha(theme.palette.error.main, 0.08)
-            : alpha(theme.palette.primary.main, 0.06),
-        },
-      }}
-    >
-      <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+    <Card onClick={() => setExpanded((v) => !v)} sx={cardSx} elevation={0}>
+      <CardContent
+        sx={{
+          p: 1.5,
+          pl: isUnread && !isError ? 1.75 : 1.5,
+          '&:last-child': { pb: 1.5 },
+        }}
+      >
         <Box
           sx={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            mb: 1,
+            gap: 1,
+            mb: 0.75,
           }}
         >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Chip
-              label={TASK_TYPE_LABELS[result.task_type]}
-              size="small"
+          {/* Mono section label: dot + task type name + NEW badge + FAILED / sig pill */}
+          <Box
+            sx={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 0.75,
+              minWidth: 0,
+              flex: 1,
+            }}
+          >
+            <Box
               sx={{
-                fontSize: '0.7rem',
-                height: 22,
-                fontWeight: 600,
-                minWidth: '120px',
-                backgroundColor: alpha(TASK_TYPE_COLORS[result.task_type], 0.18),
-                color: TASK_TYPE_COLORS[result.task_type],
+                width: 7,
+                height: 7,
+                borderRadius: '50%',
+                backgroundColor: taskColor,
+                flexShrink: 0,
               }}
             />
-            {isError && (
-              <Chip
-                icon={<ErrorIcon sx={{ fontSize: '12px !important' }} />}
-                label="FAILED"
-                size="small"
+            <Typography
+              component="span"
+              sx={{
+                ...monoSectionLabelSx,
+                color: taskColor,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              {TASK_TYPE_LABELS[result.task_type]}
+            </Typography>
+
+            {isUnread && !isError && (
+              <Box
+                component="span"
                 sx={{
-                  fontSize: '0.65rem',
-                  height: 20,
+                  fontFamily: MONO_FONT,
+                  fontSize: '0.58rem',
                   fontWeight: 700,
-                  backgroundColor: alpha(theme.palette.error.main, 0.15),
-                  color: theme.palette.error.main,
-                  '& .MuiChip-icon': { color: theme.palette.error.main },
+                  letterSpacing: '0.12em',
+                  color: violet,
+                  backgroundColor: violetSofter,
+                  border: `1px solid ${violetBorder}`,
+                  borderRadius: 0.75,
+                  px: 0.5,
+                  py: 0.05,
+                  lineHeight: 1.4,
+                  flexShrink: 0,
                 }}
-              />
+              >
+                NEW
+              </Box>
             )}
-            {!isError && result.significance && (
-              <Chip
-                label={result.significance.toUpperCase()}
-                size="small"
+
+            {isError && (
+              <Box
+                component="span"
                 sx={{
-                  fontSize: '0.65rem',
-                  minWidth: '80px',
-                  height: 20,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 0.35,
+                  fontFamily: MONO_FONT,
+                  fontSize: '0.58rem',
                   fontWeight: 700,
+                  letterSpacing: '0.12em',
+                  color: theme.palette.error.main,
+                  backgroundColor: alpha(theme.palette.error.main, 0.12),
+                  border: `1px solid ${alpha(theme.palette.error.main, 0.3)}`,
+                  borderRadius: 0.75,
+                  px: 0.5,
+                  py: 0.05,
+                  lineHeight: 1.4,
+                  flexShrink: 0,
+                }}
+              >
+                <ErrorIcon sx={{ fontSize: 10 }} />
+                FAILED
+              </Box>
+            )}
+
+            {!isError && result.significance && (
+              <Box
+                component="span"
+                sx={{
+                  fontFamily: MONO_FONT,
+                  fontSize: '0.58rem',
+                  fontWeight: 700,
+                  letterSpacing: '0.12em',
+                  color: SIGNIFICANCE_COLORS[result.significance],
                   backgroundColor: alpha(
                     SIGNIFICANCE_COLORS[result.significance],
-                    0.15
+                    0.12
                   ),
-                  color: SIGNIFICANCE_COLORS[result.significance],
+                  border: `1px solid ${alpha(
+                    SIGNIFICANCE_COLORS[result.significance],
+                    0.3
+                  )}`,
+                  borderRadius: 0.75,
+                  px: 0.5,
+                  py: 0.05,
+                  lineHeight: 1.4,
+                  flexShrink: 0,
                 }}
-              />
+              >
+                {result.significance.toUpperCase()}
+              </Box>
             )}
           </Box>
 
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          {/* Right cluster — time + tiny actions */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25, flexShrink: 0 }}>
             <Typography
               variant="caption"
-              sx={{ color: 'text.secondary', fontSize: '0.7rem' }}
+              sx={{
+                fontFamily: MONO_FONT,
+                color: 'text.secondary',
+                fontSize: '0.66rem',
+                letterSpacing: '0.04em',
+                mr: 0.25,
+              }}
             >
-              {format(new Date(result.created_at), 'MMM d · h:mm a')}
+              {format(new Date(result.created_at), 'h:mm a')}
             </Typography>
-            {!result.is_read && (
+            {isUnread && (
               <Tooltip title="Mark as read">
                 <IconButton
                   size="small"
@@ -225,9 +321,15 @@ const TaskResultCard: React.FC<TaskResultCardProps> = ({
                     e.stopPropagation();
                     onHide(result.id);
                   }}
-                  sx={{ p: 0.25 }}
+                  sx={{
+                    p: 0.25,
+                    color: 'text.secondary',
+                    '&:hover': {
+                      backgroundColor: alpha(theme.palette.text.primary, 0.06),
+                    },
+                  }}
                 >
-                  <CloseIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+                  <CloseIcon sx={{ fontSize: 14 }} />
                 </IconButton>
               </Tooltip>
             )}
@@ -238,14 +340,19 @@ const TaskResultCard: React.FC<TaskResultCardProps> = ({
                   e.stopPropagation();
                   setExpanded((v) => !v);
                 }}
-                sx={{ p: 0.25 }}
+                sx={{
+                  p: 0.25,
+                  color: 'text.secondary',
+                  '&:hover': {
+                    backgroundColor: alpha(theme.palette.text.primary, 0.06),
+                  },
+                }}
               >
                 <ExpandMoreIcon
                   sx={{
                     fontSize: 16,
-                    color: 'text.secondary',
                     transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
-                    transition: 'transform 0.2s',
+                    transition: 'transform 200ms ease',
                   }}
                 />
               </IconButton>
@@ -254,7 +361,7 @@ const TaskResultCard: React.FC<TaskResultCardProps> = ({
         </Box>
 
         <Collapse in={expanded} timeout="auto" onClick={(e) => e.stopPropagation()}>
-          <Box sx={{ mt: 0.5 }}>
+          <Box sx={{ mt: 0.25 }}>
             <HtmlMessageRenderer
               html={result.content_html}
               textColor="text.primary"
@@ -295,7 +402,9 @@ const TaskResultCard: React.FC<TaskResultCardProps> = ({
             return (
               <Box
                 sx={{
-                  mt: 1.5,
+                  mt: 1.25,
+                  pt: 1.25,
+                  borderTop: `1px solid ${hairline}`,
                   display: 'flex',
                   flexWrap: 'wrap',
                   alignItems: 'center',
@@ -313,48 +422,76 @@ const TaskResultCard: React.FC<TaskResultCardProps> = ({
           })()}
         </Collapse>
 
-        {(onFollowup || onSaveNote) && (expanded && !result.is_read) && (
+        {(onFollowup || onSaveNote) && expanded && isUnread && (
           <Box
             onClick={(e) => e.stopPropagation()}
-            sx={{ mt: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.5 }}
+            sx={{
+              mt: 1.25,
+              pt: 1.25,
+              borderTop: `1px solid ${hairline}`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              gap: 0.5,
+              flexWrap: 'wrap',
+            }}
           >
             {onSaveNote && (
               <Button
                 size="small"
-                startIcon={isSaving ? <CircularProgress size={12} color="inherit" /> : <NoteAddIcon sx={{ fontSize: 14 }} />}
+                startIcon={
+                  isSaving ? (
+                    <CircularProgress size={12} thickness={5} sx={{ color: 'inherit' }} />
+                  ) : (
+                    <NoteAddIcon sx={{ fontSize: 14 }} />
+                  )
+                }
                 onClick={handleSaveNote}
                 disabled={isSaving}
                 sx={{
                   textTransform: 'none',
+                  fontWeight: 600,
                   fontSize: '0.75rem',
-                  py: 0.25,
-                  px: 1,
                   color: 'text.secondary',
+                  backgroundColor: 'transparent',
+                  border: `1px solid ${hairline}`,
+                  borderRadius: 1,
+                  px: 1,
+                  py: 0.25,
+                  minHeight: 0,
                   '&:hover': {
-                    backgroundColor: alpha(theme.palette.action.active, 0.06),
+                    backgroundColor: alpha(theme.palette.text.primary, 0.04),
+                    borderColor: alpha(theme.palette.text.primary, 0.2),
+                  },
+                  '&.Mui-disabled': {
+                    color: alpha(theme.palette.text.secondary, 0.5),
+                    borderColor: hairline,
                   },
                 }}
               >
-                Save as Note
+                {isSaving ? 'Saving…' : 'Save as Note'}
               </Button>
             )}
             {onFollowup && (
               <Button
                 size="small"
-                startIcon={<ChatIcon sx={{ fontSize: 14 }} />}
+                startIcon={<AutoAwesomeIcon sx={{ fontSize: 14 }} />}
                 onClick={() => onFollowup(result)}
                 sx={{
                   textTransform: 'none',
+                  fontWeight: 600,
                   fontSize: '0.75rem',
-                  py: 0.25,
+                  color: violet,
+                  backgroundColor: violetSofter,
+                  border: `1px solid ${violetBorder}`,
+                  borderRadius: 1,
                   px: 1,
-                  color: theme.palette.primary.main,
-                  '&:hover': {
-                    backgroundColor: alpha(theme.palette.primary.main, 0.08),
-                  },
+                  py: 0.25,
+                  minHeight: 0,
+                  '&:hover': { backgroundColor: violetSoft },
                 }}
               >
-                Follow up with Orion
+                Ask Orion
               </Button>
             )}
           </Box>

@@ -6,9 +6,6 @@ import {
   useTheme,
   alpha,
   CircularProgress,
-  Select,
-  MenuItem,
-  FormControl,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -16,10 +13,13 @@ import {
   DoneAll as DoneAllIcon,
   Edit as EditIcon,
   WarningAmber as WarningIcon,
+  AssignmentOutlined as AssignmentIcon,
+  ExpandMore as ExpandMoreIcon,
 } from '@mui/icons-material';
 import { IconButton, Tooltip } from '@mui/material';
-import { format } from 'date-fns';
+import { format, isToday, isYesterday } from 'date-fns';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
+import { useDialogTokens, MONO_FONT } from '../../styles/dialogTokens';
 import EconomicEventShimmer from '../economicCalendar/EconomicEventShimmer';
 import ConfirmationDialog from '../common/ConfirmationDialog';
 import TaskResultCard from './TaskResultCard';
@@ -65,6 +65,19 @@ interface OrionTasksContentProps {
   isReadOnly?: boolean;
 }
 
+/**
+ * Format the group date label as a mono uppercase string.
+ * Today  → "TODAY · MAR 4"
+ * Yest.  → "MAR 3 · YESTERDAY"
+ * Other  → "EEE · MMM D"
+ */
+const formatGroupDate = (iso: string): string => {
+  const d = new Date(iso);
+  if (isToday(d)) return `TODAY · ${format(d, 'MMM d').toUpperCase()}`;
+  if (isYesterday(d)) return `${format(d, 'MMM d').toUpperCase()} · YESTERDAY`;
+  return format(d, 'EEE · MMM d').toUpperCase();
+};
+
 const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
   tasks,
   results,
@@ -87,6 +100,20 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
   isReadOnly,
 }) => {
   const theme = useTheme();
+  const {
+    violet,
+    violetSoft,
+    violetSofter,
+    violetBorder,
+    surfaceInset,
+    hairline,
+    monoLabelSx,
+    monoSectionLabelSx,
+    primaryButtonSx,
+    ghostButtonSx,
+    chipStyle,
+  } = useDialogTokens();
+
   const [createOpen, setCreateOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<OrionTask | null>(null);
   const [pendingDeleteTaskId, setPendingDeleteTaskId] = useState<string | null>(null);
@@ -149,8 +176,10 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
     );
   }, [filteredResults]);
 
+  const activeTasksCount = tasks.filter((t) => t.status === 'active').length;
+
   if (loading) {
-    return <EconomicEventShimmer count={10} />;
+    return <EconomicEventShimmer count={6} />;
   }
 
   return (
@@ -162,39 +191,79 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
         overflow: 'hidden',
       }}
     >
-      {/* Sticky header: title + action buttons only. Task chips scroll with the feed. */}
-      <Box sx={{ px: 2, pt: 2, pb: 1,  borderBottom: `1px solid ${theme.palette.divider}`, backgroundColor: 'background.paper', zIndex: 1 }}>
+      {/* Sticky top bar — mono section label + count pill + actions */}
+      <Box
+        sx={{
+          px: 2,
+          pt: 1.75,
+          pb: 1.25,
+          borderBottom: `1px solid ${hairline}`,
+          backgroundColor: 'background.paper',
+          zIndex: 1,
+        }}
+      >
         <Box
           sx={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
+            gap: 1,
           }}
         >
-          <Typography
-            variant="subtitle2"
-            sx={{ fontWeight: 700, fontSize: '0.85rem' }}
-          >
-            Active Tasks ({tasks.filter((t) => t.status === 'active').length})
-          </Typography>
+          <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
+            <Typography component="span" sx={monoSectionLabelSx}>
+              Active Tasks
+            </Typography>
+            <Box
+              component="span"
+              sx={{
+                fontFamily: MONO_FONT,
+                fontSize: '0.66rem',
+                fontWeight: 700,
+                letterSpacing: '0.06em',
+                color: violet,
+                backgroundColor: violetSofter,
+                border: `1px solid ${violetBorder}`,
+                borderRadius: 999,
+                px: 0.85,
+                py: 0.15,
+                lineHeight: 1.4,
+                minWidth: 22,
+                textAlign: 'center',
+              }}
+            >
+              {activeTasksCount}
+            </Box>
+          </Box>
+
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
             {onMarkAllRead && unreadCount > 0 && (
               <Tooltip title="Mark all results as read">
                 <IconButton
                   size="small"
                   onClick={() => onMarkAllRead()}
-                  sx={{ p: 0.5 }}
+                  sx={{
+                    ...ghostButtonSx,
+                    p: 0.6,
+                    borderRadius: 1,
+                  }}
                 >
-                  <DoneAllIcon sx={{ fontSize: 18 }} />
+                  <DoneAllIcon sx={{ fontSize: 16 }} />
                 </IconButton>
               </Tooltip>
             )}
             <Button
               size="small"
-              startIcon={<AddIcon />}
+              startIcon={<AddIcon sx={{ fontSize: 16 }} />}
               onClick={() => setCreateOpen(true)}
               disabled={allTaskTypesUsed}
-              sx={{ textTransform: 'none', fontSize: '0.8rem' }}
+              sx={{
+                ...primaryButtonSx,
+                fontSize: '0.78rem',
+                px: 1.25,
+                py: 0.4,
+                minHeight: 0,
+              }}
             >
               New Task
             </Button>
@@ -210,199 +279,282 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
           ...scrollbarStyles(theme),
         }}
       >
-        {/* Filter row — always visible when there are tasks */}
-        {tasks.length === 0 ? (
-          <Box sx={{ textAlign: 'center', py: 3, color: 'text.secondary' }}>
-            <Typography variant="body2" sx={{ mb: 1 }}>No tasks yet</Typography>
-            <Typography variant="caption">Create a task and Orion will run it on schedule</Typography>
-          </Box>
-        ) : (
+        {/* Filter row — chip-segmented bar */}
+        {tasks.length === 0 ? null : (
           <Box
             sx={{
               px: 2,
-              py: 1,
+              py: 1.25,
               display: 'flex',
-              gap: 0.5,
               alignItems: 'center',
-              borderBottom: `1px solid ${theme.palette.divider}`,
+              gap: 0.75,
+              borderBottom: `1px solid ${hairline}`,
+              backgroundColor: 'background.paper',
             }}
           >
-            <Typography variant="caption" sx={{ color: 'text.secondary', mr: 0.5, flexShrink: 0 }}>
-              Filter:
-            </Typography>
-            <FormControl size="small" sx={{ flex: 1, minWidth: 0 }}>
-              <Select
-                value={filterTaskType ?? '__all__'}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setFilterTaskType(v === '__all__' ? null : (v as TaskType));
-                }}
-                MenuProps={{
-                  sx: { zIndex: (t) => t.zIndex.modal + 100 },
-                  PaperProps: { sx: { maxHeight: 320 } },
-                }}
-                sx={{
-                  fontSize: '0.78rem',
-                  height: 30,
-                  '& .MuiSelect-select': { py: 0.5, display: 'flex', alignItems: 'center', gap: 0.5 },
-                }}
-                renderValue={(val) => {
-                  if (val === '__all__') return 'All';
-                  const type = val as TaskType;
-                  const task = tasks.find((t) => t.task_type === type);
-                  const hasFailures = (task?.consecutive_failures ?? 0) > 0;
-                  const color = TASK_TYPE_COLORS[type];
-                  return (
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                      {hasFailures && (
-                        <WarningIcon sx={{ fontSize: 14, color: theme.palette.warning.main }} />
-                      )}
-                      <Box
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 0.5,
+                flex: 1,
+                minWidth: 0,
+                overflowX: 'auto',
+                ...scrollbarStyles(theme),
+                '&::-webkit-scrollbar': { height: 0 },
+                scrollbarWidth: 'none',
+              }}
+            >
+              <Box
+                component="span"
+                onClick={() => setFilterTaskType(null)}
+                sx={chipStyle(filterTaskType === null)}
+              >
+                All
+              </Box>
+              {filterableTaskTypes.map((type) => {
+                const task = tasks.find((t) => t.task_type === type)!;
+                const hasFailures = (task.consecutive_failures ?? 0) > 0;
+                const color = TASK_TYPE_COLORS[type];
+                const selected = filterTaskType === type;
+                return (
+                  <Box
+                    key={type}
+                    component="span"
+                    onClick={() =>
+                      setFilterTaskType(selected ? null : type)
+                    }
+                    sx={chipStyle(selected)}
+                  >
+                    <Box
+                      sx={{
+                        width: 7,
+                        height: 7,
+                        borderRadius: '50%',
+                        backgroundColor: color,
+                        flexShrink: 0,
+                      }}
+                    />
+                    <span style={{ whiteSpace: 'nowrap' }}>
+                      {TASK_TYPE_LABELS[type]}
+                    </span>
+                    {hasFailures && (
+                      <WarningIcon
                         sx={{
-                          width: 8,
-                          height: 8,
-                          borderRadius: '50%',
-                          backgroundColor: color,
-                          flexShrink: 0,
+                          fontSize: 13,
+                          color: theme.palette.warning.main,
+                          ml: 0.25,
                         }}
                       />
-                      <Typography variant="caption" sx={{ fontSize: '0.78rem' }}>
-                        {TASK_TYPE_LABELS[type]}
-                      </Typography>
-                    </Box>
-                  );
-                }}
-              >
-                <MenuItem value="__all__" sx={{ fontSize: '0.8rem' }}>
-                  All
-                </MenuItem>
-                {filterableTaskTypes.map((type) => {
-                  const task = tasks.find((t) => t.task_type === type)!;
-                  const hasFailures = (task.consecutive_failures ?? 0) > 0;
-                  const color = TASK_TYPE_COLORS[type];
-                  return (
-                    <MenuItem
-                      key={type}
-                      value={type}
+                    )}
+                  </Box>
+                );
+              })}
+            </Box>
+
+            {/* Edit / delete for the selected task — ghost icon buttons */}
+            {selectedTask && (
+              <Box sx={{ display: 'flex', gap: 0.25, flexShrink: 0, pl: 0.5 }}>
+                {onUpdateTask && (
+                  <Tooltip title={`Edit ${TASK_TYPE_LABELS[selectedTask.task_type]}`}>
+                    <IconButton
+                      size="small"
+                      onClick={() => setEditingTask(selectedTask)}
                       sx={{
-                        fontSize: '0.8rem',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 1,
+                        ...ghostButtonSx,
+                        p: 0.6,
+                        borderRadius: 1,
                       }}
                     >
-                      <Box
-                        sx={{
-                          width: 8,
-                          height: 8,
-                          borderRadius: '50%',
-                          backgroundColor: color,
-                          flexShrink: 0,
-                        }}
-                      />
-                      <span>{TASK_TYPE_LABELS[type]}</span>
-                      {hasFailures && (
-                        <WarningIcon
-                          sx={{ fontSize: 14, color: theme.palette.warning.main, ml: 'auto' }}
-                        />
-                      )}
-                    </MenuItem>
-                  );
-                })}
-              </Select>
-            </FormControl>
-            {/* Edit / delete for the selected task */}
-            <Box sx={{ display: 'flex', gap: 1, flexShrink: 0 }}>
-              {onUpdateTask && (
-                <Button
-                  size="small"
-                  variant="outlined" 
-                  disabled={!selectedTask}
-                  onClick={() => selectedTask && setEditingTask(selectedTask)}
-                  sx={{ textTransform: 'none', fontSize: '0.75rem', py: 0.25, minWidth: 0 }}
-                >
-                  Edit
-                </Button>
-              )}
-              <Button
-                size="small"
-                variant="outlined" 
-                disabled={!selectedTask}
-                onClick={() => selectedTask && setPendingDeleteTaskId(selectedTask.id)}
-                sx={{ textTransform: 'none', fontSize: '0.75rem', py: 0.25, minWidth: 0 }}
-              >
-                Delete
-              </Button>
-            </Box>
+                      <EditIcon sx={{ fontSize: 15 }} />
+                    </IconButton>
+                  </Tooltip>
+                )}
+                <Tooltip title={`Delete ${TASK_TYPE_LABELS[selectedTask.task_type]}`}>
+                  <IconButton
+                    size="small"
+                    onClick={() => setPendingDeleteTaskId(selectedTask.id)}
+                    sx={{
+                      ...ghostButtonSx,
+                      p: 0.6,
+                      borderRadius: 1,
+                      '&:hover': {
+                        backgroundColor: alpha(theme.palette.error.main, 0.1),
+                        color: theme.palette.error.main,
+                      },
+                    }}
+                  >
+                    <DeleteIcon sx={{ fontSize: 15 }} />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+            )}
           </Box>
         )}
 
-        {/* Results feed */}
-        <Box sx={{ p: 2, pt: 1 }}>
-        {filteredResults.length === 0 ? (
-          <Box
-            sx={{
-              textAlign: 'center',
-              py: 4,
-              color: 'text.secondary',
-            }}
-          >
-            <Typography variant="body2">No results yet</Typography>
-            <Typography variant="caption">
-              Results will appear here as Orion completes tasks
-            </Typography>
+        {/* Tasks empty state — dashed inset card */}
+        {tasks.length === 0 ? (
+          <Box sx={{ px: 2, py: 2.5 }}>
+            <Box
+              sx={{
+                backgroundColor: surfaceInset,
+                border: `1px dashed ${alpha(violet, 0.35)}`,
+                borderRadius: 1.5,
+                px: 2,
+                py: 3.5,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 1,
+              }}
+            >
+              <Box
+                sx={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 1.25,
+                  backgroundColor: violetSoft,
+                  color: violet,
+                  border: `1px solid ${violetBorder}`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <AssignmentIcon sx={{ fontSize: 22 }} />
+              </Box>
+              <Typography
+                sx={{
+                  ...monoLabelSx,
+                  color: 'text.primary',
+                  fontSize: '0.72rem',
+                  mt: 0.5,
+                }}
+              >
+                No tasks yet
+              </Typography>
+              <Typography
+                variant="caption"
+                sx={{
+                  color: 'text.secondary',
+                  fontSize: '0.78rem',
+                  textAlign: 'center',
+                  maxWidth: 280,
+                }}
+              >
+                Create a task and Orion will run it on schedule, then post results here.
+              </Typography>
+            </Box>
           </Box>
         ) : (
-          <>
-            {groupedResults.map(([date, dateResults]) => (
-              <Box key={date} sx={{ mb: 2 }}>
+          <Box sx={{ p: 2, pt: 1.5 }}>
+            {filteredResults.length === 0 ? (
+              <Box
+                sx={{
+                  backgroundColor: surfaceInset,
+                  border: `1px dashed ${hairline}`,
+                  borderRadius: 1.5,
+                  px: 2,
+                  py: 3,
+                  textAlign: 'center',
+                }}
+              >
+                <Typography sx={{ ...monoLabelSx, color: 'text.secondary' }}>
+                  No results yet
+                </Typography>
                 <Typography
                   variant="caption"
-                  sx={{
-                    fontWeight: 700,
-                    color: 'text.secondary',
-                    fontSize: '0.7rem',
-                    textTransform: 'uppercase',
-                    letterSpacing: 0.5,
-                    mb: 0.5,
-                    display: 'block',
-                  }}
+                  sx={{ color: 'text.secondary', display: 'block', mt: 0.75 }}
                 >
-                  {format(new Date(date), 'EEEE, MMM d')}
+                  Results will appear here as Orion completes tasks
                 </Typography>
-                {dateResults.map((result) => (
-                  <TaskResultCard
-                    key={result.id}
-                    result={result}
-                    onMarkRead={onMarkRead}
-                    onHide={onHideResult}
-                    onFollowup={onFollowup}
-                    onSaveNote={onSaveNote}
-                    calendar={calendar}
-                    trades={trades}
-                    tradeOperations={tradeOperations}
-                    isReadOnly={isReadOnly}
-                  />
+              </Box>
+            ) : (
+              <>
+                {groupedResults.map(([date, dateResults]) => (
+                  <Box key={date} sx={{ mb: 2 }}>
+                    {/* Sticky mono uppercase date label with hairline divider */}
+                    <Box
+                      sx={{
+                        position: 'sticky',
+                        top: 0,
+                        zIndex: 1,
+                        backgroundColor: 'background.paper',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                        py: 0.75,
+                        mb: 1,
+                      }}
+                    >
+                      <Typography
+                        component="span"
+                        sx={{
+                          ...monoSectionLabelSx,
+                          flexShrink: 0,
+                        }}
+                      >
+                        {formatGroupDate(date)}
+                      </Typography>
+                      <Box
+                        sx={{
+                          flex: 1,
+                          height: '1px',
+                          backgroundColor: hairline,
+                        }}
+                      />
+                    </Box>
+                    {dateResults.map((result) => (
+                      <TaskResultCard
+                        key={result.id}
+                        result={result}
+                        onMarkRead={onMarkRead}
+                        onHide={onHideResult}
+                        onFollowup={onFollowup}
+                        onSaveNote={onSaveNote}
+                        calendar={calendar}
+                        trades={trades}
+                        tradeOperations={tradeOperations}
+                        isReadOnly={isReadOnly}
+                      />
+                    ))}
+                  </Box>
                 ))}
-              </Box>
-            ))}
-            {hasMore && !filterTaskType && (
-              <Box sx={{ display: 'flex', justifyContent: 'center', pb: 1 }}>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  onClick={onLoadMore}
-                  disabled={loadingMore}
-                  startIcon={loadingMore ? <CircularProgress size={14} /> : undefined}
-                  sx={{ textTransform: 'none', fontSize: '0.8rem' }}
-                >
-                  {loadingMore ? 'Loading…' : 'Load more'}
-                </Button>
-              </Box>
+                {hasMore && !filterTaskType && (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', pb: 1 }}>
+                    <Button
+                      size="small"
+                      onClick={onLoadMore}
+                      disabled={loadingMore}
+                      startIcon={
+                        loadingMore ? (
+                          <CircularProgress size={14} thickness={5} />
+                        ) : (
+                          <ExpandMoreIcon sx={{ fontSize: 16 }} />
+                        )
+                      }
+                      sx={{
+                        ...ghostButtonSx,
+                        fontSize: '0.78rem',
+                        px: 1.5,
+                        py: 0.5,
+                        borderRadius: 1.25,
+                        border: `1px solid ${hairline}`,
+                        backgroundColor: surfaceInset,
+                        '&:hover': {
+                          backgroundColor: alpha(theme.palette.text.primary, 0.05),
+                          borderColor: violetBorder,
+                        },
+                      }}
+                    >
+                      {loadingMore ? 'Loading…' : 'Load more'}
+                    </Button>
+                  </Box>
+                )}
+              </>
             )}
-          </>
+          </Box>
         )}
-        </Box>
       </Box>
 
       <CreateTaskDialog
