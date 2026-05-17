@@ -24,7 +24,6 @@ import AppLoadingProgress from './components/AppLoadingProgress';
 import AppHeader from './components/common/AppHeader';
 import AppLayout from './components/layout/AppLayout';
 import type { CalendarFormData } from './components/CalendarFormDialog';
-import CalendarLockedOverlay from './components/calendars/CalendarLockedOverlay';
 import CalendarManagementDialogs from './components/calendars/CalendarManagementDialogs';
 import { useCalendarPanelActions } from './hooks/useCalendarPanelActions';
 import { SelectedCalendarProvider, useSelectedCalendar } from './contexts/SelectedCalendarContext';
@@ -166,6 +165,24 @@ function AppContent() {
 
   const theme = useMemo(() => createTheme(createAppTheme(mode)), [mode]);
 
+  // True only after SWR returned (so we don't flash the overlay during the
+  // initial fetch) AND the user has zero non-deleted calendars. AppLayout
+  // uses this to dim every authenticated route except /about until the user
+  // creates a calendar via the side nav "Create" button.
+  //
+  // Derived from `swrCalendars` directly — NOT the locally-mirrored
+  // `calendars` state — so the overlay doesn't flash for one render on first
+  // load. The mirror is populated by a `useEffect` that fires *after* the
+  // render where SWR resolves, so on that render `swrCalendars` is already
+  // `[cal1]` while local `calendars` is still `[]`. Reading the mirror here
+  // would briefly evaluate to `true` even though the user does have data.
+  const hasNoCalendars = useMemo(
+    () =>
+      swrCalendars !== undefined &&
+      swrCalendars.filter((c) => !c.deleted_at).length === 0,
+    [swrCalendars],
+  );
+
   const handleCreateCalendar = async (name: string, account_balance: number, max_daily_drawdown: number,
      weekly_target?: number, monthly_target?: number, yearly_target?: number, 
      risk_per_trade?: number, dynamic_risk_enabled?: boolean, increased_risk_percentage?: number,
@@ -288,6 +305,7 @@ function AppContent() {
   const calendarsListActions = useMemo<CalendarsListPanelActions>(
     () => ({
       onCalendarClick: (id: string) => navigate(`/calendar/${id}`),
+      onCreateCalendar: openCreateCalendarDialog,
       onEditCalendar: panelActions.setEditTarget,
       onDuplicateCalendar: panelActions.setDuplicateTarget,
       onLinkCalendar: panelActions.setLinkTarget,
@@ -389,7 +407,12 @@ function AppContent() {
                 route below that renders without the shell. */}
             {user ? (
               <Route
-                element={<AppLayout onNewCalendar={openCreateCalendarDialog} />}
+                element={
+                  <AppLayout
+                    onNewCalendar={openCreateCalendarDialog}
+                    isLocked={hasNoCalendars}
+                  />
+                }
               >
                 <Route
                   path="/"
@@ -398,7 +421,6 @@ function AppContent() {
                       calendars={calendars}
                       isLoadingCalendars={isLoadingCalendars}
                       hasFetchedCalendars={swrCalendars !== undefined}
-                      onCreateCalendar={openCreateCalendarDialog}
                     />
                   }
                 />
@@ -428,7 +450,6 @@ function AppContent() {
                     >
                       <PerformancePage
                         onUpdateCalendar={handleUpdateCalendar}
-                        onCreateCalendar={openCreateCalendarDialog}
                       />
                     </ProtectedRoute>
                   }
@@ -599,28 +620,22 @@ interface HomeRouteResolverProps {
   isLoadingCalendars: boolean;
   /** True only after SWR has returned a defined value (even an empty
    *  array). Distinguishes "still fetching / awaiting first response"
-   *  from "fetched, no calendars exist". Without this, the lock overlay
-   *  flashes on every cold load between local state defaulting to [] and
-   *  the SWR result being mirrored into it. */
+   *  from "fetched, no calendars exist". */
   hasFetchedCalendars: boolean;
-  onCreateCalendar: () => void;
 }
 
 /**
  * Auth landing for "/". Routes the user to the most appropriate calendar:
  *  - prefers the last calendar they opened (localStorage)
  *  - falls back to the most recently updated non-trashed calendar
- *  - if zero calendars exist, renders the AppLayout shell with the lock
- *    overlay so the user can create one without leaving "/"
- *
- * Phase 8 replaces the previous "/ -> HomePage" wiring; HomePage itself
- * goes away in phase 9.
+ *  - if zero calendars exist, renders nothing — AppLayout's global lock
+ *    overlay covers the empty column and points at the side nav "Create"
+ *    button.
  */
 const HomeRouteResolver: React.FC<HomeRouteResolverProps> = ({
   calendars,
   isLoadingCalendars,
   hasFetchedCalendars,
-  onCreateCalendar,
 }) => {
   const { calendarId: storedCalendarId } = useSelectedCalendar();
   const activeCalendars = useMemo(
@@ -629,21 +644,15 @@ const HomeRouteResolver: React.FC<HomeRouteResolverProps> = ({
   );
 
   // Wait until SWR has returned. Otherwise the local `calendars` state
-  // (which starts as []) makes us briefly render the lock overlay before
-  // the real fetch result lands.
+  // (which starts as []) would make us treat an unresolved fetch as
+  // "no calendars".
   if (!hasFetchedCalendars || isLoadingCalendars) {
     return <LoadingFallback />;
   }
 
   if (activeCalendars.length === 0) {
-    return (
-      <Box sx={{ position: 'relative', minHeight: 'calc(100vh - 64px)' }}>
-        <CalendarLockedOverlay
-          onCreateCalendar={onCreateCalendar}
-          subtitle="Create a calendar to start tracking trades. The Home, Performance and Notes sections unlock once one exists."
-        />
-      </Box>
-    );
+    // AppLayout handles the lock overlay; nothing to render under it.
+    return null;
   }
 
   let targetId: string | undefined;

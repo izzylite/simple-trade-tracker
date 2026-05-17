@@ -9,7 +9,6 @@ import { useAuthState } from '../contexts/AuthStateContext';
 import { useCalendars } from '../hooks/useCalendars';
 import { Calendar } from '../types/calendar';
 import PerformanceCharts, { TimePeriod } from '../components/PerformanceCharts';
-import CalendarLockedOverlay from '../components/calendars/CalendarLockedOverlay';
 import { useSelectedCalendar } from '../contexts/SelectedCalendarContext';
 import PerformanceHeader from '../components/performance/PerformanceHeader';
 
@@ -19,8 +18,6 @@ const APP_HEADER_HEIGHT = 64;
 interface PerformancePageProps {
   /** Plumbed from App.tsx so calendar-property edits made from this page persist. */
   onUpdateCalendar?: (id: string, updates: Partial<Calendar>) => Promise<void> | void;
-  /** Triggers the Create Calendar dialog when the lock overlay's CTA is clicked. */
-  onCreateCalendar?: () => void;
 }
 
 /**
@@ -28,10 +25,13 @@ interface PerformancePageProps {
  * is driven by the global SelectedCalendarContext (selected via the
  * AppHeader). Shows a brief spinner overlay on calendar change so the
  * PerformanceCharts remount feels intentional rather than abrupt.
+ *
+ * When the user has zero calendars, AppLayout's lock overlay covers the
+ * whole content area and this page is not even mounted — so this component
+ * always has at least one active calendar to work with.
  */
 const PerformancePage: React.FC<PerformancePageProps> = ({
   onUpdateCalendar,
-  onCreateCalendar,
 }) => {
   const theme = useTheme();
   const { user } = useAuthState();
@@ -132,22 +132,6 @@ const PerformancePage: React.FC<PerformancePageProps> = ({
         }}
       >
         <CircularProgress size={32} />
-      </Box>
-    );
-  }
-
-  if (activeCalendars.length === 0) {
-    return (
-      <Box
-        sx={{
-          position: 'relative',
-          minHeight: `calc(100vh - ${APP_HEADER_HEIGHT}px)`,
-        }}
-      >
-        <CalendarLockedOverlay
-          onCreateCalendar={onCreateCalendar}
-          subtitle="Create a calendar to start tracking trades and unlock performance analytics."
-        />
       </Box>
     );
   }

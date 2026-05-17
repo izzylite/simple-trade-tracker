@@ -1,41 +1,28 @@
 import React from 'react';
-import {
-  Box,
-  Typography,
-  Button,
-  alpha,
-  useTheme,
-} from '@mui/material';
-import { AddCircleOutline as AddIcon } from '@mui/icons-material';
+import { Box, Typography, alpha, useTheme } from '@mui/material';
+import { ArrowBack as ArrowBackIcon } from '@mui/icons-material';
 
 interface CalendarLockedOverlayProps {
-  /** Callback that opens the Create Calendar dialog. When omitted the CTA is disabled. */
-  onCreateCalendar?: () => void;
-  /** Override the title copy. */
-  title?: string;
-  /** Override the subtitle copy. */
-  subtitle?: string;
-  /** Override the CTA button text. */
-  ctaLabel?: string;
+  /** Override the hint copy. */
+  hint?: string;
   /**
-   * When `false` (default) the overlay fills its parent without blocking
-   * interaction outside its bounds — so a page can mount it inside its main
-   * content area. Set `true` to render a fullscreen blocking overlay.
+   * When `false` (default) the overlay fills its parent. Set `true` for a
+   * fixed-position blocking overlay covering the viewport.
    */
   fullscreen?: boolean;
 }
 
 /**
- * Empty-state lock used on pages that require at least one calendar (Home,
- * Performance). Shown when the user has zero calendars; the CTA opens the
- * Create Calendar dialog. Notes + Assistant pages do NOT use this — Notes is
- * cross-calendar and Assistant supports an "All Calendars" mode.
+ * Dim/blur backdrop shown over the main content area when the signed-in user
+ * has zero calendars. Blocks interaction with whatever is mounted beneath it
+ * and points the user at the side nav's "Create" button — which is now the
+ * single entry point for creating a calendar.
+ *
+ * The overlay is rendered inside the main content column by `AppLayout`, so
+ * the side nav itself stays interactive.
  */
 const CalendarLockedOverlay: React.FC<CalendarLockedOverlayProps> = ({
-  onCreateCalendar,
-  title = 'Create your first calendar',
-  subtitle = "Calendars are where you log and analyse trades. You'll need at least one before this section unlocks.",
-  ctaLabel = 'Create Calendar',
+  hint = 'Create a calendar from the side navigation to unlock the app.',
   fullscreen = false,
 }) => {
   const theme = useTheme();
@@ -49,6 +36,7 @@ const CalendarLockedOverlay: React.FC<CalendarLockedOverlayProps> = ({
     : {
         position: 'absolute' as const,
         inset: 0,
+        zIndex: 10,
       };
 
   return (
@@ -58,70 +46,35 @@ const CalendarLockedOverlay: React.FC<CalendarLockedOverlayProps> = ({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        bgcolor: alpha(theme.palette.background.default, 0.85),
-        backdropFilter: 'blur(4px)',
+        bgcolor: alpha(theme.palette.background.default, 0.7),
+        backdropFilter: 'blur(6px)',
+        WebkitBackdropFilter: 'blur(6px)',
         px: 3,
+        // Block all pointer events on whatever's underneath.
+        pointerEvents: 'auto',
       }}
+      aria-live="polite"
     >
       <Box
         sx={{
-          maxWidth: 440,
-          width: '100%',
-          textAlign: 'center',
-          p: { xs: 3, sm: 5 },
-          borderRadius: 3,
-          bgcolor: 'background.paper',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1.25,
+          px: 2,
+          py: 1.25,
+          borderRadius: 999,
+          bgcolor: alpha(theme.palette.background.paper, 0.92),
           border: `1px solid ${theme.palette.divider}`,
-          boxShadow: theme.shadows[6],
+          boxShadow: theme.shadows[2],
         }}
       >
-        <Box
-          sx={{
-            width: 64,
-            height: 64,
-            borderRadius: 2,
-            mx: 'auto',
-            mb: 2.5,
-            bgcolor: alpha(theme.palette.primary.main, 0.12),
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <AddIcon sx={{ fontSize: 36, color: 'primary.main' }} />
-        </Box>
-
-        <Typography
-          variant="h6"
-          sx={{ fontWeight: 700, mb: 1, fontSize: '1.125rem' }}
-        >
-          {title}
-        </Typography>
-
+        <ArrowBackIcon sx={{ fontSize: 18, color: 'primary.main' }} />
         <Typography
           variant="body2"
-          color="text.secondary"
-          sx={{ mb: 3, lineHeight: 1.55 }}
+          sx={{ color: 'text.primary', fontWeight: 500 }}
         >
-          {subtitle}
+          {hint}
         </Typography>
-
-        <Button
-          variant="contained"
-          color="primary"
-          startIcon={<AddIcon />}
-          onClick={onCreateCalendar}
-          disabled={!onCreateCalendar}
-          sx={{
-            borderRadius: 999,
-            textTransform: 'none',
-            fontWeight: 600,
-            px: 3,
-            py: 1,
-          }}
-        >
-          {ctaLabel}
-        </Button>
       </Box>
     </Box>
   );

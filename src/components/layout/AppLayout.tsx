@@ -18,6 +18,7 @@ import {
 } from '@mui/icons-material';
 import { Outlet } from 'react-router-dom';
 import SideNav, { SIDE_NAV_WIDTH } from './SideNav';
+import CalendarLockedOverlay from '../calendars/CalendarLockedOverlay';
 import { useCalendarsListPanel } from '../../contexts/CalendarsListPanelContext';
 // CalendarsListDrawer wraps CalendarsListContent for <lg viewports. Lazy
 // keeps both out of the main bundle until the drawer actually opens.
@@ -34,7 +35,9 @@ const CalendarsListContent = lazy(
 );
 const CalendarsListDrawer = lazy(() => import('../calendars/CalendarsListDrawer'));
 
-const PANEL_WIDTH = 'clamp(360px, 36vw, 580px)';
+// Matches the local SidePanel width (sidePanel/SidePanel.tsx) so both global
+// panels feel consistent and align with the <lg drawer standard (450px).
+const PANEL_WIDTH = 'clamp(340px, 28vw, 450px)';
 // Kept as an alias so existing readers see the legacy name in this file.
 const CALENDARS_PANEL_WIDTH = PANEL_WIDTH;
 
@@ -65,6 +68,17 @@ interface AppLayoutProps {
   children?: React.ReactNode;
   /** Forwarded to SideNav. Phase 7 wires this. */
   onNewCalendar?: () => void;
+  /**
+   * True when the signed-in user has zero calendars (after SWR has resolved).
+   * Renders a dim/blur lock overlay over the main content area so the rest
+   * of the app stays unusable until the user creates one via the SideNav
+   * "Create" entry. The overlay sits *inside* the main column — SideNav,
+   * calendars panel, and side panel stay interactive.
+   *
+   * The lock is skipped on `/about` since that route doesn't require a
+   * calendar to be informational.
+   */
+  isLocked?: boolean;
 }
 
 /**
@@ -79,7 +93,7 @@ interface AppLayoutProps {
  * lg+ and a UnifiedDrawer fallback on smaller viewports. The panel state and
  * actions are provided by CalendarsListPanelContext at App level.
  */
-const AppLayout: React.FC<AppLayoutProps> = ({ children, onNewCalendar }) => {
+const AppLayout: React.FC<AppLayoutProps> = ({ children, onNewCalendar, isLocked = false }) => {
   const theme = useTheme();
   const isLgUp = useMediaQuery(theme.breakpoints.up('lg'));
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -109,6 +123,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, onNewCalendar }) => {
     currentView,
     setOpen: setSidePanelOpen,
   } = useSidePanel();
+
+  // `/about` is informational and stays accessible even without a calendar.
+  // Every other authenticated route gets the dim lock overlay when locked.
+  const showLockOverlay = isLocked && location.pathname !== '/about';
 
   const inlinePanelOpen = isLgUp && isCalendarsListOpen;
   // The provider's defaultView is `faq` so `currentView.id === 'faq'` could
@@ -190,11 +208,21 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, onNewCalendar }) => {
             }}
           />
         )}
-        {children ?? (
-          <Suspense fallback={<RouteSuspenseFallback />}>
-            <Outlet />
-          </Suspense>
+        {/* When locked, don't mount the active route at all — pages like
+            PerformancePage / NotesPage / EconomicEventsPage would otherwise
+            try to render against zero calendars. The dim overlay below sits
+            on top of an empty placeholder so the column keeps its size. */}
+        {showLockOverlay ? (
+          <Box sx={{ minHeight: 'calc(100vh - 64px)' }} />
+        ) : (
+          children ?? (
+            <Suspense fallback={<RouteSuspenseFallback />}>
+              <Outlet />
+            </Suspense>
+          )
         )}
+
+        {showLockOverlay && <CalendarLockedOverlay />}
       </Box>
 
       {/* Inline calendars-list panel — lg+ only. <lg uses the drawer below. */}
@@ -275,6 +303,14 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, onNewCalendar }) => {
                       actions.onCalendarClick(id);
                       closePanel();
                     }}
+                    onCreateCalendar={
+                      actions.onCreateCalendar
+                        ? () => {
+                            actions.onCreateCalendar?.();
+                            closePanel();
+                          }
+                        : undefined
+                    }
                     onEditCalendar={actions.onEditCalendar}
                     onDuplicateCalendar={actions.onDuplicateCalendar}
                     onLinkCalendar={actions.onLinkCalendar}
@@ -306,6 +342,14 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, onNewCalendar }) => {
               actions.onCalendarClick(id);
               closePanel();
             }}
+            onCreateCalendar={
+              actions.onCreateCalendar
+                ? () => {
+                    actions.onCreateCalendar?.();
+                    closePanel();
+                  }
+                : undefined
+            }
             onEditCalendar={actions.onEditCalendar}
             onDuplicateCalendar={actions.onDuplicateCalendar}
             onLinkCalendar={actions.onLinkCalendar}
