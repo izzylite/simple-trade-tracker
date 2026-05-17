@@ -255,7 +255,7 @@ const ProgressSection: React.FC<ProgressSectionProps> = ({
             borderRadius: 1,
             backgroundColor: 'rgba(255, 255, 255, 0.1)',
             '& .MuiLinearProgress-bar': {
-              backgroundColor: tradedDaysReached ? 'success.main' : 'primary.main',
+              backgroundColor: 'primary.main',
               borderRadius: 1
             }
           }}
@@ -285,7 +285,7 @@ const ProgressSection: React.FC<ProgressSectionProps> = ({
             borderRadius: 1,
             backgroundColor: 'rgba(255, 255, 255, 0.1)',
             '& .MuiLinearProgress-bar': {
-              backgroundColor: profitTargetReached ? 'success.main' : 'primary.main',
+              backgroundColor: 'primary.main',
               borderRadius: 1
             }
           }}
