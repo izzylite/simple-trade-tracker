@@ -1,14 +1,14 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import {
   Box,
   Typography,
   IconButton,
   Skeleton,
-  useTheme
+  useTheme,
 } from '@mui/material';
 import { ChevronLeft, ChevronRight } from '@mui/icons-material';
-import { format } from 'date-fns';
 import { alpha } from '@mui/material/styles';
+import { useDialogTokens, MONO_FONT } from '../../styles/dialogTokens';
 
 interface DayHeaderProps {
   formInputVisible: boolean;
@@ -30,102 +30,115 @@ const DayHeader: React.FC<DayHeaderProps> = ({
   onPrevDay,
   onNextDay,
   loading = false,
-  compact = false
+  compact = false,
 }) => {
   const theme = useTheme();
-  
-   
-  
+  const { isDark, violet, monoLabelSx } = useDialogTokens();
+
+  const isPositive = total_pnl >= 0;
+  const pnlColor = isPositive ? theme.palette.success.main : theme.palette.error.main;
+  const pnlBg = alpha(pnlColor, isDark ? 0.12 : 0.08);
+  const pnlBorder = alpha(pnlColor, isDark ? 0.3 : 0.22);
+
+  const balanceBg = alpha(violet, isDark ? 0.12 : 0.08);
+  const balanceBorder = alpha(violet, isDark ? 0.3 : 0.22);
+
+  const tileSectionLabelSx = {
+    ...monoLabelSx,
+    fontSize: '0.6rem',
+    letterSpacing: '0.14em',
+  };
+
+  const numberSx = {
+    fontFamily: MONO_FONT,
+    fontWeight: 700,
+    letterSpacing: '-0.01em',
+    fontSize: compact ? '1rem' : '1.25rem',
+  };
+
   return (
     <Box sx={{ mb: compact ? 2 : 3 }}>
-      <Box sx={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        mb: compact ? 1.5 : 2
-      }}>
-        {!formInputVisible && <IconButton onClick={onPrevDay} size="small">
-          <ChevronLeft fontSize={compact ? 'small' : 'medium'} />
-        </IconButton>}
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          mb: compact ? 1.5 : 2,
+        }}
+      >
+        {!formInputVisible && (
+          <IconButton onClick={onPrevDay} size="small" sx={{ color: theme.palette.text.secondary }}>
+            <ChevronLeft fontSize={compact ? 'small' : 'medium'} />
+          </IconButton>
+        )}
 
-        {title && <Typography
-          variant={compact ? 'subtitle2' : 'h6'}
-          sx={{ fontWeight: 600 }}
-        >
-          {title}
-        </Typography>}
+        {title && (
+          <Typography
+            variant={compact ? 'subtitle2' : 'h6'}
+            sx={{ fontWeight: 700, letterSpacing: '-0.01em' }}
+          >
+            {title}
+          </Typography>
+        )}
 
-        {!formInputVisible && <IconButton onClick={onNextDay} size="small">
-          <ChevronRight fontSize={compact ? 'small' : 'medium'} />
-        </IconButton>
-        }
+        {!formInputVisible && (
+          <IconButton onClick={onNextDay} size="small" sx={{ color: theme.palette.text.secondary }}>
+            <ChevronRight fontSize={compact ? 'small' : 'medium'} />
+          </IconButton>
+        )}
       </Box>
 
-      <Box sx={{ display: 'flex', gap: compact ? 1.5 : 2 }}>
+      <Box sx={{ display: 'flex', gap: compact ? 1.25 : 1.5 }}>
+        {/* Day P&L tile */}
         <Box
           sx={{
             flex: 1,
-            p: compact ? 1.5 : 2,
-            borderRadius: 1,
-            bgcolor: total_pnl >= 0
-              ? alpha(theme.palette.success.main, 0.1)
-              : alpha(theme.palette.error.main, 0.1),
-            border: '1px solid',
-            borderColor: total_pnl >= 0
-              ? alpha(theme.palette.success.main, 0.2)
-              : alpha(theme.palette.error.main, 0.2)
+            p: compact ? 1.25 : 1.5,
+            borderRadius: 1.5,
+            backgroundColor: pnlBg,
+            border: `1px solid ${pnlBorder}`,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 0.5,
           }}
         >
-          <Typography
-            variant={compact ? 'caption' : 'body2'}
-            color="text.secondary"
-          >
-            Day P&L
-          </Typography>
+          <Typography sx={tileSectionLabelSx}>Day P&amp;L</Typography>
           {loading ? (
-            <Skeleton variant="text" width={compact ? 80 : 100}
-              sx={{ fontSize: compact ? '0.95rem' : '1.25rem' }}
+            <Skeleton
+              variant="text"
+              width={compact ? 80 : 100}
+              sx={{ fontSize: compact ? '1rem' : '1.25rem' }}
             />
           ) : (
-            <Typography
-              variant={compact ? 'body1' : 'h6'}
-              sx={{
-                fontWeight: 600,
-                color: total_pnl >= 0
-                  ? theme.palette.success.main
-                  : theme.palette.error.main
-              }}
-            >
-              {total_pnl >= 0 ? '+' : ''}{total_pnl.toLocaleString()}
+            <Typography sx={{ ...numberSx, color: pnlColor }}>
+              {isPositive ? '+' : ''}
+              {total_pnl.toLocaleString()}
             </Typography>
           )}
         </Box>
 
+        {/* Balance tile */}
         <Box
           sx={{
             flex: 1,
-            p: compact ? 1.5 : 2,
-            borderRadius: 1,
-            bgcolor: alpha(theme.palette.primary.main, 0.1),
-            border: '1px solid',
-            borderColor: alpha(theme.palette.primary.main, 0.2)
+            p: compact ? 1.25 : 1.5,
+            borderRadius: 1.5,
+            backgroundColor: balanceBg,
+            border: `1px solid ${balanceBorder}`,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 0.5,
           }}
         >
-          <Typography
-            variant={compact ? 'caption' : 'body2'}
-            color="text.secondary"
-          >
-            Balance Of The Day
-          </Typography>
+          <Typography sx={tileSectionLabelSx}>Balance of the day</Typography>
           {loading ? (
-            <Skeleton variant="text" width={compact ? 90 : 120}
-              sx={{ fontSize: compact ? '0.95rem' : '1.25rem' }}
+            <Skeleton
+              variant="text"
+              width={compact ? 90 : 120}
+              sx={{ fontSize: compact ? '1rem' : '1.25rem' }}
             />
           ) : (
-            <Typography
-              variant={compact ? 'body1' : 'h6'}
-              sx={{ fontWeight: 600 }}
-            >
+            <Typography sx={{ ...numberSx, color: theme.palette.text.primary }}>
               ${account_balance.toLocaleString()}
             </Typography>
           )}

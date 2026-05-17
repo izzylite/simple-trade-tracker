@@ -1,26 +1,17 @@
 import React, { useMemo, useCallback, useState, useEffect } from 'react';
 import {
   TextField,
-  FormControl,
-  FormLabel,
-  RadioGroup,
-  FormControlLabel,
-  Radio,
   Select,
   MenuItem,
-  InputLabel,
   Box,
   FormControlLabel as MuiFormControlLabel,
   Checkbox,
   Typography,
-  Chip,
   alpha,
   useTheme,
   Autocomplete,
-  Button,
-  CircularProgress,
-  InputAdornment
 } from '@mui/material';
+import { useDialogTokens } from '../../styles/dialogTokens';
 import { DatePicker } from '@mui/x-date-pickers';
 import { Trade, TradeEconomicEvent } from '../../types/dualWrite';
 import { FormField } from '../StyledComponents';
@@ -151,6 +142,11 @@ const TradeForm: React.FC<TradeFormProps> = ({
   onOpenGalleryMode
 }) => {
   const theme = useTheme();
+  const {
+    isDark,
+    violet, surfaceInset, hairline,
+    monoLabelSx, inputSx, chipStyle,
+  } = useDialogTokens();
 
   // State for trade name suggestions
   const [tradeNameSuggestions, setTradeNameSuggestions] = useState<string[]>([]);
@@ -205,6 +201,42 @@ const TradeForm: React.FC<TradeFormProps> = ({
 
   const cumulativePnl = calculateCumulativePnl(newTrade);
 
+  /** Mono uppercase field label rendered above an input. */
+  const renderLabel = (text: string, required?: boolean) => (
+    <Typography sx={monoLabelSx}>
+      {text}
+      {required && (
+        <Box component="span" sx={{ color: theme.palette.error.main, fontFamily: 'inherit' }}>
+          *
+        </Box>
+      )}
+    </Typography>
+  );
+
+  /** Mono caption rendered below an input. */
+  const renderHelper = (text: React.ReactNode, tone: 'default' | 'warning' = 'default') => (
+    <Typography
+      sx={{
+        fontSize: '0.74rem',
+        color: tone === 'warning' ? theme.palette.warning.main : alpha(theme.palette.text.secondary, 0.85),
+        lineHeight: 1.4,
+      }}
+    >
+      {text}
+    </Typography>
+  );
+
+  /** Trade-type chip used in the segmented control. */
+  const tradeTypeOptions: Array<{
+    value: 'win' | 'loss' | 'breakeven';
+    label: string;
+    color: string;
+  }> = [
+    { value: 'win', label: 'Win', color: theme.palette.success.main },
+    { value: 'loss', label: 'Loss', color: theme.palette.error.main },
+    { value: 'breakeven', label: 'Breakeven', color: theme.palette.text.secondary },
+  ];
+
 
 
   // Calculate and update the amount based on risk
@@ -244,189 +276,243 @@ const TradeForm: React.FC<TradeFormProps> = ({
   }, [onRiskToRewardChange, dynamicRiskSettings.risk_per_trade, newTrade.partials_taken, cumulativePnl, onAmountChange]);
 
 
+  const numericInputSx = {
+    ...inputSx,
+    // Hide number input spinners across browsers
+    '& input[type=number]::-webkit-outer-spin-button, & input[type=number]::-webkit-inner-spin-button': {
+      WebkitAppearance: 'none',
+      margin: 0,
+    },
+    '& input[type=number]': {
+      MozAppearance: 'textfield',
+    },
+  };
+
   return (
     <form onSubmit={onSubmit}>
+      {/* Trade name */}
       <FormField>
-        <Autocomplete
-          freeSolo
-          options={tradeNameSuggestions}
-          value={newTrade.name}
-          onInputChange={(event, newValue) => {
-            // Create a synthetic event for compatibility with existing handler
-            const syntheticEvent = {
-              target: { value: newValue || '' }
-            } as React.ChangeEvent<HTMLInputElement>;
-            onNameChange(syntheticEvent);
-          }}
-          slotProps={{
-            popper: {
-              sx: { zIndex: Z_INDEX.DIALOG_POPUP }
-            }
-          }}
-          renderInput={(params) => (
-            <TextField
-              {...params}
-              label="Trade Name"
-              placeholder="Enter a name for this trade"
-              fullWidth
-            />
-          )}
-          renderOption={(props, option) => {
-            const { key, ...otherProps } = props;
-            return (
-              <Box component="li" key={key} {...otherProps}>
-                <Typography variant="body2">{option}</Typography>
-              </Box>
-            );
-          }}
-          sx={{
-            '& .MuiAutocomplete-option': {
-              fontSize: '0.875rem',
-            }
-          }}
-        />
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+          {renderLabel('Trade name')}
+          <Autocomplete
+            freeSolo
+            options={tradeNameSuggestions}
+            value={newTrade.name}
+            onInputChange={(event, newValue) => {
+              const syntheticEvent = {
+                target: { value: newValue || '' },
+              } as React.ChangeEvent<HTMLInputElement>;
+              onNameChange(syntheticEvent);
+            }}
+            slotProps={{
+              popper: { sx: { zIndex: Z_INDEX.DIALOG_POPUP } },
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="e.g. EURUSD"
+                fullWidth
+                size="small"
+                sx={inputSx}
+              />
+            )}
+            renderOption={(props, option) => {
+              const { key, ...otherProps } = props;
+              return (
+                <Box component="li" key={key} {...otherProps}>
+                  <Typography sx={{ fontSize: '0.875rem' }}>{option}</Typography>
+                </Box>
+              );
+            }}
+          />
+        </Box>
       </FormField>
-      <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
-        <FormField sx={{ flex: 1 }}>
+
+      {/* Price grid */}
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr 1fr', sm: '1fr 1fr' },
+          gap: 1.5,
+          mb: 2,
+        }}
+      >
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+          {renderLabel('Entry price')}
           <TextField
-            label="Entry Price"
             type="number"
-            value={newTrade.entry_price == 0 ? undefined : newTrade.entry_price}
+            value={newTrade.entry_price === 0 ? '' : newTrade.entry_price}
             onChange={onEntryChange}
             fullWidth
-            placeholder="Optional entry price"
-            slotProps={{
-              htmlInput: { step: 0.00001 }
-            }}
+            size="small"
+            placeholder="Optional"
+            slotProps={{ htmlInput: { step: 0.00001 } }}
+            sx={numericInputSx}
           />
-        </FormField>
-        <FormField sx={{ flex: 1 }}>
+        </Box>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+          {renderLabel('Exit price')}
           <TextField
-            label="Exit Price"
             type="number"
-            value={newTrade.exit_price == 0 ? undefined : newTrade.exit_price}
+            value={newTrade.exit_price === 0 ? '' : newTrade.exit_price}
             onChange={onExitChange}
             fullWidth
-            placeholder="Optional exit price"
-            slotProps={{
-              htmlInput: { step: 0.00001 }
-            }}
+            size="small"
+            placeholder="Optional"
+            slotProps={{ htmlInput: { step: 0.00001 } }}
+            sx={numericInputSx}
           />
-        </FormField>
-      </Box>
-
-      <Box sx={{ display: 'flex', gap: 2, width: '100%' }}>
-        <FormField sx={{ flex: 1 }}>
+        </Box>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+          {renderLabel('Stop loss')}
           <TextField
-            label="Stop Loss"
             type="number"
-            value={newTrade.stop_loss == 0 ? undefined : newTrade.stop_loss}
+            value={newTrade.stop_loss === 0 ? '' : newTrade.stop_loss}
             onChange={onStopLossChange}
             fullWidth
-            placeholder="Optional stop loss"
-            slotProps={{
-              htmlInput: { step: 0.00001 }
-            }}
+            size="small"
+            placeholder="Optional"
+            slotProps={{ htmlInput: { step: 0.00001 } }}
+            sx={numericInputSx}
           />
-        </FormField>
-        <FormField sx={{ flex: 1 }}>
+        </Box>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+          {renderLabel('Take profit')}
           <TextField
-            label="Take Profit"
             type="number"
-            value={newTrade.take_profit == 0 ? undefined : newTrade.take_profit}
+            value={newTrade.take_profit === 0 ? '' : newTrade.take_profit}
             onChange={onTakeProfitChange}
             fullWidth
-            placeholder="Optional take profit"
-            slotProps={{
-              htmlInput: { step: 0.00001 }
-            }}
+            size="small"
+            placeholder="Optional"
+            slotProps={{ htmlInput: { step: 0.00001 } }}
+            sx={numericInputSx}
           />
-        </FormField>
+        </Box>
       </Box>
 
-      {/* Date picker - only show when editing a trade */}
+      {/* Trade date — only when editing */}
       {editingTrade && onDateChange && (
         <FormField>
-          <DatePicker
-            label="Trade Date"
-            value={newTrade.trade_date}
-            onChange={onDateChange}
-            slotProps={{
-              textField: {
-                fullWidth: true,
-                helperText: 'Change the date of this trade'
-              },
-              popper: {
-                sx: { zIndex: Z_INDEX.DIALOG_POPUP }
-              }
-            }}
-          />
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+            {renderLabel('Trade date')}
+            <DatePicker
+              value={newTrade.trade_date}
+              onChange={onDateChange}
+              slotProps={{
+                textField: { fullWidth: true, size: 'small', sx: inputSx },
+                popper: { sx: { zIndex: Z_INDEX.DIALOG_POPUP } },
+              }}
+            />
+            {renderHelper('Change the date of this trade')}
+          </Box>
         </FormField>
       )}
-      <FormControl component="fieldset" sx={{ mb: 2 }}>
-        <FormLabel component="legend">Trade Type</FormLabel>
-        <RadioGroup
-          row
-          name="type"
-          value={newTrade.trade_type}
-          onChange={onTypeChange}
-        >
-          <FormControlLabel
-            value="win"
-            control={<Radio />}
-            label="Win"
-          />
-          <FormControlLabel
-            value="loss"
-            control={<Radio />}
-            label="Loss"
-          />
-          <FormControlLabel
-            value="breakeven"
-            control={<Radio />}
-            label="Breakeven"
-          />
-        </RadioGroup>
-      </FormControl>
-      {(!dynamicRiskSettings.risk_per_trade || (dynamicRiskSettings.risk_per_trade && newTrade.partials_taken)) ? (
+
+      {/* Trade type — chip segmented control */}
+      <FormField>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+          {renderLabel('Trade type', true)}
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+            {tradeTypeOptions.map((opt) => {
+              const selected = newTrade.trade_type === opt.value;
+              const tintedBg = alpha(opt.color, isDark ? 0.18 : 0.14);
+              const tintedBorder = alpha(opt.color, isDark ? 0.4 : 0.32);
+              return (
+                <Box
+                  key={opt.value}
+                  onClick={() => {
+                    const syntheticEvent = {
+                      target: { value: opt.value },
+                    } as any;
+                    onTypeChange(syntheticEvent);
+                  }}
+                  sx={{
+                    ...chipStyle(selected),
+                    backgroundColor: selected ? tintedBg : surfaceInset,
+                    color: selected ? opt.color : theme.palette.text.primary,
+                    border: `1px solid ${selected ? tintedBorder : hairline}`,
+                    px: 1.5,
+                    '&:hover': {
+                      backgroundColor: selected
+                        ? tintedBg
+                        : alpha(theme.palette.text.primary, isDark ? 0.06 : 0.05),
+                    },
+                  }}
+                >
+                  <Box
+                    component="span"
+                    sx={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: '50%',
+                      backgroundColor: opt.color,
+                      mr: 0.5,
+                    }}
+                  />
+                  {opt.label}
+                </Box>
+              );
+            })}
+          </Box>
+        </Box>
+      </FormField>
+
+      {/* Amount */}
+      {!dynamicRiskSettings.risk_per_trade ||
+      (dynamicRiskSettings.risk_per_trade && newTrade.partials_taken) ? (
         <FormField>
-          <TextField
-            label="Amount"
-            type="number"
-            value={newTrade.amount == 0 ? undefined : newTrade.amount}
-            onChange={(e) => onAmountChange(parseFloat(e.target.value) || 0)}
-            fullWidth
-            required
-            helperText={dynamicRiskSettings.risk_per_trade && newTrade.partials_taken ? "Manual entry for partial profits" : undefined}
-          />
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+            {renderLabel('Amount', true)}
+            <TextField
+              type="number"
+              value={newTrade.amount === 0 ? '' : newTrade.amount}
+              onChange={(e) => onAmountChange(parseFloat(e.target.value) || 0)}
+              fullWidth
+              size="small"
+              required
+              sx={numericInputSx}
+            />
+            {dynamicRiskSettings.risk_per_trade && newTrade.partials_taken &&
+              renderHelper('Manual entry for partial profits')}
+          </Box>
         </FormField>
       ) : (
         <FormField>
-          <TextField
-            label="Amount (Calculated from Risk)"
-            type="number"
-            value={calculateAmountFromRisk()}
-            sx={{
-              '& .MuiInputBase-input': { pointerEvents: 'none' }
-            }}
-            fullWidth
-            disabled
-            InputLabelProps={{
-              shrink: true
-            }}
-            helperText={
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+            {renderLabel('Amount (calculated from risk)')}
+            <TextField
+              type="number"
+              value={calculateAmountFromRisk()}
+              fullWidth
+              size="small"
+              disabled
+              sx={{
+                ...numericInputSx,
+                '& .MuiInputBase-input': {
+                  pointerEvents: 'none',
+                  fontFamily: 'inherit',
+                },
+                '& .MuiOutlinedInput-root': {
+                  ...(inputSx as Record<string, any>)['& .MuiOutlinedInput-root'],
+                  backgroundColor: alpha(violet, isDark ? 0.08 : 0.06),
+                },
+              }}
+            />
+            {renderHelper(
               dynamicRiskSettings?.dynamic_risk_enabled &&
                 dynamicRiskSettings.increased_risk_percentage &&
                 dynamicRiskSettings.profit_threshold_percentage &&
-                (Number(cumulativePnl) / Number(accountBalance) * 100) >= dynamicRiskSettings.profit_threshold_percentage
+                (Number(cumulativePnl) / Number(accountBalance) * 100) >=
+                  dynamicRiskSettings.profit_threshold_percentage
                 ? `Based on ${dynamicRiskSettings.increased_risk_percentage}% of account balance (INCREASED from ${dynamicRiskSettings.risk_per_trade}%)`
-                : `Based on ${dynamicRiskSettings.risk_per_trade}% of account balance (${formatCurrency((Number(accountBalance) * (dynamicRiskSettings.risk_per_trade || 0)) / 100)})`
-            }
-          />
+                : `Based on ${dynamicRiskSettings.risk_per_trade}% of account balance (${formatCurrency((Number(accountBalance) * (dynamicRiskSettings.risk_per_trade || 0)) / 100)})`,
+            )}
+          </Box>
         </FormField>
       )}
 
-
+      {/* Partials checkbox */}
       {dynamicRiskSettings.risk_per_trade !== undefined && (
         <FormField>
           <MuiFormControlLabel
@@ -434,97 +520,128 @@ const TradeForm: React.FC<TradeFormProps> = ({
               <Checkbox
                 checked={newTrade.partials_taken}
                 onChange={onPartialsTakenChange}
+                size="small"
+                sx={{
+                  color: alpha(theme.palette.text.secondary, 0.6),
+                  '&.Mui-checked': { color: violet },
+                }}
               />
             }
             label={
-              <Typography variant="body2">
+              <Typography sx={{ fontSize: '0.85rem', color: theme.palette.text.secondary }}>
                 Partials taken (allows manual amount entry)
               </Typography>
             }
+            sx={{ ml: -0.75 }}
           />
         </FormField>
       )}
+
+      {/* Risk to reward */}
       <FormField>
-        <TextField
-          label="Risk to Reward"
-          value={newTrade.risk_to_reward == 0 ? undefined : newTrade.risk_to_reward}
-          onChange={handleRiskToRewardChange}
-          fullWidth
-          type="number"
-          slotProps={{
-            htmlInput: { min: 0, step: 0.1 }
-          }}
-          sx={{
-            // Hide number input spinners for Chrome, Safari, Edge, Opera
-            '& input[type=number]::-webkit-outer-spin-button, & input[type=number]::-webkit-inner-spin-button': {
-              WebkitAppearance: 'none',
-              margin: 0,
-            },
-            // Hide number input spinners for Firefox
-            '& input[type=number]': {
-              MozAppearance: 'textfield',
-            },
-          }}
-        />
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+          {renderLabel('Risk to reward')}
+          <TextField
+            value={newTrade.risk_to_reward === 0 ? '' : newTrade.risk_to_reward}
+            onChange={handleRiskToRewardChange}
+            fullWidth
+            size="small"
+            type="number"
+            placeholder="e.g. 2"
+            slotProps={{ htmlInput: { min: 0, step: 0.1 } }}
+            sx={numericInputSx}
+          />
+        </Box>
       </FormField>
+
+      {/* Session */}
       <FormField>
-        <FormControl fullWidth required>
-          <InputLabel id="session-label">Session *</InputLabel>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+          {renderLabel('Session', true)}
           <Select
-            labelId="session-label"
             value={newTrade.session}
             onChange={onSessionChange}
-            label="Session *"
+            displayEmpty
             required
+            fullWidth
+            size="small"
+            renderValue={(value) => {
+              if (!value) {
+                return (
+                  <Typography component="span" sx={{ fontSize: '0.88rem', color: theme.palette.text.disabled }}>
+                    Pick a session…
+                  </Typography>
+                );
+              }
+              return value as string;
+            }}
             MenuProps={{
-              sx: { zIndex: Z_INDEX.DIALOG_POPUP }
+              sx: { zIndex: Z_INDEX.DIALOG_POPUP },
+              PaperProps: {
+                sx: {
+                  borderRadius: 1.5,
+                  border: `1px solid ${hairline}`,
+                  boxShadow: theme.shadows[8],
+                  backgroundImage: 'none',
+                  mt: 0.5,
+                },
+              },
+            }}
+            sx={inputSx}
+          >
+            <MenuItem value="" sx={{ fontSize: '0.88rem' }}>None</MenuItem>
+            <MenuItem value="Asia" sx={{ fontSize: '0.88rem' }}>Asia</MenuItem>
+            <MenuItem value="London" sx={{ fontSize: '0.88rem' }}>London</MenuItem>
+            <MenuItem value="NY AM" sx={{ fontSize: '0.88rem' }}>NY AM</MenuItem>
+            <MenuItem value="NY PM" sx={{ fontSize: '0.88rem' }}>NY PM</MenuItem>
+          </Select>
+        </Box>
+      </FormField>
+
+      {/* Tags + required-groups warning */}
+      <FormField>
+        {missingRequiredGroups.length > 0 && (
+          <Box
+            sx={{
+              mb: 1.5,
+              p: 1.25,
+              borderRadius: 1.5,
+              backgroundColor: alpha(theme.palette.warning.main, isDark ? 0.12 : 0.08),
+              border: `1px solid ${alpha(theme.palette.warning.main, isDark ? 0.4 : 0.3)}`,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 0.75,
             }}
           >
-            <MenuItem value="">None</MenuItem>
-            <MenuItem value="Asia">Asia</MenuItem>
-            <MenuItem value="London">London</MenuItem>
-            <MenuItem value="NY AM">NY AM</MenuItem>
-            <MenuItem value="NY PM">NY PM</MenuItem>
-          </Select>
-        </FormControl>
-      </FormField>
-      <FormField>
-        {/* Required Tag Groups Indicator */}
-        {missingRequiredGroups.length > 0 && (
-          <Box sx={{
-            mb: 2,
-            p: 2,
-            borderRadius: 1,
-            bgcolor: alpha(theme.palette.warning.main, 0.1),
-            border: `1px solid ${alpha(theme.palette.warning.main, 0.3)}`
-          }}>
-            <Typography variant="body2" color="warning.main" sx={{ fontWeight: 600, mb: 1 }}>
-              Required Tag Groups
+            <Typography sx={{ ...monoLabelSx, color: theme.palette.warning.main }}>
+              Required tag groups
             </Typography>
-            <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
-              Please add at least one tag from each required group:
+            <Typography sx={{ fontSize: '0.78rem', color: theme.palette.text.secondary, lineHeight: 1.4 }}>
+              Add at least one tag from each required group:
             </Typography>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-              {missingRequiredGroups.map(group => (
-                <Chip
+              {missingRequiredGroups.map((group) => (
+                <Box
                   key={group}
-                  label={group}
-                  size="small"
-                  color="warning"
-                  variant="outlined"
                   sx={{
-                    fontWeight: 500,
-                    '& .MuiChip-label': {
-                      fontSize: '0.75rem'
-                    }
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    px: 1,
+                    py: 0.25,
+                    borderRadius: 999,
+                    fontSize: '0.72rem',
+                    fontWeight: 600,
+                    color: theme.palette.warning.main,
+                    backgroundColor: alpha(theme.palette.warning.main, isDark ? 0.18 : 0.14),
+                    border: `1px solid ${alpha(theme.palette.warning.main, isDark ? 0.4 : 0.32)}`,
                   }}
-                />
+                >
+                  {group}
+                </Box>
               ))}
             </Box>
           </Box>
         )}
-
-
 
         <TagsInput
           tags={newTrade.tags}
@@ -533,10 +650,8 @@ const TradeForm: React.FC<TradeFormProps> = ({
           calendarId={calendarId}
           onTagUpdated={onTagUpdated}
         />
-        <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-          Pro tip: Categorize tags using the format "Category:Tag" (e.g., "Strategy:Breakout", "Setup:Double Top").
-          Categorized tags are grouped together in charts, making it easier to filter and analyze your trading patterns
-          and identify which strategies and setups are most profitable. Note: Only one colon (:) is allowed per tag.
+        <Typography sx={{ fontSize: '0.72rem', color: alpha(theme.palette.text.secondary, 0.85), mt: 0.75, lineHeight: 1.4, display: 'block' }}>
+          Tip: categorize tags as <code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '0.7rem' }}>Category:Tag</code> (e.g. <code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '0.7rem' }}>Strategy:Breakout</code>). Grouped tags cluster in charts so you can spot which setups perform best. One colon per tag.
         </Typography>
       </FormField>
 
