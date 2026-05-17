@@ -12,13 +12,11 @@ import {
   Typography,
   Alert,
   Tooltip,
-  Divider,
   useTheme,
   alpha,
   List,
   ListItem,
   ListItemButton,
-  Chip,
   TextField,
   InputAdornment,
   CircularProgress,
@@ -46,6 +44,7 @@ import { Trade } from '../../../types/trade';
 import { Calendar } from '../../../types/calendar';
 import { EconomicEvent } from '../../../types/economicCalendar';
 import { scrollbarStyles } from '../../../styles/scrollbarStyles';
+import { useDialogTokens, MONO_FONT } from '../../../styles/dialogTokens';
 import { logger } from '../../../utils/logger';
 import { stripReferencedBlocks } from '../../../utils/chatMentions';
 import { useAuthState } from '../../../contexts/AuthStateContext';
@@ -119,6 +118,18 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
 }) => {
   const { onOpenGalleryMode } = tradeOperations;
   const theme = useTheme();
+  const tokens = useDialogTokens();
+  const {
+    violet,
+    violetSoft,
+    violetSofter,
+    violetBorder,
+    surfaceInset,
+    hairline,
+    inputSx,
+    chipStyle,
+    monoSectionLabelSx,
+  } = tokens;
   const { user } = useAuthState();
   const chatInterfaceRef = useRef<AIChatInterfaceRef>(null);
 
@@ -503,53 +514,124 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
         display: 'flex',
         alignItems: 'center',
         gap: 1,
-        px: 1,
-        py: 0.5,
+        px: 1.25,
+        py: 0.75,
         flexShrink: 0,
-        borderBottom: `1px solid ${theme.palette.divider}`
+        borderBottom: `1px solid ${hairline}`,
       }}>
-        {/* Calendar context picker — inline in header */}
+        {/* Calendar context picker — chip-style trigger that opens a themed
+            paper menu. Mirrors the dialog-token chipStyle() language. */}
         {availableCalendars && availableCalendars.length > 0 && onCalendarChange ? (
           <FormControl size="small" sx={{ flex: 1, minWidth: 0 }}>
             <Select
               value={selectedCalendarId}
               onChange={(e) => onCalendarChange(e.target.value)}
               displayEmpty
-              MenuProps={{ sx: { zIndex: Z_INDEX.DIALOG_POPUP } }}
+              variant="standard"
+              disableUnderline
+              MenuProps={{
+                sx: { zIndex: Z_INDEX.DIALOG_POPUP },
+                PaperProps: {
+                  sx: {
+                    mt: 0.75,
+                    borderRadius: 1.5,
+                    border: `1px solid ${hairline}`,
+                    boxShadow: theme.shadows[10],
+                    backgroundImage: 'none',
+                    overflow: 'hidden',
+                    '& .MuiMenuItem-root': {
+                      fontSize: '0.82rem',
+                      fontWeight: 500,
+                      py: 0.85,
+                      px: 1.5,
+                      '&:hover': { backgroundColor: violetSofter },
+                      '&.Mui-selected': {
+                        backgroundColor: violetSoft,
+                        color: violet,
+                        '&:hover': { backgroundColor: violetSoft },
+                      },
+                    },
+                  },
+                },
+              }}
+              renderValue={(val) => {
+                const selected = availableCalendars.find((c) => c.id === val);
+                return (
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      fontSize: '0.82rem',
+                      fontWeight: 600,
+                      color: selected ? violet : theme.palette.text.primary,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {selected ? selected.name : 'All Calendars'}
+                  </Typography>
+                );
+              }}
               sx={{
-                borderRadius: 1,
-                bgcolor: 'background.default',
-                '& .MuiSelect-select': { py: 0.75, fontSize: '0.8rem' },
+                borderRadius: 999,
+                px: 1.25,
+                py: 0.25,
+                backgroundColor: surfaceInset,
+                border: `1px solid ${hairline}`,
+                transition: 'all 120ms ease',
+                '&:hover': {
+                  backgroundColor: violetSofter,
+                  borderColor: violetBorder,
+                },
+                '& .MuiSelect-select': {
+                  py: 0.4,
+                  pl: 0.5,
+                  pr: '24px !important',
+                  backgroundColor: 'transparent !important',
+                  display: 'flex',
+                  alignItems: 'center',
+                  minHeight: '0 !important',
+                },
+                '& .MuiSvgIcon-root': {
+                  color: theme.palette.text.secondary,
+                  right: 4,
+                },
               }}
             >
-              <MenuItem value="">
-                <Typography variant="body2" color="text.secondary">
-                  All Calendars
-                </Typography>
-              </MenuItem>
+              <MenuItem value="">All Calendars</MenuItem>
               {availableCalendars.map((cal) => (
-                <MenuItem key={cal.id} value={cal.id}>
-                  <Typography variant="body2">{cal.name}</Typography>
-                </MenuItem>
+                <MenuItem key={cal.id} value={cal.id}>{cal.name}</MenuItem>
               ))}
             </Select>
           </FormControl>
         ) : calendar ? (
-          <FormControl size="small" sx={{ flex: 1, minWidth: 0 }}>
-            <Select
-              value={calendar.id}
-              disabled
+          <Box
+            sx={{
+              flex: 1,
+              minWidth: 0,
+              display: 'inline-flex',
+              alignItems: 'center',
+              px: 1.25,
+              py: 0.55,
+              borderRadius: 999,
+              backgroundColor: surfaceInset,
+              border: `1px solid ${hairline}`,
+            }}
+          >
+            <Typography
+              variant="body2"
               sx={{
-                borderRadius: 1,
-                bgcolor: 'background.default',
-                '& .MuiSelect-select': { py: 0.75, fontSize: '0.8rem' },
+                fontSize: '0.82rem',
+                fontWeight: 600,
+                color: theme.palette.text.primary,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
               }}
             >
-              <MenuItem value={calendar.id}>
-                <Typography variant="body2">{calendar.name}</Typography>
-              </MenuItem>
-            </Select>
-          </FormControl>
+              {calendar.name}
+            </Typography>
+          </Box>
         ) : null}
 
         {user && (
@@ -569,12 +651,9 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
                   }}
                   aria-label="Back to Chat"
                   sx={{
-                    color: 'primary.main',
-                    '&:hover': {
-                      backgroundColor: alpha(
-                        theme.palette.primary.main, 0.1
-                      )
-                    }
+                    color: violet,
+                    borderRadius: 1.25,
+                    '&:hover': { backgroundColor: violetSofter },
                   }}
                 >
                   <ArrowBackIcon fontSize="small" />
@@ -587,12 +666,9 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
                   onClick={() => onReturnToPrevious?.()}
                   aria-label="Back to previous conversation"
                   sx={{
-                    color: 'primary.main',
-                    '&:hover': {
-                      backgroundColor: alpha(
-                        theme.palette.primary.main, 0.1
-                      )
-                    }
+                    color: violet,
+                    borderRadius: 1.25,
+                    '&:hover': { backgroundColor: violetSofter },
                   }}
                 >
                   <ArrowBackIcon fontSize="small" />
@@ -605,13 +681,10 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
                   onClick={handleNewChat}
                   disabled={messages.length === 0}
                   sx={{
-                    color: 'primary.main',
-                    '&:hover': {
-                      backgroundColor: alpha(
-                        theme.palette.primary.main, 0.1
-                      )
-                    },
-                    '&:disabled': { color: 'text.disabled' }
+                    color: violet,
+                    borderRadius: 1.25,
+                    '&:hover': { backgroundColor: violetSofter },
+                    '&:disabled': { color: 'text.disabled' },
                   }}
                 >
                   <NewChatIcon fontSize="small" />
@@ -629,14 +702,13 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
                 }}
                 aria-label="Conversation History"
                 sx={{
-                  color: showHistoryView
-                    ? 'primary.main'
-                    : 'text.secondary',
-                  '&:hover': {
-                    backgroundColor: alpha(
-                      theme.palette.primary.main, 0.08
-                    )
-                  }
+                  color: showHistoryView ? violet : 'text.secondary',
+                  borderRadius: 1.25,
+                  backgroundColor: showHistoryView ? violetSoft : 'transparent',
+                  border: showHistoryView
+                    ? `1px solid ${violetBorder}`
+                    : '1px solid transparent',
+                  '&:hover': { backgroundColor: violetSofter },
                 }}
               >
                 <HistoryIcon fontSize="small" />
@@ -653,14 +725,13 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
                 }}
                 aria-label="Reminders"
                 sx={{
-                  color: showRemindersView
-                    ? 'primary.main'
-                    : 'text.secondary',
-                  '&:hover': {
-                    backgroundColor: alpha(
-                      theme.palette.primary.main, 0.08
-                    )
-                  }
+                  color: showRemindersView ? violet : 'text.secondary',
+                  borderRadius: 1.25,
+                  backgroundColor: showRemindersView ? violetSoft : 'transparent',
+                  border: showRemindersView
+                    ? `1px solid ${violetBorder}`
+                    : '1px solid transparent',
+                  '&:hover': { backgroundColor: violetSofter },
                 }}
               >
                 <AlarmIcon fontSize="small" />
@@ -677,14 +748,13 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
                 }}
                 aria-label="Memory Logs"
                 sx={{
-                  color: showMemoryLogsView
-                    ? 'primary.main'
-                    : 'text.secondary',
-                  '&:hover': {
-                    backgroundColor: alpha(
-                      theme.palette.primary.main, 0.08
-                    )
-                  }
+                  color: showMemoryLogsView ? violet : 'text.secondary',
+                  borderRadius: 1.25,
+                  backgroundColor: showMemoryLogsView ? violetSoft : 'transparent',
+                  border: showMemoryLogsView
+                    ? `1px solid ${violetBorder}`
+                    : '1px solid transparent',
+                  '&:hover': { backgroundColor: violetSofter },
                 }}
               >
                 <ManageSearchIcon fontSize="small" />
@@ -792,8 +862,8 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
             // doesn't leak through this overlay.
             zIndex: 20
           }}>
-            {/* Search Bar with inline filter dropdown */}
-            <Box sx={{ p: 2, pb: 1 }}>
+            {/* Search Bar with inline filter chips */}
+            <Box sx={{ px: 2, pt: 2, pb: 1.25, display: 'flex', flexDirection: 'column', gap: 1.25 }}>
               <TextField
                 fullWidth
                 size="small"
@@ -809,107 +879,43 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
                       />
                     </InputAdornment>
                   ),
-                  endAdornment: (
-                    <InputAdornment position="end" sx={{ mr: 0.5 }}>
-                      <FormControl size="small" variant="standard">
-                        <Select
-                          value={historyFilter}
-                          onChange={(e) =>
-                            setHistoryFilter(
-                              e.target.value as 'all' | 'pinned'
-                            )
-                          }
-                          disableUnderline
-                          MenuProps={{
-                            sx: { zIndex: Z_INDEX.DIALOG_POPUP },
-                            PaperProps: { sx: { mt: 0.5 } }
-                          }}
-                          sx={{
-                            fontSize: '0.78rem',
-                            height: 28,
-                            color: 'text.secondary',
-                            '& .MuiSelect-select': {
-                              py: 0.25,
-                              pl: 1, 
-                              pr: '24px !important',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 0.5,
-                              backgroundColor: 'transparent',
-                            },
-                            '&:hover .MuiSelect-select': {
-                              backgroundColor: 'transparent',
-                            },
-                            '&:focus .MuiSelect-select': {
-                              backgroundColor: 'transparent',
-                            },
-                            '& .MuiSvgIcon-root': {
-                              color: 'text.secondary',
-                              right: 2,
-                            },
-                          }}
-                          renderValue={(val) => (
-                            <Box sx={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 0.5
-                            }}>
-                              <Typography
-                                variant="caption"
-                                sx={{
-                                  fontSize: '0.78rem',
-                                  fontWeight: 500
-                                }}
-                              >
-                                {val === 'pinned' ? 'Pinned' : 'All'}
-                              </Typography>
-                            </Box>
-                          )}
-                        >
-                          <MenuItem
-                            value="all"
-                            sx={{
-                              fontSize: '0.8rem',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 1
-                            }}
-                          >
-                            <span>All</span>
-                          </MenuItem>
-                          <MenuItem
-                            value="pinned"
-                            sx={{
-                              fontSize: '0.8rem',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 1
-                            }}
-                          >
-                             
-                            <span>Pinned</span>
-                          </MenuItem>
-                        </Select>
-                      </FormControl>
-                    </InputAdornment>
-                  ),
                 }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: 2,
-                    pr: 0.5,
-                    backgroundColor: alpha(
-                      theme.palette.background.paper, 0.8
-                    ),
-                    '&:hover': {
-                      backgroundColor: theme.palette.background.paper,
-                    },
-                    '&.Mui-focused': {
-                      backgroundColor: theme.palette.background.paper,
-                    }
-                  }
-                }}
+                sx={inputSx}
               />
+              {/* Filter pills — mirror chipStyle() language */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                <Box
+                  component="span"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setHistoryFilter('all')}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setHistoryFilter('all');
+                    }
+                  }}
+                  sx={chipStyle(historyFilter === 'all')}
+                >
+                  All
+                </Box>
+                <Box
+                  component="span"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setHistoryFilter('pinned')}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setHistoryFilter('pinned');
+                    }
+                  }}
+                  sx={chipStyle(historyFilter === 'pinned')}
+                >
+                  <PushPinIcon sx={{ fontSize: 13 }} />
+                  Pinned
+                </Box>
+              </Box>
             </Box>
 
             {/* History Content */}
@@ -931,160 +937,168 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
                   </Alert>
                 </Box>
               ) : (
-                <List sx={{ p: 0 }}>
-                  {filteredConversations.map(
-                    (conversation, index) => (
-                      <React.Fragment key={conversation.id}>
-                        <ListItem disablePadding>
-                          <ListItemButton
-                            onClick={() =>
-                              handleSelectConversation(conversation)
-                            }
-                            sx={{
-                              py: 2,
-                              px: 2,
-                              display: 'flex',
-                              alignItems: 'flex-start',
-                              gap: 1,
-                              '&:hover': {
-                                backgroundColor: alpha(
-                                  theme.palette.primary.main, 0.08
-                                )
-                              }
-                            }}
-                          >
-                            <Box sx={{ flex: 1, minWidth: 0 }}>
-                              <Box sx={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 1,
-                                mb: 0.5
-                              }}>
-                                <Typography
-                                  variant="subtitle1"
-                                  sx={{
-                                    fontWeight: 600,
-                                    fontSize: '0.95rem',
-                                    flex: 1,
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    whiteSpace: 'nowrap'
-                                  }}
-                                >
-                                  {conversation.title}
-                                </Typography>
-                                <Chip
-                                  label={
-                                    `${conversation.message_count} msgs`
-                                  }
-                                  size="small"
-                                  sx={{
-                                    height: 20,
-                                    fontSize: '0.7rem',
-                                    backgroundColor: alpha(
-                                      theme.palette.primary.main, 0.1
-                                    ),
-                                    color: 'primary.main'
-                                  }}
-                                />
-                              </Box>
-                              <Typography
-                                variant="body2"
-                                color="text.secondary"
-                                sx={{
-                                  fontSize: '0.85rem',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  display: '-webkit-box',
-                                  WebkitLineClamp: 2,
-                                  WebkitBoxOrient: 'vertical',
-                                  mb: 0.5
-                                }}
-                              >
-                                {getPreviewText(conversation)}
-                              </Typography>
-                              <Box sx={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 0.5
-                              }}>
-                                <ScheduleIcon
-                                  sx={{
-                                    fontSize: 14,
-                                    color: 'text.disabled'
-                                  }}
-                                />
-                                <Typography
-                                  variant="caption"
-                                  color="text.disabled"
-                                >
-                                  {format(
-                                    conversation.updated_at,
-                                    'MMM d, yyyy \u2022 h:mm a'
-                                  )}
-                                </Typography>
-                              </Box>
-                            </Box>
+                <List sx={{ p: 0, px: 1.5, pt: 0.5 }}>
+                  {filteredConversations.map((conversation) => {
+                    const isActive = conversation.id === currentConversationId;
+                    return (
+                      <ListItem
+                        key={conversation.id}
+                        disablePadding
+                        sx={{ mb: 0.75 }}
+                      >
+                        <ListItemButton
+                          onClick={() => handleSelectConversation(conversation)}
+                          sx={{
+                            py: 1.5,
+                            px: 1.5,
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            gap: 1,
+                            borderRadius: 1.5,
+                            border: `1px solid ${isActive ? violetBorder : hairline}`,
+                            backgroundColor: isActive ? violetSoft : surfaceInset,
+                            transition: 'all 120ms ease',
+                            '&:hover': {
+                              backgroundColor: isActive ? violetSoft : violetSofter,
+                              borderColor: violetBorder,
+                            },
+                          }}
+                        >
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
                             <Box sx={{
                               display: 'flex',
-                              flexDirection: 'column',
                               alignItems: 'center',
-                              gap: 0.25,
-                              flexShrink: 0,
-                              mt: 0.25
+                              gap: 1,
+                              mb: 0.5
                             }}>
-                              <Tooltip
-                                title={
-                                  conversation.pinned
-                                    ? 'Unpin conversation'
-                                    : 'Pin conversation'
-                                }
+                              <Typography
+                                variant="subtitle1"
+                                sx={{
+                                  fontWeight: 600,
+                                  fontSize: '0.9rem',
+                                  flex: 1,
+                                  color: isActive ? violet : theme.palette.text.primary,
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap'
+                                }}
                               >
-                                <IconButton
-                                  onClick={(e) =>
-                                    handlePinToggle(conversation.id, e)
-                                  }
-                                  size="small"
-                                  sx={{
-                                    color: conversation.pinned
-                                      ? 'primary.main'
-                                      : 'text.secondary',
-                                    '&:hover': {
-                                      backgroundColor: alpha(
-                                        theme.palette.primary.main, 0.1
-                                      )
-                                    }
-                                  }}
-                                >
-                                  {conversation.pinned
-                                    ? <PushPinIcon fontSize="small" />
-                                    : <PushPinOutlinedIcon fontSize="small" />
-                                  }
-                                </IconButton>
-                              </Tooltip>
+                                {conversation.title}
+                              </Typography>
+                              <Box
+                                sx={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  height: 20,
+                                  px: 0.85,
+                                  borderRadius: 999,
+                                  fontFamily: MONO_FONT,
+                                  fontSize: '0.66rem',
+                                  fontWeight: 600,
+                                  letterSpacing: '0.04em',
+                                  backgroundColor: isActive ? alpha(violet, 0.18) : violetSofter,
+                                  color: violet,
+                                  border: `1px solid ${violetBorder}`,
+                                }}
+                              >
+                                {conversation.message_count}
+                              </Box>
+                            </Box>
+                            <Typography
+                              variant="body2"
+                              color="text.secondary"
+                              sx={{
+                                fontSize: '0.82rem',
+                                lineHeight: 1.45,
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                display: '-webkit-box',
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: 'vertical',
+                                mb: 0.65
+                              }}
+                            >
+                              {getPreviewText(conversation)}
+                            </Typography>
+                            <Box sx={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 0.5
+                            }}>
+                              <ScheduleIcon
+                                sx={{
+                                  fontSize: 12,
+                                  color: 'text.disabled'
+                                }}
+                              />
+                              <Typography
+                                variant="caption"
+                                color="text.disabled"
+                                sx={{
+                                  fontFamily: MONO_FONT,
+                                  fontSize: '0.68rem',
+                                  letterSpacing: '0.02em',
+                                }}
+                              >
+                                {format(
+                                  conversation.updated_at,
+                                  'MMM d, yyyy \u2022 h:mm a'
+                                )}
+                              </Typography>
+                            </Box>
+                          </Box>
+                          <Box sx={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: 0.25,
+                            flexShrink: 0,
+                            mt: 0.25
+                          }}>
+                            <Tooltip
+                              title={
+                                conversation.pinned
+                                  ? 'Unpin conversation'
+                                  : 'Pin conversation'
+                              }
+                            >
                               <IconButton
-                                onClick={(e) =>
-                                  handleDeleteClick(conversation.id, e)
-                                }
+                                onClick={(e) => handlePinToggle(conversation.id, e)}
                                 size="small"
                                 sx={{
-                                  color: 'error.main',
+                                  color: conversation.pinned ? violet : 'text.secondary',
+                                  borderRadius: 1,
+                                  '&:hover': { backgroundColor: violetSofter },
+                                }}
+                              >
+                                {conversation.pinned
+                                  ? <PushPinIcon fontSize="small" />
+                                  : <PushPinOutlinedIcon fontSize="small" />
+                                }
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Delete conversation">
+                              <IconButton
+                                onClick={(e) => handleDeleteClick(conversation.id, e)}
+                                size="small"
+                                sx={{
+                                  color: 'text.secondary',
+                                  borderRadius: 1,
+                                  transition: 'all 120ms ease',
                                   '&:hover': {
-                                    backgroundColor: alpha(
-                                      theme.palette.error.main, 0.1
-                                    )
-                                  }
+                                    color: theme.palette.error.main,
+                                    backgroundColor: alpha(theme.palette.error.main, 0.1),
+                                  },
                                 }}
                               >
                                 <DeleteIcon fontSize="small" />
                               </IconButton>
-                            </Box>
-                          </ListItemButton>
-                        </ListItem>
-                        {index < conversations.length - 1 && <Divider />}
-                      </React.Fragment>
-                    )
-                  )}
+                            </Tooltip>
+                          </Box>
+                        </ListItemButton>
+                      </ListItem>
+                    );
+                  })}
                 </List>
               )}
 
@@ -1111,20 +1125,14 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
             {/* Footer Info */}
             {!loadingConversations && conversations.length > 0 && (
               <Box sx={{
-                p: 2,
-                borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                backgroundColor: alpha(
-                  theme.palette.background.default, 0.5
-                )
+                px: 2,
+                py: 1.25,
+                borderTop: `1px solid ${hairline}`,
+                backgroundColor: tokens.footerBg,
               }}>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ fontSize: '0.75rem' }}
-                >
-                  Showing {conversations.length} of{' '}
-                  {totalConversationsCount} conversation
-                  {totalConversationsCount !== 1 ? 's' : ''}
+                <Typography component="span" sx={monoSectionLabelSx}>
+                  {conversations.length} / {totalConversationsCount}
+                  {' '}conversation{totalConversationsCount !== 1 ? 's' : ''}
                 </Typography>
               </Box>
             )}
