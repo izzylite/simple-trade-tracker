@@ -19,6 +19,7 @@ import {
 import { dialogProps } from '../../../styles/dialogStyles';
 import { Z_INDEX } from '../../../styles/zIndex';
 import { scrollbarStyles } from '../../../styles/scrollbarStyles';
+import { useDialogTokens } from '../../../styles/dialogTokens';
 import {
   Search as SearchIcon,
   FilterList as FilterListIcon,
@@ -165,6 +166,7 @@ const TagManagementContent: React.FC<TagManagementContentProps> = ({
   onSuggestDefinitions,
 }) => {
   const theme = useTheme();
+  const dialogTokens = useDialogTokens();
   const {
     searchTerm,
     setSearchTerm,
@@ -1272,23 +1274,17 @@ const TagManagementContent: React.FC<TagManagementContentProps> = ({
 
       {/* Tag View Dialog */}
       {(() => {
-        const isDarkTv = theme.palette.mode === 'dark';
-        const violet = theme.palette.primary.main;
-        const violetSoft = alpha(violet, isDarkTv ? 0.18 : 0.14);
-        const violetBorder = alpha(violet, isDarkTv ? 0.35 : 0.28);
-        const surfaceInset = isDarkTv
-          ? 'rgba(255,255,255,0.03)'
-          : alpha(theme.palette.text.primary, 0.03);
-        const hairline = isDarkTv ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
-        const MONO_FONT_TV = "'JetBrains Mono', ui-monospace, monospace";
-        const monoLabelSx = {
-          fontFamily: MONO_FONT_TV,
-          fontSize: '0.62rem',
-          fontWeight: 600,
-          letterSpacing: '0.12em',
-          textTransform: 'uppercase' as const,
-          color: alpha(theme.palette.text.secondary, 0.85),
-        };
+        const {
+          surfaceInset,
+          hairline,
+          paperSx,
+          headerSx,
+          iconAvatarSx,
+          footerSx,
+          monoSectionLabelSx: monoLabelSx,
+          primaryButtonSx,
+          ghostButtonSx,
+        } = dialogTokens;
         return (
           <Dialog
             open={!!tagToView}
@@ -1299,41 +1295,13 @@ const TagManagementContent: React.FC<TagManagementContentProps> = ({
             sx={{ zIndex: Z_INDEX.DIALOG }}
             slotProps={{
               paper: {
-                sx: {
-                  borderRadius: 2,
-                  border: `1px solid ${hairline}`,
-                  boxShadow: theme.shadows[10],
-                  backgroundImage: 'none',
-                  overflow: 'hidden',
-                },
+                sx: paperSx,
               },
             }}
           >
             {/* Header */}
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1.5,
-                px: 2.5,
-                py: 1.75,
-                borderBottom: `1px solid ${hairline}`,
-              }}
-            >
-              <Box
-                sx={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 1.25,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: violetSoft,
-                  color: violet,
-                  border: `1px solid ${violetBorder}`,
-                  flexShrink: 0,
-                }}
-              >
+            <Box sx={headerSx}>
+              <Box sx={iconAvatarSx}>
                 <TagIcon sx={{ fontSize: 18 }} />
               </Box>
               <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -1419,31 +1387,10 @@ const TagManagementContent: React.FC<TagManagementContentProps> = ({
             </Box>
 
             {/* Footer */}
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'flex-end',
-                gap: 1,
-                px: 2.5,
-                py: 1.5,
-                borderTop: `1px solid ${hairline}`,
-                backgroundColor: isDarkTv
-                  ? 'rgba(255,255,255,0.02)'
-                  : alpha(theme.palette.text.primary, 0.02),
-              }}
-            >
+            <Box sx={footerSx}>
               <Button
                 onClick={() => setTagToView(null)}
-                sx={{
-                  textTransform: 'none',
-                  fontWeight: 600,
-                  fontSize: '0.85rem',
-                  color: theme.palette.text.secondary,
-                  '&:hover': {
-                    backgroundColor: alpha(theme.palette.text.primary, 0.04),
-                  },
-                }}
+                sx={ghostButtonSx}
               >
                 Close
               </Button>
@@ -1454,21 +1401,7 @@ const TagManagementContent: React.FC<TagManagementContentProps> = ({
                     setTagToView(null);
                   }}
                   variant="contained"
-                  sx={{
-                    textTransform: 'none',
-                    fontWeight: 600,
-                    fontSize: '0.85rem',
-                    backgroundColor: violet,
-                    color: '#fff',
-                    borderRadius: 1.25,
-                    px: 1.75,
-                    py: 0.75,
-                    boxShadow: 'none',
-                    '&:hover': {
-                      backgroundColor: theme.palette.primary.dark,
-                      boxShadow: 'none',
-                    },
-                  }}
+                  sx={primaryButtonSx}
                 >
                   Edit tag
                 </Button>

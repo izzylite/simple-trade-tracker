@@ -45,6 +45,7 @@ import {
   updateTemplateLastUsed,
 } from '../../utils/importMappingStorage';
 import BaseDialog from '../common/BaseDialog';
+import { useDialogTokens, MONO_FONT } from '../../styles/dialogTokens';
 // Lazy-load xlsx (~600KB) only when an .xlsx file is actually parsed.
 const loadXLSX = () => import('xlsx');
 
@@ -57,8 +58,6 @@ interface ImportMappingDialogProps {
 
 const STEPS = ['Upload & Parse', 'Map Columns', 'Preview & Validate'];
 
-const MONO_FONT = "'JetBrains Mono', ui-monospace, monospace";
-
 export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
   open,
   onClose,
@@ -66,43 +65,17 @@ export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
   file,
 }) => {
   const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
-
-  const violet = theme.palette.primary.main;
-  const violetSoft = alpha(violet, isDark ? 0.18 : 0.14);
-  const violetSofter = alpha(violet, isDark ? 0.12 : 0.10);
-  const violetBorder = alpha(violet, isDark ? 0.35 : 0.28);
-  const surfaceInset = isDark
-    ? 'rgba(255,255,255,0.03)'
-    : alpha(theme.palette.text.primary, 0.03);
-  const hairline = isDark ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
-
-  const monoLabelSx = {
-    fontFamily: MONO_FONT,
-    fontSize: '0.68rem',
-    fontWeight: 600,
-    letterSpacing: '0.12em',
-    textTransform: 'uppercase' as const,
-    color: theme.palette.text.secondary,
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 0.75,
-  };
-
-  const inputSx = {
-    '& .MuiOutlinedInput-root': {
-      borderRadius: 1.5,
-      backgroundColor: surfaceInset,
-      '& fieldset': { borderColor: hairline },
-      '&:hover fieldset': { borderColor: alpha(violet, 0.5) },
-      '&.Mui-focused fieldset': { borderColor: violet, borderWidth: 1 },
-    },
-    '& .MuiOutlinedInput-input, & .MuiSelect-select': {
-      py: 1.1,
-      fontSize: '0.88rem',
-      fontWeight: 500,
-    },
-  };
+  const {
+    isDark,
+    violet,
+    violetSoft,
+    violetSofter,
+    violetBorder,
+    surfaceInset,
+    hairline,
+    monoLabelSx,
+    inputSx,
+  } = useDialogTokens();
 
   const ghostButtonSx = {
     textTransform: 'none' as const,

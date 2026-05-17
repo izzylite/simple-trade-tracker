@@ -21,6 +21,7 @@ import {
 import { alpha } from '@mui/material/styles';
 import { dialogProps } from '../../styles/dialogStyles';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
+import { useDialogTokens } from '../../styles/dialogTokens';
 import { Editor, EditorState, convertToRaw } from 'draft-js';
 import 'draft-js/dist/Draft.css';
 
@@ -233,6 +234,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
   onEditorStateChange,
 }, ref) => {
   const theme = useTheme();
+  const linkDialogTokens = useDialogTokens();
   const Z_INDEX = 2000;
 
   // Refs must be declared before any useEffect that uses them
@@ -1276,48 +1278,18 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
 
       {/* Link Dialog */}
       {(() => {
-        const isDarkLink = theme.palette.mode === 'dark';
-        const violet = theme.palette.primary.main;
-        const violetSoft = alpha(violet, isDarkLink ? 0.18 : 0.14);
-        const violetBorder = alpha(violet, isDarkLink ? 0.35 : 0.28);
-        const surfaceInset = isDarkLink
-          ? 'rgba(255,255,255,0.03)'
-          : alpha(theme.palette.text.primary, 0.03);
-        const hairline = isDarkLink ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
-        const MONO_FONT_LINK = "'JetBrains Mono', ui-monospace, monospace";
-        const monoLabelSx = {
-          fontFamily: MONO_FONT_LINK,
-          fontSize: '0.68rem',
-          fontWeight: 600,
-          letterSpacing: '0.12em',
-          textTransform: 'uppercase' as const,
-          color: theme.palette.text.secondary,
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 0.75,
-        };
-        const optionalSx = {
-          fontFamily: MONO_FONT_LINK,
-          fontSize: '0.66rem',
-          fontWeight: 500,
-          letterSpacing: '0.08em',
-          color: alpha(theme.palette.text.secondary, 0.7),
-          textTransform: 'none' as const,
-        };
-        const inputSx = {
-          '& .MuiOutlinedInput-root': {
-            borderRadius: 1.5,
-            backgroundColor: surfaceInset,
-            '& fieldset': { borderColor: hairline },
-            '&:hover fieldset': { borderColor: alpha(violet, 0.5) },
-            '&.Mui-focused fieldset': { borderColor: violet, borderWidth: 1 },
-          },
-          '& .MuiOutlinedInput-input': {
-            py: 1.1,
-            fontSize: '0.88rem',
-            fontWeight: 500,
-          },
-        };
+        const {
+          paperSx,
+          headerSx,
+          iconAvatarSx,
+          footerSx,
+          monoLabelSx,
+          optionalSx,
+          inputSx,
+          primaryButtonSx,
+          ghostButtonSx,
+          destructiveButtonSx,
+        } = linkDialogTokens;
         const hasExistingLink = !!getCurrentLink(editorState);
         const handleClose = () => setLinkDialogOpen(false);
         return (
@@ -1330,43 +1302,11 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
             disableRestoreFocus
             {...dialogProps}
             sx={{ zIndex: Z_INDEX }}
-            slotProps={{
-              paper: {
-                sx: {
-                  borderRadius: 2,
-                  border: `1px solid ${hairline}`,
-                  boxShadow: theme.shadows[10],
-                  backgroundImage: 'none',
-                  overflow: 'hidden',
-                },
-              },
-            }}
+            slotProps={{ paper: { sx: paperSx } }}
           >
             {/* Header */}
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1.5,
-                px: 2.5,
-                py: 1.75,
-                borderBottom: `1px solid ${hairline}`,
-              }}
-            >
-              <Box
-                sx={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 1.25,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: violetSoft,
-                  color: violet,
-                  border: `1px solid ${violetBorder}`,
-                  flexShrink: 0,
-                }}
-              >
+            <Box sx={headerSx}>
+              <Box sx={iconAvatarSx}>
                 {hasExistingLink ? (
                   <EditIcon sx={{ fontSize: 18 }} />
                 ) : (
@@ -1452,20 +1392,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
             </Box>
 
             {/* Footer */}
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: 1,
-                px: 2.5,
-                py: 1.5,
-                borderTop: `1px solid ${hairline}`,
-                backgroundColor: isDarkLink
-                  ? 'rgba(255,255,255,0.02)'
-                  : alpha(theme.palette.text.primary, 0.02),
-              }}
-            >
+            <Box sx={{ ...footerSx, justifyContent: 'space-between' }}>
               {hasExistingLink ? (
                 <Button
                   onClick={() => {
@@ -1475,20 +1402,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
                     setLinkUrl('');
                   }}
                   startIcon={<LinkOffIcon sx={{ fontSize: 16 }} />}
-                  sx={{
-                    textTransform: 'none',
-                    fontWeight: 600,
-                    fontSize: '0.82rem',
-                    color: theme.palette.error.main,
-                    backgroundColor: alpha(theme.palette.error.main, 0.08),
-                    border: `1px solid ${alpha(theme.palette.error.main, 0.3)}`,
-                    borderRadius: 1.25,
-                    px: 1.5,
-                    py: 0.5,
-                    '&:hover': {
-                      backgroundColor: alpha(theme.palette.error.main, 0.16),
-                    },
-                  }}
+                  sx={destructiveButtonSx}
                 >
                   Remove link
                 </Button>
@@ -1497,16 +1411,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
               )}
 
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Button
-                  onClick={handleClose}
-                  sx={{
-                    textTransform: 'none',
-                    fontWeight: 600,
-                    fontSize: '0.85rem',
-                    color: theme.palette.text.secondary,
-                    '&:hover': { backgroundColor: alpha(theme.palette.text.primary, 0.04) },
-                  }}
-                >
+                <Button onClick={handleClose} sx={ghostButtonSx}>
                   Cancel
                 </Button>
                 <Button
@@ -1514,25 +1419,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
                   disabled={!linkUrl.trim()}
                   variant="contained"
                   endIcon={!hasExistingLink ? <ArrowIcon sx={{ fontSize: 14 }} /> : undefined}
-                  sx={{
-                    textTransform: 'none',
-                    fontWeight: 600,
-                    fontSize: '0.85rem',
-                    backgroundColor: violet,
-                    color: '#fff',
-                    borderRadius: 1.25,
-                    px: 1.75,
-                    py: 0.75,
-                    boxShadow: 'none',
-                    '&:hover': {
-                      backgroundColor: theme.palette.primary.dark,
-                      boxShadow: 'none',
-                    },
-                    '&.Mui-disabled': {
-                      backgroundColor: alpha(violet, 0.35),
-                      color: alpha('#fff', 0.7),
-                    },
-                  }}
+                  sx={primaryButtonSx}
                 >
                   {hasExistingLink ? 'Update link' : 'Insert link'}
                 </Button>

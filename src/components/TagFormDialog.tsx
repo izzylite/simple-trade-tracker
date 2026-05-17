@@ -12,6 +12,7 @@ import {
     useTheme,
     CircularProgress,
 } from '@mui/material';
+import { useDialogTokens, MONO_FONT } from '../styles/dialogTokens';
 import {
     Close as CloseIcon,
     AutoAwesome as AIIcon,
@@ -57,8 +58,6 @@ interface TagFormDialogProps {
     onDelete?: (deletedTag: string, tradesUpdated: number) => void;
 }
 
-const MONO_FONT = "'JetBrains Mono', ui-monospace, monospace";
-
 const TagFormDialog: React.FC<TagFormDialogProps> = ({
     open,
     onClose,
@@ -72,7 +71,14 @@ const TagFormDialog: React.FC<TagFormDialogProps> = ({
     onDelete,
 }) => {
     const theme = useTheme();
-    const isDark = theme.palette.mode === 'dark';
+    const {
+        isDark,
+        violet, violetSoft, violetSofter, violetBorder,
+        surfaceInset, hairline,
+        paperSx, headerSx, iconAvatarSx, footerSx,
+        monoLabelSx, optionalSx, inputSx,
+        primaryButtonSx, ghostButtonSx,
+    } = useDialogTokens();
     const { user } = useAuthState();
 
     const isEdit = !!editTag;
@@ -155,33 +161,8 @@ const TagFormDialog: React.FC<TagFormDialogProps> = ({
         ? formatTagWithCapitalizedGroup(`${effectiveGroup}:x`).split(':')[0]
         : '';
 
-    const violet = theme.palette.primary.main;
-    const violetSoft = alpha(violet, isDark ? 0.18 : 0.14);
-    const violetSofter = alpha(violet, isDark ? 0.12 : 0.10);
-    const violetBorder = alpha(violet, isDark ? 0.35 : 0.28);
-    const surfaceInset = isDark ? 'rgba(255,255,255,0.03)' : alpha(theme.palette.text.primary, 0.03);
-    const hairline = isDark ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
-
-    const monoLabelSx = {
-        fontFamily: MONO_FONT,
-        fontSize: '0.68rem',
-        fontWeight: 600,
-        letterSpacing: '0.12em',
-        textTransform: 'uppercase' as const,
-        color: theme.palette.text.secondary,
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 0.75,
-    };
-
-    const optionalSx = {
-        fontFamily: MONO_FONT,
-        fontSize: '0.68rem',
-        fontWeight: 500,
-        letterSpacing: '0.08em',
-        color: alpha(theme.palette.text.secondary, 0.7),
-        textTransform: 'none' as const,
-    };
+    // Local optionalSx uses 0.68rem (hook default is 0.66rem) — preserve variation.
+    const optionalSxLocal = { ...optionalSx, fontSize: '0.68rem' };
 
     const chipStyle = (color: string, selected: boolean) => ({
         display: 'inline-flex',
@@ -408,42 +389,12 @@ const TagFormDialog: React.FC<TagFormDialogProps> = ({
             {...dialogProps}
             sx={{ zIndex: Z_INDEX.DIALOG }}
             slotProps={{
-                paper: {
-                    sx: {
-                        borderRadius: 2,
-                        border: `1px solid ${hairline}`,
-                        boxShadow: theme.shadows[10],
-                        backgroundImage: 'none',
-                        overflow: 'hidden',
-                    },
-                },
+                paper: { sx: paperSx },
             }}
         >
             {/* Header */}
-            <Box
-                sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1.5,
-                    px: 2.5,
-                    py: 1.75,
-                    borderBottom: `1px solid ${hairline}`,
-                }}
-            >
-                <Box
-                    sx={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: 1.25,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundColor: violetSoft,
-                        color: violet,
-                        border: `1px solid ${violetBorder}`,
-                        flexShrink: 0,
-                    }}
-                >
+            <Box sx={headerSx}>
+                <Box sx={iconAvatarSx}>
                     {isEdit ? <EditIcon sx={{ fontSize: 18 }} /> : <AddIcon sx={{ fontSize: 18 }} />}
                 </Box>
                 <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -533,13 +484,7 @@ const TagFormDialog: React.FC<TagFormDialogProps> = ({
                         disabled={busy}
                         size="small"
                         sx={{
-                            '& .MuiOutlinedInput-root': {
-                                borderRadius: 1.5,
-                                backgroundColor: surfaceInset,
-                                '& fieldset': { borderColor: hairline },
-                                '&:hover fieldset': { borderColor: alpha(violet, 0.5) },
-                                '&.Mui-focused fieldset': { borderColor: violet, borderWidth: 1 },
-                            },
+                            ...inputSx,
                             '& .MuiOutlinedInput-input': {
                                 py: 1.25,
                                 fontSize: '0.9rem',
@@ -605,14 +550,8 @@ const TagFormDialog: React.FC<TagFormDialogProps> = ({
                             size="small"
                             disabled={busy}
                             sx={{
+                                ...inputSx,
                                 mt: 0.5,
-                                '& .MuiOutlinedInput-root': {
-                                    borderRadius: 1.5,
-                                    backgroundColor: surfaceInset,
-                                    '& fieldset': { borderColor: hairline },
-                                    '&:hover fieldset': { borderColor: alpha(violet, 0.5) },
-                                    '&.Mui-focused fieldset': { borderColor: violet, borderWidth: 1 },
-                                },
                                 '& .MuiOutlinedInput-input': {
                                     py: 1,
                                     fontSize: '0.85rem',
@@ -627,7 +566,7 @@ const TagFormDialog: React.FC<TagFormDialogProps> = ({
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <Typography sx={monoLabelSx}>
                             Definition
-                            <Box component="span" sx={{ ...optionalSx, ml: 0.5 }}>· Optional</Box>
+                            <Box component="span" sx={{ ...optionalSxLocal, ml: 0.5 }}>· Optional</Box>
                         </Typography>
                         <Button
                             size="small"
@@ -673,13 +612,7 @@ const TagFormDialog: React.FC<TagFormDialogProps> = ({
                         placeholder="A 1-hour Order Block is the last opposing candle before a strong impulsive move…"
                         inputProps={{ maxLength: 2024 }}
                         sx={{
-                            '& .MuiOutlinedInput-root': {
-                                borderRadius: 1.5,
-                                backgroundColor: surfaceInset,
-                                '& fieldset': { borderColor: hairline },
-                                '&:hover fieldset': { borderColor: alpha(violet, 0.5) },
-                                '&.Mui-focused fieldset': { borderColor: violet, borderWidth: 1 },
-                            },
+                            ...inputSx,
                             '& .MuiOutlinedInput-input': {
                                 fontSize: '0.85rem',
                                 ...scrollbarStyles(theme),
@@ -708,18 +641,7 @@ const TagFormDialog: React.FC<TagFormDialogProps> = ({
             </Box>
 
             {/* Footer */}
-            <Box
-                sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 1,
-                    px: 2.5,
-                    py: 1.5,
-                    borderTop: `1px solid ${hairline}`,
-                    backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : alpha(theme.palette.text.primary, 0.02),
-                }}
-            >
+            <Box sx={{ ...footerSx, justifyContent: 'space-between' }}>
                 {isEdit ? (
                     onDelete && onTagUpdated ? (
                         <Button
@@ -783,13 +705,7 @@ const TagFormDialog: React.FC<TagFormDialogProps> = ({
                     <Button
                         onClick={() => !busy && onClose()}
                         disabled={busy}
-                        sx={{
-                            textTransform: 'none',
-                            fontWeight: 600,
-                            fontSize: '0.85rem',
-                            color: theme.palette.text.secondary,
-                            '&:hover': { backgroundColor: alpha(theme.palette.text.primary, 0.04) },
-                        }}
+                        sx={ghostButtonSx}
                     >
                         Cancel
                     </Button>
@@ -798,22 +714,7 @@ const TagFormDialog: React.FC<TagFormDialogProps> = ({
                         disabled={busy || !trimmedName}
                         variant="contained"
                         endIcon={!isEdit ? <ArrowIcon sx={{ fontSize: 14 }} /> : undefined}
-                        sx={{
-                            textTransform: 'none',
-                            fontWeight: 600,
-                            fontSize: '0.85rem',
-                            backgroundColor: violet,
-                            color: '#fff',
-                            borderRadius: 1.25,
-                            px: 1.75,
-                            py: 0.75,
-                            boxShadow: 'none',
-                            '&:hover': { backgroundColor: theme.palette.primary.dark, boxShadow: 'none' },
-                            '&.Mui-disabled': {
-                                backgroundColor: alpha(violet, 0.35),
-                                color: alpha('#fff', 0.7),
-                            },
-                        }}
+                        sx={primaryButtonSx}
                     >
                         {primaryLabel}
                     </Button>

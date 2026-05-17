@@ -89,6 +89,7 @@ import {
   ArrowForward as ArrowIcon,
 } from '@mui/icons-material';
 import { dialogProps } from '../../styles/dialogStyles';
+import { useDialogTokens, MONO_FONT } from '../../styles/dialogTokens';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -207,6 +208,7 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
   hideTitleLabel = false,
 }, ref) => {
   const theme = useTheme();
+  const dialogTokens = useDialogTokens();
   const { user } = useAuthState();
   const noteNav = useNoteNavigation();
 
@@ -1440,47 +1442,18 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
 
       {/* Insert trade share link dialog */}
       {(() => {
-        const isDarkTL = theme.palette.mode === 'dark';
-        const violet = theme.palette.primary.main;
-        const violetSoft = alpha(violet, isDarkTL ? 0.18 : 0.14);
-        const violetBorder = alpha(violet, isDarkTL ? 0.35 : 0.28);
-        const surfaceInset = isDarkTL
-          ? 'rgba(255,255,255,0.03)'
-          : alpha(theme.palette.text.primary, 0.03);
-        const hairline = isDarkTL
-          ? 'rgba(255,255,255,0.08)'
-          : theme.palette.divider;
-        const MONO_FONT_TL = "'JetBrains Mono', ui-monospace, monospace";
-        const monoLabelSx = {
-          fontFamily: MONO_FONT_TL,
-          fontSize: '0.68rem',
-          fontWeight: 600,
-          letterSpacing: '0.12em',
-          textTransform: 'uppercase' as const,
-          color: theme.palette.text.secondary,
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 0.75,
-        };
-        const inputSx = {
+        const {
+          violet, surfaceInset, hairline,
+          monoLabelSx,
+          paperSx, headerSx, iconAvatarSx, footerSx,
+          primaryButtonSx, ghostButtonSx,
+        } = dialogTokens;
+        // Trade-link URL input uses a monospaced font so URLs scan cleanly,
+        // and switches its border to error tones while a validation error is active.
+        const errorInputSx = {
           '& .MuiOutlinedInput-root': {
             borderRadius: 1.5,
             backgroundColor: surfaceInset,
-            '& fieldset': { borderColor: hairline },
-            '&:hover fieldset': { borderColor: alpha(violet, 0.5) },
-            '&.Mui-focused fieldset': { borderColor: violet, borderWidth: 1 },
-          },
-          '& .MuiOutlinedInput-input': {
-            py: 1.1,
-            fontSize: '0.88rem',
-            fontWeight: 500,
-            fontFamily: MONO_FONT_TL,
-          },
-        };
-        const errorInputSx = {
-          ...inputSx,
-          '& .MuiOutlinedInput-root': {
-            ...inputSx['& .MuiOutlinedInput-root'],
             '& fieldset': {
               borderColor: tradeLinkError
                 ? alpha(theme.palette.error.main, 0.6)
@@ -1496,6 +1469,12 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
               borderWidth: 1,
             },
           },
+          '& .MuiOutlinedInput-input': {
+            py: 1.1,
+            fontSize: '0.88rem',
+            fontWeight: 500,
+            fontFamily: MONO_FONT,
+          },
         };
         const handleClose = () =>
           !tradeLinkLoading && setTradeLinkDialogOpen(false);
@@ -1508,43 +1487,11 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
             fullWidth
             {...dialogProps}
             sx={{ zIndex: Z_INDEX.RICH_TEXT_DIALOG }}
-            slotProps={{
-              paper: {
-                sx: {
-                  borderRadius: 2,
-                  border: `1px solid ${hairline}`,
-                  boxShadow: theme.shadows[10],
-                  backgroundImage: 'none',
-                  overflow: 'hidden',
-                },
-              },
-            }}
+            slotProps={{ paper: { sx: paperSx } }}
           >
             {/* Header */}
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1.5,
-                px: 2.5,
-                py: 1.75,
-                borderBottom: `1px solid ${hairline}`,
-              }}
-            >
-              <Box
-                sx={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 1.25,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: violetSoft,
-                  color: violet,
-                  border: `1px solid ${violetBorder}`,
-                  flexShrink: 0,
-                }}
-              >
+            <Box sx={headerSx}>
+              <Box sx={iconAvatarSx}>
                 <TradeLinkIcon sx={{ fontSize: 18 }} />
               </Box>
               <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -1657,32 +1604,11 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
             </Box>
 
             {/* Footer */}
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'flex-end',
-                gap: 1,
-                px: 2.5,
-                py: 1.5,
-                borderTop: `1px solid ${hairline}`,
-                backgroundColor: isDarkTL
-                  ? 'rgba(255,255,255,0.02)'
-                  : alpha(theme.palette.text.primary, 0.02),
-              }}
-            >
+            <Box sx={footerSx}>
               <Button
                 onClick={handleClose}
                 disabled={tradeLinkLoading}
-                sx={{
-                  textTransform: 'none',
-                  fontWeight: 600,
-                  fontSize: '0.85rem',
-                  color: theme.palette.text.secondary,
-                  '&:hover': {
-                    backgroundColor: alpha(theme.palette.text.primary, 0.04),
-                  },
-                }}
+                sx={ghostButtonSx}
               >
                 Cancel
               </Button>
@@ -1694,34 +1620,12 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
                 variant="contained"
                 endIcon={
                   tradeLinkLoading ? (
-                    <CircularProgress
-                      size={14}
-                      thickness={5}
-                      sx={{ color: 'inherit' }}
-                    />
+                    <CircularProgress size={14} thickness={5} sx={{ color: 'inherit' }} />
                   ) : (
                     <ArrowIcon sx={{ fontSize: 14 }} />
                   )
                 }
-                sx={{
-                  textTransform: 'none',
-                  fontWeight: 600,
-                  fontSize: '0.85rem',
-                  backgroundColor: violet,
-                  color: '#fff',
-                  borderRadius: 1.25,
-                  px: 1.75,
-                  py: 0.75,
-                  boxShadow: 'none',
-                  '&:hover': {
-                    backgroundColor: theme.palette.primary.dark,
-                    boxShadow: 'none',
-                  },
-                  '&.Mui-disabled': {
-                    backgroundColor: alpha(violet, 0.35),
-                    color: alpha('#fff', 0.7),
-                  },
-                }}
+                sx={primaryButtonSx}
               >
                 {tradeLinkLoading ? 'Resolving…' : 'Insert trade'}
               </Button>

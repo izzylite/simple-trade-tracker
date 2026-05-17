@@ -46,8 +46,7 @@ import {
 } from '../../config/researchTemplates';
 import BaseDialog from '../common/BaseDialog';
 import { Z_INDEX } from '../../styles/zIndex';
-
-const MONO_FONT = "'JetBrains Mono', ui-monospace, monospace";
+import { useDialogTokens, MONO_FONT } from '../../styles/dialogTokens';
 
 // Backfill template fields on legacy task configs saved before templates
 // existed. Returns a fully-populated MarketResearchConfig so the form never
@@ -348,56 +347,20 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
   onSave,
 }) => {
   const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
+  const {
+    isDark,
+    violet, violetSoft, violetSofter, violetBorder,
+    surfaceInset, hairline,
+    monoLabelSx, optionalSx: optionalSxHook, inputSx,
+    primaryButtonSx,
+  } = useDialogTokens();
+  // Local optionalSx uses 0.68rem (hook default is 0.66rem) — preserve variation.
+  const optionalSx = { ...optionalSxHook, fontSize: '0.68rem' };
   const isEditMode = !!editingTask;
   const [taskType, setTaskType] = useState<TaskType | ''>('');
   const [config, setConfig] = useState<TaskConfig | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [macroQueryInput, setMacroQueryInput] = useState('');
-
-  // Style tokens — match canonical tag-dialog language.
-  const violet = theme.palette.primary.main;
-  const violetSoft = alpha(violet, isDark ? 0.18 : 0.14);
-  const violetSofter = alpha(violet, isDark ? 0.12 : 0.10);
-  const violetBorder = alpha(violet, isDark ? 0.35 : 0.28);
-  const surfaceInset = isDark ? 'rgba(255,255,255,0.03)' : alpha(theme.palette.text.primary, 0.03);
-  const hairline = isDark ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
-
-  const monoLabelSx = {
-    fontFamily: MONO_FONT,
-    fontSize: '0.68rem',
-    fontWeight: 600,
-    letterSpacing: '0.12em',
-    textTransform: 'uppercase' as const,
-    color: theme.palette.text.secondary,
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 0.75,
-  };
-
-  const optionalSx = {
-    fontFamily: MONO_FONT,
-    fontSize: '0.68rem',
-    fontWeight: 500,
-    letterSpacing: '0.08em',
-    color: alpha(theme.palette.text.secondary, 0.7),
-    textTransform: 'none' as const,
-  };
-
-  const inputSx = {
-    '& .MuiOutlinedInput-root': {
-      borderRadius: 1.5,
-      backgroundColor: surfaceInset,
-      '& fieldset': { borderColor: hairline },
-      '&:hover fieldset': { borderColor: alpha(violet, 0.5) },
-      '&.Mui-focused fieldset': { borderColor: violet, borderWidth: 1 },
-    },
-    '& .MuiOutlinedInput-input, & .MuiSelect-select': {
-      py: 1.1,
-      fontSize: '0.88rem',
-      fontWeight: 500,
-    },
-  };
 
   const menuPaperSx = {
     borderRadius: 1.5,

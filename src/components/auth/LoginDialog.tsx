@@ -34,6 +34,7 @@ import { inviteService } from '../../services/inviteService';
 import { logger } from '../../utils/logger';
 import { dialogProps } from '../../styles/dialogStyles';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
+import { useDialogTokens } from '../../styles/dialogTokens';
 
 interface LoginDialogProps {
   open: boolean;
@@ -51,7 +52,6 @@ export interface LoginPromptContentProps {
 type AuthStep = 'invite' | 'auth' | 'reset-password';
 type EmailAuthType = 'signin' | 'signup';
 
-const MONO_FONT = "'JetBrains Mono', ui-monospace, monospace";
 
 export const LoginPromptContent: React.FC<LoginPromptContentProps> = ({
   title = 'Welcome back',
@@ -87,55 +87,16 @@ export const LoginPromptContent: React.FC<LoginPromptContentProps> = ({
   const [resetError, setResetError] = useState<string | null>(null);
   const [resetSuccess, setResetSuccess] = useState<string | null>(null);
 
-  // Tokens
-  const violet = theme.palette.primary.main;
-  const violetSoft = alpha(violet, isDark ? 0.18 : 0.14);
-  const violetSofter = alpha(violet, isDark ? 0.12 : 0.10);
-  const violetBorder = alpha(violet, isDark ? 0.35 : 0.28);
-  const surfaceInset = isDark ? 'rgba(255,255,255,0.03)' : alpha(theme.palette.text.primary, 0.03);
-  const hairline = isDark ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
-
-  const monoLabelSx = useMemo(
-    () => ({
-      fontFamily: MONO_FONT,
-      fontSize: '0.68rem',
-      fontWeight: 600,
-      letterSpacing: '0.12em',
-      textTransform: 'uppercase' as const,
-      color: theme.palette.text.secondary,
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: 0.75,
-    }),
-    [theme.palette.text.secondary],
-  );
-
-  const optionalSx = {
-    fontFamily: MONO_FONT,
-    fontSize: '0.68rem',
-    fontWeight: 500,
-    letterSpacing: '0.08em',
-    color: alpha(theme.palette.text.secondary, 0.7),
-    textTransform: 'none' as const,
-  };
-
-  const inputSx = useMemo(
-    () => ({
-      '& .MuiOutlinedInput-root': {
-        borderRadius: 1.5,
-        backgroundColor: surfaceInset,
-        '& fieldset': { borderColor: hairline },
-        '&:hover fieldset': { borderColor: alpha(violet, 0.5) },
-        '&.Mui-focused fieldset': { borderColor: violet, borderWidth: 1 },
-      },
-      '& .MuiOutlinedInput-input': {
-        py: 1.1,
-        fontSize: '0.88rem',
-        fontWeight: 500,
-      },
-    }),
-    [surfaceInset, hairline, violet],
-  );
+  // Dialog tokens — single source of truth
+  const {
+    violet, violetSoft, violetSofter, violetBorder,
+    surfaceInset, hairline,
+    monoLabelSx,
+    optionalSx: optionalSxHook,
+    inputSx,
+  } = useDialogTokens();
+  // Local optionalSx variant uses 0.68rem (hook default is 0.66rem)
+  const optionalSx = { ...optionalSxHook, fontSize: '0.68rem' };
 
   // Handle invite verification
   const handleVerifyInvite = async () => {

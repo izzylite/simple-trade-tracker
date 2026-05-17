@@ -20,6 +20,7 @@ import {
 import { scrollbarStyles } from '../styles/scrollbarStyles';
 import { Z_INDEX } from '../styles/zIndex';
 import { dialogProps } from '../styles/dialogStyles';
+import { useDialogTokens, MONO_FONT } from '../styles/dialogTokens';
 
 export interface SelectableItem {
   /** Stable ID used in `selected`/`onChange`. */
@@ -60,8 +61,6 @@ interface TagSelectionDialogProps {
   emptyText?: string;
 }
 
-const MONO_FONT = "'JetBrains Mono', ui-monospace, monospace";
-
 /**
  * Generic two-list picker dialog.
  *
@@ -90,33 +89,25 @@ const TagSelectionDialog: React.FC<TagSelectionDialogProps> = ({
   emptyText = 'Nothing to select yet.',
 }) => {
   const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
+  const {
+    isDark,
+    surfaceInset,
+    hairline,
+    paperSx,
+    headerSx,
+    iconAvatarSx,
+    footerSx,
+    monoLabelSx,
+    inputSx,
+    primaryButtonSx,
+  } = useDialogTokens();
   const [query, setQuery] = useState('');
 
   useEffect(() => {
     if (!open) setQuery('');
   }, [open]);
 
-  const violet = theme.palette.primary.main;
-  const violetSoft = alpha(violet, isDark ? 0.18 : 0.14);
-  const violetBorder = alpha(violet, isDark ? 0.35 : 0.28);
-  const surfaceInset = isDark
-    ? 'rgba(255,255,255,0.03)'
-    : alpha(theme.palette.text.primary, 0.03);
-  const hairline = isDark ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
   const accentColor = theme.palette[accent].main;
-
-  const monoLabelSx = {
-    fontFamily: MONO_FONT,
-    fontSize: '0.68rem',
-    fontWeight: 600,
-    letterSpacing: '0.12em',
-    textTransform: 'uppercase' as const,
-    color: theme.palette.text.secondary,
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 0.75,
-  };
 
   const accentLabelSx = {
     ...monoLabelSx,
@@ -173,42 +164,13 @@ const TagSelectionDialog: React.FC<TagSelectionDialogProps> = ({
       sx={{ zIndex: Z_INDEX.DIALOG }}
       slotProps={{
         paper: {
-          sx: {
-            borderRadius: 2,
-            border: `1px solid ${hairline}`,
-            boxShadow: theme.shadows[10],
-            backgroundImage: 'none',
-            overflow: 'hidden',
-            maxHeight: '82vh',
-          },
+          sx: { ...paperSx, maxHeight: '82vh' },
         },
       }}
     >
       {/* Header */}
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 1.5,
-          px: 2.5,
-          py: 1.75,
-          borderBottom: `1px solid ${hairline}`,
-        }}
-      >
-        <Box
-          sx={{
-            width: 32,
-            height: 32,
-            borderRadius: 1.25,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: violetSoft,
-            color: violet,
-            border: `1px solid ${violetBorder}`,
-            flexShrink: 0,
-          }}
-        >
+      <Box sx={headerSx}>
+        <Box sx={iconAvatarSx}>
           {icon ?? <TagIcon sx={{ fontSize: 18 }} />}
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -348,23 +310,7 @@ const TagSelectionDialog: React.FC<TagSelectionDialogProps> = ({
                 </InputAdornment>
               ) : undefined,
             }}
-            sx={{
-              '& .MuiOutlinedInput-root': {
-                borderRadius: 1.5,
-                backgroundColor: surfaceInset,
-                '& fieldset': { borderColor: hairline },
-                '&:hover fieldset': { borderColor: alpha(violet, 0.5) },
-                '&.Mui-focused fieldset': {
-                  borderColor: violet,
-                  borderWidth: 1,
-                },
-              },
-              '& .MuiOutlinedInput-input': {
-                py: 1.1,
-                fontSize: '0.88rem',
-                fontWeight: 500,
-              },
-            }}
+            sx={inputSx}
           />
         </Box>
 
@@ -525,39 +471,8 @@ const TagSelectionDialog: React.FC<TagSelectionDialogProps> = ({
       </Box>
 
       {/* Footer */}
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'flex-end',
-          gap: 1,
-          px: 2.5,
-          py: 1.5,
-          borderTop: `1px solid ${hairline}`,
-          backgroundColor: isDark
-            ? 'rgba(255,255,255,0.02)'
-            : alpha(theme.palette.text.primary, 0.02),
-        }}
-      >
-        <Button
-          onClick={onClose}
-          variant="contained"
-          sx={{
-            textTransform: 'none',
-            fontWeight: 600,
-            fontSize: '0.85rem',
-            backgroundColor: violet,
-            color: '#fff',
-            borderRadius: 1.25,
-            px: 1.75,
-            py: 0.75,
-            boxShadow: 'none',
-            '&:hover': {
-              backgroundColor: theme.palette.primary.dark,
-              boxShadow: 'none',
-            },
-          }}
-        >
+      <Box sx={footerSx}>
+        <Button onClick={onClose} variant="contained" sx={primaryButtonSx}>
           Done
         </Button>
       </Box>

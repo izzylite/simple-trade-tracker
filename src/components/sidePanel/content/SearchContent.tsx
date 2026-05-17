@@ -44,6 +44,7 @@ import { SelectInput } from '../../common';
 import { scrollbarStyles } from '../../../styles/scrollbarStyles';
 import { dialogProps } from '../../../styles/dialogStyles';
 import { Z_INDEX } from '../../../styles/zIndex';
+import { useDialogTokens, MONO_FONT } from '../../../styles/dialogTokens';
 import TradeList from '../../trades/TradeList';
 import TradeCardShimmer from '../../TradeCardShimmer';
 import { useTradeOperations } from '../../../contexts/TradeOperationsContext';
@@ -53,8 +54,6 @@ import {
   DateFilter,
   DateFilterType,
 } from '../../../contexts/SearchPanelStateContext';
-
-const MONO_FONT = "'JetBrains Mono', ui-monospace, monospace";
 
 export interface SearchContentProps {
   /** Kept for backward compatibility with parent call sites; the search
@@ -658,40 +657,13 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
   onClearAll,
 }) => {
   const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
-
-  const violet = theme.palette.primary.main;
-  const violetSoft = alpha(violet, isDark ? 0.18 : 0.14);
-  const violetBorder = alpha(violet, isDark ? 0.35 : 0.28);
-  const surfaceInset = isDark ? 'rgba(255,255,255,0.03)' : alpha(theme.palette.text.primary, 0.03);
-  const hairline = isDark ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
-
-  const monoLabelSx = {
-    fontFamily: MONO_FONT,
-    fontSize: '0.68rem',
-    fontWeight: 600,
-    letterSpacing: '0.12em',
-    textTransform: 'uppercase' as const,
-    color: theme.palette.text.secondary,
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 0.75,
-  };
-
-  const inputSx = {
-    '& .MuiOutlinedInput-root': {
-      borderRadius: 1.5,
-      backgroundColor: surfaceInset,
-      '& fieldset': { borderColor: hairline },
-      '&:hover fieldset': { borderColor: alpha(violet, 0.5) },
-      '&.Mui-focused fieldset': { borderColor: violet, borderWidth: 1 },
-    },
-    '& .MuiOutlinedInput-input': {
-      py: 1.1,
-      fontSize: '0.88rem',
-      fontWeight: 500,
-    },
-  };
+  const {
+    violet, violetSoft, violetBorder,
+    surfaceInset, hairline,
+    paperSx, headerSx, iconAvatarSx, footerSx,
+    monoLabelSx, inputSx,
+    primaryButtonSx, ghostButtonSx,
+  } = useDialogTokens();
 
   return (
     <Dialog
@@ -703,41 +675,13 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
       sx={{ zIndex: Z_INDEX.DIALOG }}
       slotProps={{
         paper: {
-          sx: {
-            borderRadius: 2,
-            border: `1px solid ${hairline}`,
-            boxShadow: theme.shadows[10],
-            backgroundImage: 'none',
-            overflow: 'hidden',
-          },
+          sx: paperSx,
         },
       }}
     >
       {/* Header */}
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 1.5,
-          px: 2.5,
-          py: 1.75,
-          borderBottom: `1px solid ${hairline}`,
-        }}
-      >
-        <Box
-          sx={{
-            width: 32,
-            height: 32,
-            borderRadius: 1.25,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: violetSoft,
-            color: violet,
-            border: `1px solid ${violetBorder}`,
-            flexShrink: 0,
-          }}
-        >
+      <Box sx={headerSx}>
+        <Box sx={iconAvatarSx}>
           <FilterIcon sx={{ fontSize: 18 }} />
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -1039,28 +983,11 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
       </Box>
 
       {/* Footer */}
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 1,
-          px: 2.5,
-          py: 1.5,
-          borderTop: `1px solid ${hairline}`,
-          backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : alpha(theme.palette.text.primary, 0.02),
-        }}
-      >
+      <Box sx={{ ...footerSx, justifyContent: 'space-between' }}>
         <Button
           onClick={onClearAll}
           disabled={activeFilterCount === 0}
-          sx={{
-            textTransform: 'none',
-            fontWeight: 600,
-            fontSize: '0.82rem',
-            color: theme.palette.text.secondary,
-            '&:hover': { backgroundColor: alpha(theme.palette.text.primary, 0.04) },
-          }}
+          sx={{ ...ghostButtonSx, fontSize: '0.82rem' }}
         >
           Clear all
         </Button>
@@ -1068,31 +995,14 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Button
             onClick={onClose}
-            sx={{
-              textTransform: 'none',
-              fontWeight: 600,
-              fontSize: '0.85rem',
-              color: theme.palette.text.secondary,
-              '&:hover': { backgroundColor: alpha(theme.palette.text.primary, 0.04) },
-            }}
+            sx={ghostButtonSx}
           >
             Cancel
           </Button>
           <Button
             onClick={onClose}
             variant="contained"
-            sx={{
-              textTransform: 'none',
-              fontWeight: 600,
-              fontSize: '0.85rem',
-              backgroundColor: violet,
-              color: '#fff',
-              borderRadius: 1.25,
-              px: 1.75,
-              py: 0.75,
-              boxShadow: 'none',
-              '&:hover': { backgroundColor: theme.palette.primary.dark, boxShadow: 'none' },
-            }}
+            sx={primaryButtonSx}
           >
             Done
           </Button>

@@ -7,7 +7,6 @@ import {
   Typography,
   IconButton,
   useTheme,
-  alpha,
 } from '@mui/material';
 import {
   Close as CloseIcon,
@@ -23,6 +22,7 @@ import {
 import { scrollbarStyles } from '../styles/scrollbarStyles';
 import { Z_INDEX } from '../styles/zIndex';
 import { dialogProps } from '../styles/dialogStyles';
+import { useDialogTokens, MONO_FONT } from '../styles/dialogTokens';
 
 interface TagFilterDialogProps {
   open: boolean;
@@ -35,8 +35,6 @@ interface TagFilterDialogProps {
   showApplyButton?: boolean;
 }
 
-const MONO_FONT = "'JetBrains Mono', ui-monospace, monospace";
-
 const TagFilterDialog: React.FC<TagFilterDialogProps> = ({
   open,
   onClose,
@@ -48,15 +46,19 @@ const TagFilterDialog: React.FC<TagFilterDialogProps> = ({
   showApplyButton = true,
 }) => {
   const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
-
-  const violet = theme.palette.primary.main;
-  const violetSoft = alpha(violet, isDark ? 0.18 : 0.14);
-  const violetBorder = alpha(violet, isDark ? 0.35 : 0.28);
-  const surfaceInset = isDark
-    ? 'rgba(255,255,255,0.03)'
-    : alpha(theme.palette.text.primary, 0.03);
-  const hairline = isDark ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
+  const {
+    surfaceInset,
+    hairline,
+    paperSx,
+    headerSx,
+    iconAvatarSx,
+    footerSx,
+    monoLabelSx,
+    optionalSx,
+    primaryButtonSx,
+    ghostButtonSx,
+    chipStyle: baseChipStyle,
+  } = useDialogTokens();
 
   const [selectedTagGroup, setSelectedTagGroup] = useState<string>('');
 
@@ -83,49 +85,11 @@ const TagFilterDialog: React.FC<TagFilterDialogProps> = ({
     onTagsChange([]);
   };
 
-  const monoLabelSx = {
-    fontFamily: MONO_FONT,
-    fontSize: '0.68rem',
-    fontWeight: 600,
-    letterSpacing: '0.12em',
-    textTransform: 'uppercase' as const,
-    color: theme.palette.text.secondary,
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 0.75,
-  };
-
-  const optionalSx = {
-    fontFamily: MONO_FONT,
-    fontSize: '0.68rem',
-    fontWeight: 500,
-    letterSpacing: '0.08em',
-    color: alpha(theme.palette.text.secondary, 0.7),
-    textTransform: 'none' as const,
-  };
-
-  // Mirror TagFormDialog.chipStyle — violet selected fill, surfaceInset
-  // unselected with hairline border, color dot inside.
+  // Mirror TagFormDialog.chipStyle — base hook chip plus the color dot indicator.
   const chipStyle = (color: string, selected: boolean) => ({
-    display: 'inline-flex',
-    alignItems: 'center',
+    ...baseChipStyle(selected),
     gap: 0.75,
-    px: 1.25,
-    py: 0.5,
-    borderRadius: 999,
-    cursor: 'pointer',
     fontSize: '0.8rem',
-    fontWeight: 600,
-    userSelect: 'none' as const,
-    transition: 'all 120ms ease',
-    backgroundColor: selected ? violetSoft : surfaceInset,
-    color: selected ? violet : theme.palette.text.primary,
-    border: `1px solid ${selected ? violetBorder : hairline}`,
-    '&:hover': {
-      backgroundColor: selected
-        ? violetSoft
-        : alpha(theme.palette.text.primary, isDark ? 0.06 : 0.05),
-    },
     '& .dot': {
       width: 6,
       height: 6,
@@ -145,41 +109,13 @@ const TagFilterDialog: React.FC<TagFilterDialogProps> = ({
       sx={{ zIndex: Z_INDEX.DIALOG }}
       slotProps={{
         paper: {
-          sx: {
-            borderRadius: 2,
-            border: `1px solid ${hairline}`,
-            boxShadow: theme.shadows[10],
-            backgroundImage: 'none',
-            overflow: 'hidden',
-          },
+          sx: paperSx,
         },
       }}
     >
       {/* Header */}
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 1.5,
-          px: 2.5,
-          py: 1.75,
-          borderBottom: `1px solid ${hairline}`,
-        }}
-      >
-        <Box
-          sx={{
-            width: 32,
-            height: 32,
-            borderRadius: 1.25,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: violetSoft,
-            color: violet,
-            border: `1px solid ${violetBorder}`,
-            flexShrink: 0,
-          }}
-        >
+      <Box sx={headerSx}>
+        <Box sx={iconAvatarSx}>
           <FilterIcon sx={{ fontSize: 18 }} />
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -313,78 +249,24 @@ const TagFilterDialog: React.FC<TagFilterDialogProps> = ({
 
       {/* Footer */}
       {(showClearButton || showApplyButton) && (
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 1,
-            px: 2.5,
-            py: 1.5,
-            borderTop: `1px solid ${hairline}`,
-            backgroundColor: isDark
-              ? 'rgba(255,255,255,0.02)'
-              : alpha(theme.palette.text.primary, 0.02),
-          }}
-        >
+        <Box sx={{ ...footerSx, justifyContent: 'space-between' }}>
           <Box>
             {showClearButton && (
               <Button
                 onClick={handleClearTags}
                 disabled={selectedTags.length === 0}
-                sx={{
-                  textTransform: 'none',
-                  fontWeight: 600,
-                  fontSize: '0.82rem',
-                  color: theme.palette.text.secondary,
-                  '&:hover': {
-                    backgroundColor: alpha(theme.palette.text.primary, 0.04),
-                  },
-                }}
+                sx={{ ...ghostButtonSx, fontSize: '0.82rem' }}
               >
                 Clear all
               </Button>
             )}
           </Box>
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <Button
-              onClick={onClose}
-              sx={{
-                textTransform: 'none',
-                fontWeight: 600,
-                fontSize: '0.85rem',
-                color: theme.palette.text.secondary,
-                '&:hover': {
-                  backgroundColor: alpha(theme.palette.text.primary, 0.04),
-                },
-              }}
-            >
+            <Button onClick={onClose} sx={ghostButtonSx}>
               Cancel
             </Button>
             {showApplyButton && (
-              <Button
-                onClick={onClose}
-                variant="contained"
-                sx={{
-                  textTransform: 'none',
-                  fontWeight: 600,
-                  fontSize: '0.85rem',
-                  backgroundColor: violet,
-                  color: '#fff',
-                  borderRadius: 1.25,
-                  px: 1.75,
-                  py: 0.75,
-                  boxShadow: 'none',
-                  '&:hover': {
-                    backgroundColor: theme.palette.primary.dark,
-                    boxShadow: 'none',
-                  },
-                  '&.Mui-disabled': {
-                    backgroundColor: alpha(violet, 0.35),
-                    color: alpha('#fff', 0.7),
-                  },
-                }}
-              >
+              <Button onClick={onClose} variant="contained" sx={primaryButtonSx}>
                 Apply
               </Button>
             )}

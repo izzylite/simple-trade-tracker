@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   Button,
@@ -12,6 +12,7 @@ import {
   alpha,
   useTheme,
 } from '@mui/material';
+import { useDialogTokens, MONO_FONT } from '../styles/dialogTokens';
 import {
   Image as ImageIcon,
   DeleteOutline as DeleteIcon,
@@ -52,7 +53,6 @@ interface CalendarFormDialogProps {
   submitButtonText: string;
 }
 
-const MONO_FONT = "'JetBrains Mono', ui-monospace, monospace";
 const NUMERIC_INPUT_REGEX = /^\d*\.?\d*$/;
 
 export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
@@ -66,7 +66,14 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
   submitButtonText,
 }) => {
   const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
+  const {
+    isDark,
+    violet, violetSoft, violetSofter, violetBorder,
+    surfaceInset, hairline,
+    paperSx, headerSx, iconAvatarSx, footerSx,
+    monoLabelSx, monoSectionLabelSx, optionalSx, inputSx,
+    primaryButtonSx, ghostButtonSx,
+  } = useDialogTokens();
 
   const [name, setName] = useState('');
   const [accountBalance, setAccountBalance] = useState('');
@@ -84,72 +91,17 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
 
   const [isImagePickerOpen, setIsImagePickerOpen] = useState(false);
 
-  const violet = theme.palette.primary.main;
-  const violetSoft = alpha(violet, isDark ? 0.18 : 0.14);
-  const violetSofter = alpha(violet, isDark ? 0.12 : 0.1);
-  const violetBorder = alpha(violet, isDark ? 0.35 : 0.28);
-  const surfaceInset = isDark ? 'rgba(255,255,255,0.03)' : alpha(theme.palette.text.primary, 0.03);
-  const hairline = isDark ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
-
-  const monoLabelSx = useMemo(
-    () => ({
+  // Extend hook's inputSx with adornment typography styling (used by numericField prefix/suffix).
+  const inputSxWithAdornment = {
+    ...inputSx,
+    '& .MuiInputAdornment-root .MuiTypography-root': {
       fontFamily: MONO_FONT,
-      fontSize: '0.68rem',
+      fontSize: '0.78rem',
       fontWeight: 600,
-      letterSpacing: '0.12em',
-      textTransform: 'uppercase' as const,
       color: theme.palette.text.secondary,
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: 0.75,
-    }),
-    [theme.palette.text.secondary],
-  );
-
-  const sectionLabelSx = useMemo(
-    () => ({
-      ...monoLabelSx,
-      fontSize: '0.62rem',
-      color: alpha(theme.palette.text.secondary, 0.85),
-    }),
-    [monoLabelSx, theme.palette.text.secondary],
-  );
-
-  const optionalSx = useMemo(
-    () => ({
-      fontFamily: MONO_FONT,
-      fontSize: '0.66rem',
-      fontWeight: 500,
-      letterSpacing: '0.08em',
-      color: alpha(theme.palette.text.secondary, 0.7),
-      textTransform: 'none' as const,
-    }),
-    [theme.palette.text.secondary],
-  );
-
-  const inputSx = useMemo(
-    () => ({
-      '& .MuiOutlinedInput-root': {
-        borderRadius: 1.5,
-        backgroundColor: surfaceInset,
-        '& fieldset': { borderColor: hairline },
-        '&:hover fieldset': { borderColor: alpha(violet, 0.5) },
-        '&.Mui-focused fieldset': { borderColor: violet, borderWidth: 1 },
-      },
-      '& .MuiOutlinedInput-input': {
-        py: 1.1,
-        fontSize: '0.88rem',
-        fontWeight: 500,
-      },
-      '& .MuiInputAdornment-root .MuiTypography-root': {
-        fontFamily: MONO_FONT,
-        fontSize: '0.78rem',
-        fontWeight: 600,
-        color: theme.palette.text.secondary,
-      },
-    }),
-    [surfaceInset, hairline, violet, theme.palette.text.secondary],
-  );
+    },
+  };
+  const sectionLabelSx = monoSectionLabelSx;
 
   useEffect(() => {
     if (!open) return;
@@ -307,7 +259,7 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
           </Box>
         ) : undefined,
       }}
-      sx={inputSx}
+      sx={inputSxWithAdornment}
     />
   );
 
@@ -320,42 +272,12 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
       {...dialogProps}
       sx={{ zIndex: Z_INDEX.DIALOG }}
       slotProps={{
-        paper: {
-          sx: {
-            borderRadius: 2,
-            border: `1px solid ${hairline}`,
-            boxShadow: theme.shadows[10],
-            backgroundImage: 'none',
-            overflow: 'hidden',
-          },
-        },
+        paper: { sx: paperSx },
       }}
     >
       {/* Header */}
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 1.5,
-          px: 2.5,
-          py: 1.75,
-          borderBottom: `1px solid ${hairline}`,
-        }}
-      >
-        <Box
-          sx={{
-            width: 32,
-            height: 32,
-            borderRadius: 1.25,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: violetSoft,
-            color: violet,
-            border: `1px solid ${violetBorder}`,
-            flexShrink: 0,
-          }}
-        >
+      <Box sx={headerSx}>
+        <Box sx={iconAvatarSx}>
           {isEdit ? <EditIcon sx={{ fontSize: 18 }} /> : <CalendarIcon sx={{ fontSize: 18 }} />}
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -667,28 +589,11 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
       </Box>
 
       {/* Footer */}
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'flex-end',
-          gap: 1,
-          px: 2.5,
-          py: 1.5,
-          borderTop: `1px solid ${hairline}`,
-          backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : alpha(theme.palette.text.primary, 0.02),
-        }}
-      >
+      <Box sx={footerSx}>
         <Button
           onClick={() => !isSubmitting && onClose()}
           disabled={isSubmitting}
-          sx={{
-            textTransform: 'none',
-            fontWeight: 600,
-            fontSize: '0.85rem',
-            color: theme.palette.text.secondary,
-            '&:hover': { backgroundColor: alpha(theme.palette.text.primary, 0.04) },
-          }}
+          sx={ghostButtonSx}
         >
           Cancel
         </Button>
@@ -703,22 +608,7 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
               <ArrowIcon sx={{ fontSize: 14 }} />
             ) : undefined
           }
-          sx={{
-            textTransform: 'none',
-            fontWeight: 600,
-            fontSize: '0.85rem',
-            backgroundColor: violet,
-            color: '#fff',
-            borderRadius: 1.25,
-            px: 1.75,
-            py: 0.75,
-            boxShadow: 'none',
-            '&:hover': { backgroundColor: theme.palette.primary.dark, boxShadow: 'none' },
-            '&.Mui-disabled': {
-              backgroundColor: alpha(violet, 0.35),
-              color: alpha('#fff', 0.7),
-            },
-          }}
+          sx={primaryButtonSx}
         >
           {submitButtonText}
         </Button>

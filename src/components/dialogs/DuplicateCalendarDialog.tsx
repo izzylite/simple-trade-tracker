@@ -7,7 +7,6 @@ import {
   IconButton,
   CircularProgress,
   useTheme,
-  alpha,
 } from '@mui/material';
 import {
   ContentCopy as CopyIcon,
@@ -17,6 +16,7 @@ import {
 import { Calendar } from '../../types/calendar';
 import { dialogProps } from '../../styles/dialogStyles';
 import { Z_INDEX } from '../../styles/zIndex';
+import { useDialogTokens } from '../../styles/dialogTokens';
 
 interface DuplicateCalendarDialogProps {
   open: boolean;
@@ -26,8 +26,6 @@ interface DuplicateCalendarDialogProps {
   onDuplicate: (withContent: boolean) => void;
 }
 
-const MONO_FONT = "'JetBrains Mono', ui-monospace, monospace";
-
 export const DuplicateCalendarDialog: React.FC<DuplicateCalendarDialogProps> = ({
   open,
   calendar,
@@ -36,25 +34,14 @@ export const DuplicateCalendarDialog: React.FC<DuplicateCalendarDialogProps> = (
   onDuplicate,
 }) => {
   const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
+  const {
+    violet, violetSofter, violetBorder,
+    surfaceInset, hairline,
+    paperSx, headerSx, iconAvatarSx, footerSx,
+    monoSectionLabelSx, ghostButtonSx,
+  } = useDialogTokens();
 
-  const violet = theme.palette.primary.main;
-  const violetSoft = alpha(violet, isDark ? 0.18 : 0.14);
-  const violetSofter = alpha(violet, isDark ? 0.10 : 0.08);
-  const violetBorder = alpha(violet, isDark ? 0.35 : 0.28);
-  const surfaceInset = isDark
-    ? 'rgba(255,255,255,0.03)'
-    : alpha(theme.palette.text.primary, 0.03);
-  const hairline = isDark ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
-
-  const monoLabelSx = {
-    fontFamily: MONO_FONT,
-    fontSize: '0.62rem',
-    fontWeight: 600,
-    letterSpacing: '0.12em',
-    textTransform: 'uppercase' as const,
-    color: theme.palette.text.secondary,
-  };
+  const monoLabelSx = monoSectionLabelSx;
 
   const choiceButtonSx = {
     width: '100%',
@@ -89,41 +76,13 @@ export const DuplicateCalendarDialog: React.FC<DuplicateCalendarDialogProps> = (
       sx={{ zIndex: Z_INDEX.DIALOG }}
       slotProps={{
         paper: {
-          sx: {
-            borderRadius: 2,
-            border: `1px solid ${hairline}`,
-            boxShadow: theme.shadows[10],
-            backgroundImage: 'none',
-            overflow: 'hidden',
-          },
+          sx: paperSx,
         },
       }}
     >
       {/* Header */}
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 1.5,
-          px: 2.5,
-          py: 1.75,
-          borderBottom: `1px solid ${hairline}`,
-        }}
-      >
-        <Box
-          sx={{
-            width: 32,
-            height: 32,
-            borderRadius: 1.25,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: violetSoft,
-            color: violet,
-            border: `1px solid ${violetBorder}`,
-            flexShrink: 0,
-          }}
-        >
+      <Box sx={headerSx}>
+        <Box sx={iconAvatarSx}>
           <CopyIcon sx={{ fontSize: 18 }} />
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -245,32 +204,11 @@ export const DuplicateCalendarDialog: React.FC<DuplicateCalendarDialogProps> = (
       </Box>
 
       {/* Footer */}
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'flex-end',
-          gap: 1,
-          px: 2.5,
-          py: 1.5,
-          borderTop: `1px solid ${hairline}`,
-          backgroundColor: isDark
-            ? 'rgba(255,255,255,0.02)'
-            : alpha(theme.palette.text.primary, 0.02),
-        }}
-      >
+      <Box sx={footerSx}>
         <Button
           onClick={onClose}
           disabled={isDuplicating}
-          sx={{
-            textTransform: 'none',
-            fontWeight: 600,
-            fontSize: '0.85rem',
-            color: theme.palette.text.secondary,
-            '&:hover': {
-              backgroundColor: alpha(theme.palette.text.primary, 0.04),
-            },
-          }}
+          sx={ghostButtonSx}
         >
           Cancel
         </Button>

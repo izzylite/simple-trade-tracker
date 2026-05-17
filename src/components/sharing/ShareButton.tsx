@@ -33,6 +33,7 @@ import {
   generateCalendarShareLink
 } from '../../services/sharingService';
 import { Z_INDEX } from '../../styles/zIndex';
+import { useDialogTokens, MONO_FONT } from '../../styles/dialogTokens';
 
 // Generic interface for shareable items
 interface ShareableItem {
@@ -71,6 +72,11 @@ const ShareButton: React.FC<ShareButtonProps> = (props) => {
   const { type, item, onUpdateItemProperty } = props;
   const { user } = useAuthState();
   const theme = useTheme();
+  const {
+    violet, surfaceInset, hairline,
+    paperSx, headerSx, iconAvatarSx, footerSx,
+    monoLabelSx, primaryButtonSx, ghostButtonSx,
+  } = useDialogTokens();
 
   // Trade-specific props
   const calendarId = type === 'trade' ? (props as ShareTradeProps).calendarId : undefined;
@@ -270,23 +276,6 @@ const ShareButton: React.FC<ShareButtonProps> = (props) => {
 
         {/* Share Link Dialog */}
         {(() => {
-          const isDarkSb = theme.palette.mode === 'dark';
-          const violet = theme.palette.primary.main;
-          const violetSoft = alpha(violet, isDarkSb ? 0.18 : 0.14);
-          const violetBorder = alpha(violet, isDarkSb ? 0.35 : 0.28);
-          const surfaceInset = isDarkSb
-            ? 'rgba(255,255,255,0.03)'
-            : alpha(theme.palette.text.primary, 0.03);
-          const hairline = isDarkSb ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
-          const MONO_FONT_SB = "'JetBrains Mono', ui-monospace, monospace";
-          const monoLabelSx = {
-            fontFamily: MONO_FONT_SB,
-            fontSize: '0.68rem',
-            fontWeight: 600,
-            letterSpacing: '0.12em',
-            textTransform: 'uppercase' as const,
-            color: theme.palette.text.secondary,
-          };
           const titleText = type === 'trade' ? 'Share trade' : 'Share calendar';
           const subtitleText = type === 'trade'
             ? 'Anyone with this link can view the trade in read-only mode'
@@ -303,41 +292,13 @@ const ShareButton: React.FC<ShareButtonProps> = (props) => {
               sx={{ zIndex: Z_INDEX.TOOLTIP }}
               slotProps={{
                 paper: {
-                  sx: {
-                    borderRadius: 2,
-                    border: `1px solid ${hairline}`,
-                    boxShadow: theme.shadows[10],
-                    backgroundImage: 'none',
-                    overflow: 'hidden',
-                  },
+                  sx: paperSx,
                 },
               }}
             >
               {/* Header */}
-              <Box
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 1.5,
-                  px: 2.5,
-                  py: 1.75,
-                  borderBottom: `1px solid ${hairline}`,
-                }}
-              >
-                <Box
-                  sx={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 1.25,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: violetSoft,
-                    color: violet,
-                    border: `1px solid ${violetBorder}`,
-                    flexShrink: 0,
-                  }}
-                >
+              <Box sx={headerSx}>
+                <Box sx={iconAvatarSx}>
                   <LinkIcon sx={{ fontSize: 18 }} />
                 </Box>
                 <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -394,38 +355,17 @@ const ShareButton: React.FC<ShareButtonProps> = (props) => {
                     '& .MuiOutlinedInput-input': {
                       py: 1.1,
                       fontSize: '0.82rem',
-                      fontFamily: MONO_FONT_SB,
+                      fontFamily: MONO_FONT,
                     },
                   }}
                 />
               </Box>
 
               {/* Footer */}
-              <Box
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'flex-end',
-                  gap: 1,
-                  px: 2.5,
-                  py: 1.5,
-                  borderTop: `1px solid ${hairline}`,
-                  backgroundColor: isDarkSb
-                    ? 'rgba(255,255,255,0.02)'
-                    : alpha(theme.palette.text.primary, 0.02),
-                }}
-              >
+              <Box sx={footerSx}>
                 <Button
                   onClick={() => setShareDialogOpen(false)}
-                  sx={{
-                    textTransform: 'none',
-                    fontWeight: 600,
-                    fontSize: '0.85rem',
-                    color: theme.palette.text.secondary,
-                    '&:hover': {
-                      backgroundColor: alpha(theme.palette.text.primary, 0.04),
-                    },
-                  }}
+                  sx={ghostButtonSx}
                 >
                   Close
                 </Button>
@@ -433,21 +373,7 @@ const ShareButton: React.FC<ShareButtonProps> = (props) => {
                   onClick={handleCopyLink}
                   variant="contained"
                   startIcon={<CopyIcon sx={{ fontSize: 16 }} />}
-                  sx={{
-                    textTransform: 'none',
-                    fontWeight: 600,
-                    fontSize: '0.85rem',
-                    backgroundColor: violet,
-                    color: '#fff',
-                    borderRadius: 1.25,
-                    px: 1.75,
-                    py: 0.75,
-                    boxShadow: 'none',
-                    '&:hover': {
-                      backgroundColor: theme.palette.primary.dark,
-                      boxShadow: 'none',
-                    },
-                  }}
+                  sx={primaryButtonSx}
                 >
                   Copy link
                 </Button>

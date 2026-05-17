@@ -30,8 +30,7 @@ import Shimmer from '../Shimmer';
 import { unsplashCache, UnsplashImage } from '../../services/unsplashCache';
 import { logger } from '../../utils/logger';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
-
-const MONO_FONT = "'JetBrains Mono', ui-monospace, monospace";
+import { useDialogTokens, MONO_FONT } from '../../styles/dialogTokens';
 
 const DEFAULT_POPULAR_SEARCHES = [
   'trading charts',
@@ -101,7 +100,17 @@ const UnsplashImagePicker: React.FC<UnsplashImagePickerProps> = ({
   fallbackPlaceholders = defaultFallback,
 }) => {
   const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
+  const {
+    violet,
+    violetSoft,
+    violetBorder,
+    surfaceInset,
+    hairline,
+    monoSectionLabelSx: monoLabelSx,
+    inputSx,
+    primaryButtonSx,
+    chipStyle,
+  } = useDialogTokens();
 
   const [searchQuery, setSearchQuery] = useState(defaultQuery);
   const [images, setImages] = useState<UnsplashImage[]>([]);
@@ -109,42 +118,6 @@ const UnsplashImagePicker: React.FC<UnsplashImagePickerProps> = ({
   const [isFromCache, setIsFromCache] = useState(false);
 
   const UNSPLASH_ACCESS_KEY = process.env.REACT_APP_UNSPLASH_ACCESS_KEY;
-
-  const violet = theme.palette.primary.main;
-  const violetSoft = alpha(violet, isDark ? 0.18 : 0.14);
-  const violetBorder = alpha(violet, isDark ? 0.35 : 0.28);
-  const surfaceInset = isDark ? 'rgba(255,255,255,0.03)' : alpha(theme.palette.text.primary, 0.03);
-  const hairline = isDark ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
-
-  const monoLabelSx = useMemo(
-    () => ({
-      fontFamily: MONO_FONT,
-      fontSize: '0.62rem',
-      fontWeight: 600,
-      letterSpacing: '0.12em',
-      textTransform: 'uppercase' as const,
-      color: alpha(theme.palette.text.secondary, 0.85),
-    }),
-    [theme.palette.text.secondary],
-  );
-
-  const inputSx = useMemo(
-    () => ({
-      '& .MuiOutlinedInput-root': {
-        borderRadius: 1.5,
-        backgroundColor: surfaceInset,
-        '& fieldset': { borderColor: hairline },
-        '&:hover fieldset': { borderColor: alpha(violet, 0.5) },
-        '&.Mui-focused fieldset': { borderColor: violet, borderWidth: 1 },
-      },
-      '& .MuiOutlinedInput-input': {
-        py: 1.1,
-        fontSize: '0.88rem',
-        fontWeight: 500,
-      },
-    }),
-    [surfaceInset, hairline, violet],
-  );
 
   const enhancedQueries = useMemo(() => {
     const recent = unsplashCache.getPopularQueries(3);
@@ -234,29 +207,6 @@ const UnsplashImagePicker: React.FC<UnsplashImagePickerProps> = ({
 
   const cacheStats = unsplashCache.getCacheStats();
 
-  const chipStyle = (selected: boolean) => ({
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 0.5,
-    px: 1.25,
-    py: 0.5,
-    borderRadius: 999,
-    cursor: 'pointer',
-    fontSize: '0.78rem',
-    fontWeight: 600,
-    userSelect: 'none' as const,
-    fontFamily: 'inherit',
-    transition: 'all 120ms ease',
-    backgroundColor: selected ? violetSoft : surfaceInset,
-    color: selected ? violet : theme.palette.text.primary,
-    border: `1px solid ${selected ? violetBorder : hairline}`,
-    '&:hover': {
-      backgroundColor: selected
-        ? violetSoft
-        : alpha(theme.palette.text.primary, isDark ? 0.06 : 0.05),
-    },
-  });
-
   const cols = {
     xs: columns?.xs ?? 2,
     sm: columns?.sm ?? 3,
@@ -297,21 +247,7 @@ const UnsplashImagePicker: React.FC<UnsplashImagePickerProps> = ({
           onClick={() => handleSearch(searchQuery)}
           disabled={loading || !searchQuery.trim()}
           variant="contained"
-          sx={{
-            minWidth: 110,
-            textTransform: 'none',
-            fontWeight: 600,
-            fontSize: '0.85rem',
-            backgroundColor: violet,
-            color: '#fff',
-            borderRadius: 1.25,
-            boxShadow: 'none',
-            '&:hover': { backgroundColor: theme.palette.primary.dark, boxShadow: 'none' },
-            '&.Mui-disabled': {
-              backgroundColor: alpha(violet, 0.35),
-              color: alpha('#fff', 0.7),
-            },
-          }}
+          sx={{ ...primaryButtonSx, minWidth: 110 }}
         >
           {loading ? <CircularProgress size={16} thickness={5} color="inherit" /> : 'Search'}
         </Button>

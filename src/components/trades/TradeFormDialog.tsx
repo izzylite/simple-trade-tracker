@@ -6,9 +6,9 @@ import {
   Snackbar,
   Alert,
   Typography,
-  alpha,
   useTheme,
 } from '@mui/material';
+import { useDialogTokens } from '../../styles/dialogTokens';
 import {
   TrendingUp as TrendingUpIcon,
   Edit as EditIcon,
@@ -34,7 +34,6 @@ import { Z_INDEX } from '../../styles/zIndex';
 import { TradeRepository } from '../../services/repository/repositories/TradeRepository';
 import { deriveTradeDateForSession } from '../../utils/sessionTimeUtils';
 
-const MONO_FONT = "'JetBrains Mono', ui-monospace, monospace";
 // Re-export pure helpers from the side-effect-free helper module so
 // callers can keep importing them from TradeFormDialog while
 // TradeOperationsContext (and tests) can import directly from
@@ -125,39 +124,11 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
   onCalendarChange
 }) => {
   const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
-
-  const violet = theme.palette.primary.main;
-  const violetSoft = alpha(violet, isDark ? 0.18 : 0.14);
-  const surfaceInset = isDark ? 'rgba(255,255,255,0.03)' : alpha(theme.palette.text.primary, 0.03);
-  const hairline = isDark ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
-
-  const monoLabelSx = {
-    fontFamily: MONO_FONT,
-    fontSize: '0.68rem',
-    fontWeight: 600,
-    letterSpacing: '0.12em',
-    textTransform: 'uppercase' as const,
-    color: theme.palette.text.secondary,
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 0.75,
-  };
-
-  const inputSx = {
-    '& .MuiOutlinedInput-root': {
-      borderRadius: 1.5,
-      backgroundColor: surfaceInset,
-      '& fieldset': { borderColor: hairline },
-      '&:hover fieldset': { borderColor: alpha(violet, 0.5) },
-      '&.Mui-focused fieldset': { borderColor: violet, borderWidth: 1 },
-    },
-    '& .MuiOutlinedInput-input, & .MuiSelect-select': {
-      py: 1.1,
-      fontSize: '0.88rem',
-      fontWeight: 500,
-    },
-  };
+  const {
+    violet, violetSoft,
+    hairline,
+    monoLabelSx, inputSx,
+  } = useDialogTokens();
 
   // State
 

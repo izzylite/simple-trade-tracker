@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
   Dialog,
   Button,
@@ -27,6 +27,7 @@ import { FILE_SIZE_LIMITS, formatFileSize } from '../../../../utils/fileValidati
 import { scrollbarStyles } from '../../../../styles/scrollbarStyles';
 import { Z_INDEX } from '../../../../styles/zIndex';
 import { dialogProps } from '../../../../styles/dialogStyles';
+import { useDialogTokens, MONO_FONT } from '../../../../styles/dialogTokens';
 import { v4 as uuidv4 } from 'uuid';
 
 interface ImageUploadDialogProps {
@@ -34,8 +35,6 @@ interface ImageUploadDialogProps {
   onClose: () => void;
   onImageInsert: (src: string, alt?: string) => void;
 }
-
-const MONO_FONT = "'JetBrains Mono', ui-monospace, monospace";
 
 type TabKey = 'upload' | 'url' | 'unsplash';
 
@@ -75,57 +74,23 @@ const ImageUploadDialog: React.FC<ImageUploadDialogProps> = ({
 
   const UNSPLASH_ACCESS_KEY = process.env.REACT_APP_UNSPLASH_ACCESS_KEY;
 
-  const violet = theme.palette.primary.main;
-  const violetSoft = alpha(violet, isDark ? 0.18 : 0.14);
-  const violetSofter = alpha(violet, isDark ? 0.12 : 0.1);
-  const violetBorder = alpha(violet, isDark ? 0.35 : 0.28);
-  const surfaceInset = isDark ? 'rgba(255,255,255,0.03)' : alpha(theme.palette.text.primary, 0.03);
-  const hairline = isDark ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
-
-  const monoLabelSx = useMemo(
-    () => ({
-      fontFamily: MONO_FONT,
-      fontSize: '0.68rem',
-      fontWeight: 600,
-      letterSpacing: '0.12em',
-      textTransform: 'uppercase' as const,
-      color: theme.palette.text.secondary,
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: 0.75,
-    }),
-    [theme.palette.text.secondary],
-  );
-
-  const optionalSx = useMemo(
-    () => ({
-      fontFamily: MONO_FONT,
-      fontSize: '0.66rem',
-      fontWeight: 500,
-      letterSpacing: '0.08em',
-      color: alpha(theme.palette.text.secondary, 0.7),
-      textTransform: 'none' as const,
-    }),
-    [theme.palette.text.secondary],
-  );
-
-  const inputSx = useMemo(
-    () => ({
-      '& .MuiOutlinedInput-root': {
-        borderRadius: 1.5,
-        backgroundColor: surfaceInset,
-        '& fieldset': { borderColor: hairline },
-        '&:hover fieldset': { borderColor: alpha(violet, 0.5) },
-        '&.Mui-focused fieldset': { borderColor: violet, borderWidth: 1 },
-      },
-      '& .MuiOutlinedInput-input': {
-        py: 1.1,
-        fontSize: '0.88rem',
-        fontWeight: 500,
-      },
-    }),
-    [surfaceInset, hairline, violet],
-  );
+  const {
+    violet,
+    violetSoft,
+    violetSofter,
+    violetBorder,
+    surfaceInset,
+    hairline,
+    paperSx,
+    headerSx,
+    iconAvatarSx,
+    footerSx,
+    monoLabelSx,
+    optionalSx,
+    inputSx,
+    primaryButtonSx,
+    ghostButtonSx,
+  } = useDialogTokens();
 
   const resetState = useCallback(() => {
     setImageUrl('');
@@ -305,41 +270,13 @@ const ImageUploadDialog: React.FC<ImageUploadDialogProps> = ({
       sx={{ zIndex: Z_INDEX.RICH_TEXT_DIALOG }}
       slotProps={{
         paper: {
-          sx: {
-            borderRadius: 2,
-            border: `1px solid ${hairline}`,
-            boxShadow: theme.shadows[10],
-            backgroundImage: 'none',
-            overflow: 'hidden',
-          },
+          sx: paperSx,
         },
       }}
     >
       {/* Header */}
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 1.5,
-          px: 2.5,
-          py: 1.75,
-          borderBottom: `1px solid ${hairline}`,
-        }}
-      >
-        <Box
-          sx={{
-            width: 32,
-            height: 32,
-            borderRadius: 1.25,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: violetSoft,
-            color: violet,
-            border: `1px solid ${violetBorder}`,
-            flexShrink: 0,
-          }}
-        >
+      <Box sx={headerSx}>
+        <Box sx={iconAvatarSx}>
           <ImageIcon sx={{ fontSize: 18 }} />
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -602,18 +539,7 @@ const ImageUploadDialog: React.FC<ImageUploadDialogProps> = ({
       </Box>
 
       {/* Footer */}
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 1,
-          px: 2.5,
-          py: 1.5,
-          borderTop: `1px solid ${hairline}`,
-          backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : alpha(theme.palette.text.primary, 0.02),
-        }}
-      >
+      <Box sx={{ ...footerSx, justifyContent: 'space-between' }}>
         <Typography
           sx={{
             fontSize: '0.75rem',
@@ -653,13 +579,7 @@ const ImageUploadDialog: React.FC<ImageUploadDialogProps> = ({
           <Button
             onClick={handleClose}
             disabled={uploading}
-            sx={{
-              textTransform: 'none',
-              fontWeight: 600,
-              fontSize: '0.85rem',
-              color: theme.palette.text.secondary,
-              '&:hover': { backgroundColor: alpha(theme.palette.text.primary, 0.04) },
-            }}
+            sx={ghostButtonSx}
           >
             Cancel
           </Button>
@@ -669,22 +589,7 @@ const ImageUploadDialog: React.FC<ImageUploadDialogProps> = ({
               disabled={!imageUrl.trim()}
               variant="contained"
               endIcon={<ArrowIcon sx={{ fontSize: 14 }} />}
-              sx={{
-                textTransform: 'none',
-                fontWeight: 600,
-                fontSize: '0.85rem',
-                backgroundColor: violet,
-                color: '#fff',
-                borderRadius: 1.25,
-                px: 1.75,
-                py: 0.75,
-                boxShadow: 'none',
-                '&:hover': { backgroundColor: theme.palette.primary.dark, boxShadow: 'none' },
-                '&.Mui-disabled': {
-                  backgroundColor: alpha(violet, 0.35),
-                  color: alpha('#fff', 0.7),
-                },
-              }}
+              sx={primaryButtonSx}
             >
               Insert image
             </Button>

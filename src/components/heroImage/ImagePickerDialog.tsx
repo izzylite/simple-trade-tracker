@@ -15,6 +15,7 @@ import { UnsplashImage } from '../../services/unsplashCache';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import { dialogProps } from '../../styles/dialogStyles';
 import { Z_INDEX } from '../../styles/zIndex';
+import { useDialogTokens } from '../../styles/dialogTokens';
 
 export interface ImageAttribution {
   id: string;
@@ -39,12 +40,14 @@ const ImagePickerDialog: React.FC<ImagePickerDialogProps> = ({
   title = 'Choose a cover image',
 }) => {
   const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
-
-  const violet = theme.palette.primary.main;
-  const violetSoft = alpha(violet, isDark ? 0.18 : 0.14);
-  const violetBorder = alpha(violet, isDark ? 0.35 : 0.28);
-  const hairline = isDark ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
+  const {
+    violet,
+    paperSx,
+    headerSx,
+    iconAvatarSx,
+    footerSx,
+    ghostButtonSx,
+  } = useDialogTokens();
 
   const handleImageSelect = (image: UnsplashImage) => {
     const highQualityUrl = `${image.urls.full}&q=85&fm=jpg&fit=crop&w=1200&h=600`;
@@ -69,41 +72,13 @@ const ImagePickerDialog: React.FC<ImagePickerDialogProps> = ({
       sx={{ zIndex: Z_INDEX.DIALOG + 200 }}
       slotProps={{
         paper: {
-          sx: {
-            borderRadius: 2,
-            border: `1px solid ${hairline}`,
-            boxShadow: theme.shadows[10],
-            backgroundImage: 'none',
-            overflow: 'hidden',
-          },
+          sx: paperSx,
         },
       }}
     >
       {/* Header */}
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 1.5,
-          px: 2.5,
-          py: 1.75,
-          borderBottom: `1px solid ${hairline}`,
-        }}
-      >
-        <Box
-          sx={{
-            width: 32,
-            height: 32,
-            borderRadius: 1.25,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: violetSoft,
-            color: violet,
-            border: `1px solid ${violetBorder}`,
-            flexShrink: 0,
-          }}
-        >
+      <Box sx={headerSx}>
+        <Box sx={iconAvatarSx}>
           <ImageIcon sx={{ fontSize: 18 }} />
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -143,18 +118,7 @@ const ImagePickerDialog: React.FC<ImagePickerDialogProps> = ({
       </Box>
 
       {/* Footer */}
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 1,
-          px: 2.5,
-          py: 1.25,
-          borderTop: `1px solid ${hairline}`,
-          backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : alpha(theme.palette.text.primary, 0.02),
-        }}
-      >
+      <Box sx={{ ...footerSx, justifyContent: 'space-between', py: 1.25 }}>
         <Typography
           sx={{
             fontSize: '0.75rem',
@@ -184,16 +148,7 @@ const ImagePickerDialog: React.FC<ImagePickerDialogProps> = ({
             Unsplash
           </Link>
         </Typography>
-        <Button
-          onClick={onClose}
-          sx={{
-            textTransform: 'none',
-            fontSize: '0.85rem',
-            fontWeight: 600,
-            color: theme.palette.text.secondary,
-            '&:hover': { backgroundColor: alpha(theme.palette.text.primary, 0.04) },
-          }}
-        >
+        <Button onClick={onClose} sx={ghostButtonSx}>
           Cancel
         </Button>
       </Box>

@@ -30,6 +30,7 @@ import ReactMarkdown from 'react-markdown';
 import { EconomicEvent } from '../../types/economicCalendar';
 import { Trade } from '../../types/dualWrite';
 import { BaseDialog } from '../common';
+import { useDialogTokens, MONO_FONT } from '../../styles/dialogTokens';
 import TradeList from '../trades/TradeList';
 import { cleanEventNameForPinning, eventMatchV1 } from '../../utils/eventNameUtils';
 import { useUserPinnedEvents } from '../../contexts/UserPinnedEventsContext';
@@ -56,8 +57,6 @@ interface EconomicEventDetailDialogProps {
   isReadOnly?: boolean;
 }
 
-const MONO_FONT = "'JetBrains Mono', ui-monospace, monospace";
-
 const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
   open,
   onClose,
@@ -70,7 +69,16 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
     onOpenGalleryMode,
   } = tradeOperations;
   const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
+  const {
+    isDark,
+    violet,
+    violetSoft,
+    violetSofter,
+    violetBorder,
+    surfaceInset,
+    hairline,
+    monoLabelSx,
+  } = useDialogTokens();
   const { user } = useAuthState();
   const userId = user?.id ?? null;
   // Cross-calendar mode: load calendars once so the trade list can show a
@@ -108,26 +116,8 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
   const [isLoadingTrades, setIsLoadingTrades] = useState(false);
   const hasInitialLoad = useRef(false);
 
-  // ── design tokens ──────────────────────────────────────────────────────
-  const violet = theme.palette.primary.main;
-  const violetSoft = alpha(violet, isDark ? 0.18 : 0.14);
-  const violetSofter = alpha(violet, isDark ? 0.12 : 0.10);
-  const violetBorder = alpha(violet, isDark ? 0.35 : 0.28);
-  const surfaceInset = isDark ? 'rgba(255,255,255,0.03)' : alpha(theme.palette.text.primary, 0.03);
+  // ── design tokens (additional local) ──────────────────────────────────
   const surfaceInsetHover = isDark ? 'rgba(255,255,255,0.06)' : alpha(theme.palette.text.primary, 0.05);
-  const hairline = isDark ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
-
-  const monoLabelSx = {
-    fontFamily: MONO_FONT,
-    fontSize: '0.68rem',
-    fontWeight: 600,
-    letterSpacing: '0.12em',
-    textTransform: 'uppercase' as const,
-    color: theme.palette.text.secondary,
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 0.75,
-  };
 
   // Determine which trading session this event falls under
   const eventSession = useMemo(

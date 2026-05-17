@@ -21,6 +21,7 @@ import {
 import { Calendar } from '../../types/dualWrite';
 import { dialogProps } from '../../styles/dialogStyles';
 import { Z_INDEX } from '../../styles/zIndex';
+import { useDialogTokens } from '../../styles/dialogTokens';
 
 interface CalendarLinkDialogProps {
   open: boolean;
@@ -32,8 +33,6 @@ interface CalendarLinkDialogProps {
   onUnlink: () => Promise<void>;
 }
 
-const MONO_FONT = "'JetBrains Mono', ui-monospace, monospace";
-
 export const CalendarLinkDialog: React.FC<CalendarLinkDialogProps> = ({
   open,
   calendar,
@@ -44,27 +43,17 @@ export const CalendarLinkDialog: React.FC<CalendarLinkDialogProps> = ({
   onUnlink,
 }) => {
   const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
+  const {
+    violet, violetSofter, violetBorder,
+    surfaceInset, hairline,
+    paperSx, headerSx, iconAvatarSx, footerSx,
+    monoLabelSx,
+    primaryButtonSx, ghostButtonSx, destructiveButtonSx,
+  } = useDialogTokens();
 
   const [selectedCalendarId, setSelectedCalendarId] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const violet = theme.palette.primary.main;
-  const violetSoft = alpha(violet, isDark ? 0.18 : 0.14);
-  const violetSofter = alpha(violet, isDark ? 0.12 : 0.1);
-  const violetBorder = alpha(violet, isDark ? 0.35 : 0.28);
-  const surfaceInset = isDark ? 'rgba(255,255,255,0.03)' : alpha(theme.palette.text.primary, 0.03);
-  const hairline = isDark ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
-
-  const monoLabelSx = {
-    fontFamily: MONO_FONT,
-    fontSize: '0.68rem',
-    fontWeight: 600,
-    letterSpacing: '0.12em',
-    textTransform: 'uppercase' as const,
-    color: theme.palette.text.secondary,
-  };
 
   const availableCalendars = calendars.filter(
     (c) => c.id !== calendar?.id && c.linked_to_calendar_id !== calendar?.id,
@@ -124,41 +113,13 @@ export const CalendarLinkDialog: React.FC<CalendarLinkDialogProps> = ({
       sx={{ zIndex: Z_INDEX.DIALOG }}
       slotProps={{
         paper: {
-          sx: {
-            borderRadius: 2,
-            border: `1px solid ${hairline}`,
-            boxShadow: theme.shadows[10],
-            backgroundImage: 'none',
-            overflow: 'hidden',
-          },
+          sx: paperSx,
         },
       }}
     >
       {/* Header */}
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 1.5,
-          px: 2.5,
-          py: 1.75,
-          borderBottom: `1px solid ${hairline}`,
-        }}
-      >
-        <Box
-          sx={{
-            width: 32,
-            height: 32,
-            borderRadius: 1.25,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: violetSoft,
-            color: violet,
-            border: `1px solid ${violetBorder}`,
-            flexShrink: 0,
-          }}
-        >
+      <Box sx={headerSx}>
+        <Box sx={iconAvatarSx}>
           <LinkIcon sx={{ fontSize: 18 }} />
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -299,19 +260,9 @@ export const CalendarLinkDialog: React.FC<CalendarLinkDialogProps> = ({
                     disabled={isProcessing}
                     startIcon={<UnlinkIcon sx={{ fontSize: 16 }} />}
                     sx={{
-                      textTransform: 'none',
-                      fontWeight: 600,
-                      fontSize: '0.82rem',
-                      color: theme.palette.error.main,
-                      backgroundColor: alpha(theme.palette.error.main, 0.08),
-                      border: `1px solid ${alpha(theme.palette.error.main, 0.3)}`,
-                      borderRadius: 1.25,
+                      ...destructiveButtonSx,
                       px: 1.25,
-                      py: 0.5,
                       flexShrink: 0,
-                      '&:hover': {
-                        backgroundColor: alpha(theme.palette.error.main, 0.16),
-                      },
                     }}
                   >
                     Unlink
@@ -395,30 +346,11 @@ export const CalendarLinkDialog: React.FC<CalendarLinkDialogProps> = ({
       </Box>
 
       {/* Footer */}
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'flex-end',
-          gap: 1,
-          px: 2.5,
-          py: 1.5,
-          borderTop: `1px solid ${hairline}`,
-          backgroundColor: isDark
-            ? 'rgba(255,255,255,0.02)'
-            : alpha(theme.palette.text.primary, 0.02),
-        }}
-      >
+      <Box sx={footerSx}>
         <Button
           onClick={onClose}
           disabled={isProcessing}
-          sx={{
-            textTransform: 'none',
-            fontWeight: 600,
-            fontSize: '0.85rem',
-            color: theme.palette.text.secondary,
-            '&:hover': { backgroundColor: alpha(theme.palette.text.primary, 0.04) },
-          }}
+          sx={ghostButtonSx}
         >
           {linkedCalendar ? 'Close' : 'Cancel'}
         </Button>
@@ -434,22 +366,7 @@ export const CalendarLinkDialog: React.FC<CalendarLinkDialogProps> = ({
                 <ArrowIcon sx={{ fontSize: 14 }} />
               )
             }
-            sx={{
-              textTransform: 'none',
-              fontWeight: 600,
-              fontSize: '0.85rem',
-              backgroundColor: violet,
-              color: '#fff',
-              borderRadius: 1.25,
-              px: 1.75,
-              py: 0.75,
-              boxShadow: 'none',
-              '&:hover': { backgroundColor: theme.palette.primary.dark, boxShadow: 'none' },
-              '&.Mui-disabled': {
-                backgroundColor: alpha(violet, 0.35),
-                color: alpha('#fff', 0.7),
-              },
-            }}
+            sx={primaryButtonSx}
           >
             {isSubmitting ? 'Linking…' : 'Link calendar'}
           </Button>

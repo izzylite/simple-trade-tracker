@@ -20,6 +20,7 @@ import {
 import { dialogProps } from '../styles/dialogStyles';
 import { scrollbarStyles } from '../styles/scrollbarStyles';
 import { Z_INDEX } from '../styles/zIndex';
+import { useDialogTokens, MONO_FONT } from '../styles/dialogTokens';
 import { tagService, TagSuggestion } from '../services/tagService';
 import { useAuthState } from '../contexts/AuthStateContext';
 import { formatTagForDisplay, getTagColor } from '../utils/tagColors';
@@ -42,8 +43,6 @@ interface ReviewRow {
   accepted: boolean;
 }
 
-const MONO_FONT = "'JetBrains Mono', ui-monospace, monospace";
-
 const TagSuggestionReviewDialog: React.FC<TagSuggestionReviewDialogProps> = ({
   open,
   onClose,
@@ -52,7 +51,19 @@ const TagSuggestionReviewDialog: React.FC<TagSuggestionReviewDialogProps> = ({
   onSaved,
 }) => {
   const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
+  const {
+    isDark,
+    violet,
+    surfaceInset,
+    hairline,
+    paperSx,
+    headerSx,
+    iconAvatarSx,
+    footerSx,
+    monoLabelSx,
+    primaryButtonSx,
+    ghostButtonSx,
+  } = useDialogTokens();
   const { user } = useAuthState();
 
   const [rows, setRows] = useState<ReviewRow[]>([]);
@@ -141,24 +152,6 @@ const TagSuggestionReviewDialog: React.FC<TagSuggestionReviewDialogProps> = ({
     }
   };
 
-  const violet = theme.palette.primary.main;
-  const violetSoft = alpha(violet, isDark ? 0.18 : 0.14);
-  const violetBorder = alpha(violet, isDark ? 0.35 : 0.28);
-  const hairline = isDark ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
-  const surfaceInset = isDark ? 'rgba(255,255,255,0.03)' : alpha(theme.palette.text.primary, 0.03);
-
-  const monoLabelSx = {
-    fontFamily: MONO_FONT,
-    fontSize: '0.68rem',
-    fontWeight: 600,
-    letterSpacing: '0.12em',
-    textTransform: 'uppercase' as const,
-    color: theme.palette.text.secondary,
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 0.75,
-  };
-
   const acceptedCount = rows.filter((r) => r.accepted && r.definition.trim() !== '').length;
 
   return (
@@ -171,41 +164,13 @@ const TagSuggestionReviewDialog: React.FC<TagSuggestionReviewDialogProps> = ({
       sx={{ zIndex: Z_INDEX.DIALOG }}
       slotProps={{
         paper: {
-          sx: {
-            borderRadius: 2,
-            border: `1px solid ${hairline}`,
-            boxShadow: theme.shadows[10],
-            backgroundImage: 'none',
-            overflow: 'hidden',
-          },
+          sx: paperSx,
         },
       }}
     >
       {/* Header */}
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 1.5,
-          px: 2.5,
-          py: 1.75,
-          borderBottom: `1px solid ${hairline}`,
-        }}
-      >
-        <Box
-          sx={{
-            width: 32,
-            height: 32,
-            borderRadius: 1.25,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: violetSoft,
-            color: violet,
-            border: `1px solid ${violetBorder}`,
-            flexShrink: 0,
-          }}
-        >
+      <Box sx={headerSx}>
+        <Box sx={iconAvatarSx}>
           <AIIcon sx={{ fontSize: 18 }} />
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -420,18 +385,7 @@ const TagSuggestionReviewDialog: React.FC<TagSuggestionReviewDialogProps> = ({
       </Box>
 
       {/* Footer */}
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 1,
-          px: 2.5,
-          py: 1.5,
-          borderTop: `1px solid ${hairline}`,
-          backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : alpha(theme.palette.text.primary, 0.02),
-        }}
-      >
+      <Box sx={{ ...footerSx, justifyContent: 'space-between' }}>
         <Typography sx={{ fontSize: '0.78rem', color: 'text.secondary' }}>
           {loading || error || rows.length <= 1
             ? ''
@@ -456,12 +410,7 @@ const TagSuggestionReviewDialog: React.FC<TagSuggestionReviewDialogProps> = ({
           <Button
             onClick={() => !saving && onClose()}
             disabled={saving}
-            sx={{
-              textTransform: 'none',
-              fontWeight: 600,
-              fontSize: '0.85rem',
-              color: 'text.secondary',
-            }}
+            sx={ghostButtonSx}
           >
             Cancel
           </Button>
@@ -474,22 +423,7 @@ const TagSuggestionReviewDialog: React.FC<TagSuggestionReviewDialogProps> = ({
                 <CircularProgress size={14} thickness={5} sx={{ color: 'inherit' }} />
               ) : undefined
             }
-            sx={{
-              textTransform: 'none',
-              fontWeight: 600,
-              fontSize: '0.85rem',
-              backgroundColor: violet,
-              color: '#fff',
-              borderRadius: 1.25,
-              px: 1.75,
-              py: 0.75,
-              boxShadow: 'none',
-              '&:hover': { backgroundColor: theme.palette.primary.dark, boxShadow: 'none' },
-              '&.Mui-disabled': {
-                backgroundColor: alpha(violet, 0.35),
-                color: alpha('#fff', 0.7),
-              },
-            }}
+            sx={primaryButtonSx}
           >
             {saving
               ? 'Saving…'

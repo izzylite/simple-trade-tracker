@@ -23,6 +23,7 @@ import { addYears, subYears } from 'date-fns';
 import { Trade, YearStats } from '../types/dualWrite';
 import TargetBadge from '../components/TargetBadge';
 import { BaseDialog } from './common';
+import { useDialogTokens, MONO_FONT } from '../styles/dialogTokens';
 
 interface SelectDateDialogProps {
   open: boolean;
@@ -36,8 +37,6 @@ interface SelectDateDialogProps {
   onOpenGalleryMode?: (trades: Trade[], initialTradeId?: string, title?: string, fetchYear?: number) => void;
 }
 
-const MONO_FONT = "'JetBrains Mono', ui-monospace, monospace";
-
 const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
   open,
   onClose,
@@ -50,7 +49,6 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
   onOpenGalleryMode
 }) => {
   const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
   const isSmDown = useMediaQuery(theme.breakpoints.down('sm'));
   const [currentDate, setCurrentDate] = React.useState(initialDate || new Date());
   const currentYear = currentDate.getFullYear();
@@ -60,25 +58,17 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
   ], []);
 
   // ── design tokens ────────────────────────────────────────────────────────
-  const violet = theme.palette.primary.main;
-  const violetSoft = alpha(violet, isDark ? 0.18 : 0.14);
-  const violetSofter = alpha(violet, isDark ? 0.12 : 0.10);
-  const violetBorder = alpha(violet, isDark ? 0.35 : 0.28);
-  const surfaceInset = isDark ? 'rgba(255,255,255,0.03)' : alpha(theme.palette.text.primary, 0.03);
+  const {
+    isDark,
+    violet,
+    violetSoft,
+    violetSofter,
+    violetBorder,
+    surfaceInset,
+    hairline,
+    monoLabelSx,
+  } = useDialogTokens();
   const surfaceInsetHover = isDark ? 'rgba(255,255,255,0.06)' : alpha(theme.palette.text.primary, 0.05);
-  const hairline = isDark ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
-
-  const monoLabelSx = {
-    fontFamily: MONO_FONT,
-    fontSize: '0.68rem',
-    fontWeight: 600,
-    letterSpacing: '0.12em',
-    textTransform: 'uppercase' as const,
-    color: theme.palette.text.secondary,
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 0.75,
-  };
 
   React.useEffect(() => {
     if (initialDate) {
