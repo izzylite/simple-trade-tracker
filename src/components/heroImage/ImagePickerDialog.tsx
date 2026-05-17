@@ -1,34 +1,28 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Dialog,
-  DialogContent,
   Box,
   IconButton,
   Typography,
   TextField,
   Button,
   CircularProgress,
-  Card,
-  CardMedia,
-  CardActionArea,
-  useTheme,
   Link,
-  Chip,
-  DialogTitle
+  useTheme,
+  alpha,
 } from '@mui/material';
-import { alpha } from '@mui/material/styles';
 import {
   Close as CloseIcon,
   Search as SearchIcon,
-  Cached as CachedIcon
+  Cached as CachedIcon,
+  Image as ImageIcon,
 } from '@mui/icons-material';
 import Shimmer from '../Shimmer';
 import { unsplashCache, UnsplashImage } from '../../services/unsplashCache';
 import { logger } from '../../utils/logger';
-import { getDialogProps } from '../../utils/dialogUtils';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
-
-
+import { dialogProps } from '../../styles/dialogStyles';
+import { Z_INDEX } from '../../styles/zIndex';
 
 export interface ImageAttribution {
   id: string;
@@ -46,71 +40,82 @@ interface ImagePickerDialogProps {
   title?: string;
 }
 
+const MONO_FONT = "'JetBrains Mono', ui-monospace, monospace";
+
+const DEFAULT_QUERIES = [
+  'trading charts',
+  'financial markets',
+  'business success',
+  'growth analytics',
+  'stock market',
+  'cryptocurrency',
+  'investment',
+  'profit growth',
+];
+
 const ImagePickerDialog: React.FC<ImagePickerDialogProps> = ({
   open,
   onClose,
   onImageSelect,
-  title = "Choose a cover image"
+  title = 'Choose a cover image',
 }) => {
   const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+
   const [searchQuery, setSearchQuery] = useState('');
   const [images, setImages] = useState<UnsplashImage[]>([]);
   const [loading, setLoading] = useState(false);
   const [isFromCache, setIsFromCache] = useState(false);
-  const dialogBaseProps = getDialogProps(theme);
 
   const UNSPLASH_ACCESS_KEY = process.env.REACT_APP_UNSPLASH_ACCESS_KEY;
 
-  const popularSearches = [
-    'trading charts',
-    'financial markets',
-    'business success',
-    'growth analytics',
-    'stock market',
-    'cryptocurrency',
-    'investment',
-    'profit growth'
-  ];
+  const violet = theme.palette.primary.main;
+  const violetSoft = alpha(violet, isDark ? 0.18 : 0.14);
+  const violetSofter = alpha(violet, isDark ? 0.12 : 0.1);
+  const violetBorder = alpha(violet, isDark ? 0.35 : 0.28);
+  const surfaceInset = isDark ? 'rgba(255,255,255,0.03)' : alpha(theme.palette.text.primary, 0.03);
+  const hairline = isDark ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
 
-  // Get recently searched queries from cache
-  const getEnhancedPopularSearches = () => {
-    const recentQueries = unsplashCache.getPopularQueries(3);
-    const defaultSearches = popularSearches;
+  const monoLabelSx = useMemo(
+    () => ({
+      fontFamily: MONO_FONT,
+      fontSize: '0.62rem',
+      fontWeight: 600,
+      letterSpacing: '0.12em',
+      textTransform: 'uppercase' as const,
+      color: alpha(theme.palette.text.secondary, 0.85),
+    }),
+    [theme.palette.text.secondary],
+  );
 
-    // Combine recent queries with default ones, avoiding duplicates
-    const combined = [...recentQueries];
-    defaultSearches.forEach(search => {
-      if (!combined.some(query => query.toLowerCase() === search.toLowerCase())) {
-        combined.push(search);
-      }
+  const enhancedQueries = useMemo(() => {
+    const recent = unsplashCache.getPopularQueries(3);
+    const combined = [...recent];
+    DEFAULT_QUERIES.forEach((q) => {
+      if (!combined.some((r) => r.toLowerCase() === q.toLowerCase())) combined.push(q);
     });
-
-    return combined.slice(0, 8); // Limit to 8 total suggestions
-  };
+    return combined.slice(0, 8);
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const generatePlaceholderImages = (query: string): UnsplashImage[] => {
     const categories = ['trading', 'finance', 'business', 'charts', 'success', 'growth'];
-    const selectedCategory = categories.find(cat => query.toLowerCase().includes(cat)) || 'business';
+    const selectedCategory =
+      categories.find((cat) => query.toLowerCase().includes(cat)) || 'business';
 
     return Array.from({ length: 24 }, (_, i) => ({
       id: `placeholder-${i}`,
       urls: {
         small: `https://picsum.photos/400/200?random=${i}&blur=1`,
         regular: `https://picsum.photos/800/400?random=${i}`,
-        full: `https://picsum.photos/1200/600?random=${i}`
+        full: `https://picsum.photos/1200/600?random=${i}`,
       },
-      links: {
-        download_location: '',
-        html: ''
-      },
+      links: { download_location: '', html: '' },
       alt_description: `${selectedCategory} image ${i + 1}`,
       user: {
         name: 'Demo User',
         username: 'demo_user',
-        links: {
-          html: ''
-        }
-      }
+        links: { html: '' },
+      },
     }));
   };
 
@@ -121,7 +126,6 @@ const ImagePickerDialog: React.FC<ImagePickerDialogProps> = ({
     setIsFromCache(false);
 
     try {
-      // Check cache first
       const cachedImages = unsplashCache.getCachedImages(query);
       if (cachedImages) {
         logger.log(`Loading ${cachedImages.length} images from cache for query: "${query}"`);
@@ -135,7 +139,6 @@ const ImagePickerDialog: React.FC<ImagePickerDialogProps> = ({
         logger.warn('Unsplash API key not configured, using placeholder images');
         const placeholderImages = generatePlaceholderImages(query);
         setImages(placeholderImages);
-        // Cache placeholder images too
         unsplashCache.cacheImages(query, placeholderImages);
         setLoading(false);
         return;
@@ -145,30 +148,25 @@ const ImagePickerDialog: React.FC<ImagePickerDialogProps> = ({
       const response = await fetch(
         `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=24&orientation=landscape`,
         {
-          headers: {
-            Authorization: `Client-ID ${UNSPLASH_ACCESS_KEY}`,
-          },
-        }
+          headers: { Authorization: `Client-ID ${UNSPLASH_ACCESS_KEY}` },
+        },
       );
 
       if (response.ok) {
         const data = await response.json();
         setImages(data.results);
-        // Cache the results
         unsplashCache.cacheImages(query, data.results);
         logger.log(`Cached ${data.results.length} images for query: "${query}"`);
       } else {
         logger.error('Failed to fetch images from Unsplash');
         const placeholderImages = generatePlaceholderImages(query);
         setImages(placeholderImages);
-        // Cache placeholder images as fallback
         unsplashCache.cacheImages(query, placeholderImages);
       }
     } catch (error) {
       logger.error('Error fetching images:', error);
       const placeholderImages = generatePlaceholderImages(query);
       setImages(placeholderImages);
-      // Cache placeholder images as fallback
       unsplashCache.cacheImages(query, placeholderImages);
     } finally {
       setLoading(false);
@@ -176,20 +174,16 @@ const ImagePickerDialog: React.FC<ImagePickerDialogProps> = ({
   };
 
   const handleImageClick = async (image: UnsplashImage) => {
-    // Trigger download endpoint as required by Unsplash guidelines
     if (image.links.download_location && UNSPLASH_ACCESS_KEY) {
       try {
         await fetch(image.links.download_location, {
-          headers: {
-            Authorization: `Client-ID ${UNSPLASH_ACCESS_KEY}`,
-          },
+          headers: { Authorization: `Client-ID ${UNSPLASH_ACCESS_KEY}` },
         });
       } catch (error) {
         logger.error('Error triggering download endpoint:', error);
       }
     }
 
-    // Pass the image data including attribution info - use full size with quality parameters for better quality
     const highQualityUrl = `${image.urls.full}&q=85&fm=jpg&fit=crop&w=1200&h=600`;
     onImageSelect(highQualityUrl, {
       id: image.id,
@@ -197,7 +191,7 @@ const ImagePickerDialog: React.FC<ImagePickerDialogProps> = ({
       photographerUsername: image.user.username,
       photographerUrl: `${image.user.links.html}?utm_source=trade-tracker&utm_medium=referral`,
       unsplashUrl: `${image.links.html}?utm_source=trade-tracker&utm_medium=referral`,
-      altDescription: image.alt_description
+      altDescription: image.alt_description,
     });
     onClose();
   };
@@ -207,412 +201,455 @@ const ImagePickerDialog: React.FC<ImagePickerDialogProps> = ({
     handleSearchImages(search);
   };
 
-  // Load default images when dialog opens and clean up expired cache
-  React.useEffect(() => {
-    if (open) {
-      // Clean up expired cache entries
-      const removedCount = unsplashCache.removeExpiredEntries();
-      if (removedCount > 0) {
-        logger.log(`Removed ${removedCount} expired cache entries`);
-      }
+  useEffect(() => {
+    if (!open) return;
+    const removedCount = unsplashCache.removeExpiredEntries();
+    if (removedCount > 0) logger.log(`Removed ${removedCount} expired cache entries`);
 
-      // Load default images if none are loaded
-      if (images.length === 0) {
-        setSearchQuery('trading charts');
-        handleSearchImages('trading charts');
-      }
+    if (images.length === 0) {
+      setSearchQuery('trading charts');
+      handleSearchImages('trading charts');
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
+  const cacheStats = unsplashCache.getCacheStats();
+
+  const chipStyle = (selected: boolean) => ({
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 0.5,
+    px: 1.25,
+    py: 0.5,
+    borderRadius: 999,
+    cursor: 'pointer',
+    fontSize: '0.78rem',
+    fontWeight: 600,
+    userSelect: 'none' as const,
+    fontFamily: 'inherit',
+    transition: 'all 120ms ease',
+    backgroundColor: selected ? violetSoft : surfaceInset,
+    color: selected ? violet : theme.palette.text.primary,
+    border: `1px solid ${selected ? violetBorder : hairline}`,
+    '&:hover': {
+      backgroundColor: selected
+        ? violetSoft
+        : alpha(theme.palette.text.primary, isDark ? 0.06 : 0.05),
+    },
+  });
 
   return (
     <Dialog
       open={open}
       onClose={onClose}
-      maxWidth="lg"
+      maxWidth="md"
       fullWidth
-      {...dialogBaseProps}
-      sx={{
-        ...(dialogBaseProps.sx || {}),
-        zIndex: (theme) => theme.zIndex.modal + 200, // Ensure it's above the AIChatDrawer
+      {...dialogProps}
+      sx={{ zIndex: Z_INDEX.DIALOG + 200 }}
+      slotProps={{
+        paper: {
+          sx: {
+            borderRadius: 2,
+            border: `1px solid ${hairline}`,
+            boxShadow: theme.shadows[10],
+            backgroundImage: 'none',
+            overflow: 'hidden',
+          },
+        },
       }}
     >
-      <DialogTitle
+      {/* Header */}
+      <Box
         sx={{
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
-          py: 2,
+          gap: 1.5,
           px: 2.5,
-          borderBottom: '1px solid',
-          borderColor: 'divider',
+          py: 1.75,
+          borderBottom: `1px solid ${hairline}`,
         }}
       >
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-          <Typography variant="h6" sx={{ fontWeight: 600 }}>
+        <Box
+          sx={{
+            width: 32,
+            height: 32,
+            borderRadius: 1.25,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: violetSoft,
+            color: violet,
+            border: `1px solid ${violetBorder}`,
+            flexShrink: 0,
+          }}
+        >
+          <ImageIcon sx={{ fontSize: 18 }} />
+        </Box>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography sx={{ fontWeight: 700, fontSize: '0.95rem', lineHeight: 1.2 }}>
             {title}
           </Typography>
-          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            Choose a clean cover image from curated Unsplash photos
+          <Typography
+            sx={{ fontSize: '0.78rem', color: theme.palette.text.secondary, lineHeight: 1.3 }}
+          >
+            Curated landscape photography from Unsplash
           </Typography>
         </Box>
         <IconButton
           onClick={onClose}
           size="small"
-          sx={{
-            color: 'text.secondary',
-            '&:hover': {
-              bgcolor: alpha(theme.palette.error.main, 0.08),
-              color: 'error.main',
-            },
-          }}
+          sx={{ color: theme.palette.text.secondary }}
         >
-          <CloseIcon />
+          <CloseIcon fontSize="small" />
         </IconButton>
-      </DialogTitle>
+      </Box>
 
-      <DialogContent sx={{ pt: 2, px: 2.5 }}>
-        {/* Search */}
+      {/* Body */}
+      <Box
+        sx={{
+          px: 2.5,
+          py: 2,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 2,
+          ...scrollbarStyles(theme),
+          overflowY: 'auto',
+          maxHeight: '75vh',
+        }}
+      >
+        {/* Search row */}
         <Box
           sx={{
             display: 'flex',
-            gap: 1.5,
-            mt: 1,
-            mb: 2,
-            alignItems: 'center',
-            flexDirection: { xs: 'column', sm: 'row' }
+            gap: 1.25,
+            alignItems: 'stretch',
+            flexDirection: { xs: 'column', sm: 'row' },
           }}
         >
           <TextField
             fullWidth
             size="small"
-            placeholder="Search for trading charts, financial markets, business..."
+            placeholder="Search trading, markets, business..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSearchImages()}
             slotProps={{
               input: {
-                startAdornment: <SearchIcon sx={{ mr: 1.5, color: 'primary.main' }} />,
-                sx: {
-                  borderRadius: 1
-                }
-              }
+                startAdornment: (
+                  <SearchIcon
+                    sx={{ mr: 1.25, fontSize: 18, color: theme.palette.text.secondary }}
+                  />
+                ),
+              },
             }}
             sx={{
               '& .MuiOutlinedInput-root': {
-                borderRadius: 1
+                borderRadius: 1.5,
+                backgroundColor: surfaceInset,
+                '& fieldset': { borderColor: hairline },
+                '&:hover fieldset': { borderColor: alpha(violet, 0.5) },
+                '&.Mui-focused fieldset': { borderColor: violet, borderWidth: 1 },
               },
-              bgcolor: 'background.paper',
-              borderRadius: 1,
-              border: '1px solid',
-              borderColor: 'divider'
+              '& .MuiOutlinedInput-input': {
+                py: 1.1,
+                fontSize: '0.88rem',
+                fontWeight: 500,
+              },
             }}
           />
           <Button
-            variant="contained"
             onClick={() => handleSearchImages()}
-            disabled={loading}
+            disabled={loading || !searchQuery.trim()}
+            variant="contained"
             sx={{
-              minWidth: 120,
-              borderRadius: 1,
-              background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)`,
-              '&:hover': {
-                background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 100%)`,
-                transform: 'translateY(-1px)',
-                boxShadow: (theme) => `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`
-              }
+              minWidth: 110,
+              textTransform: 'none',
+              fontWeight: 600,
+              fontSize: '0.85rem',
+              backgroundColor: violet,
+              color: '#fff',
+              borderRadius: 1.25,
+              boxShadow: 'none',
+              '&:hover': { backgroundColor: theme.palette.primary.dark, boxShadow: 'none' },
+              '&.Mui-disabled': {
+                backgroundColor: alpha(violet, 0.35),
+                color: alpha('#fff', 0.7),
+              },
             }}
           >
-            {loading ? <CircularProgress size={20} color="inherit" /> : 'Search'}
+            {loading ? <CircularProgress size={16} thickness={5} color="inherit" /> : 'Search'}
           </Button>
         </Box>
 
-        {/* Cache status indicator */}
-        {isFromCache && (
-          <Box sx={{ mb: 2 }}>
-            <Chip
-              icon={<CachedIcon />}
-              label="Loaded from cache"
-              size="small"
-              color="success"
-              variant="outlined"
-              sx={{
-                fontSize: '0.75rem',
-                height: 24,
-                '& .MuiChip-icon': {
-                  fontSize: '0.9rem'
-                }
-              }}
-            />
-          </Box>
-        )}
-
         {/* Popular searches */}
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="subtitle2" sx={{
-            color: 'text.primary',
-            mb: 1.5,
-            display: 'block',
-            fontWeight: 600
-          }}>
-            ✨ Popular searches
-          </Typography>
-          <Box sx={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 1
-          }}>
-            {getEnhancedPopularSearches().map((search, index) => {
-              const isRecentQuery = unsplashCache.isCached(search);
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 1,
+            }}
+          >
+            <Typography sx={monoLabelSx}>Popular searches</Typography>
+            {isFromCache && (
+              <Box
+                sx={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 0.5,
+                  px: 0.875,
+                  py: 0.25,
+                  borderRadius: 999,
+                  backgroundColor: surfaceInset,
+                  border: `1px solid ${hairline}`,
+                  fontFamily: MONO_FONT,
+                  fontSize: '0.65rem',
+                  color: theme.palette.text.secondary,
+                }}
+              >
+                <CachedIcon sx={{ fontSize: 12 }} />
+                cached
+              </Box>
+            )}
+          </Box>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+            {enhancedQueries.map((search, index) => {
+              const isCached = unsplashCache.isCached(search);
+              const selected = searchQuery.toLowerCase() === search.toLowerCase();
               return (
-                <Button
+                <Box
                   key={`${search}-${index}`}
-                  size="small"
-                  variant="outlined"
                   onClick={() => handlePopularSearchClick(search)}
-                  startIcon={isRecentQuery ? <CachedIcon sx={{ fontSize: '0.8rem' }} /> : undefined}
-                  sx={{
-                    fontSize: '0.8rem',
-                    textTransform: 'none',
-                    borderRadius: 1,
-                    minWidth: 'auto',
-                    px: 2,
-                    py: 0.5,
-                    borderColor: isRecentQuery ? 'success.main' : 'divider',
-                    color: isRecentQuery ? 'success.main' : 'text.primary',
-                    background: (theme) => isRecentQuery
-                      ? `linear-gradient(135deg, ${alpha(theme.palette.success.main, 0.05)} 0%, ${alpha(theme.palette.success.light, 0.05)} 100%)`
-                      : theme.palette.mode === 'dark'
-                        ? `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.8)} 0%, ${alpha(theme.palette.background.default, 0.9)} 100%)`
-                        : 'linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(248,250,252,0.9) 100%)',
-                    '&:hover': {
-                      borderColor: isRecentQuery ? 'success.main' : 'primary.main',
-                      color: isRecentQuery ? 'success.main' : 'primary.main',
-                      background: (theme) => isRecentQuery
-                        ? `linear-gradient(135deg, ${alpha(theme.palette.success.main, 0.1)} 0%, ${alpha(theme.palette.success.light, 0.1)} 100%)`
-                        : `linear-gradient(135deg, ${alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.15 : 0.05)} 0%, ${alpha(theme.palette.primary.light, theme.palette.mode === 'dark' ? 0.15 : 0.05)} 100%)`,
-                      transform: 'translateY(-1px)',
-                      boxShadow: (theme) => `0 2px 8px ${alpha(isRecentQuery ? theme.palette.success.main : theme.palette.primary.main, 0.25)}`
-                    }
-                  }}
+                  sx={chipStyle(selected)}
                 >
+                  {isCached && <CachedIcon sx={{ fontSize: 12, opacity: 0.7 }} />}
                   {search}
-                </Button>
+                </Box>
               );
             })}
           </Box>
         </Box>
 
-        {/* Cache Management */}
-        <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-            {(() => {
-              const stats = unsplashCache.getCacheStats();
-              return `${stats.totalEntries} cached searches • ${(stats.totalSize / 1024).toFixed(1)}KB`;
-            })()}
-          </Typography>
-          <Button
-            size="small"
-            variant="text"
-            onClick={() => {
-              unsplashCache.clearCache();
-              setImages([]);
-              setIsFromCache(false);
-            }}
+        {/* Results */}
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <Box
             sx={{
-              fontSize: '0.75rem',
-              textTransform: 'none',
-              color: 'text.secondary',
-              '&:hover': {
-                color: 'error.main'
-              }
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 1,
             }}
           >
-            Clear cache
-          </Button>
-        </Box>
+            <Typography sx={monoLabelSx}>
+              Results {!loading && images.length > 0 && `· ${images.length}`}
+            </Typography>
+            <Typography
+              sx={{
+                fontFamily: MONO_FONT,
+                fontSize: '0.65rem',
+                color: alpha(theme.palette.text.secondary, 0.75),
+              }}
+            >
+              {cacheStats.totalEntries} cached · {(cacheStats.totalSize / 1024).toFixed(1)}KB
+            </Typography>
+          </Box>
 
-        {/* Images Grid */}
-        <Box
-          sx={{
-            maxHeight: 380,
-            overflowY: 'auto',
-            overflowX: 'hidden',
-            borderRadius: 1,
-            border: `1px solid ${theme.palette.divider}`,
-            bgcolor:
-              theme.palette.mode === 'dark'
-                ? alpha(theme.palette.background.paper, 0.9)
-                : alpha(theme.palette.background.default, 0.9),
-            p: 1.5,
-            ...scrollbarStyles(theme)
-          }}
-        >
-          {loading ? (
-            <Box
-              sx={{
-                display: 'grid',
-                gridTemplateColumns: {
-                  xs: 'repeat(2, 1fr)',
-                  sm: 'repeat(3, 1fr)',
-                  md: 'repeat(4, 1fr)',
-                  lg: 'repeat(5, 1fr)'
-                },
-                gap: 1.5
-              }}
-            >
-              {Array.from({ length: 20 }).map((_, index) => (
-                <Shimmer
-                  key={index}
-                  height={140}
-                  borderRadius={1}
-                  variant="wave"
-                  intensity="medium"
-                />
-              ))}
-            </Box>
-          ) : (
-            <Box
-              sx={{
-                display: 'grid',
-                gridTemplateColumns: {
-                  xs: 'repeat(2, 1fr)',
-                  sm: 'repeat(3, 1fr)',
-                  md: 'repeat(4, 1fr)',
-                  lg: 'repeat(5, 1fr)'
-                },
-                gap: 1.5
-              }}
-            >
-              {images.map((image) => (
-                <Card
-                  key={image.id}
+          <Box
+            sx={{
+              borderRadius: 1.5,
+              border: `1px solid ${hairline}`,
+              backgroundColor: surfaceInset,
+              p: 1.25,
+              minHeight: 420,
+              maxHeight: 420,
+              overflowY: 'auto',
+              overflowX: 'hidden',
+              ...scrollbarStyles(theme),
+            }}
+          >
+            {!loading && images.length === 0 ? (
+              <Box
+                sx={{
+                  height: '100%',
+                  minHeight: 396,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 0.75,
+                  color: alpha(theme.palette.text.secondary, 0.7),
+                }}
+              >
+                <ImageIcon sx={{ fontSize: 28, color: alpha(violet, 0.45) }} />
+                <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: theme.palette.text.secondary }}>
+                  No images yet
+                </Typography>
+                <Typography
                   sx={{
-                    borderRadius: 1,
-                    transition: 'transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease',
-                    cursor: 'pointer',
-                    position: 'relative',
-                    overflow: 'hidden',
-                    border: '1px solid',
-                    borderColor: alpha(theme.palette.divider, 0.7),
-                    '&:hover': {
-                      transform: 'translateY(-2px)',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.18)',
-                      borderColor: theme.palette.primary.main,
-                      '& .image-overlay': {
-                        opacity: 1
-                      }
-                    }
+                    fontFamily: MONO_FONT,
+                    fontSize: '0.7rem',
+                    color: alpha(theme.palette.text.secondary, 0.7),
                   }}
                 >
-                  <CardActionArea
-                    onClick={() => handleImageClick(image)}
-                    sx={{
-                      position: 'relative',
-                      '&:hover .MuiCardActionArea-focusHighlight': {
-                        opacity: 0
-                      }
-                    }}
-                  >
-                    <CardMedia
-                      component="img"
-                      height="120"
-                      image={image.urls.small}
-                      alt={image.alt_description || 'Cover image'}
-                      sx={{
-                        objectFit: 'cover'
-                      }}
-                    />
-
-                    {/* Hover overlay */}
-                    <Box
-                      className="image-overlay"
-                      sx={{
-                        position: 'absolute',
-                        inset: 0,
-                        backgroundColor: alpha(theme.palette.common.black, 0.4),
-                        opacity: 0,
-                        transition: 'opacity 0.2s ease',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: 'common.white'
-                      }}
-                    >
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        Select Image
-                      </Typography>
-                    </Box>
-
-                    {/* Attribution overlay - only show for real Unsplash images */}
-                    {image.user.username !== 'demo_user' && (
-                      <Box
-                        sx={{
-                          position: 'absolute',
-                          bottom: 0,
-                          left: 0,
-                          right: 0,
-                          background: 'linear-gradient(transparent, rgba(0,0,0,0.8))',
-                          color: 'white',
-                          p: 1,
-                          fontSize: '0.7rem'
-                        }}
-                      >
-                        <Typography variant="caption" sx={{
-                          fontSize: '0.7rem',
-                          fontWeight: 500,
-                          textShadow: '0 1px 2px rgba(0,0,0,0.8)'
-                        }}>
-                          📸 {image.user.name}
-                        </Typography>
-                      </Box>
-                    )}
-                  </CardActionArea>
-                </Card>
-              ))}
-            </Box>
-          )}
-        </Box>
-
-        {/* Unsplash Attribution Footer */}
-        <Box sx={{
-          mt: 3,
-          pt: 3,
-          borderTop: '1px solid',
-          borderColor: 'divider',
-          textAlign: 'center',
-          background: (theme) => `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.02)} 0%, ${alpha(theme.palette.primary.light, 0.02)} 100%)`,
-          borderRadius: 1,
-          mx: -1,
-          px: 2
-        }}>
-          <Typography variant="body2" sx={{
-            color: 'text.secondary',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 1
-          }}>
-            <Box component="span" sx={{ fontSize: '1.2rem' }}>📷</Box>
-            <Link
-              href="https://unsplash.com/?utm_source=trade-tracker&utm_medium=referral"
-              target="_blank"
-              rel="noopener noreferrer"
+                  Search or pick a popular query above
+                </Typography>
+              </Box>
+            ) : (
+            <Box
               sx={{
-                color: 'primary.main',
-                textDecoration: 'none',
-                fontWeight: 600,
-                borderBottom: '1px solid transparent',
-                transition: 'border-color 0.2s ease',
-                '&:hover': {
-                  borderBottomColor: 'primary.main'
-                }
+                display: 'grid',
+                gridTemplateColumns: {
+                  xs: 'repeat(2, 1fr)',
+                  sm: 'repeat(3, 1fr)',
+                  md: 'repeat(4, 1fr)',
+                },
+                gap: 1.25,
               }}
             >
-              Photo by Unsplash
-            </Link>
-          </Typography>
+              {loading
+                ? Array.from({ length: 16 }).map((_, index) => (
+                    <Shimmer
+                      key={index}
+                      height={130}
+                      borderRadius={2}
+                      variant="wave"
+                      intensity="medium"
+                    />
+                  ))
+                : images.map((image) => (
+                    <Box
+                      key={image.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => handleImageClick(image)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          handleImageClick(image);
+                        }
+                      }}
+                      sx={{
+                        position: 'relative',
+                        height: 130,
+                        borderRadius: 1.25,
+                        overflow: 'hidden',
+                        cursor: 'pointer',
+                        border: `1px solid ${hairline}`,
+                        backgroundColor: theme.palette.background.default,
+                        backgroundImage: `url(${image.urls.small})`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                        transition: 'transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease',
+                        '&:hover': {
+                          transform: 'translateY(-2px)',
+                          borderColor: violetBorder, 
+                        },
+                        '&:focus-visible': {
+                          outline: `2px solid ${violet}`,
+                          outlineOffset: 2,
+                        },
+                      }}
+                    >
+                      
+                      {image.user.username !== 'demo_user' && (
+                        <Box
+                          sx={{
+                            position: 'absolute',
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            px: 0.75,
+                            py: 0.5,
+                            background: `linear-gradient(transparent, ${alpha(theme.palette.common.black, 0.7)})`,
+                          }}
+                        >
+                          <Typography
+                            sx={{
+                              fontSize: '0.65rem',
+                              fontWeight: 500,
+                              color: '#fff',
+                              textShadow: '0 1px 2px rgba(0,0,0,0.6)',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            📸 {image.user.name}
+                          </Typography>
+                        </Box>
+                      )}
+                    </Box>
+                  ))}
+            </Box>
+            )}
+          </Box>
         </Box>
-      </DialogContent>
+      </Box>
+
+      {/* Footer */}
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 1,
+          px: 2.5,
+          py: 1.25,
+          borderTop: `1px solid ${hairline}`,
+          backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : alpha(theme.palette.text.primary, 0.02),
+        }}
+      >
+        <Typography
+          sx={{
+            fontSize: '0.75rem',
+            color: theme.palette.text.secondary,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 0.75,
+          }}
+        >
+          <Box component="span" sx={{ fontSize: '0.9rem' }}>
+            📷
+          </Box>
+          Photos by{' '}
+          <Link
+            href="https://unsplash.com/?utm_source=trade-tracker&utm_medium=referral"
+            target="_blank"
+            rel="noopener noreferrer"
+            sx={{
+              color: violet,
+              fontWeight: 600,
+              textDecoration: 'none',
+              borderBottom: `1px solid ${alpha(violet, 0.3)}`,
+              transition: 'border-color 150ms ease',
+              '&:hover': { borderBottomColor: violet },
+            }}
+          >
+            Unsplash
+          </Link>
+        </Typography>
+        <Button
+          size="small"
+          onClick={() => {
+            unsplashCache.clearCache();
+            setImages([]);
+            setIsFromCache(false);
+          }}
+          sx={{
+            textTransform: 'none',
+            fontSize: '0.75rem',
+            fontWeight: 600,
+            color: theme.palette.text.secondary,
+            '&:hover': {
+              backgroundColor: alpha(theme.palette.error.main, 0.08),
+              color: theme.palette.error.main,
+            },
+          }}
+        >
+          Clear cache
+        </Button>
+      </Box>
     </Dialog>
   );
 };

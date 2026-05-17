@@ -1,28 +1,30 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
+  Dialog,
   Button,
   TextField,
-  Stack,
   Box,
   CircularProgress,
   Typography,
-  FormControlLabel,
   Switch,
-  Card,
-  CardMedia,
   IconButton,
   Tooltip,
   alpha,
-  useTheme
+  useTheme,
 } from '@mui/material';
 import {
   Image as ImageIcon,
-  Delete as DeleteIcon,
-
+  DeleteOutline as DeleteIcon,
+  CalendarMonth as CalendarIcon,
+  Edit as EditIcon,
+  ArrowForward as ArrowIcon,
+  AutoAwesome as SparkIcon,
 } from '@mui/icons-material';
 import { Calendar } from '../types/calendar';
-import { BaseDialog } from './common';
 import { ImagePickerDialog, ImageAttribution } from './heroImage';
+import { scrollbarStyles } from '../styles/scrollbarStyles';
+import { dialogProps } from '../styles/dialogStyles';
+import { Z_INDEX } from '../styles/zIndex';
 
 export interface CalendarFormData {
   name: string;
@@ -37,7 +39,6 @@ export interface CalendarFormData {
   profit_threshold_percentage?: number;
   hero_image_url?: string;
   hero_image_attribution?: ImageAttribution;
-
 }
 
 interface CalendarFormDialogProps {
@@ -51,6 +52,9 @@ interface CalendarFormDialogProps {
   submitButtonText: string;
 }
 
+const MONO_FONT = "'JetBrains Mono', ui-monospace, monospace";
+const NUMERIC_INPUT_REGEX = /^\d*\.?\d*$/;
+
 export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
   open,
   onClose,
@@ -59,107 +63,177 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
   isSubmitting,
   mode,
   title,
-  submitButtonText
+  submitButtonText,
 }) => {
   const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
 
-  // Form state
   const [name, setName] = useState('');
-  const [account_balance, setAccount_balance] = useState('');
-  const [max_daily_drawdown, setMax_daily_drawdown] = useState('');
-  const [weekly_target, setWeekly_target] = useState('');
-  const [monthly_target, setMonthly_target] = useState('');
-  const [yearly_target, setYearly_target] = useState('');
-  const [risk_per_trade, setRisk_per_trade] = useState('');
-  const [dynamic_risk_enabled, setDynamicRiskEnabled] = useState(false);
-  const [increased_risk_percentage, setIncreasedRiskPercentage] = useState('');
-  const [profit_threshold_percentage, setProfitThresholdPercentage] = useState('');
+  const [accountBalance, setAccountBalance] = useState('');
+  const [maxDailyDrawdown, setMaxDailyDrawdown] = useState('');
+  const [weeklyTarget, setWeeklyTarget] = useState('');
+  const [monthlyTarget, setMonthlyTarget] = useState('');
+  const [yearlyTarget, setYearlyTarget] = useState('');
+  const [riskPerTrade, setRiskPerTrade] = useState('');
+  const [dynamicRiskEnabled, setDynamicRiskEnabled] = useState(false);
+  const [increasedRiskPercentage, setIncreasedRiskPercentage] = useState('');
+  const [profitThresholdPercentage, setProfitThresholdPercentage] = useState('');
 
-  // Hero image state
-  const [hero_image_url, setHeroImageUrl] = useState<string>('');
-  const [hero_image_attribution, setHeroImageAttribution] = useState<ImageAttribution | undefined>(undefined);
+  const [heroImageUrl, setHeroImageUrl] = useState<string>('');
+  const [heroImageAttribution, setHeroImageAttribution] = useState<ImageAttribution | undefined>(undefined);
 
   const [isImagePickerOpen, setIsImagePickerOpen] = useState(false);
 
-  // Initialize form with initial data when in edit mode or when initial data is provided, or reset when dialog opens/closes
-  useEffect(() => {
-    if (open) {
-      if (initialData) {
-        setName(initialData.name || '');
-        setAccount_balance(initialData.account_balance?.toString() || '');
-        setMax_daily_drawdown(initialData.max_daily_drawdown?.toString() || '');
-        setWeekly_target(initialData.weekly_target?.toString() || '');
-        setMonthly_target(initialData.monthly_target?.toString() || '');
-        setYearly_target(initialData.yearly_target?.toString() || '');
-        setRisk_per_trade(initialData.risk_per_trade?.toString() || '');
-        setDynamicRiskEnabled(initialData.dynamic_risk_enabled || false);
-        setIncreasedRiskPercentage(initialData.increased_risk_percentage?.toString() || '');
-        setProfitThresholdPercentage(initialData.profit_threshold_percentage?.toString() || '');
-        setHeroImageUrl(initialData.hero_image_url || '');
-        setHeroImageAttribution(initialData.hero_image_attribution);
+  const violet = theme.palette.primary.main;
+  const violetSoft = alpha(violet, isDark ? 0.18 : 0.14);
+  const violetSofter = alpha(violet, isDark ? 0.12 : 0.1);
+  const violetBorder = alpha(violet, isDark ? 0.35 : 0.28);
+  const surfaceInset = isDark ? 'rgba(255,255,255,0.03)' : alpha(theme.palette.text.primary, 0.03);
+  const hairline = isDark ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
 
-      } else {
-        // Reset form for create mode without initial data
-        resetForm();
-      }
+  const monoLabelSx = useMemo(
+    () => ({
+      fontFamily: MONO_FONT,
+      fontSize: '0.68rem',
+      fontWeight: 600,
+      letterSpacing: '0.12em',
+      textTransform: 'uppercase' as const,
+      color: theme.palette.text.secondary,
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: 0.75,
+    }),
+    [theme.palette.text.secondary],
+  );
+
+  const sectionLabelSx = useMemo(
+    () => ({
+      ...monoLabelSx,
+      fontSize: '0.62rem',
+      color: alpha(theme.palette.text.secondary, 0.85),
+    }),
+    [monoLabelSx, theme.palette.text.secondary],
+  );
+
+  const optionalSx = useMemo(
+    () => ({
+      fontFamily: MONO_FONT,
+      fontSize: '0.66rem',
+      fontWeight: 500,
+      letterSpacing: '0.08em',
+      color: alpha(theme.palette.text.secondary, 0.7),
+      textTransform: 'none' as const,
+    }),
+    [theme.palette.text.secondary],
+  );
+
+  const inputSx = useMemo(
+    () => ({
+      '& .MuiOutlinedInput-root': {
+        borderRadius: 1.5,
+        backgroundColor: surfaceInset,
+        '& fieldset': { borderColor: hairline },
+        '&:hover fieldset': { borderColor: alpha(violet, 0.5) },
+        '&.Mui-focused fieldset': { borderColor: violet, borderWidth: 1 },
+      },
+      '& .MuiOutlinedInput-input': {
+        py: 1.1,
+        fontSize: '0.88rem',
+        fontWeight: 500,
+      },
+      '& .MuiInputAdornment-root .MuiTypography-root': {
+        fontFamily: MONO_FONT,
+        fontSize: '0.78rem',
+        fontWeight: 600,
+        color: theme.palette.text.secondary,
+      },
+    }),
+    [surfaceInset, hairline, violet, theme.palette.text.secondary],
+  );
+
+  useEffect(() => {
+    if (!open) return;
+    if (initialData) {
+      setName(initialData.name || '');
+      setAccountBalance(initialData.account_balance?.toString() || '');
+      setMaxDailyDrawdown(initialData.max_daily_drawdown?.toString() || '');
+      setWeeklyTarget(initialData.weekly_target?.toString() || '');
+      setMonthlyTarget(initialData.monthly_target?.toString() || '');
+      setYearlyTarget(initialData.yearly_target?.toString() || '');
+      setRiskPerTrade(initialData.risk_per_trade?.toString() || '');
+      setDynamicRiskEnabled(initialData.dynamic_risk_enabled || false);
+      setIncreasedRiskPercentage(initialData.increased_risk_percentage?.toString() || '');
+      setProfitThresholdPercentage(initialData.profit_threshold_percentage?.toString() || '');
+      setHeroImageUrl(initialData.hero_image_url || '');
+      setHeroImageAttribution(initialData.hero_image_attribution);
+    } else {
+      resetForm();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initialData, mode]);
 
   const resetForm = () => {
     setName('');
-    setAccount_balance('');
-    setMax_daily_drawdown('');
-    setWeekly_target('');
-    setMonthly_target('');
-    setYearly_target('');
-    setRisk_per_trade('');
+    setAccountBalance('');
+    setMaxDailyDrawdown('');
+    setWeeklyTarget('');
+    setMonthlyTarget('');
+    setYearlyTarget('');
+    setRiskPerTrade('');
     setDynamicRiskEnabled(false);
     setIncreasedRiskPercentage('');
     setProfitThresholdPercentage('');
     setHeroImageUrl('');
     setHeroImageAttribution(undefined);
-
   };
+
+  const handleNumericChange = (setter: React.Dispatch<React.SetStateAction<string>>) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      const value = e.target.value;
+      if (value === '' || NUMERIC_INPUT_REGEX.test(value)) setter(value);
+    };
 
   const handleSubmit = async () => {
-    if (name.trim() && account_balance.trim() && max_daily_drawdown.trim()) {
-      const balance = parseFloat(account_balance);
-      const maxDrawdown = parseFloat(max_daily_drawdown);
-      const weeklyTargetValue = weekly_target.trim() ? parseFloat(weekly_target) : undefined;
-      const monthlyTargetValue = monthly_target.trim() ? parseFloat(monthly_target) : undefined;
-      const yearlyTargetValue = yearly_target.trim() ? parseFloat(yearly_target) : undefined;
-      const riskPerTradeValue = risk_per_trade.trim() ? parseFloat(risk_per_trade) : undefined;
-      const increasedRiskValue = increased_risk_percentage.trim() ? parseFloat(increased_risk_percentage) : undefined;
-      const profitThresholdValue = profit_threshold_percentage.trim() ? parseFloat(profit_threshold_percentage) : undefined;
+    if (!name.trim() || !accountBalance.trim() || !maxDailyDrawdown.trim()) return;
 
-      if (!isNaN(balance) && balance >= 0 && !isNaN(maxDrawdown) && maxDrawdown > 0 &&
-          (weeklyTargetValue === undefined || (!isNaN(weeklyTargetValue) && weeklyTargetValue > 0)) &&
-          (monthlyTargetValue === undefined || (!isNaN(monthlyTargetValue) && monthlyTargetValue > 0)) &&
-          (yearlyTargetValue === undefined || (!isNaN(yearlyTargetValue) && yearlyTargetValue > 0)) &&
-          (riskPerTradeValue === undefined || (!isNaN(riskPerTradeValue) && riskPerTradeValue > 0)) &&
-          (increasedRiskValue === undefined || (!isNaN(increasedRiskValue) && increasedRiskValue > 0)) &&
-          (profitThresholdValue === undefined || (!isNaN(profitThresholdValue) && profitThresholdValue > 0))) {
+    const balance = parseFloat(accountBalance);
+    const maxDrawdown = parseFloat(maxDailyDrawdown);
+    const weeklyVal = weeklyTarget.trim() ? parseFloat(weeklyTarget) : undefined;
+    const monthlyVal = monthlyTarget.trim() ? parseFloat(monthlyTarget) : undefined;
+    const yearlyVal = yearlyTarget.trim() ? parseFloat(yearlyTarget) : undefined;
+    const riskVal = riskPerTrade.trim() ? parseFloat(riskPerTrade) : undefined;
+    const increasedRiskVal = increasedRiskPercentage.trim()
+      ? parseFloat(increasedRiskPercentage)
+      : undefined;
+    const profitThresholdVal = profitThresholdPercentage.trim()
+      ? parseFloat(profitThresholdPercentage)
+      : undefined;
 
-        await onSubmit({
-          name: name.trim(),
-          account_balance: balance,
-          max_daily_drawdown: maxDrawdown,
-          weekly_target: weeklyTargetValue,
-          monthly_target: monthlyTargetValue,
-          yearly_target: yearlyTargetValue,
-          risk_per_trade: riskPerTradeValue,
-          dynamic_risk_enabled,
-          increased_risk_percentage: increasedRiskValue,
-          profit_threshold_percentage: profitThresholdValue,
-          hero_image_url: hero_image_url || undefined,
-          hero_image_attribution: hero_image_attribution,
+    if (isNaN(balance) || balance < 0) return;
+    if (isNaN(maxDrawdown) || maxDrawdown <= 0) return;
+    if (weeklyVal !== undefined && (isNaN(weeklyVal) || weeklyVal < 0)) return;
+    if (monthlyVal !== undefined && (isNaN(monthlyVal) || monthlyVal < 0)) return;
+    if (yearlyVal !== undefined && (isNaN(yearlyVal) || yearlyVal < 0)) return;
+    if (riskVal !== undefined && (isNaN(riskVal) || riskVal <= 0)) return;
+    if (increasedRiskVal !== undefined && (isNaN(increasedRiskVal) || increasedRiskVal <= 0)) return;
+    if (profitThresholdVal !== undefined && (isNaN(profitThresholdVal) || profitThresholdVal <= 0)) return;
 
-        });
-      }
-    }
+    await onSubmit({
+      name: name.trim(),
+      account_balance: balance,
+      max_daily_drawdown: maxDrawdown,
+      weekly_target: weeklyVal,
+      monthly_target: monthlyVal,
+      yearly_target: yearlyVal,
+      risk_per_trade: riskVal,
+      dynamic_risk_enabled: dynamicRiskEnabled,
+      increased_risk_percentage: increasedRiskVal,
+      profit_threshold_percentage: profitThresholdVal,
+      hero_image_url: heroImageUrl || undefined,
+      hero_image_attribution: heroImageAttribution,
+    });
   };
 
-  // Hero image handlers
   const handleImageSelect = (imageUrl: string, attribution?: ImageAttribution) => {
     setHeroImageUrl(imageUrl);
     setHeroImageAttribution(attribution);
@@ -169,334 +243,494 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
   const handleRemoveImage = () => {
     setHeroImageUrl('');
     setHeroImageAttribution(undefined);
-
   };
 
+  const isFormValid = name.trim() && accountBalance.trim() && maxDailyDrawdown.trim();
+  const isEdit = mode === 'edit';
+  const subtitle = isEdit
+    ? 'Update calendar settings, targets, and risk rules'
+    : 'Set the rules and rhythm for a new trading calendar';
 
-
-  const isFormValid = name.trim() && account_balance.trim() && max_daily_drawdown.trim();
-
-  const dialogTitle = title;
-
-  const dialogActions = (
-    <>
-      <Button
-        onClick={onClose}
-        disabled={isSubmitting}
-      >
-        Cancel
-      </Button>
-      <Button
-        onClick={handleSubmit}
-        variant="contained"
-        disabled={!isFormValid || isSubmitting}
-        sx={{
-          minWidth: 100,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 1
-        }}
-      >
-        {submitButtonText}
-        {isSubmitting && (
-          <CircularProgress
-            size={20}
-            color="inherit"
-          />
+  const renderLabel = (
+    label: string,
+    opts: { required?: boolean; optional?: boolean; hint?: string } = {},
+  ) => (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
+      <Typography sx={monoLabelSx}>
+        {label}
+        {opts.required && (
+          <Box component="span" sx={{ color: theme.palette.error.main, fontFamily: 'inherit' }}>
+            *
+          </Box>
         )}
-      </Button>
-    </>
+        {opts.optional && (
+          <Box component="span" sx={{ ...optionalSx, ml: 0.5 }}>
+            · Optional
+          </Box>
+        )}
+      </Typography>
+      {opts.hint && (
+        <Typography sx={{ fontSize: '0.72rem', color: alpha(theme.palette.text.secondary, 0.85) }}>
+          {opts.hint}
+        </Typography>
+      )}
+    </Box>
+  );
+
+  const numericField = (
+    value: string,
+    onChange: React.Dispatch<React.SetStateAction<string>>,
+    opts: {
+      prefix?: string;
+      suffix?: string;
+      placeholder?: string;
+      size?: 'small' | 'medium';
+    } = {},
+  ) => (
+    <TextField
+      value={value}
+      onChange={handleNumericChange(onChange)}
+      type="number"
+      fullWidth
+      size={opts.size ?? 'small'}
+      placeholder={opts.placeholder}
+      disabled={isSubmitting}
+      InputProps={{
+        startAdornment: opts.prefix ? (
+          <Box component="span" sx={{ mr: 1, color: theme.palette.text.secondary }}>
+            {opts.prefix}
+          </Box>
+        ) : undefined,
+        endAdornment: opts.suffix ? (
+          <Box component="span" sx={{ ml: 1, color: theme.palette.text.secondary }}>
+            {opts.suffix}
+          </Box>
+        ) : undefined,
+      }}
+      sx={inputSx}
+    />
   );
 
   return (
-    <BaseDialog
+    <Dialog
       open={open}
       onClose={() => !isSubmitting && onClose()}
-      maxWidth="xs"
+      maxWidth="sm"
       fullWidth
-      title={dialogTitle}
-      actions={dialogActions}
-      hideFooterCancelButton={true}
+      {...dialogProps}
+      sx={{ zIndex: Z_INDEX.DIALOG }}
+      slotProps={{
+        paper: {
+          sx: {
+            borderRadius: 2,
+            border: `1px solid ${hairline}`,
+            boxShadow: theme.shadows[10],
+            backgroundImage: 'none',
+            overflow: 'hidden',
+          },
+        },
+      }}
     >
-      <Stack spacing={2} sx={{ mt: 1 }}>
-          <TextField
-            label="Calendar Name"
-            fullWidth
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            autoFocus
-          />
+      {/* Header */}
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1.5,
+          px: 2.5,
+          py: 1.75,
+          borderBottom: `1px solid ${hairline}`,
+        }}
+      >
+        <Box
+          sx={{
+            width: 32,
+            height: 32,
+            borderRadius: 1.25,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: violetSoft,
+            color: violet,
+            border: `1px solid ${violetBorder}`,
+            flexShrink: 0,
+          }}
+        >
+          {isEdit ? <EditIcon sx={{ fontSize: 18 }} /> : <CalendarIcon sx={{ fontSize: 18 }} />}
+        </Box>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography sx={{ fontWeight: 700, fontSize: '0.95rem', lineHeight: 1.2 }}>
+            {title}
+          </Typography>
+          <Typography sx={{ fontSize: '0.78rem', color: theme.palette.text.secondary, lineHeight: 1.3 }}>
+            {subtitle}
+          </Typography>
+        </Box>
+      </Box>
 
-          {/* Hero Image Section */}
-          <Box>
-            <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 600 }}>
-              Cover Image (Optional)
-            </Typography>
+      {/* Body */}
+      <Box
+        sx={{
+          px: 2.5,
+          py: 2,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 2.5,
+          ...scrollbarStyles(theme),
+          overflowY: 'auto',
+          maxHeight: '70vh',
+        }}
+      >
+        {/* Identity */}
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+          <Typography sx={sectionLabelSx}>Identity</Typography>
 
-            {hero_image_url ? (
-              <Card sx={{
-                position: 'relative',
-                borderRadius: 2,
-                overflow: 'hidden',
-                border: '1px solid',
-                borderColor: 'divider'
-              }}>
-                <CardMedia
-                  component="div"
-                  sx={{
-                    height: 120,
-                    backgroundImage: `url(${hero_image_url})`,
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                    backgroundRepeat: 'no-repeat',
-                    position: 'relative',
-                    '&::before': {
-                      content: '""',
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      background: `linear-gradient(to bottom, ${alpha(theme.palette.common.black, 0.1)}, ${alpha(theme.palette.common.black, 0.3)})`,
-                      zIndex: 1
-                    }
-                  }}
-                />
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+            {renderLabel('Calendar name', { required: true })}
+            <TextField
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              fullWidth
+              autoFocus
+              size="small"
+              placeholder="e.g. Funded Challenge — FTMO 100K"
+              disabled={isSubmitting}
+              sx={inputSx}
+            />
+          </Box>
 
-                {/* Image controls overlay */}
-                <Box sx={{
-                  position: 'absolute',
-                  top: 8,
-                  right: 8,
-                  display: 'flex',
-                  gap: 1,
-                  zIndex: 2
-                }}>
-
-
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+            {renderLabel('Cover image', { optional: true })}
+            {heroImageUrl ? (
+              <Box
+                sx={{
+                  position: 'relative',
+                  borderRadius: 1.5,
+                  overflow: 'hidden',
+                  border: `1px solid ${hairline}`,
+                  height: 120,
+                  backgroundImage: `url(${heroImageUrl})`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                  '&::before': {
+                    content: '""',
+                    position: 'absolute',
+                    inset: 0,
+                    background: `linear-gradient(to bottom, ${alpha(theme.palette.common.black, 0.05)}, ${alpha(theme.palette.common.black, 0.35)})`,
+                  },
+                }}
+              >
+                <Box sx={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 0.75 }}>
+                  <Tooltip title="Replace image">
+                    <IconButton
+                      size="small"
+                      onClick={() => setIsImagePickerOpen(true)}
+                      disabled={isSubmitting}
+                      sx={{
+                        backgroundColor: alpha(theme.palette.common.black, 0.55),
+                        color: '#fff',
+                        backdropFilter: 'blur(4px)',
+                        '&:hover': { backgroundColor: alpha(theme.palette.common.black, 0.75) },
+                      }}
+                    >
+                      <ImageIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </Tooltip>
                   <Tooltip title="Remove image">
                     <IconButton
                       size="small"
                       onClick={handleRemoveImage}
+                      disabled={isSubmitting}
                       sx={{
                         backgroundColor: alpha(theme.palette.error.main, 0.9),
-                        color: 'white',
-                        '&:hover': {
-                          backgroundColor: theme.palette.error.main,
-                        }
+                        color: '#fff',
+                        '&:hover': { backgroundColor: theme.palette.error.main },
                       }}
                     >
-                      <DeleteIcon fontSize="small" />
+                      <DeleteIcon sx={{ fontSize: 16 }} />
                     </IconButton>
                   </Tooltip>
                 </Box>
-
-                {/* Attribution */}
-                {hero_image_attribution && (
-                  <Box sx={{
-                    position: 'absolute',
-                    bottom: 4,
-                    right: 4,
-                    backgroundColor: alpha(theme.palette.common.black, 0.7),
-                    color: 'white',
-                    px: 1,
-                    py: 0.5,
-                    borderRadius: 0.5,
-                    zIndex: 2
-                  }}>
-                    <Typography variant="caption" sx={{ fontSize: '0.6rem' }}>
-                      📸 {hero_image_attribution.photographer}
+                {heroImageAttribution && (
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      bottom: 6,
+                      right: 8,
+                      px: 0.75,
+                      py: 0.25,
+                      borderRadius: 0.75,
+                      backgroundColor: alpha(theme.palette.common.black, 0.6),
+                      color: '#fff',
+                    }}
+                  >
+                    <Typography sx={{ fontSize: '0.65rem', fontWeight: 500 }}>
+                      📸 {heroImageAttribution.photographer}
                     </Typography>
                   </Box>
                 )}
-              </Card>
+              </Box>
             ) : (
-              <Button
-                variant="outlined"
-                startIcon={<ImageIcon />}
-                onClick={() => setIsImagePickerOpen(true)}
-                sx={{
-                  height: 120,
-                  borderStyle: 'dashed',
-                  borderColor: 'divider',
-                  color: 'text.secondary',
-                  '&:hover': {
-                    borderColor: 'primary.main',
-                    color: 'primary.main',
-                    backgroundColor: alpha(theme.palette.primary.main, 0.04)
+              <Box
+                role="button"
+                tabIndex={0}
+                onClick={() => !isSubmitting && setIsImagePickerOpen(true)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    if (!isSubmitting) setIsImagePickerOpen(true);
                   }
                 }}
-                fullWidth
+                sx={{
+                  height: 120,
+                  borderRadius: 1.5,
+                  border: `1px dashed ${alpha(violet, isDark ? 0.45 : 0.35)}`,
+                  backgroundColor: violetSofter,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 0.75,
+                  color: violet,
+                  cursor: isSubmitting ? 'default' : 'pointer',
+                  transition: 'background-color 150ms ease, border-color 150ms ease',
+                  '&:hover': isSubmitting
+                    ? undefined
+                    : {
+                        backgroundColor: violetSoft,
+                        borderColor: violetBorder,
+                      },
+                  '&:focus-visible': {
+                    outline: `2px solid ${violet}`,
+                    outlineOffset: 2,
+                  },
+                }}
               >
-                Add Cover Image
-              </Button>
+                <ImageIcon sx={{ fontSize: 22 }} />
+                <Typography sx={{ fontSize: '0.85rem', fontWeight: 600 }}>
+                  Choose a cover image
+                </Typography>
+                <Typography
+                  sx={{
+                    fontSize: '0.72rem',
+                    color: alpha(theme.palette.text.secondary, 0.85),
+                    fontFamily: MONO_FONT,
+                  }}
+                >
+                  Unsplash · landscape
+                </Typography>
+              </Box>
             )}
           </Box>
-          <TextField
-            label={mode === 'create' ? "Initial Account Balance" : "Account Balance"}
-            fullWidth
-            value={account_balance}
-            onChange={(e) => {
-              const value = e.target.value;
-              if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                setAccount_balance(value);
-              }
-            }}
-            type="number"
-            InputProps={{
-              startAdornment: <Box component="span" sx={{ mr: 1 }}>$</Box>
-            }}
-          />
-          <TextField
-            label="Max Daily Drawdown (%)"
-            fullWidth
-            value={max_daily_drawdown}
-            onChange={(e) => {
-              const value = e.target.value;
-              if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                setMax_daily_drawdown(value);
-              }
-            }}
-            type="number"
-            InputProps={{
-              endAdornment: <Box component="span" sx={{ ml: 1 }}>%</Box>
-            }}
-            helperText="Maximum allowed loss percentage per day"
-          />
-          <TextField
-            label="Weekly Target (%)"
-            fullWidth
-            value={weekly_target}
-            onChange={(e) => {
-              const value = e.target.value;
-              if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                setWeekly_target(value);
-              }
-            }}
-            type="number"
-            InputProps={{
-              endAdornment: <Box component="span" sx={{ ml: 1 }}>%</Box>
-            }}
-            helperText="Target profit percentage per week"
-          />
-          <TextField
-            label="Monthly Target (%)"
-            fullWidth
-            value={monthly_target}
-            onChange={(e) => {
-              const value = e.target.value;
-              if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                setMonthly_target(value);
-              }
-            }}
-            type="number"
-            InputProps={{
-              endAdornment: <Box component="span" sx={{ ml: 1 }}>%</Box>
-            }}
-            helperText="Target profit percentage per month"
-          />
-          <TextField
-            label="Yearly Target (%)"
-            fullWidth
-            value={yearly_target}
-            onChange={(e) => {
-              const value = e.target.value;
-              if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                setYearly_target(value);
-              }
-            }}
-            type="number"
-            InputProps={{
-              endAdornment: <Box component="span" sx={{ ml: 1 }}>%</Box>
-            }}
-            helperText="Target profit percentage per year"
-          />
-          <TextField
-            label="Risk Per Trade (%)"
-            fullWidth
-            value={risk_per_trade}
-            onChange={(e) => {
-              const value = e.target.value;
-              if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                setRisk_per_trade(value);
-              }
-            }}
-            type="number"
-            InputProps={{
-              endAdornment: <Box component="span" sx={{ ml: 1 }}>%</Box>
-            }}
-            helperText="Percentage of account balance to risk per trade (optional)"
-          />
+        </Box>
 
-          {risk_per_trade && (
-            <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 2, mt: 1 }}>
-              <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 600 }}>
-                Dynamic Risk Settings
-              </Typography>
+        {/* Capital */}
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+          <Typography sx={sectionLabelSx}>Capital</Typography>
 
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={dynamic_risk_enabled}
-                    onChange={(e) => setDynamicRiskEnabled(e.target.checked)}
-                    color="primary"
-                  />
-                }
-                label="Enable Dynamic Risk"
-                sx={{ mb: 1.5 }}
-              />
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+              gap: 1.5,
+            }}
+          >
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+              {renderLabel(isEdit ? 'Account balance' : 'Initial balance', { required: true })}
+              {numericField(accountBalance, setAccountBalance, { prefix: '$', placeholder: '10000' })}
+            </Box>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+              {renderLabel('Max daily drawdown', { required: true })}
+              {numericField(maxDailyDrawdown, setMaxDailyDrawdown, { suffix: '%', placeholder: '5' })}
+            </Box>
+          </Box>
+        </Box>
 
-              {dynamic_risk_enabled && (
-                <Stack spacing={2}>
-                  <TextField
-                    label="Profit Threshold (%)"
-                    fullWidth
-                    value={profit_threshold_percentage}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                        setProfitThresholdPercentage(value);
-                      }
-                    }}
-                    type="number"
-                    InputProps={{
-                      endAdornment: <Box component="span" sx={{ ml: 1 }}>%</Box>
-                    }}
-                    helperText="Increase risk when profit exceeds this percentage"
-                    size="small"
-                  />
+        {/* Targets */}
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+            <Typography sx={sectionLabelSx}>Targets</Typography>
+            <Typography
+              sx={{
+                fontFamily: MONO_FONT,
+                fontSize: '0.66rem',
+                color: alpha(theme.palette.text.secondary, 0.75),
+              }}
+            >
+              Set to 0 to skip
+            </Typography>
+          </Box>
 
-                  <TextField
-                    label="Increased Risk (%)"
-                    fullWidth
-                    value={increased_risk_percentage}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                        setIncreasedRiskPercentage(value);
-                      }
-                    }}
-                    type="number"
-                    InputProps={{
-                      endAdornment: <Box component="span" sx={{ ml: 1 }}>%</Box>
-                    }}
-                    helperText="New risk percentage when profit threshold is exceeded"
-                    size="small"
-                  />
-                </Stack>
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' },
+              gap: 1.5,
+              p: 1.5,
+              borderRadius: 1.5,
+              border: `1px solid ${hairline}`,
+              backgroundColor: surfaceInset,
+            }}
+          >
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+              {renderLabel('Weekly')}
+              {numericField(weeklyTarget, setWeeklyTarget, { suffix: '%', placeholder: '2' })}
+            </Box>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+              {renderLabel('Monthly')}
+              {numericField(monthlyTarget, setMonthlyTarget, { suffix: '%', placeholder: '8' })}
+            </Box>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+              {renderLabel('Yearly')}
+              {numericField(yearlyTarget, setYearlyTarget, { suffix: '%', placeholder: '100' })}
+            </Box>
+          </Box>
+        </Box>
+
+        {/* Risk */}
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+          <Typography sx={sectionLabelSx}>Risk</Typography>
+
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+            {renderLabel('Risk per trade', {
+              optional: true,
+              hint: 'Percent of balance staked per position',
+            })}
+            {numericField(riskPerTrade, setRiskPerTrade, { suffix: '%', placeholder: '1' })}
+          </Box>
+
+          {riskPerTrade && (
+            <Box
+              sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 1.5,
+                p: 1.75,
+                borderRadius: 1.5,
+                border: `1px solid ${violetBorder}`,
+                backgroundColor: violetSofter,
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
+                  <SparkIcon sx={{ fontSize: 16, color: violet, flexShrink: 0 }} />
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography sx={{ fontWeight: 700, fontSize: '0.85rem', lineHeight: 1.2 }}>
+                      Dynamic risk
+                    </Typography>
+                    <Typography
+                      sx={{
+                        fontSize: '0.74rem',
+                        color: theme.palette.text.secondary,
+                        lineHeight: 1.3,
+                      }}
+                    >
+                      Scale up risk after a profit threshold is hit
+                    </Typography>
+                  </Box>
+                </Box>
+                <Switch
+                  checked={dynamicRiskEnabled}
+                  onChange={(e) => setDynamicRiskEnabled(e.target.checked)}
+                  disabled={isSubmitting}
+                  size="small"
+                />
+              </Box>
+
+              {dynamicRiskEnabled && (
+                <Box
+                  sx={{
+                    display: 'grid',
+                    gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+                    gap: 1.25,
+                  }}
+                >
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                    {renderLabel('Profit threshold')}
+                    {numericField(profitThresholdPercentage, setProfitThresholdPercentage, {
+                      suffix: '%',
+                      placeholder: '5',
+                    })}
+                  </Box>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                    {renderLabel('Increased risk')}
+                    {numericField(increasedRiskPercentage, setIncreasedRiskPercentage, {
+                      suffix: '%',
+                      placeholder: '2',
+                    })}
+                  </Box>
+                </Box>
               )}
             </Box>
           )}
-        </Stack>
+        </Box>
+      </Box>
 
-        {/* Image Picker Dialog */}
-        <ImagePickerDialog
-          open={isImagePickerOpen}
-          onClose={() => setIsImagePickerOpen(false)}
-          onImageSelect={handleImageSelect}
-          title="Choose a cover image for your calendar"
-        />
-    </BaseDialog>
+      {/* Footer */}
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          gap: 1,
+          px: 2.5,
+          py: 1.5,
+          borderTop: `1px solid ${hairline}`,
+          backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : alpha(theme.palette.text.primary, 0.02),
+        }}
+      >
+        <Button
+          onClick={() => !isSubmitting && onClose()}
+          disabled={isSubmitting}
+          sx={{
+            textTransform: 'none',
+            fontWeight: 600,
+            fontSize: '0.85rem',
+            color: theme.palette.text.secondary,
+            '&:hover': { backgroundColor: alpha(theme.palette.text.primary, 0.04) },
+          }}
+        >
+          Cancel
+        </Button>
+        <Button
+          onClick={handleSubmit}
+          disabled={!isFormValid || isSubmitting}
+          variant="contained"
+          endIcon={
+            isSubmitting ? (
+              <CircularProgress size={14} thickness={5} sx={{ color: 'inherit' }} />
+            ) : !isEdit ? (
+              <ArrowIcon sx={{ fontSize: 14 }} />
+            ) : undefined
+          }
+          sx={{
+            textTransform: 'none',
+            fontWeight: 600,
+            fontSize: '0.85rem',
+            backgroundColor: violet,
+            color: '#fff',
+            borderRadius: 1.25,
+            px: 1.75,
+            py: 0.75,
+            boxShadow: 'none',
+            '&:hover': { backgroundColor: theme.palette.primary.dark, boxShadow: 'none' },
+            '&.Mui-disabled': {
+              backgroundColor: alpha(violet, 0.35),
+              color: alpha('#fff', 0.7),
+            },
+          }}
+        >
+          {submitButtonText}
+        </Button>
+      </Box>
+
+      <ImagePickerDialog
+        open={isImagePickerOpen}
+        onClose={() => setIsImagePickerOpen(false)}
+        onImageSelect={handleImageSelect}
+        title="Choose a cover image for your calendar"
+      />
+    </Dialog>
   );
 };
 
