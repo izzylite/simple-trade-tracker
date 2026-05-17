@@ -42,11 +42,6 @@ import {
   MenuList,
   MenuItem,
   ListItemText,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  CircularProgress,
 } from '@mui/material';
 import {
   pink,
@@ -85,11 +80,7 @@ import {
   StickyNote2Outlined as NoteIcon,
   LocalOfferOutlined as TagIcon2,
   EventOutlined as EventIcon,
-  CallMadeOutlined as TradeLinkIcon,
-  ArrowForward as ArrowIcon,
 } from '@mui/icons-material';
-import { dialogProps } from '../../styles/dialogStyles';
-import { useDialogTokens, MONO_FONT } from '../../styles/dialogTokens';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -99,8 +90,7 @@ import { EditorState } from 'draft-js';
 import RichTextEditor, {
   RichTextEditorHandle,
 } from '../common/RichTextEditor';
-import type { TradeChipData } from '../common/RichTextEditor/utils/tradeEntityUtils';
-import { isInternalTradeLink } from '../common/RichTextEditor/utils/linkUtils';
+import { useTradeLinkInsertion } from '../common/RichTextEditor/hooks/useTradeLinkInsertion';
 import { Z_INDEX } from '../../styles/zIndex';
 import EditorToolbar from '../common/RichTextEditor/components/EditorToolbar';
 import ImagePickerDialog from '../heroImage/ImagePickerDialog';
@@ -120,10 +110,6 @@ import { isGroupedTag, getTagName, getTagGroup } from '../../utils/tagColors';
 import NoteShareButton from './NoteShareButton';
 import { useNoteNavigation } from '../../hooks/useNoteNavigation';
 import { getContentAsJson } from '../common/RichTextEditor/utils/draftUtils';
-import { getSharedTrade } from '../../services/sharingService';
-import { Trade } from '../../types/dualWrite';
-import TradeGalleryDialog from '../TradeGalleryDialog';
-import ImageZoomDialog, { ImageZoomProp } from '../ImageZoomDialog';
 import { IMPACT_COLORS, CURRENCY_FLAGS } from '../../types/economicCalendar';
 import type { ImpactLevel, Currency } from '../../types/economicCalendar';
 import {
@@ -208,7 +194,6 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
   hideTitleLabel = false,
 }, ref) => {
   const theme = useTheme();
-  const dialogTokens = useDialogTokens();
   const { user } = useAuthState();
   const noteNav = useNoteNavigation();
 
@@ -272,11 +257,14 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
   // Share snackbar
   const [shareSnackbar, setShareSnackbar] = useState<string | null>(null);
 
-  // Trade preview (TradeGalleryDialog)
-  const [previewTrade, setPreviewTrade] = useState<Trade | null>(null);
-  const [tradePreviewOpen, setTradePreviewOpen] = useState(false);
-  const [tradePreviewLoading, setTradePreviewLoading] = useState(false);
-  const [zoomedImages, setZoomedImages] = useState<ImageZoomProp | null>(null);
+  // Trade-link insertion + shared-trade preview + image zoom — all bundled in
+  // the shared hook so TradeForm and any future editor surface gets the same
+  // dialogs with consistent styling and z-index.
+  const {
+    onInsertTradeLink: openTradeLinkDialog,
+    onSharedTradeClick: handleSharedTradeClick,
+    elements: tradeLinkElements,
+  } = useTradeLinkInsertion(editorRef);
 
   // Available notes for /note picker (exclude current)
   const availableNotes = (calendarNotes ?? [])
@@ -602,70 +590,8 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
     noteNav.navigateTo(noteId, noteTitle);
   }, [noteNav, saveIfDirty]);
 
-  // ─── Insert-trade-link dialog ────────────────────────────────────────────
-  // Toolbar button → dialog → user pastes /shared/<shareId> URL → we resolve
-  // it via getSharedTrade and ask the editor to insert a TRADE_LINK chip.
-  const [tradeLinkDialogOpen, setTradeLinkDialogOpen] = useState(false);
-  const [tradeLinkInputUrl, setTradeLinkInputUrl] = useState('');
-  const [tradeLinkError, setTradeLinkError] = useState<string | null>(null);
-  const [tradeLinkLoading, setTradeLinkLoading] = useState(false);
-
-  const openTradeLinkDialog = useCallback(() => {
-    setTradeLinkInputUrl('');
-    setTradeLinkError(null);
-    setTradeLinkLoading(false);
-    setTradeLinkDialogOpen(true);
-  }, []);
-
-  const submitTradeLinkInsert = useCallback(async () => {
-    const url = tradeLinkInputUrl.trim();
-    if (!url) {
-      setTradeLinkError('Paste a trade share link to continue.');
-      return;
-    }
-    const parsed = isInternalTradeLink(url);
-    if (parsed.type !== 'shared' || !parsed.id) {
-      setTradeLinkError("That doesn't look like a trade share link (expected /shared/<id>).");
-      return;
-    }
-    setTradeLinkError(null);
-    setTradeLinkLoading(true);
-    try {
-      const result = await getSharedTrade(parsed.id);
-      const trade = result?.trade;
-      if (!trade) {
-        setTradeLinkError('Share link not found or is no longer accessible.');
-        return;
-      }
-      const data: TradeChipData = {
-        shareId: parsed.id,
-        tradeId: trade.id,
-        date: new Date(trade.trade_date).toISOString(),
-        // trade.amount is signed P&L; preserve sign for win/loss styling.
-        pnl: trade.amount ?? 0,
-      };
-      editorRef.current?.insertTradeLink(data);
-      setTradeLinkDialogOpen(false);
-    } catch (err) {
-      logger.error('Failed to resolve trade share link', err);
-      setTradeLinkError('Failed to load the trade. Check the link and try again.');
-    } finally {
-      setTradeLinkLoading(false);
-    }
-  }, [tradeLinkInputUrl]);
-
-  const handleSharedTradeClick = useCallback(async (shareId: string, _tradeId: string) => {
-    setTradePreviewOpen(true);
-    setTradePreviewLoading(true);
-    try {
-      const data = await getSharedTrade(shareId);
-      if (data?.trade) setPreviewTrade(data.trade);
-    } catch (err) {
-      logger.error('Error loading shared trade:', err);
-    } finally {
-      setTradePreviewLoading(false);
-    }
-  }, []);
+  // Trade-link insert dialog + shared-trade preview now live in
+  // useTradeLinkInsertion (see hook declaration earlier in this component).
 
   const handleImageSelect = (imageUrl: string) => {
     setCoverImage(imageUrl);
@@ -1440,199 +1366,10 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
         title="Choose a cover image"
       />
 
-      {/* Insert trade share link dialog */}
-      {(() => {
-        const {
-          violet, surfaceInset, hairline,
-          monoLabelSx,
-          paperSx, headerSx, iconAvatarSx, footerSx,
-          primaryButtonSx, ghostButtonSx,
-        } = dialogTokens;
-        // Trade-link URL input uses a monospaced font so URLs scan cleanly,
-        // and switches its border to error tones while a validation error is active.
-        const errorInputSx = {
-          '& .MuiOutlinedInput-root': {
-            borderRadius: 1.5,
-            backgroundColor: surfaceInset,
-            '& fieldset': {
-              borderColor: tradeLinkError
-                ? alpha(theme.palette.error.main, 0.6)
-                : hairline,
-            },
-            '&:hover fieldset': {
-              borderColor: tradeLinkError
-                ? theme.palette.error.main
-                : alpha(violet, 0.5),
-            },
-            '&.Mui-focused fieldset': {
-              borderColor: tradeLinkError ? theme.palette.error.main : violet,
-              borderWidth: 1,
-            },
-          },
-          '& .MuiOutlinedInput-input': {
-            py: 1.1,
-            fontSize: '0.88rem',
-            fontWeight: 500,
-            fontFamily: MONO_FONT,
-          },
-        };
-        const handleClose = () =>
-          !tradeLinkLoading && setTradeLinkDialogOpen(false);
-
-        return (
-          <Dialog
-            open={tradeLinkDialogOpen}
-            onClose={handleClose}
-            maxWidth="sm"
-            fullWidth
-            {...dialogProps}
-            sx={{ zIndex: Z_INDEX.RICH_TEXT_DIALOG }}
-            slotProps={{ paper: { sx: paperSx } }}
-          >
-            {/* Header */}
-            <Box sx={headerSx}>
-              <Box sx={iconAvatarSx}>
-                <TradeLinkIcon sx={{ fontSize: 18 }} />
-              </Box>
-              <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Typography
-                  sx={{ fontWeight: 700, fontSize: '0.95rem', lineHeight: 1.2 }}
-                >
-                  Insert trade share link
-                </Typography>
-                <Typography
-                  sx={{
-                    fontSize: '0.78rem',
-                    color: theme.palette.text.secondary,
-                    lineHeight: 1.3,
-                  }}
-                >
-                  Embed a live trade chip from any shared trade URL
-                </Typography>
-              </Box>
-              <IconButton
-                onClick={handleClose}
-                disabled={tradeLinkLoading}
-                size="small"
-                sx={{ color: theme.palette.text.secondary }}
-              >
-                <CloseIcon fontSize="small" />
-              </IconButton>
-            </Box>
-
-            {/* Body */}
-            <Box
-              sx={{
-                px: 2.5,
-                py: 2,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 1.75,
-              }}
-            >
-              <Box
-                sx={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: 1,
-                  px: 1.25,
-                  py: 1,
-                  borderRadius: 1.25,
-                  border: `1px solid ${hairline}`,
-                  backgroundColor: surfaceInset,
-                }}
-              >
-                <TradeLinkIcon
-                  sx={{ fontSize: 14, color: violet, mt: 0.25, flexShrink: 0 }}
-                />
-                <Typography
-                  sx={{
-                    fontSize: '0.78rem',
-                    color: theme.palette.text.secondary,
-                    lineHeight: 1.5,
-                  }}
-                >
-                  Paste a trade share link. This will resolve to a clickable trade chip.
-                </Typography>
-              </Box>
-
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
-                <Typography sx={monoLabelSx}>
-                  Share URL
-                  <Box
-                    component="span"
-                    sx={{
-                      color: theme.palette.error.main,
-                      fontFamily: 'inherit',
-                    }}
-                  >
-                    *
-                  </Box>
-                </Typography>
-                <TextField
-                  autoFocus
-                  fullWidth
-                  size="small"
-                  value={tradeLinkInputUrl}
-                  onChange={(e) => {
-                    setTradeLinkInputUrl(e.target.value);
-                    if (tradeLinkError) setTradeLinkError(null);
-                  }}
-                  placeholder="https://app/shared/share_…"
-                  error={!!tradeLinkError}
-                  disabled={tradeLinkLoading}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !tradeLinkLoading) {
-                      e.preventDefault();
-                      void submitTradeLinkInsert();
-                    }
-                  }}
-                  sx={errorInputSx}
-                />
-                {tradeLinkError && (
-                  <Typography
-                    sx={{
-                      fontSize: '0.75rem',
-                      color: theme.palette.error.main,
-                      mt: 0.25,
-                    }}
-                  >
-                    {tradeLinkError}
-                  </Typography>
-                )}
-              </Box>
-            </Box>
-
-            {/* Footer */}
-            <Box sx={footerSx}>
-              <Button
-                onClick={handleClose}
-                disabled={tradeLinkLoading}
-                sx={ghostButtonSx}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={() => {
-                  void submitTradeLinkInsert();
-                }}
-                disabled={tradeLinkLoading || !tradeLinkInputUrl.trim()}
-                variant="contained"
-                endIcon={
-                  tradeLinkLoading ? (
-                    <CircularProgress size={14} thickness={5} sx={{ color: 'inherit' }} />
-                  ) : (
-                    <ArrowIcon sx={{ fontSize: 14 }} />
-                  )
-                }
-                sx={primaryButtonSx}
-              >
-                {tradeLinkLoading ? 'Resolving…' : 'Insert trade'}
-              </Button>
-            </Box>
-          </Dialog>
-        );
-      })()}
+      {/* Insert-trade-link dialog + shared-trade preview + image zoom — all
+          provided by useTradeLinkInsertion to avoid duplicating the JSX in
+          every editor surface (NoteEditorBody, TradeForm, …). */}
+      {tradeLinkElements}
 
 
       <ConfirmationDialog
@@ -1648,39 +1385,6 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
         sx={{ zIndex: Z_INDEX.LOADING_PROGRESS }}
       />
 
-      {tradePreviewOpen && (
-        <TradeGalleryDialog
-          open={tradePreviewOpen}
-          onClose={() => { setTradePreviewOpen(false); setPreviewTrade(null); }}
-          trades={previewTrade ? [previewTrade] : []}
-          initialTradeId={previewTrade?.id}
-          loading={tradePreviewLoading}
-          setZoomedImage={(url, allImages, initialIndex) => {
-            setZoomedImages({ selectetdImageIndex: initialIndex || 0, allImages: allImages || [url] });
-          }}
-          title={previewTrade?.name || 'Trade Preview'}
-          isReadOnly
-          tradeOperations={{
-            onZoomImage: (url, allImages, initialIndex) => {
-              setZoomedImages({ selectetdImageIndex: initialIndex || 0, allImages: allImages || [url] });
-            },
-            onUpdateTradeProperty: undefined,
-            calendarId: undefined,
-            onOpenGalleryMode: undefined,
-            economicFilter: undefined,
-            isTradeUpdating: undefined,
-            isReadOnly: true,
-          }}
-        />
-      )}
-
-      {zoomedImages && (
-        <ImageZoomDialog
-          open={!!zoomedImages}
-          onClose={() => setZoomedImages(null)}
-          imageProp={zoomedImages}
-        />
-      )}
     </Box>
   );
 });

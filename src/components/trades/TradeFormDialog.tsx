@@ -33,6 +33,7 @@ import { formatTagsWithCapitalizedGroups } from '../../utils/tagColors';
 import { Z_INDEX } from '../../styles/zIndex';
 import { TradeRepository } from '../../services/repository/repositories/TradeRepository';
 import { deriveTradeDateForSession } from '../../utils/sessionTimeUtils';
+import { useUserPinnedEvents } from '../../contexts/UserPinnedEventsContext';
 
 // Re-export pure helpers from the side-effect-free helper module so
 // callers can keep importing them from TradeFormDialog while
@@ -129,6 +130,9 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     hairline,
     monoLabelSx, inputSx,
   } = useDialogTokens();
+
+  // Pinned economic events — feeds the notes-tab /event picker.
+  const { pins: userPinnedEvents } = useUserPinnedEvents();
 
   // State
 
@@ -1435,6 +1439,8 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
               onImagesReordered={handleImagesReordered}
               onSubmit={editingTrade ? handleEditSubmit : handleSubmit}
               onOpenGalleryMode={onOpenGalleryMode}
+              availableNotes={calendar?.notes}
+              availableEvents={userPinnedEvents}
             />
 
 

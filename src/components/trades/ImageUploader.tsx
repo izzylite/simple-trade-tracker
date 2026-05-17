@@ -1,12 +1,19 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {
   Box,
   Typography,
   Button,
   IconButton,
-  Tooltip
+  Tooltip,
+  alpha,
 } from '@mui/material';
-import { AddPhotoAlternate, ViewList, GridView } from '@mui/icons-material';
+import {
+  AddPhotoAlternate,
+  ViewList,
+  GridView,
+  CloudUploadOutlined,
+} from '@mui/icons-material';
+import { useDialogTokens } from '../../styles/dialogTokens';
 
 import { PendingImage, TradeImage } from './TradeForm';
 import ImageGrid, { GridImage, GridPendingImage } from './ImageGrid';
@@ -21,10 +28,6 @@ interface ImageUploaderProps {
   onImagesReordered?: (images: Array<GridImage | GridPendingImage>) => void;
 }
 
-
-
-type LayoutMode = 'vertical' | 'grid';
-
 const ImageUploader: React.FC<ImageUploaderProps> = ({
   pendingImages,
   uploadedImages,
@@ -35,11 +38,17 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   onImagesReordered
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { violet, violetSoft, violetSofter, hairline, surfaceInset } =
+    useDialogTokens();
+
+  // Tracks dragenter/leave depth so nested children flickering doesn't toggle
+  // the drop-zone styling off mid-drag.
+  const [dragDepth, setDragDepth] = useState(0);
+  const isDragging = dragDepth > 0;
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       onImageUpload(e.target.files);
-      // Reset the input value so the same file can be selected again
       e.target.value = '';
     }
   };
@@ -48,40 +57,31 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     fileInputRef.current?.click();
   };
 
-  // Check if any images are currently uploading (pending images are still uploading)
-  const isAnyImageUploading = (): boolean => {
-    return pendingImages.length > 0;
-  };
+  const isAnyImageUploading = (): boolean => pendingImages.length > 0;
+  const hasImages = pendingImages.length + uploadedImages.length > 0;
 
   const organizeImagesVertically = () => {
     if (!onImagesReordered || isAnyImageUploading()) return;
 
     const allImages = [...pendingImages, ...uploadedImages];
-
-    // Sort images by their existing row and column values to maintain relative order
     const sortedImages = [...allImages].sort((a, b) => {
       const aRow = a.row ?? 0;
       const bRow = b.row ?? 0;
       const aCol = a.column ?? 0;
       const bCol = b.column ?? 0;
-
       if (aRow === bRow) return aCol - bCol;
       return aRow - bRow;
     });
 
-    // Reorganize images vertically (one per row)
     const reorganizedImages = sortedImages.map((image, index) => ({
       ...image,
       row: index,
       column: 0,
-      column_width: 100 // Full width for vertical layout
+      column_width: 100,
     }));
 
-    // Split back into pending and uploaded images
     const newPendingImages = reorganizedImages.filter(img => 'file' in img) as GridPendingImage[];
     const newUploadedImages = reorganizedImages.filter(img => !('file' in img)) as GridImage[];
-
-    // Update the layout
     onImagesReordered([...newPendingImages, ...newUploadedImages]);
   };
 
@@ -89,44 +89,32 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     if (!onImagesReordered || isAnyImageUploading()) return;
 
     const allImages = [...pendingImages, ...uploadedImages];
-
-    // Sort images by their existing row and column values to maintain relative order
     const sortedImages = [...allImages].sort((a, b) => {
       const aRow = a.row ?? 0;
       const bRow = b.row ?? 0;
       const aCol = a.column ?? 0;
       const bCol = b.column ?? 0;
-
       if (aRow === bRow) return aCol - bCol;
       return aRow - bRow;
     });
 
-    // Calculate grid layout with max 3 columns
     const maxColumns = 3;
     const columnWidth = 100 / maxColumns;
 
     const reorganizedImages = sortedImages.map((image, index) => {
       const row = Math.floor(index / maxColumns);
       const column = index % maxColumns;
-
-      return {
-        ...image,
-        row,
-        column,
-        columnWidth
-      };
+      return { ...image, row, column, columnWidth };
     });
 
-    // Split back into pending and uploaded images
     const newPendingImages = reorganizedImages.filter(img => 'file' in img) as GridPendingImage[];
     const newUploadedImages = reorganizedImages.filter(img => !('file' in img)) as GridImage[];
-
-    // Update the layout
     onImagesReordered([...newPendingImages, ...newUploadedImages]);
-   
   };
 
-  const handlePaste = (event: ClipboardEvent) => {
+  // Clipboard paste — captured at document level so the user can paste images
+  // any time the dialog is open (matches the previous behavior).
+  const handlePaste = useCallback((event: ClipboardEvent) => {
     const items = event.clipboardData?.items;
     if (!items) return;
 
@@ -135,9 +123,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
       const item = items[i];
       if (item.type.indexOf('image') !== -1) {
         const file = item.getAsFile();
-        if (file) {
-          imageFiles.push(file);
-        }
+        if (file) imageFiles.push(file);
       }
     }
 
@@ -146,23 +132,123 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
       imageFiles.forEach(file => dataTransfer.items.add(file));
       onImageUpload(dataTransfer.files);
     }
-  };
+  }, [onImageUpload]);
 
   useEffect(() => {
-    // Add paste event listener to the document
     document.addEventListener('paste', handlePaste);
+    return () => document.removeEventListener('paste', handlePaste);
+  }, [handlePaste]);
 
-    // Clean up the event listener when the component unmounts
-    return () => {
-      document.removeEventListener('paste', handlePaste);
-    };
-  }, [onImageUpload]); // Add onImageUpload to the dependency array
+  // ─── Drag-and-drop ───────────────────────────────────────────────────────
+  const dropZoneOnly = (e: React.DragEvent) => {
+    // Only react to file drags (not text/HTML drags from rich content).
+    return Array.from(e.dataTransfer.types).includes('Files');
+  };
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    if (!dropZoneOnly(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setDragDepth(d => d + 1);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    if (!dropZoneOnly(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'copy';
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    if (!dropZoneOnly(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setDragDepth(d => Math.max(0, d - 1));
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    if (!dropZoneOnly(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setDragDepth(0);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      onImageUpload(e.dataTransfer.files);
+    }
+  };
+
+  // Shared drop-zone styling — used full-bleed in the empty state, and as a
+  // compact "Add more" button when images are already present.
+  const dropZoneSx = (compact: boolean) => ({
+    flex: compact ? 'none' : 1,
+    minHeight: compact ? 'auto' : 220,
+    display: 'flex',
+    flexDirection: 'column' as const,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: compact ? 0.5 : 1.25,
+    px: 3,
+    py: compact ? 2 : 4,
+    borderRadius: 2,
+    border: `2px dashed ${isDragging ? violet : hairline}`,
+    backgroundColor: isDragging ? violetSofter : surfaceInset,
+    cursor: 'pointer',
+    transition: 'background-color 150ms ease, border-color 150ms ease',
+    textAlign: 'center' as const,
+    '&:hover': {
+      borderColor: alpha(violet, 0.7),
+      backgroundColor: violetSofter,
+    },
+  });
 
   return (
-    <Box sx={{ mt: 2 }}>
-      <Typography variant="subtitle1" sx={{ mb: 1 }}>
-        Images
-      </Typography>
+    <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+      {/* Header — title + layout toggles (toggles only matter when images exist) */}
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          mb: 1.25,
+        }}
+      >
+        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+          Images
+        </Typography>
+
+        {hasImages && (
+          <Box sx={{ display: 'flex', gap: 0.25 }}>
+            <Tooltip title="Arrange images vertically (one per row)">
+              <span>
+                <IconButton
+                  onClick={organizeImagesVertically}
+                  size="small"
+                  disabled={
+                    pendingImages.length + uploadedImages.length < 2 ||
+                    isAnyImageUploading()
+                  }
+                >
+                  <ViewList fontSize="small" />
+                </IconButton>
+              </span>
+            </Tooltip>
+
+            <Tooltip title="Arrange images in a grid (max 3 columns)">
+              <span>
+                <IconButton
+                  onClick={organizeImagesInGrid}
+                  size="small"
+                  disabled={
+                    pendingImages.length + uploadedImages.length < 2 ||
+                    isAnyImageUploading()
+                  }
+                >
+                  <GridView fontSize="small" />
+                </IconButton>
+              </span>
+            </Tooltip>
+          </Box>
+        )}
+      </Box>
 
       <input
         type="file"
@@ -173,59 +259,100 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
         onChange={handleFileInputChange}
       />
 
-      <Box sx={{ mb: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+      {hasImages ? (
+        <>
+          {/* Compact "Add more" drop zone above the grid. */}
+          <Box
+            onClick={handleAddImageClick}
+            onDragEnter={handleDragEnter}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handleAddImageClick();
+              }
+            }}
+            sx={{ ...dropZoneSx(true), mb: 1.5 }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <AddPhotoAlternate sx={{ fontSize: 20, color: violet }} />
+              <Typography sx={{ fontSize: '0.88rem', fontWeight: 600, color: violet }}>
+                Add more
+              </Typography>
+            </Box>
+            <Typography variant="caption" color="text.secondary">
+              Drop files, click to browse, or paste (Ctrl+V) · max 1MB each
+            </Typography>
+          </Box>
+
+          <ImageGrid
+            pendingImages={pendingImages}
+            uploadedImages={uploadedImages}
+            editingTrade={editingTrade}
+            onImageCaptionChange={onImageCaptionChange}
+            onImageRemove={onImageRemove}
+            onImagesReordered={onImagesReordered}
+          />
+        </>
+      ) : (
+        // Empty state — full-height drop zone fills the tab so the dialog
+        // stays a consistent height across tabs.
+        <Box
+          onClick={handleAddImageClick}
+          onDragEnter={handleDragEnter}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              handleAddImageClick();
+            }
+          }}
+          sx={dropZoneSx(false)}
+        >
+          <Box
+            sx={{
+              width: 56,
+              height: 56,
+              borderRadius: '50%',
+              backgroundColor: violetSoft,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              mb: 0.5,
+            }}
+          >
+            <CloudUploadOutlined sx={{ fontSize: 28, color: violet }} />
+          </Box>
+          <Typography sx={{ fontSize: '1rem', fontWeight: 600 }}>
+            {isDragging ? 'Drop to upload' : 'Drop screenshots here'}
+          </Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ maxWidth: 360 }}>
+            Drag &amp; drop, click to browse, or paste with Ctrl+V.
+            <br />Max 1&nbsp;MB per image.
+          </Typography>
           <Button
             variant="outlined"
             startIcon={<AddPhotoAlternate />}
-            onClick={handleAddImageClick}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleAddImageClick();
+            }}
+            sx={{ mt: 1.5, borderRadius: 1.25, textTransform: 'none' }}
           >
-            Add Images
+            Browse files
           </Button>
-          <Box sx={{ flex: 1 }} />  {/* This will push the buttons to the right */}
-
-          <Tooltip title="Arrange images vertically (one per row)">
-            <span> {/* Wrapper needed for disabled Tooltip */}
-              <IconButton
-                onClick={organizeImagesVertically}
-                color={'default'}
-                disabled={pendingImages.length + uploadedImages.length < 2 || isAnyImageUploading()}
-              >
-                <ViewList />
-              </IconButton>
-            </span>
-          </Tooltip>
-
-          <Tooltip title="Arrange images in a grid (max 3 columns)">
-            <span> {/* Wrapper needed for disabled Tooltip */}
-              <IconButton
-                onClick={organizeImagesInGrid}
-                color={'default'}
-                disabled={pendingImages.length + uploadedImages.length < 2 || isAnyImageUploading()}
-              >
-                <GridView />
-              </IconButton>
-            </span>
-          </Tooltip>
         </Box>
-        <Typography variant="caption" color="text.secondary" display="block">
-          You can also paste images directly (Ctrl+V). Maximum file size: 1MB per image.
-        </Typography>
-      </Box>
-
-      {(pendingImages.length > 0 || uploadedImages.length > 0) && (
-        <ImageGrid
-          pendingImages={pendingImages}
-          uploadedImages={uploadedImages}
-          editingTrade={editingTrade}
-          onImageCaptionChange={onImageCaptionChange}
-          onImageRemove={onImageRemove}
-          onImagesReordered={onImagesReordered}
-        />
       )}
     </Box>
   );
 };
-
 
 export default ImageUploader;

@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback, useState, useEffect } from 'react';
+import React, { useMemo, useCallback, useState, useEffect, useRef } from 'react';
 import {
   TextField,
   Select,
@@ -11,9 +11,14 @@ import {
   useTheme,
   Autocomplete,
 } from '@mui/material';
+import {
+  TuneOutlined as TradeTabIcon,
+  PhotoLibraryOutlined as ScreenshotsTabIcon,
+  NotesOutlined as NotesTabIcon,
+} from '@mui/icons-material';
 import { useDialogTokens } from '../../styles/dialogTokens';
 import { DatePicker } from '@mui/x-date-pickers';
-import { Trade, TradeEconomicEvent } from '../../types/dualWrite';
+import { Trade, TradeEconomicEvent, PinnedEvent } from '../../types/dualWrite';
 import { FormField } from '../StyledComponents';
 import ImageUploader from './ImageUploader';
 import { GridImage, GridPendingImage } from './ImageGrid';
@@ -21,7 +26,9 @@ import { formatCurrency } from '../../utils/formatters';
 import TagsInput from './TagsInput';
 import { isGroupedTag, getTagGroup } from '../../utils/tagColors';
 import { DynamicRiskSettings } from '../../utils/dynamicRiskUtils';
-import RichTextEditor from '../common/RichTextEditor';
+import RichTextEditor, { RichTextEditorHandle } from '../common/RichTextEditor';
+import { useTradeLinkInsertion } from '../common/RichTextEditor/hooks/useTradeLinkInsertion';
+import RoundedTabs, { TabPanel } from '../common/RoundedTabs';
 import { fetchAndGenerateTradeNameSuggestions } from '../../utils/tradeNameSuggestions';
 import { Currency } from '../../types/economicCalendar';
 import { CURRENCY_PAIRS } from '../../services/tradeEconomicEventService';
@@ -106,6 +113,10 @@ interface TradeFormProps {
   // Optional props for trade link navigation in notes
   trades?: Array<{ id: string;[key: string]: any }>;
   onOpenGalleryMode?: (trades: any[], initialTradeId?: string, title?: string) => void;
+  /** Notes from the calendar — feeds the /note picker inside the notes editor. */
+  availableNotes?: Array<{ id: string; title: string; color?: string }>;
+  /** Pinned economic events — feeds the /event picker inside the notes editor. */
+  availableEvents?: PinnedEvent[];
 }
 
 const TradeForm: React.FC<TradeFormProps> = ({
@@ -139,7 +150,9 @@ const TradeForm: React.FC<TradeFormProps> = ({
   onImagesReordered,
   onSubmit,
   trades,
-  onOpenGalleryMode
+  onOpenGalleryMode,
+  availableNotes,
+  availableEvents,
 }) => {
   const theme = useTheme();
   const {
@@ -150,6 +163,22 @@ const TradeForm: React.FC<TradeFormProps> = ({
 
   // State for trade name suggestions
   const [tradeNameSuggestions, setTradeNameSuggestions] = useState<string[]>([]);
+
+  // Active tab inside the dialog: 0 = Trade, 1 = Screenshots, 2 = Notes
+  const [activeTab, setActiveTab] = useState<number>(0);
+
+  // Editor + trade-link plumbing shared with NoteEditorBody.
+  const editorRef = useRef<RichTextEditorHandle>(null);
+  // Bumping this on mention/note/event state change forces a re-render so the
+  // editor's internal pickers stay positioned correctly.
+  const [, setMentionVersion] = useState(0);
+  const bumpMention = useCallback(() => setMentionVersion(v => v + 1), []);
+
+  const {
+    onInsertTradeLink,
+    onSharedTradeClick,
+    elements: tradeLinkElements,
+  } = useTradeLinkInsertion(editorRef);
 
   // Fetch and generate trade name suggestions
   useEffect(() => {
@@ -288,8 +317,38 @@ const TradeForm: React.FC<TradeFormProps> = ({
     },
   };
 
+  // Badge counts for tabs
+  const screenshotCount = newTrade.pending_images.length + newTrade.uploaded_images.length;
+
+  const tabs = [
+    { label: 'Trade', icon: <TradeTabIcon sx={{ fontSize: 16 }} /> },
+    {
+      label: 'Screenshots',
+      icon: <ScreenshotsTabIcon sx={{ fontSize: 16 }} />,
+      badgeCount: screenshotCount,
+    },
+    { label: 'Notes', icon: <NotesTabIcon sx={{ fontSize: 16 }} /> },
+  ];
+
   return (
     <form onSubmit={onSubmit}>
+      <Box sx={{ mb: 2 }}>
+        <RoundedTabs
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabChange={(_, v) => setActiveTab(v)}
+          size="small"
+          fullWidth
+        />
+      </Box>
+
+      {/* Stable min-height so the dialog doesn't shrink when switching tabs.
+          Screenshots & Notes tabs are typically shorter than Trade — the
+          fullHeight TabPanels let their empty-state surfaces (drop zone,
+          editor) stretch into this floor. */}
+      <Box sx={{ minHeight: 460, display: 'flex', flexDirection: 'column' }}>
+
+      <TabPanel value={activeTab} index={0} fullHeight>
       {/* Trade name */}
       <FormField>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
@@ -654,42 +713,64 @@ const TradeForm: React.FC<TradeFormProps> = ({
           Tip: categorize tags as <code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '0.7rem' }}>Category:Tag</code> (e.g. <code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '0.7rem' }}>Strategy:Breakout</code>). Grouped tags cluster in charts so you can spot which setups perform best. One colon per tag.
         </Typography>
       </FormField>
+      </TabPanel>
 
-
-      {/* Debug layout information */}
-      {/* {(() => {
-        logger.log("TradeForm rendering with images:",
-          "Pending:", newTrade.pending_images.map(img => ({ id: img.id, row: img.row, column: img.column, column_width: img.column_width })),
-          "Uploaded:", newTrade.uploaded_images.map(img => ({ id: img.id, row: img.row, column: img.column, column_width: img.column_width })));
-        return null;
-      })()} */}
-
-      <ImageUploader
-        pendingImages={newTrade.pending_images}
-        uploadedImages={newTrade.uploaded_images}
-        editingTrade={editingTrade !== null}
-        onImageUpload={onImageUpload}
-        onImageCaptionChange={onImageCaptionChange}
-        onImageRemove={onImageRemove}
-        onImagesReordered={onImagesReordered}
-      />
-
-      <FormField>
-        <RichTextEditor
-          label="Notes"
-          value={newTrade.notes}
-          onChange={onNotesChange}
-          placeholder="Add notes for this trade..."
-          minHeight={150}
-          maxHeight={400}
-          maxLength={1024}
-          toolbarVariant="sticky"
-          stickyPosition="bottom"
-          calendarId={calendarId}
-          trades={trades}
-          onOpenGalleryMode={onOpenGalleryMode}
+      <TabPanel value={activeTab} index={1} fullHeight>
+        <ImageUploader
+          pendingImages={newTrade.pending_images}
+          uploadedImages={newTrade.uploaded_images}
+          editingTrade={editingTrade !== null}
+          onImageUpload={onImageUpload}
+          onImageCaptionChange={onImageCaptionChange}
+          onImageRemove={onImageRemove}
+          onImagesReordered={onImagesReordered}
         />
-      </FormField>
+      </TabPanel>
+
+      <TabPanel value={activeTab} index={2} fullHeight>
+        {/* Notes tab — mirrors the NoteEditorBody journal layout:
+            generous centred column, sticky toolbar, no surrounding chrome. */}
+        <Box
+          sx={{
+            flex: 1,
+            minHeight: 0,
+            width: '100%',
+            maxWidth: 760,
+            mx: 'auto',
+            px: { xs: 0.5, md: 2 },
+            py: 1,
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          <RichTextEditor
+            ref={editorRef}
+            value={newTrade.notes}
+            onChange={onNotesChange}
+            placeholder="Write your trade journal — type /tag, /note, or /event to embed, or use the editor tool to insert a trade share link…"
+            minHeight={320}
+            maxHeight={520}
+            maxLength={1024}
+            toolbarVariant="sticky"
+            stickyPosition="bottom"
+            calendarId={calendarId}
+            trades={trades}
+            onOpenGalleryMode={onOpenGalleryMode}
+            // Mention / note / event pickers — same wiring as NoteEditorBody
+            availableTradeTags={allTags}
+            onMentionStateChange={bumpMention}
+            availableNotes={availableNotes}
+            onNoteLinkStateChange={bumpMention}
+            availableEvents={availableEvents}
+            onEventLinkStateChange={bumpMention}
+            // Toolbar "Insert trade link" button + clickable embedded chips
+            onInsertTradeLink={onInsertTradeLink}
+            onSharedTradeClick={onSharedTradeClick}
+          />
+        </Box>
+      </TabPanel>
+
+      </Box>
 
       <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2, gap: 1 }}>
         <button
@@ -698,6 +779,8 @@ const TradeForm: React.FC<TradeFormProps> = ({
           disabled={isSubmitting}
         />
       </Box>
+
+      {tradeLinkElements}
     </form>
   );
 };
