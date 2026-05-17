@@ -26,7 +26,6 @@ describe('TradeUIContext', () => {
     expect(result.current.onEditTrade).toBeUndefined();
     expect(result.current.onZoomImage).toBeUndefined();
     expect(result.current.onOpenGalleryMode).toBeUndefined();
-    expect(result.current.onOpenAIChat).toBeUndefined();
   });
 
   it('reads ops published by usePublishTradeUI', () => {

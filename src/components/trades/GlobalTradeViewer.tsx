@@ -35,7 +35,6 @@ const GlobalTradeViewer: React.FC = () => {
         : tradeOps.onDeleteMultipleTrades,
       onZoomImage: openImageZoom,
       onOpenGalleryMode: undefined,
-      onOpenAIChat: undefined,
       onUpdateCalendarProperty: isReadOnly
         ? undefined
         : tradeOps.onUpdateCalendarProperty,

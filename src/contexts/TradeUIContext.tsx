@@ -29,8 +29,6 @@ export interface TradeUIOps {
     title?: string,
     fetchYear?: number
   ) => void;
-  /** Opens the AI chat drawer scoped to a single trade. */
-  onOpenAIChat?: (trade: Trade) => void;
 }
 
 interface TradeUIContextValue {
@@ -89,13 +87,11 @@ export const usePublishTradeUI = (ops: TradeUIOps): void => {
       onEditTrade: ops.onEditTrade,
       onZoomImage: ops.onZoomImage,
       onOpenGalleryMode: ops.onOpenGalleryMode,
-      onOpenAIChat: ops.onOpenAIChat,
     }),
     [
       ops.onEditTrade,
       ops.onZoomImage,
       ops.onOpenGalleryMode,
-      ops.onOpenAIChat,
     ]
   );
 

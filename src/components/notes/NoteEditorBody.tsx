@@ -1764,7 +1764,6 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
             calendarId: undefined,
             onOpenGalleryMode: undefined,
             economicFilter: undefined,
-            onOpenAIChat: undefined,
             isTradeUpdating: undefined,
             isReadOnly: true,
           }}

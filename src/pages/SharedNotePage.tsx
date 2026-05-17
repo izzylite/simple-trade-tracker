@@ -281,7 +281,6 @@ const SharedNotePage: React.FC = () => {
               calendarId: undefined,
               onOpenGalleryMode: undefined,
               economicFilter: undefined,
-              onOpenAIChat: undefined,
               isTradeUpdating: undefined,
               isReadOnly: true,
             }}

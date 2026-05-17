@@ -105,7 +105,6 @@ const GlobalAIChat: React.FC = () => {
           title,
           fetchYear,
         }),
-      onOpenAIChat: undefined,
       onUpdateCalendarProperty: tradeOps.onUpdateCalendarProperty,
       isTradeUpdating: tradeOps.isTradeUpdating ?? (() => false),
       deletingTradeIds: tradeOps.deletingTradeIds ?? [],

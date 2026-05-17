@@ -223,7 +223,6 @@ export const TradeOperationsProvider: React.FC<{
       onDeleteMultipleTrades: isReadOnly ? undefined : onDeleteMultipleTrades,
       onZoomImage: undefined,
       onOpenGalleryMode: undefined,
-      onOpenAIChat: undefined,
       onUpdateCalendarProperty: isReadOnly
         ? undefined
         : onUpdateCalendarProperty,

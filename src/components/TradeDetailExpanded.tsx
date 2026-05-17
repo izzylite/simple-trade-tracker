@@ -78,10 +78,6 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
   trades,
   tradeOperations,
 }) => {
-  // Destructure from tradeOperations directly. `onOpenAIChat` is
-  // intentionally not destructured — per-trade AI focus is now exposed
-  // only via the TradeGalleryDialog header, so this surface no longer
-  // renders an "Ask Orion" button.
   const {
     onZoomImage: setZoomedImage,
     onUpdateTradeProperty,

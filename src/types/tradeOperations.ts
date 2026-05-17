@@ -10,7 +10,7 @@ import { EconomicCalendarFilterSettings } from '../hooks/useEconomicCalendarFilt
  * - TradeList, TradeDetailExpanded
  * - TradesListDialog, EconomicEventDetailDialog
  * - EconomicCalendarDrawer, MonthlyStatisticsSection
- * - TradeGalleryDialog, AIChatDrawer, PinnedTradesDrawer
+ * - TradeGalleryDialog, AIChatDrawer
  * - DayDialog, TradeCalendarPage
  */
 export interface TradeOperationsProps {
@@ -48,9 +48,6 @@ export interface TradeOperationsProps {
     /** If set, dialog will fetch trades for this year when trades array is empty */
     fetchYear?: number
   ) => void;
-
-  /** Open AI chat for a specific trade */
-  onOpenAIChat?: (trade: Trade) => void;
 
   /** Handle shared trade link click (inline preview) */
   onSharedTradeClick?: (shareId: string, tradeId: string) => void;
@@ -105,7 +102,6 @@ export function extractTradeOperations(props: TradeOperationsProps): TradeOperat
     onDeleteMultipleTrades: props.onDeleteMultipleTrades,
     onZoomImage: props.onZoomImage,
     onOpenGalleryMode: props.onOpenGalleryMode,
-    onOpenAIChat: props.onOpenAIChat,
     onSharedTradeClick: props.onSharedTradeClick,
     onUpdateCalendarProperty: props.onUpdateCalendarProperty,
     isTradeUpdating: props.isTradeUpdating,

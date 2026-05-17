@@ -195,7 +195,6 @@ const SharedTradeView: React.FC<SharedTradeViewProps> = ({ shareId }) => {
           calendarId: undefined,
           onOpenGalleryMode: undefined,
           economicFilter: undefined,
-          onOpenAIChat: undefined,
           isTradeUpdating: undefined,
           isReadOnly: true
         }}

@@ -34,7 +34,6 @@ export interface DayTradesContentProps {
   onDateChange: (date: Date) => void;
   showAddForm: (editTrade?: Trade | null) => void;
   tradeOperations: TradeOperationsProps;
-  onOpenAIChatMode?: (trades: Trade[], tradeId: string, title?: string) => void;
   weekTrades?: Trade[];
   isActive?: boolean;
   /** Optional: when provided, used for "View Events" button instead of opening internal drawer */
@@ -54,7 +53,6 @@ const DayTradesContent: React.FC<DayTradesContentProps> = ({
   showAddForm,
   onDateChange,
   tradeOperations,
-  onOpenAIChatMode,
   weekTrades,
   isActive = true,
   onOpenEvents,
@@ -151,14 +149,6 @@ const DayTradesContent: React.FC<DayTradesContentProps> = ({
     showAddForm(trade);
   }, [showAddForm]);
 
-  const handleOpenAIChat = useCallback((trade: Trade) => {
-    if (onOpenAIChatMode) {
-      const title = `AI Analysis - ${trade.name || format(date, 'MMM d, yyyy')}`;
-      setExpandedTradeId(null);
-      onOpenAIChatMode(trades, trade.id, title);
-    }
-  }, [onOpenAIChatMode, trades, date]);
-
   const handleOpenEventsDrawer = useCallback(() => {
     if (onOpenEvents) {
       onOpenEvents();
@@ -173,8 +163,7 @@ const DayTradesContent: React.FC<DayTradesContentProps> = ({
   const mergedTradeOperations: TradeOperationsProps = useMemo(() => ({
     ...tradeOperations,
     onEditTrade: isReadOnly ? undefined : handleEditClick,
-    onOpenAIChat: onOpenAIChatMode ? handleOpenAIChat : undefined,
-  }), [tradeOperations, isReadOnly, handleEditClick, onOpenAIChatMode, handleOpenAIChat]);
+  }), [tradeOperations, isReadOnly, handleEditClick]);
 
   const handleGalleryClick = useCallback(() => {
     if (onGalleryClick) {

@@ -614,7 +614,6 @@ const NoteMetaPanel: React.FC<NoteMetaPanelProps> = ({ note, notes, onSelectNote
             calendarId: undefined,
             onOpenGalleryMode: undefined,
             economicFilter: undefined,
-            onOpenAIChat: undefined,
             isTradeUpdating: undefined,
             isReadOnly: true,
           }}

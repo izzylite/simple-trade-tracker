@@ -6,7 +6,7 @@ import { ImageZoomProp } from '../components/ImageZoomDialog';
 import { logger } from '../utils/logger';
 
 interface UseEventPageTradeOpsReturn {
-  tradeOps: Pick<TradeOperationsProps, 'onUpdateTradeProperty' | 'onZoomImage' | 'onOpenGalleryMode' | 'onOpenAIChat'>;
+  tradeOps: Pick<TradeOperationsProps, 'onUpdateTradeProperty' | 'onZoomImage' | 'onOpenGalleryMode'>;
   isTradeUpdating: (tradeId: string) => boolean;
   zoomedImages: ImageZoomProp | null;
   setZoomedImage: (url: string, allImages?: string[], initialIndex?: number) => void;
@@ -82,10 +82,6 @@ export function useEventPageTradeOps(): UseEventPageTradeOpsReturn {
     []
   );
 
-  const openGalleryModeAI = useCallback((trade: Trade) => {
-    setGalleryMode({ open: true, trades: [trade], initialTradeId: trade.id, title: trade.name, aiOnlyMode: true });
-  }, []);
-
   const closeGalleryMode = useCallback(() => {
     setGalleryMode((prev) => ({ ...prev, open: false }));
   }, []);
@@ -95,7 +91,6 @@ export function useEventPageTradeOps(): UseEventPageTradeOpsReturn {
       onUpdateTradeProperty,
       onZoomImage: setZoomedImage,
       onOpenGalleryMode: openGalleryMode,
-      onOpenAIChat: openGalleryModeAI,
     },
     isTradeUpdating,
     zoomedImages,

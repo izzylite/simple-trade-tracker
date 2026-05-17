@@ -1238,10 +1238,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     onZoomImage: tradeViewer.openImageZoom,
     onOpenGalleryMode: (trades, initialTradeId, title, fetchYear) =>
       tradeViewer.openGallery({ trades, initialTradeId, title, fetchYear }),
-    // `onOpenAIChat` intentionally not wired — per-trade AI focus is now
-    // exclusively reached by opening TradeGalleryDialog (the Orion side
-    // panel lives in its header). Callers that need the AI flow should
-    // launch the gallery instead (see DayTradesContent below).
     onUpdateCalendarProperty: isReadOnly ? undefined : onUpdateCalendarProperty,
     isTradeUpdating,
     deletingTradeIds: globalTradeOps.deletingTradeIds ?? [],
@@ -1406,17 +1402,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
                   }
                 }
                 tradeOperations={tradeOperations}
-                onOpenAIChatMode={
-                  isReadOnly
-                    ? undefined
-                    : (t, tradeId, title) =>
-                      tradeViewer.openGallery({
-                        trades: t,
-                        initialTradeId: tradeId,
-                        title,
-                        aiOnlyMode: true,
-                      })
-                }
                 weekTrades={wTrades}
                 isActive={
                   isPanelOpen
@@ -2224,17 +2209,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
             onDateChange={handleDayChange}
             account_balance={accountBalance}
             tradeOperations={tradeOperations}
-            onOpenAIChatMode={
-              isReadOnly
-                ? undefined
-                : (trades, tradeId, title) =>
-                  tradeViewer.openGallery({
-                    trades,
-                    initialTradeId: tradeId,
-                    title,
-                    aiOnlyMode: true,
-                  })
-            }
             weekTrades={selectedDate
               ? weeklyStatsMap.get(format(startOfWeek(selectedDate, { weekStartsOn: 0 }), 'yyyy-MM-dd'))?.weekTrades
               : undefined

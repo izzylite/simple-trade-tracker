@@ -160,7 +160,6 @@ const NoteViewerContent: React.FC<NoteViewerContentProps> = ({ note }) => {
             calendarId: undefined,
             onOpenGalleryMode: undefined,
             economicFilter: undefined,
-            onOpenAIChat: undefined,
             isTradeUpdating: undefined,
             isReadOnly: true,
           }}

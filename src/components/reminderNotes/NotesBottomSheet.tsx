@@ -470,7 +470,6 @@ const NotesBottomSheet: React.FC<NotesBottomSheetProps> = ({
             calendarId: undefined,
             onOpenGalleryMode: undefined,
             economicFilter: undefined,
-            onOpenAIChat: undefined,
             isTradeUpdating: undefined,
             isReadOnly: true,
           }}
