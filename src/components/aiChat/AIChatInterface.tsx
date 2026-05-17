@@ -11,9 +11,6 @@ import {
   IconButton,
   Button,
   Typography,
-  Alert,
-  CircularProgress,
-  Divider,
   useTheme,
   alpha
 } from '@mui/material';
@@ -25,6 +22,7 @@ import {
   Close as CloseIcon,
   KeyboardArrowDown as ScrollDownIcon
 } from '@mui/icons-material';
+import { useDialogTokens } from '../../styles/dialogTokens';
 import ChatMessage from './ChatMessage';
 import ReminderSeparator from './ReminderSeparator';
 import CrossSessionReminderCard from '../notifications/CrossSessionReminderCard';
@@ -182,6 +180,22 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
   onScrolledToMessage,
 }, ref) => {
   const theme = useTheme();
+  const tokens = useDialogTokens();
+  const {
+    violet,
+    violetSoft,
+    violetSofter,
+    violetBorder,
+    surfaceInset,
+    hairline,
+    footerBg,
+    monoLabelSx,
+    monoSectionLabelSx,
+    chipStyle,
+    primaryButtonSx,
+    destructiveButtonSx,
+    iconAvatarSx,
+  } = tokens;
   const notificationsCtx = useNotificationsOptional();
   const crossSessionCards = useMemo(
     () =>
@@ -662,85 +676,103 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
 
         {/* Question Templates - Only show when no conversation started */}
         {shouldShowTemplates && (
-          <Box sx={{ mt: 3 }}>
-            <Typography
-              variant="h6"
-              sx={{
-                mb: 2,
-                color: 'text.primary',
-                fontWeight: 600
-              }}
-            >
-              Try these questions:
-            </Typography>
+          <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {/* Welcome avatar + caption */}
+            <Box sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 1,
+              mb: 1,
+            }}>
+              <Box sx={{ ...iconAvatarSx, width: 44, height: 44, borderRadius: 1.5 }}>
+                <OrionIcon size={24} />
+              </Box>
+              <Typography
+                component="span"
+                sx={{
+                  ...monoLabelSx,
+                  fontSize: '0.62rem',
+                  color: alpha(theme.palette.text.secondary, 0.85),
+                }}
+              >
+                Try these questions
+              </Typography>
+            </Box>
 
             {questionTemplates.map((category: QuestionTemplate, categoryIndex: number) => (
-              <Box key={categoryIndex} sx={{ mb: 3 }}>
-                <Typography
-                  variant="subtitle2"
-                  sx={{
-                    mb: 1.5,
-                    color: 'primary.main',
-                    fontWeight: 600,
-                    fontSize: '0.85rem'
-                  }}
-                >
+              <Box
+                key={categoryIndex}
+                sx={{
+                  p: 1.5,
+                  borderRadius: 1.5,
+                  backgroundColor: surfaceInset,
+                  border: `1px solid ${hairline}`,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 1,
+                }}
+              >
+                <Typography component="span" sx={monoSectionLabelSx}>
                   {category.category}
                 </Typography>
 
                 <Box sx={{
                   display: 'flex',
-                  flexDirection: 'column',
-                  gap: 1
+                  flexWrap: 'wrap',
+                  gap: 0.75,
                 }}>
                   {category.questions.map((question, questionIndex) => (
-                    <Button
+                    <Box
                       key={questionIndex}
-                      variant="outlined"
-                      size="small"
+                      component="span"
+                      role="button"
+                      tabIndex={0}
                       onClick={() => handleTemplateClick(question)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          handleTemplateClick(question);
+                        }
+                      }}
                       sx={{
-                        justifyContent: 'flex-start',
+                        ...chipStyle(false),
+                        maxWidth: '100%',
+                        whiteSpace: 'normal',
                         textAlign: 'left',
-                        py: 1.5,
-                        px: 2,
-                        borderRadius: 2,
-                        textTransform: 'none',
-                        fontSize: '0.875rem',
-                        lineHeight: 1.4,
-                        borderColor: alpha(theme.palette.primary.main, 0.3),
-                        backgroundColor: alpha(theme.palette.background.paper, 0.8),
-                        '&:hover': {
-                          borderColor: 'primary.main',
-                          backgroundColor: alpha(theme.palette.primary.main, 0.08),
-                          transform: 'translateY(-1px)',
-                          boxShadow: `0 2px 8px ${alpha(theme.palette.primary.main, 0.2)}`
-                        },
-                        transition: 'all 0.2s ease-in-out'
+                        lineHeight: 1.35,
                       }}
                     >
                       {question}
-                    </Button>
+                    </Box>
                   ))}
                 </Box>
               </Box>
             ))}
 
             <Box sx={{
-              mt: 3,
+              mt: 1,
               mb: 2,
-              p: 2,
-              backgroundColor: alpha(theme.palette.info.main, 0.08),
-              borderRadius: 2,
-              border: '1px solid',
-              borderColor: alpha(theme.palette.info.main, 0.2)
+              p: 1.5,
+              backgroundColor: surfaceInset,
+              borderRadius: 1.5,
+              border: `1px solid ${hairline}`,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 0.75,
             }}>
+              <Typography component="span" sx={monoSectionLabelSx}>
+                Pro Tip
+              </Typography>
               <Typography
                 variant="body2"
-                color="info.main"
-                sx={{ fontWeight: 500 }}
+                sx={{
+                  fontSize: '0.82rem',
+                  lineHeight: 1.5,
+                  color: theme.palette.text.secondary,
+                }}
               >
-                Pro Tip: You can ask complex questions like "I've been struggling with my breakout strategy on Tuesdays. Can you show me all my losing trades tagged 'breakout' that occurred on a Tuesday in the last 6 months, and analyze if there were any specific economic events or market conditions that contributed to these losses?" - I'll analyze your data and provide detailed insights!
+                You can ask complex questions like "I've been struggling with my breakout strategy on Tuesdays. Can you show me all my losing trades tagged 'breakout' that occurred on a Tuesday in the last 6 months, and analyze if there were any specific economic events or market conditions that contributed to these losses?" — I'll analyze your data and provide detailed insights.
               </Typography>
             </Box>
           </Box>
@@ -748,20 +780,40 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
 
         {/* Typing Indicator */}
         {isTyping && (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, px: 1, mb: 3 }}>
-            <OrionIcon
-              size={26}
-              sx={{
-                animation: 'orionPulse 1.5s ease-in-out infinite',
-                '@keyframes orionPulse': {
-                  '0%, 100%': { opacity: 0.6, transform: 'scale(0.95)' },
-                  '50%': { opacity: 1, transform: 'scale(1.05)' }
-                }
-              }}
-            />
-            <Typography variant="body2" color="text.disabled" sx={{ fontSize: '0.85rem' }}>
-              {toolExecutionStatus || 'Orion is thinking…'}
-            </Typography>
+          <Box sx={{ display: 'flex', px: 1, mb: 2 }}>
+            <Box sx={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 1,
+              px: 1.25,
+              py: 0.6,
+              borderRadius: 999,
+              backgroundColor: surfaceInset,
+              border: `1px solid ${hairline}`,
+            }}>
+              <Box sx={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                backgroundColor: violet,
+                boxShadow: `0 0 0 0 ${alpha(violet, 0.5)}`,
+                animation: 'orionDotPulse 1.4s ease-in-out infinite',
+                '@keyframes orionDotPulse': {
+                  '0%, 100%': { opacity: 0.55, transform: 'scale(0.9)' },
+                  '50%': { opacity: 1, transform: 'scale(1.1)' },
+                },
+              }} />
+              <Typography
+                component="span"
+                sx={{
+                  ...monoLabelSx,
+                  fontSize: '0.66rem',
+                  color: theme.palette.text.secondary,
+                }}
+              >
+                {toolExecutionStatus || 'Orion is thinking'}
+              </Typography>
+            </Box>
           </Box>
         )}
 
@@ -770,104 +822,165 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
 
         {/* Scroll-to-bottom button */}
         {showScrollDown && (
-          <IconButton
+          <Button
             onClick={scrollToBottom}
             size="small"
+            aria-label="Scroll to latest"
             sx={{
+              ...primaryButtonSx,
               position: 'absolute',
               bottom: 12,
               left: '50%',
               transform: 'translateX(-50%)',
               zIndex: 10,
-              backgroundColor: theme.palette.background.paper,
-              border: '1px solid',
-              borderColor: 'divider',
-              boxShadow: theme.shadows[4],
-              width: 32,
-              height: 32,
-              color: 'text.secondary',
+              minWidth: 0,
+              px: 1,
+              py: 0.5,
+              borderRadius: 999,
+              boxShadow: `0 0 0 1px ${alpha(violet, 0.35)}, 0 4px 14px ${alpha(violet, 0.35)}`,
               '&:hover': {
-                backgroundColor: alpha(theme.palette.background.paper, 1),
-                color: 'primary.main',
-                borderColor: alpha(theme.palette.primary.main, 0.3)
-              }
+                ...(primaryButtonSx as any)['&:hover'],
+                boxShadow: `0 0 0 1px ${alpha(violet, 0.45)}, 0 6px 18px ${alpha(violet, 0.45)}`,
+              },
             }}
           >
             <ScrollDownIcon sx={{ fontSize: 18 }} />
-          </IconButton>
+          </Button>
         )}
       </Box>
-
-      <Divider sx={{ borderColor: alpha(theme.palette.divider, 0.5) }} />
 
       {/* Message Limit Warning */}
       {isAtMessageLimit && (
         <Box sx={{ p: 2, pb: 0 }}>
-          <Alert
-            severity="warning"
-            action={
-              <Button
-                color="inherit"
-                size="small"
-                onClick={handleNewChat}
-                startIcon={<NewChatIcon />}
-                sx={{ fontWeight: 600 }}
-              >
-                Start New Chat
-              </Button>
-            }
+          <Box
             sx={{
-              borderRadius: 2,
-              '& .MuiAlert-message': {
-                width: '100%'
-              }
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 1.5,
+              p: 1.5,
+              borderRadius: 1.5,
+              backgroundColor: alpha(theme.palette.warning.main, 0.08),
+              border: `1px solid ${alpha(theme.palette.warning.main, 0.35)}`,
             }}
           >
-            <Typography variant="body2" sx={{ fontWeight: 600 }}>
-              Conversation Limit Reached
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              This conversation has reached the maximum length of {messageLimit} messages.
-              Please start a new conversation to continue.
-            </Typography>
-          </Alert>
+            <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+              <Typography
+                component="span"
+                sx={{
+                  ...monoLabelSx,
+                  fontSize: '0.66rem',
+                  color: theme.palette.warning.main,
+                }}
+              >
+                Conversation Limit Reached
+              </Typography>
+              <Typography
+                variant="body2"
+                sx={{
+                  fontSize: '0.82rem',
+                  lineHeight: 1.45,
+                  color: theme.palette.text.secondary,
+                }}
+              >
+                This conversation has reached the maximum length of {messageLimit} messages.
+                Please start a new conversation to continue.
+              </Typography>
+            </Box>
+            <Button
+              size="small"
+              onClick={handleNewChat}
+              startIcon={<NewChatIcon />}
+              sx={{
+                ...primaryButtonSx,
+                flexShrink: 0,
+              }}
+            >
+              Start New Chat
+            </Button>
+          </Box>
         </Box>
       )}
 
       {/* Mention Warning (deleted referenced note) */}
       {mentionWarning && (
         <Box sx={{ p: 2, pb: 0 }}>
-          <Alert
-            severity="warning"
-            onClose={() => setMentionWarning(null)}
-            sx={{ borderRadius: 2 }}
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 1.5,
+              p: 1.5,
+              borderRadius: 1.5,
+              backgroundColor: alpha(theme.palette.warning.main, 0.08),
+              border: `1px solid ${alpha(theme.palette.warning.main, 0.35)}`,
+            }}
           >
-            <Typography variant="body2">{mentionWarning}</Typography>
-          </Alert>
+            <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+              <Typography
+                component="span"
+                sx={{
+                  ...monoLabelSx,
+                  fontSize: '0.66rem',
+                  color: theme.palette.warning.main,
+                }}
+              >
+                Missing Reference
+              </Typography>
+              <Typography
+                variant="body2"
+                sx={{
+                  fontSize: '0.82rem',
+                  lineHeight: 1.45,
+                  color: theme.palette.text.secondary,
+                }}
+              >
+                {mentionWarning}
+              </Typography>
+            </Box>
+            <IconButton
+              size="small"
+              aria-label="Dismiss"
+              onClick={() => setMentionWarning(null)}
+              sx={{
+                color: theme.palette.text.secondary,
+                borderRadius: 1.25,
+                flexShrink: 0,
+                '&:hover': {
+                  color: theme.palette.error.main,
+                  backgroundColor: alpha(theme.palette.error.main, 0.08),
+                },
+              }}
+            >
+              <CloseIcon sx={{ fontSize: 16 }} />
+            </IconButton>
+          </Box>
         </Box>
       )}
 
       {/* Input Area */}
       <Box sx={{
         p: 2,
-        backgroundColor: alpha(theme.palette.background.paper, 0.8),
-        backdropFilter: 'blur(10px)'
+        borderTop: `1px solid ${hairline}`,
+        backgroundColor: footerBg,
       }}>
         {/* Image Preview Section */}
         {attachedImages.length > 0 && (
           <Box sx={{
             display: 'flex',
-            gap: 1,
-            mb: 1.5,
+            gap: 0.75,
+            mb: 1.25,
             flexWrap: 'wrap',
             alignItems: 'center'
           }}>
             <Typography
-              variant="caption"
+              component="span"
               sx={{
-                color: attachedImages.length >= MAX_IMAGES ? 'warning.main' : 'text.secondary',
-                fontWeight: 500,
-                mr: 0.5
+                ...monoLabelSx,
+                fontSize: '0.62rem',
+                color: attachedImages.length >= MAX_IMAGES
+                  ? theme.palette.warning.main
+                  : theme.palette.text.secondary,
+                mr: 0.5,
               }}
             >
               {attachedImages.length}/{MAX_IMAGES}
@@ -879,10 +992,10 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
                   position: 'relative',
                   width: 64,
                   height: 64,
-                  borderRadius: 1.5,
+                  borderRadius: 1.25,
                   overflow: 'hidden',
-                  border: '1px solid',
-                  borderColor: 'divider'
+                  backgroundColor: surfaceInset,
+                  border: `1px solid ${hairline}`,
                 }}
               >
                 <Box
@@ -897,18 +1010,24 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
                 />
                 <IconButton
                   size="small"
+                  aria-label="Remove image"
                   onClick={() => handleRemoveImage(image.id)}
                   sx={{
                     position: 'absolute',
                     top: 2,
                     right: 2,
-                    width: 18,
-                    height: 18,
-                    backgroundColor: 'rgba(0,0,0,0.6)',
-                    color: 'white',
+                    width: 20,
+                    height: 20,
+                    backgroundColor: alpha(theme.palette.background.paper, 0.85),
+                    color: theme.palette.text.secondary,
+                    border: `1px solid ${hairline}`,
+                    borderRadius: 1,
+                    transition: 'all 120ms ease',
                     '&:hover': {
-                      backgroundColor: 'rgba(0,0,0,0.8)'
-                    }
+                      backgroundColor: alpha(theme.palette.error.main, 0.12),
+                      color: theme.palette.error.main,
+                      borderColor: alpha(theme.palette.error.main, 0.4),
+                    },
                   }}
                 >
                   <CloseIcon sx={{ fontSize: 12 }} />
@@ -932,17 +1051,18 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
           onPaste={handlePaste}
           sx={{
             display: 'flex',
-            gap: 1,
+            gap: 0.75,
             alignItems: 'center',
-            backgroundColor: 'background.paper',
-            borderRadius: 3,
-            p: 1,
-            border: '1px solid',
-            borderColor: 'divider',
+            backgroundColor: surfaceInset,
+            borderRadius: 1.5,
+            p: 0.75,
+            border: `1px solid ${hairline}`,
+            transition: 'all 120ms ease',
+            '&:hover': { borderColor: alpha(violet, 0.5) },
             '&:focus-within': {
-              borderColor: 'primary.main',
-              boxShadow: `0 0 0 1px ${alpha(theme.palette.primary.main, 0.15)}`
-            }
+              borderColor: violet,
+              boxShadow: `0 0 0 1px ${alpha(violet, 0.25)}`,
+            },
           }}
         >
           <AIChatMentionInput
@@ -950,7 +1070,7 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
             value={inputMessage}
             onChange={setInputMessage}
             onKeyDown={handleKeyPress}
-            placeholder={calendar ? "Ask Orion… (use / to mention tags & notes)" : "Ask Orion about your trading..."}
+            placeholder={calendar ? "Ask Orion… (use @ to mention)" : "Ask Orion about your trading..."}
             disabled={isLoading || isAtMessageLimit}
             allTags={allTagsMemo}
             allNotes={allNotesMemo}
@@ -959,86 +1079,79 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
             maxRows={4}
             sx={mentionInputSx}
           />
-          {/* Image upload button */}
+          {/* Image upload button — ghost icon, violet hover */}
           <IconButton
             aria-label="Attach image"
             onClick={handleImageUploadClick}
             disabled={isReadOnly || isLoading || isAtMessageLimit || attachedImages.length >= MAX_IMAGES}
             size="small"
             sx={{
-              backgroundColor: attachedImages.length > 0
-                ? alpha(theme.palette.primary.main, 0.1)
-                : 'background.default',
-              color: attachedImages.length > 0 ? 'primary.main' : 'text.secondary',
               width: 32,
               height: 32,
-              borderRadius: 2,
-              border: '1px solid',
-              borderColor: attachedImages.length > 0 ? 'primary.main' : 'divider',
-              transition: 'all 0.2s ease-in-out',
+              borderRadius: 1.25,
+              color: attachedImages.length > 0 ? violet : theme.palette.text.secondary,
+              backgroundColor: attachedImages.length > 0 ? violetSoft : 'transparent',
+              border: `1px solid ${attachedImages.length > 0 ? violetBorder : 'transparent'}`,
+              transition: 'all 120ms ease',
               '&:hover': {
-                backgroundColor: alpha(theme.palette.primary.main, 0.12),
-                borderColor: 'primary.main',
-                color: 'primary.main'
+                backgroundColor: violetSofter,
+                color: violet,
               },
               '&:disabled': {
-                backgroundColor: 'action.disabledBackground',
-                color: 'action.disabled',
-                borderColor: 'action.disabledBackground'
-              }
+                color: theme.palette.action.disabled,
+                backgroundColor: 'transparent',
+                borderColor: 'transparent',
+              },
             }}
           >
             <ImageIcon sx={{ fontSize: 18 }} />
           </IconButton>
-          <IconButton
-            onClick={isLoading ? handleCancelRequest : handleSendMessage}
-            disabled={(!inputMessage.trim() && attachedImages.length === 0 && !isLoading) || isAtMessageLimit}
-            size="small"
-            sx={{
-              backgroundColor: isLoading
-                ? 'error.main'
-                : (inputMessage.trim() || attachedImages.length > 0)
-                  ? 'primary.main'
-                  : 'action.disabledBackground',
-              color: isLoading
-                ? 'error.contrastText'
-                : (inputMessage.trim() || attachedImages.length > 0)
-                  ? 'primary.contrastText'
-                  : 'action.disabled',
-              width: 36,
-              height: 36,
-              transition: 'all 0.2s ease-in-out',
-              '&:hover': {
-                backgroundColor: isLoading
-                  ? 'error.dark'
-                  : (inputMessage.trim() || attachedImages.length > 0)
-                    ? 'primary.dark'
-                    : 'action.disabledBackground',
-                transform: (inputMessage.trim() || attachedImages.length > 0) && !isLoading ? 'scale(1.05)' : 'none'
-              },
-              '&:disabled': {
-                backgroundColor: 'action.disabledBackground',
-                color: 'action.disabled'
-              }
-            }}
-          >
-            {isLoading ? (
-              <StopIcon sx={{ fontSize: 18 }} />
-            ) : (
-              <SendIcon sx={{ fontSize: 18 }} />
-            )}
-          </IconButton>
+          {isLoading ? (
+            <Button
+              aria-label="Stop generating"
+              onClick={handleCancelRequest}
+              size="small"
+              sx={{
+                ...destructiveButtonSx,
+                minWidth: 0,
+                px: 1,
+                py: 0.5,
+                height: 32,
+              }}
+            >
+              <StopIcon sx={{ fontSize: 16, mr: 0.5 }} />
+              Stop
+            </Button>
+          ) : (
+            <Button
+              aria-label="Send message"
+              onClick={handleSendMessage}
+              disabled={(!inputMessage.trim() && attachedImages.length === 0) || isAtMessageLimit}
+              size="small"
+              sx={{
+                ...primaryButtonSx,
+                minWidth: 0,
+                px: 1,
+                py: 0.5,
+                height: 32,
+              }}
+            >
+              <SendIcon sx={{ fontSize: 16, mr: 0.5 }} />
+              Send
+            </Button>
+          )}
         </Box>
 
         {/* Helper Text */}
         <Typography
-          variant="caption"
-          color="text.secondary"
+          component="span"
           sx={{
+            ...monoSectionLabelSx,
             mt: 1,
             display: 'block',
             textAlign: 'center',
-            opacity: 0.7
+            fontSize: '0.6rem',
+            opacity: 0.8,
           }}
         >
           {`Enter to send • Shift+Enter newline • / for commands • @ for notes & tags • Up to ${MAX_IMAGES} images`}
