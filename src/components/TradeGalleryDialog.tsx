@@ -1110,7 +1110,6 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
                 ...tradeOperations,
                 onOpenGalleryMode: undefined
               }}
-              showAIButton={false}
             />
           ) : null}
         </Box>

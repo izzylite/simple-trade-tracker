@@ -91,7 +91,6 @@ import { CalendarRepository } from '../services/repository/repositories/Calendar
 import CalendarFormDialog, { CalendarFormData } from '../components/CalendarFormDialog';
 import ShareButton from '../components/sharing/ShareButton';
 import { exportTrades } from '../utils/tradeExportImport';
-import { useAIChat } from '../contexts/AIChatContext';
 import NoteEditorDialog from '../components/notes/NoteEditorDialog';
 import CalendarNotesPanel from '../components/notes/CalendarNotesPanel';
 import UnifiedDrawer from '../components/common/UnifiedDrawer';
@@ -127,7 +126,6 @@ import {
   SidePanelView,
   DayTradesView,
   EconomicCalendarView,
-  AIAnalysisView,
 } from '../contexts/SidePanelContext';
 import { usePanelMutexSlot } from '../contexts/PanelMutexContext';
 import { SearchPanelStateProvider } from '../contexts/SearchPanelStateContext';
@@ -136,7 +134,6 @@ import { EventsPanelStateProvider } from '../contexts/EventsPanelStateContext';
 import { NotesPanelStateProvider } from '../contexts/NotesPanelStateContext';
 import { TagsPanelStateProvider } from '../contexts/TagsPanelStateContext';
 import SidePanel from '../components/sidePanel/SidePanel';
-import AIChatContent from '../components/sidePanel/content/AIChatContent';
 import SearchContent from '../components/sidePanel/content/SearchContent';
 import TagManagementContent from '../components/sidePanel/content/TagManagementContent';
 import DayTradesContent from '../components/sidePanel/content/DayTradesContent';
@@ -688,11 +685,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
   const handleDismissReminder = useCallback((noteId: string) => {
     setDismissedReminderIds(prev => new Set(prev).add(noteId));
   }, []);
-
-  // AI Chat drawer — dispatched through global AIChatContext. The drawer
-  // itself mounts once at App level (GlobalAIChat) along with the global
-  // FAB (GlobalAIChatFab); this page just opens it for in-trade actions.
-  const globalAIChat = useAIChat();
 
   // Notes drawer state
   const [isNotesDrawerOpen, setIsNotesDrawerOpen] = useState(false);
@@ -1246,7 +1238,10 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     onZoomImage: tradeViewer.openImageZoom,
     onOpenGalleryMode: (trades, initialTradeId, title, fetchYear) =>
       tradeViewer.openGallery({ trades, initialTradeId, title, fetchYear }),
-    onOpenAIChat: isReadOnly ? undefined : (trade) => globalAIChat.openWithTrade(trade),
+    // `onOpenAIChat` intentionally not wired — per-trade AI focus is now
+    // exclusively reached by opening TradeGalleryDialog (the Orion side
+    // panel lives in its header). Callers that need the AI flow should
+    // launch the gallery instead (see DayTradesContent below).
     onUpdateCalendarProperty: isReadOnly ? undefined : onUpdateCalendarProperty,
     isTradeUpdating,
     deletingTradeIds: globalTradeOps.deletingTradeIds ?? [],
@@ -1258,7 +1253,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     isReadOnly,
     globalTradeOps,
     tradeViewer,
-    globalAIChat,
     onUpdateCalendarProperty,
     isTradeUpdating,
     calendarId,
@@ -1338,25 +1332,6 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
               />
             ),
           };
-        case 'ai-analysis': {
-          const aiView = view as AIAnalysisView;
-          return {
-            title: aiView.title || 'AI Analysis',
-            component: (
-              <AIChatContent
-                trades={aiView.trades}
-                calendar={calendar!}
-                isReadOnly={isReadOnly}
-                tradeOperations={tradeOperations}
-                isActive={
-                  isPanelOpen
-                  && currentView.id === 'ai-analysis'
-                }
-                initialTradeId={aiView.tradeId}
-              />
-            ),
-          };
-        }
         case 'stats': {
           return {
             title: 'Overview',
@@ -1434,14 +1409,13 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
                 onOpenAIChatMode={
                   isReadOnly
                     ? undefined
-                    : (t, tradeId, title) => {
-                      pushPanel({
-                        id: 'ai-analysis',
-                        tradeId,
+                    : (t, tradeId, title) =>
+                      tradeViewer.openGallery({
                         trades: t,
+                        initialTradeId: tradeId,
                         title,
-                      });
-                    }
+                        aiOnlyMode: true,
+                      })
                 }
                 weekTrades={wTrades}
                 isActive={
@@ -2383,8 +2357,11 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
         </UnifiedDrawer>
       )}
 
-      {/* AI Chat Drawer is mounted once at App level via GlobalAIChat —
-          this page opens it through `globalAIChat.open()`. */}
+      {/* Per-trade AI focus is reached only via TradeGalleryDialog (the
+          Orion side panel in its header). The app-wide AI chat drawer
+          is still mounted once at App level via GlobalAIChat and
+          opened via GlobalAIChatFab — this page no longer dispatches
+          per-trade chat into it. */}
 
       {/* Notes Drawer — <lg only */}
       {!isLgUp && (

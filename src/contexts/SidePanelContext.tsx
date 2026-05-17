@@ -1,6 +1,5 @@
 // src/contexts/SidePanelContext.tsx
 import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react';
-import { Trade } from '../types/dualWrite';
 import { EconomicEvent } from '../types/economicCalendar';
 
 // -- Types --
@@ -18,10 +17,6 @@ export interface SearchView {
   id: 'search';
 }
 
-export interface PinnedView {
-  id: 'pinned';
-}
-
 export interface TagsView {
   id: 'tags';
 }
@@ -29,13 +24,6 @@ export interface TagsView {
 export interface DayTradesView {
   id: 'day-trades';
   date: Date;
-}
-
-export interface AIAnalysisView {
-  id: 'ai-analysis';
-  tradeId: string;
-  trades: Trade[];
-  title?: string;
 }
 
 export interface AIChatView {
@@ -81,10 +69,8 @@ export type SidePanelView =
   | EconomicCalendarView
   | NotesView
   | SearchView
-  | PinnedView
   | TagsView
   | DayTradesView
-  | AIAnalysisView
   | AIChatView
   | FAQView
   | StatsView

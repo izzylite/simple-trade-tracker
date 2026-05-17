@@ -6,7 +6,6 @@ import {
   CircularProgress,
   Divider,
   Paper,
-  Button,
   IconButton,
   Tooltip,
   LinearProgress
@@ -27,7 +26,6 @@ import {
   ViewList as ViewListIcon,
   Category as CategoryIcon,
   ListAlt as ListAltIcon,
-  SmartToy as AIIcon,
   Edit as EditIcon,
   OpenInFull as ExpandIcon
 } from '@mui/icons-material';
@@ -51,9 +49,6 @@ interface TradeDetailExpandedProps {
   animate?: boolean;
   trades?: Array<{ id: string;[key: string]: any }>;
   tradeOperations: TradeOperationsProps;
-  /** Show "Ask Orion" button in the Properties row. TradeGalleryDialog
-   *  hides this because Orion is in its header. */
-  showAIButton?: boolean;
 }
 
 // Define shimmer animation
@@ -82,15 +77,16 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
   animate,
   trades,
   tradeOperations,
-  showAIButton = true
 }) => {
-  // Destructure from tradeOperations directly
+  // Destructure from tradeOperations directly. `onOpenAIChat` is
+  // intentionally not destructured — per-trade AI focus is now exposed
+  // only via the TradeGalleryDialog header, so this surface no longer
+  // renders an "Ask Orion" button.
   const {
     onZoomImage: setZoomedImage,
     onUpdateTradeProperty,
     calendarId,
     onOpenGalleryMode,
-    onOpenAIChat,
     onEditTrade,
     isReadOnly = false,
     onSharedTradeClick
@@ -367,29 +363,6 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                 }}>
                   Properties
                 </Typography>
-                {showAIButton && onOpenAIChat && (
-                  <Button
-                    size="small"
-                    startIcon={<AIIcon sx={{ fontSize: 16 }} />}
-                    onClick={() => onOpenAIChat(trade)}
-                    sx={{
-                      color: 'text.secondary',
-                      textTransform: 'none',
-                      fontSize: '0.8rem',
-                      minWidth: 'auto',
-                      px: 1,
-                      py: 0.25,
-                      '&:hover': {
-                        backgroundColor: alpha(
-                          theme.palette.primary.main, 0.1
-                        ),
-                        color: 'primary.main'
-                      }
-                    }}
-                  >
-                    Ask Orion
-                  </Button>
-                )}
               </Box>
 
               <Stack spacing={{ xs: 1.5, sm: 2 }} sx={{ width: '100%' }}>
