@@ -27,6 +27,9 @@ import SidePanel from '../sidePanel/SidePanel';
 import { useSidePanel } from '../../contexts/SidePanelContext';
 import { appRenderView } from '../sidePanel/appRenderView';
 import UnifiedDrawer from '../common/UnifiedDrawer';
+// Eagerly imported so it can serve as the Suspense fallback for the lazy
+// CalendarsListContent chunk below — must be ready before that chunk arrives.
+import CalendarsPanelShimmer from '../sidePanel/content/CalendarsPanelShimmer';
 
 // CalendarsListContent: pulls list-management UI + dialogs. Only rendered
 // when the inline panel opens (lg+) — keep it out of main bundle.
@@ -295,7 +298,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, onNewCalendar, isLocked
                   minHeight: 0,
                 }}
               >
-                <Suspense fallback={<CircularProgress size={24} sx={{ m: 2 }} />}>
+                <Suspense
+                  fallback={
+                    <Box sx={{ px: 2, pt: 2, pb: 1 }}>
+                      <CalendarsPanelShimmer /> 
+                    </Box>
+                  }
+                >
                   <CalendarsListContent
                     isActive={inlinePanelOpen}
                     activeCalendarId={calendarId || undefined}
