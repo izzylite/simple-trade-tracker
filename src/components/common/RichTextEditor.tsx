@@ -7,13 +7,19 @@ import {
   Typography,
   useTheme,
   Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   Button,
   TextField,
+  IconButton,
 } from '@mui/material';
+import {
+  Close as CloseIcon,
+  Link as LinkIcon,
+  Edit as EditIcon,
+  LinkOff as LinkOffIcon,
+  ArrowForward as ArrowIcon,
+} from '@mui/icons-material';
 import { alpha } from '@mui/material/styles';
+import { dialogProps } from '../../styles/dialogStyles';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import { Editor, EditorState, convertToRaw } from 'draft-js';
 import 'draft-js/dist/Draft.css';
@@ -1269,77 +1275,272 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
       </Box>
 
       {/* Link Dialog */}
-      <Dialog
-        open={linkDialogOpen}
-        onClose={() => setLinkDialogOpen(false)}
-        maxWidth="sm"
-        fullWidth
-        disableScrollLock={true}
-        disableEnforceFocus={false}
-        disableRestoreFocus={true}
-        sx={{ zIndex: Z_INDEX }}
-      >
-        <DialogTitle>{getCurrentLink(editorState) ? 'Edit Link' : 'Insert Link'}</DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            margin="dense"
-            label="Link Text"
+      {(() => {
+        const isDarkLink = theme.palette.mode === 'dark';
+        const violet = theme.palette.primary.main;
+        const violetSoft = alpha(violet, isDarkLink ? 0.18 : 0.14);
+        const violetBorder = alpha(violet, isDarkLink ? 0.35 : 0.28);
+        const surfaceInset = isDarkLink
+          ? 'rgba(255,255,255,0.03)'
+          : alpha(theme.palette.text.primary, 0.03);
+        const hairline = isDarkLink ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
+        const MONO_FONT_LINK = "'JetBrains Mono', ui-monospace, monospace";
+        const monoLabelSx = {
+          fontFamily: MONO_FONT_LINK,
+          fontSize: '0.68rem',
+          fontWeight: 600,
+          letterSpacing: '0.12em',
+          textTransform: 'uppercase' as const,
+          color: theme.palette.text.secondary,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 0.75,
+        };
+        const optionalSx = {
+          fontFamily: MONO_FONT_LINK,
+          fontSize: '0.66rem',
+          fontWeight: 500,
+          letterSpacing: '0.08em',
+          color: alpha(theme.palette.text.secondary, 0.7),
+          textTransform: 'none' as const,
+        };
+        const inputSx = {
+          '& .MuiOutlinedInput-root': {
+            borderRadius: 1.5,
+            backgroundColor: surfaceInset,
+            '& fieldset': { borderColor: hairline },
+            '&:hover fieldset': { borderColor: alpha(violet, 0.5) },
+            '&.Mui-focused fieldset': { borderColor: violet, borderWidth: 1 },
+          },
+          '& .MuiOutlinedInput-input': {
+            py: 1.1,
+            fontSize: '0.88rem',
+            fontWeight: 500,
+          },
+        };
+        const hasExistingLink = !!getCurrentLink(editorState);
+        const handleClose = () => setLinkDialogOpen(false);
+        return (
+          <Dialog
+            open={linkDialogOpen}
+            onClose={handleClose}
+            maxWidth="sm"
             fullWidth
-            variant="outlined"
-            value={linkText}
-            onChange={(e) => setLinkText(e.target.value)}
-            sx={{ mb: 2 }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && linkUrl.trim()) {
-                e.preventDefault();
-                insertLink();
-              }
+            disableScrollLock
+            disableRestoreFocus
+            {...dialogProps}
+            sx={{ zIndex: Z_INDEX }}
+            slotProps={{
+              paper: {
+                sx: {
+                  borderRadius: 2,
+                  border: `1px solid ${hairline}`,
+                  boxShadow: theme.shadows[10],
+                  backgroundImage: 'none',
+                  overflow: 'hidden',
+                },
+              },
             }}
-          />
-          <TextField
-            margin="dense"
-            label="URL"
-            fullWidth
-            variant="outlined"
-            value={linkUrl}
-            onChange={(e) => setLinkUrl(e.target.value)}
-            placeholder="https://example.com"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && linkUrl.trim()) {
-                e.preventDefault();
-                insertLink();
-              }
-            }}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setLinkDialogOpen(false)}>
-            Cancel
-          </Button>
-          {getCurrentLink(editorState) && (
-            <Button
-              onClick={() => {
-                removeLink();
-                setLinkDialogOpen(false);
-                setLinkText('');
-                setLinkUrl('');
-              }}
-              color="error"
-              variant="outlined"
-            >
-              Remove Link
-            </Button>
-          )}
-          <Button
-            onClick={insertLink}
-            variant="contained"
-            disabled={!linkUrl.trim()}
           >
-            {getCurrentLink(editorState) ? 'Update Link' : 'Insert Link'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+            {/* Header */}
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5,
+                px: 2.5,
+                py: 1.75,
+                borderBottom: `1px solid ${hairline}`,
+              }}
+            >
+              <Box
+                sx={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 1.25,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: violetSoft,
+                  color: violet,
+                  border: `1px solid ${violetBorder}`,
+                  flexShrink: 0,
+                }}
+              >
+                {hasExistingLink ? (
+                  <EditIcon sx={{ fontSize: 18 }} />
+                ) : (
+                  <LinkIcon sx={{ fontSize: 18 }} />
+                )}
+              </Box>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography sx={{ fontWeight: 700, fontSize: '0.95rem', lineHeight: 1.2 }}>
+                  {hasExistingLink ? 'Edit link' : 'Insert link'}
+                </Typography>
+                <Typography
+                  sx={{ fontSize: '0.78rem', color: theme.palette.text.secondary, lineHeight: 1.3 }}
+                >
+                  Connect a snippet of text to a URL
+                </Typography>
+              </Box>
+              <IconButton
+                onClick={handleClose}
+                size="small"
+                sx={{ color: theme.palette.text.secondary }}
+              >
+                <CloseIcon fontSize="small" />
+              </IconButton>
+            </Box>
+
+            {/* Body */}
+            <Box
+              sx={{
+                px: 2.5,
+                py: 2,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 1.75,
+              }}
+            >
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                <Typography sx={monoLabelSx}>
+                  Link text
+                  <Box component="span" sx={{ ...optionalSx, ml: 0.5 }}>· Optional</Box>
+                </Typography>
+                <TextField
+                  autoFocus
+                  fullWidth
+                  size="small"
+                  value={linkText}
+                  onChange={(e) => setLinkText(e.target.value)}
+                  placeholder="Display text — leave blank to use the URL"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && linkUrl.trim()) {
+                      e.preventDefault();
+                      insertLink();
+                    }
+                  }}
+                  sx={inputSx}
+                />
+              </Box>
+
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                <Typography sx={monoLabelSx}>
+                  URL
+                  <Box
+                    component="span"
+                    sx={{ color: theme.palette.error.main, fontFamily: 'inherit' }}
+                  >
+                    *
+                  </Box>
+                </Typography>
+                <TextField
+                  fullWidth
+                  size="small"
+                  value={linkUrl}
+                  onChange={(e) => setLinkUrl(e.target.value)}
+                  placeholder="https://example.com"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && linkUrl.trim()) {
+                      e.preventDefault();
+                      insertLink();
+                    }
+                  }}
+                  sx={inputSx}
+                />
+              </Box>
+            </Box>
+
+            {/* Footer */}
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 1,
+                px: 2.5,
+                py: 1.5,
+                borderTop: `1px solid ${hairline}`,
+                backgroundColor: isDarkLink
+                  ? 'rgba(255,255,255,0.02)'
+                  : alpha(theme.palette.text.primary, 0.02),
+              }}
+            >
+              {hasExistingLink ? (
+                <Button
+                  onClick={() => {
+                    removeLink();
+                    setLinkDialogOpen(false);
+                    setLinkText('');
+                    setLinkUrl('');
+                  }}
+                  startIcon={<LinkOffIcon sx={{ fontSize: 16 }} />}
+                  sx={{
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    fontSize: '0.82rem',
+                    color: theme.palette.error.main,
+                    backgroundColor: alpha(theme.palette.error.main, 0.08),
+                    border: `1px solid ${alpha(theme.palette.error.main, 0.3)}`,
+                    borderRadius: 1.25,
+                    px: 1.5,
+                    py: 0.5,
+                    '&:hover': {
+                      backgroundColor: alpha(theme.palette.error.main, 0.16),
+                    },
+                  }}
+                >
+                  Remove link
+                </Button>
+              ) : (
+                <Box />
+              )}
+
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Button
+                  onClick={handleClose}
+                  sx={{
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    fontSize: '0.85rem',
+                    color: theme.palette.text.secondary,
+                    '&:hover': { backgroundColor: alpha(theme.palette.text.primary, 0.04) },
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={insertLink}
+                  disabled={!linkUrl.trim()}
+                  variant="contained"
+                  endIcon={!hasExistingLink ? <ArrowIcon sx={{ fontSize: 14 }} /> : undefined}
+                  sx={{
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    fontSize: '0.85rem',
+                    backgroundColor: violet,
+                    color: '#fff',
+                    borderRadius: 1.25,
+                    px: 1.75,
+                    py: 0.75,
+                    boxShadow: 'none',
+                    '&:hover': {
+                      backgroundColor: theme.palette.primary.dark,
+                      boxShadow: 'none',
+                    },
+                    '&.Mui-disabled': {
+                      backgroundColor: alpha(violet, 0.35),
+                      color: alpha('#fff', 0.7),
+                    },
+                  }}
+                >
+                  {hasExistingLink ? 'Update link' : 'Insert link'}
+                </Button>
+              </Box>
+            </Box>
+          </Dialog>
+        );
+      })()}
 
       {/* Image Upload Dialog */}
       <ImageUploadDialog
