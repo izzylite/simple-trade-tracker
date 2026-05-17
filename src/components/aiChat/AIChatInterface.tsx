@@ -1152,15 +1152,18 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
         <Typography
           component="span"
           sx={{
-            ...monoSectionLabelSx,
-            mt: 1,
+            mt: 0.875,
             display: 'block',
             textAlign: 'center',
-            fontSize: '0.6rem',
-            opacity: 0.8,
+            fontSize: '0.68rem',
+            fontWeight: 400,
+            letterSpacing: 0,
+            textTransform: 'none',
+            lineHeight: 1.5,
+            color: alpha(theme.palette.text.secondary, 0.7),
           }}
         >
-          {`Enter to send • Shift+Enter newline • / for commands • @ for notes & tags • Up to ${MAX_IMAGES} images`}
+          {`Enter to send · Shift+Enter newline · / for commands · @ for notes & tags · Up to ${MAX_IMAGES} images`}
         </Typography>
       </Box>
 
