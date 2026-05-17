@@ -4,9 +4,9 @@ import {
   Typography,
   IconButton,
   Box,
-  Paper,
   useTheme,
-  useMediaQuery
+  useMediaQuery,
+  Tooltip,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import {
@@ -16,13 +16,13 @@ import {
   EmojiEvents,
   CalendarMonth,
   CalendarToday,
-  ViewCarousel as GalleryIcon
+  ViewCarousel as GalleryIcon,
+  EventOutlined,
 } from '@mui/icons-material';
 import { addYears, subYears } from 'date-fns';
 import { Trade, YearStats } from '../types/dualWrite';
 import TargetBadge from '../components/TargetBadge';
 import { BaseDialog } from './common';
-import { scrollbarStyles } from '../styles/scrollbarStyles';
 
 interface SelectDateDialogProps {
   open: boolean;
@@ -36,6 +36,8 @@ interface SelectDateDialogProps {
   onOpenGalleryMode?: (trades: Trade[], initialTradeId?: string, title?: string, fetchYear?: number) => void;
 }
 
+const MONO_FONT = "'JetBrains Mono', ui-monospace, monospace";
+
 const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
   open,
   onClose,
@@ -48,13 +50,35 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
   onOpenGalleryMode
 }) => {
   const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   const isSmDown = useMediaQuery(theme.breakpoints.down('sm'));
   const [currentDate, setCurrentDate] = React.useState(initialDate || new Date());
   const currentYear = currentDate.getFullYear();
-  const months = [
+  const months = React.useMemo(() => [
     'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'
-  ];
+  ], []);
+
+  // ── design tokens ────────────────────────────────────────────────────────
+  const violet = theme.palette.primary.main;
+  const violetSoft = alpha(violet, isDark ? 0.18 : 0.14);
+  const violetSofter = alpha(violet, isDark ? 0.12 : 0.10);
+  const violetBorder = alpha(violet, isDark ? 0.35 : 0.28);
+  const surfaceInset = isDark ? 'rgba(255,255,255,0.03)' : alpha(theme.palette.text.primary, 0.03);
+  const surfaceInsetHover = isDark ? 'rgba(255,255,255,0.06)' : alpha(theme.palette.text.primary, 0.05);
+  const hairline = isDark ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
+
+  const monoLabelSx = {
+    fontFamily: MONO_FONT,
+    fontSize: '0.68rem',
+    fontWeight: 600,
+    letterSpacing: '0.12em',
+    textTransform: 'uppercase' as const,
+    color: theme.palette.text.secondary,
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 0.75,
+  };
 
   React.useEffect(() => {
     if (initialDate) {
@@ -77,23 +101,21 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
       const yearData = yearStats[currentYear.toString()];
       const totalTrades = yearData?.total_trades || 0;
       const title = `${currentYear} - All Trades (${totalTrades} trades)`;
-      // Use fetch mode with empty trades array and fetchYear
-      // TradeGalleryDialog derives totalCount from calendar.year_stats
       onOpenGalleryMode([], undefined, title, currentYear);
       onClose();
     }
   };
 
   const currentMonth = currentDate.getMonth();
+  const isInitialYear = currentYear === initialDate?.getFullYear();
+  const todayYear = new Date().getFullYear();
 
-  // Get yearly statistics from pre-calculated year_stats
-  // Falls back to empty stats if year data not available
+  // Yearly statistics from pre-calculated year_stats
   const yearlyStats = React.useMemo(() => {
     const stats = yearStats[currentYear.toString()];
     const startOfYear = new Date(currentYear, 0, 1);
 
     if (!stats) {
-      // Fallback for years with no trades or not yet calculated
       return {
         totalTrades: 0,
         yearlyPnL: 0,
@@ -102,11 +124,10 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
         yearlyWinRate: '0',
         yearlyGrowthPercentage: '0',
         accountValueAtStartOfYear: accountBalance,
-        startOfYear
+        startOfYear,
       };
     }
 
-    // Calculate account value at start of year from previous years' PnL
     let accountValueAtStartOfYear = accountBalance;
     Object.entries(yearStats).forEach(([year, yearData]) => {
       if (parseInt(year) < currentYear) {
@@ -122,7 +143,7 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
       yearlyWinRate: stats.win_rate.toFixed(1),
       yearlyGrowthPercentage: stats.yearly_growth_percentage.toFixed(2),
       accountValueAtStartOfYear,
-      startOfYear
+      startOfYear,
     };
   }, [currentYear, yearStats, accountBalance]);
 
@@ -134,10 +155,9 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
     yearlyWinRate,
     yearlyGrowthPercentage,
     accountValueAtStartOfYear,
-    startOfYear
   } = yearlyStats;
 
-  // Get monthly statistics from pre-calculated year_stats
+  // Monthly statistics from pre-calculated year_stats
   const monthlyStats = React.useMemo(() => {
     const stats = new Map<number, {
       monthPnL: number;
@@ -154,24 +174,21 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
     const yearData = yearStats[currentYear.toString()];
 
     if (!yearData) {
-      // Fallback: create empty stats for all 12 months
       for (let monthIndex = 0; monthIndex < 12; monthIndex++) {
         stats.set(monthIndex, {
           monthPnL: 0,
           tradeCount: 0,
           accountValueAtStartOfMonth: accountBalance,
           targetProgress: null,
-          growthPercentage: '0'
+          growthPercentage: '0',
         });
       }
       return stats;
     }
 
-    // Use pre-calculated monthly stats from year_stats
     for (let monthIndex = 0; monthIndex < 12; monthIndex++) {
       const monthStats = yearData.monthly_stats[monthIndex];
 
-      // Calculate target progress if monthly target is set using pre-calculated values
       let targetProgress = null;
       if (monthlyTarget && monthlyTarget > 0 && monthStats.account_value_at_start > 0) {
         const targetAmount = (monthlyTarget / 100) * monthStats.account_value_at_start;
@@ -179,7 +196,7 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
         targetProgress = {
           progress: Math.min(rawProgress, 100),
           isMet: monthStats.month_pnl >= targetAmount,
-          rawProgress
+          rawProgress,
         };
       }
 
@@ -188,134 +205,249 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
         tradeCount: monthStats.trade_count,
         accountValueAtStartOfMonth: monthStats.account_value_at_start,
         targetProgress,
-        growthPercentage: monthStats.growth_percentage.toFixed(2)
+        growthPercentage: monthStats.growth_percentage.toFixed(2),
       });
     }
 
     return stats;
   }, [currentYear, yearStats, accountBalance, monthlyTarget]);
 
-  // Get best month from pre-calculated year_stats
+  // Best month from pre-calculated year_stats
   const bestMonth = React.useMemo(() => {
     const yearData = yearStats[currentYear.toString()];
-
     if (!yearData || yearData.best_month_pnl <= 0) {
-      return {
-        name: 'None',
-        pnl: 0
-      };
+      return { name: 'None', pnl: 0 };
     }
-
     return {
       name: months[yearData.best_month_index],
-      pnl: yearData.best_month_pnl
+      pnl: yearData.best_month_pnl,
     };
   }, [currentYear, yearStats, months]);
 
-  // Calculate yearly target progress using pre-calculated values
+  // Yearly target progress
   const yearlyTargetProgress = React.useMemo(() => {
     if (!yearlyTarget || yearlyTarget <= 0 || accountValueAtStartOfYear <= 0) return null;
-
     const targetAmount = (yearlyTarget / 100) * accountValueAtStartOfYear;
     const rawProgress = targetAmount > 0 ? (yearlyPnL / targetAmount) * 100 : 0;
-
     return {
       progress: Math.min(rawProgress, 100),
       isMet: yearlyPnL >= targetAmount,
-      rawProgress
+      rawProgress,
     };
   }, [yearlyTarget, accountValueAtStartOfYear, yearlyPnL]);
 
+  // ── header title row (title + year stepper) ──────────────────────────────
   const dialogTitle = (
-    <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
-      <CalendarToday sx={{
-        fontSize: { xs: '1.5rem', sm: '1.6rem', md: '1.75rem' },
-        color: theme.palette.primary.main
-      }} />
-      <Typography
-        variant="h5"
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Typography sx={{ fontWeight: 700, fontSize: '0.95rem', lineHeight: 1.2 }}>
+          Jump to a month
+        </Typography>
+        <Typography
+          sx={{
+            fontSize: '0.78rem',
+            color: theme.palette.text.secondary,
+            lineHeight: 1.3,
+          }}
+        >
+          Browse {currentYear} by month, then pick one to open
+        </Typography>
+      </Box>
+
+      {/* Year stepper */}
+      <Box
         sx={{
-          fontWeight: 700,
-          flex: 1,
-          color: 'text.primary',
-          fontSize: { xs: '1.25rem', sm: '1.35rem', md: '1.5rem' },
-          ml: { xs: 1, sm: 1.25, md: 1.5 }
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 0.25,
+          px: 0.5,
+          py: 0.25,
+          borderRadius: 1.5,
+          backgroundColor: surfaceInset,
+          border: `1px solid ${hairline}`,
         }}
       >
-        Select Month
-      </Typography>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-        {currentYear !== new Date().getFullYear() && (
-          <Button
-            onClick={handleToday}
-            size={isSmDown ? 'small' : 'medium'}
-            variant="outlined"
-            startIcon={<CalendarToday sx={{ fontSize: '1.05rem' }} />}
+        <Tooltip title="Previous year">
+          <IconButton
+            onClick={handlePrevYear}
+            size="small"
             sx={{
-              ml: 1,
-              textTransform: 'none',
-              fontWeight: 600,
-              borderRadius: 1.5,
-              px: { xs: 1.5, sm: 1.75, md: 2 }
+              color: theme.palette.text.secondary,
+              width: 26,
+              height: 26,
+              borderRadius: 1,
+              '&:hover': { backgroundColor: violetSofter, color: violet },
             }}
           >
-            Today
-          </Button>
-        )}
-        <IconButton onClick={handlePrevYear} sx={{ color: 'text.primary', bgcolor: alpha(theme.palette.primary.main, 0.05) }}>
-          <ChevronLeft />
-        </IconButton>
+            <ChevronLeft sx={{ fontSize: 18 }} />
+          </IconButton>
+        </Tooltip>
         <Typography
-          variant="h5"
           sx={{
-            fontWeight: 800,
-            color: 'text.primary',
-            minWidth: { xs: 64, sm: 72, md: 80 },
+            fontFamily: MONO_FONT,
+            fontWeight: 700,
+            fontSize: '0.85rem',
+            color: theme.palette.text.primary,
+            minWidth: 44,
             textAlign: 'center',
-            letterSpacing: '-0.5px'
+            letterSpacing: '0.02em',
+            px: 0.5,
           }}
         >
           {currentYear}
         </Typography>
-        <IconButton onClick={handleNextYear} sx={{ color: 'text.primary', bgcolor: alpha(theme.palette.primary.main, 0.05) }}>
-          <ChevronRight />
-        </IconButton>
+        <Tooltip title="Next year">
+          <IconButton
+            onClick={handleNextYear}
+            size="small"
+            sx={{
+              color: theme.palette.text.secondary,
+              width: 26,
+              height: 26,
+              borderRadius: 1,
+              '&:hover': { backgroundColor: violetSofter, color: violet },
+            }}
+          >
+            <ChevronRight sx={{ fontSize: 18 }} />
+          </IconButton>
+        </Tooltip>
       </Box>
+
+      {currentYear !== todayYear && (
+        <Tooltip title="Jump to current year">
+          <Button
+            onClick={handleToday}
+            size="small"
+            startIcon={<CalendarToday sx={{ fontSize: 14 }} />}
+            sx={{
+              textTransform: 'none',
+              fontWeight: 600,
+              fontSize: '0.78rem',
+              color: violet,
+              backgroundColor: violetSofter,
+              border: `1px solid ${violetBorder}`,
+              borderRadius: 1,
+              px: 1.1,
+              py: 0.25,
+              minHeight: 0,
+              ml: 0.5,
+              '&:hover': { backgroundColor: violetSoft },
+            }}
+          >
+            Today
+          </Button>
+        </Tooltip>
+      )}
     </Box>
   );
 
-  const dialogActions = (
-    <Box sx={{ display: 'flex', gap: { xs: 1.5, sm: 2 } }}>
+  // ── footer actions ───────────────────────────────────────────────────────
+  const dialogActions = onOpenGalleryMode && totalTrades > 0 ? (
+    <Button
+      onClick={handleYearlyGalleryMode}
+      variant="contained"
+      startIcon={<GalleryIcon sx={{ fontSize: 16 }} />}
+      sx={{
+        textTransform: 'none',
+        fontWeight: 600,
+        fontSize: '0.85rem',
+        backgroundColor: violet,
+        color: '#fff',
+        borderRadius: 1.25,
+        px: 1.75,
+        py: 0.75,
+        boxShadow: 'none',
+        '&:hover': { backgroundColor: theme.palette.primary.dark, boxShadow: 'none' },
+      }}
+    >
+      Gallery view
+    </Button>
+  ) : undefined;
 
-      <Button
-        onClick={onClose}
-        variant="outlined"
-        size={isSmDown ? 'medium' : 'large'}
+  // Helper to format a positive/negative dollar amount with up/down glyph
+  const renderPnL = (value: number, big = false) => {
+    const positive = value > 0;
+    const negative = value < 0;
+    const color = positive
+      ? theme.palette.success.main
+      : negative
+        ? theme.palette.error.main
+        : theme.palette.text.primary;
+    return (
+      <Typography
         sx={{
-          textTransform: 'none',
-          fontWeight: 600,
-          borderRadius: 1.5,
-          px: { xs: 2, sm: 2.5, md: 3 }
+          fontFamily: MONO_FONT,
+          fontWeight: 700,
+          fontSize: big ? { xs: '1.2rem', sm: '1.3rem' } : '1rem',
+          color,
+          display: 'inline-flex',
+          alignItems: 'baseline',
+          gap: 0.4,
+          letterSpacing: '-0.01em',
         }}
       >
-        Cancel
-      </Button>{onOpenGalleryMode && totalTrades > 0 && (
-        <Button
-          onClick={handleYearlyGalleryMode}
-          variant="contained"
-          size={isSmDown ? 'medium' : 'large'}
-          startIcon={<GalleryIcon />}
+        ${Math.abs(value).toLocaleString()}
+        {value !== 0 && (
+          <Box component="span" sx={{ fontSize: big ? '0.85rem' : '0.7rem', fontWeight: 600 }}>
+            {positive ? '↑' : '↓'}
+          </Box>
+        )}
+      </Typography>
+    );
+  };
+
+  // Stat tile used in yearly summary
+  const StatTile: React.FC<{
+    icon: React.ReactNode;
+    label: string;
+    children: React.ReactNode;
+    sub?: React.ReactNode;
+    accent?: string;
+  }> = ({ icon, label, children, sub, accent }) => (
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 0.75,
+        p: 1.5,
+        borderRadius: 1.5,
+        backgroundColor: surfaceInset,
+        border: `1px solid ${hairline}`,
+      }}
+    >
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+        <Box
           sx={{
-            textTransform: 'none',
-            fontWeight: 600,
-            borderRadius: 1.5,
-            px: { xs: 2, sm: 2.5, md: 3 }
+            width: 22,
+            height: 22,
+            borderRadius: 0.75,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: alpha(accent || violet, isDark ? 0.18 : 0.14),
+            color: accent || violet,
+            border: `1px solid ${alpha(accent || violet, isDark ? 0.35 : 0.28)}`,
+            flexShrink: 0,
           }}
         >
-          Gallery View
-        </Button>
+          {icon}
+        </Box>
+        <Typography sx={{ ...monoLabelSx, fontSize: '0.62rem' }}>{label}</Typography>
+      </Box>
+      <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, flexWrap: 'wrap' }}>
+        {children}
+      </Box>
+      {sub && (
+        <Typography
+          sx={{
+            fontSize: '0.72rem',
+            color: theme.palette.text.secondary,
+            fontWeight: 500,
+          }}
+        >
+          {sub}
+        </Typography>
       )}
-
     </Box>
   );
 
@@ -324,408 +456,346 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
       open={open}
       onClose={onClose}
       title={dialogTitle}
+      headerIcon={<EventOutlined sx={{ fontSize: 18 }} />}
       actions={dialogActions}
       maxWidth="sm"
       fullWidth
-      hideFooterCancelButton
+      cancelButtonText="Close"
     >
-      <Box sx={{
-        pt: { xs: '12px', sm: '16px', md: '24px' },
-        pb: { xs: '12px', sm: '16px', md: '24px' },
-        ...scrollbarStyles(theme)
-      }}>
-        <Paper elevation={0} sx={{
-          px: { xs: 2, sm: 2.5, md: 3 },
-          py: { xs: 1.5, sm: 2, md: 2 },
-          mb: 2,
-          borderRadius: 2,
-          bgcolor: theme => alpha(theme.palette.background.default, 0.5),
-          border: '1px solid',
-          borderColor: theme => theme.palette.divider,
-          position: 'relative',
-          overflow: 'hidden',
-        }}>
-          <Box sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            mb: { xs: 2, sm: 2.25, md: 2.5 },
-            pl: 1
-          }}>
-            <Box sx={{ display: 'flex', flexDirection: 'row', gap: 0.5 }}>
-              <Typography
-                variant="h6"
-                sx={{
-                  color: 'text.primary',
-                  fontSize: { xs: '1rem', sm: '1.05rem', md: '1.1rem' },
-                  fontWeight: 600
-                }}
-              >
-                Yearly Statistics
-              </Typography>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.25 }}>
+        {/* ── Yearly summary panel ────────────────────────────────────── */}
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 1,
+              flexWrap: 'wrap',
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography sx={monoLabelSx}>{currentYear} · Year summary</Typography>
               {yearlyTargetProgress && (
                 <TargetBadge
                   progress={yearlyTargetProgress.rawProgress}
                   isMet={yearlyTargetProgress.isMet}
-                  tooltipText={`${yearlyTargetProgress.isMet ? 'Yearly target achieved' : 'Progress towards yearly target'}: ${yearlyTargetProgress.rawProgress.toFixed(0)}%`}
+                  tooltipText={`${
+                    yearlyTargetProgress.isMet
+                      ? 'Yearly target achieved'
+                      : 'Progress towards yearly target'
+                  }: ${yearlyTargetProgress.rawProgress.toFixed(0)}%`}
                 />
               )}
             </Box>
 
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              <Box sx={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 1,
-                bgcolor: theme => alpha(theme.palette.success.light, 0.1),
-                py: 0.75,
-                px: 1.5,
-                borderRadius: 1,
-                border: '1px solid',
-                borderColor: 'success.light'
-              }}>
-                <Typography variant="body2" sx={{
-                  fontSize: '0.85rem',
-                  fontWeight: 500,
-                  color: 'text.secondary'
-                }}>
-                  Best Month:
-                </Typography>
-                <Typography variant="body2" sx={{
-                  fontSize: '0.85rem',
-                  fontWeight: 700,
-                  color: 'success.main'
-                }}>
-                  {bestMonth.name} (${bestMonth.pnl.toLocaleString()})
-                </Typography>
-              </Box>
-
-
-            </Box>
-
-          </Box>
-
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr' }, gap: { xs: 2, sm: 3, md: 4 }, width: '100%' }}>
-            <Box>
-              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 1 }}>
-                <Box sx={{
-                  p: 0.7,
-                  borderRadius: 1,
-                  bgcolor: theme => alpha(theme.palette.primary.main, 0.1),
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  mb: 1
-                }}>
-                  <TrendingUp sx={{
-                    fontSize: { xs: '1.05rem', sm: '1.15rem', md: '1.2rem' },
-                    color: 'primary.main'
-                  }} />
-                </Box>
-                <Typography variant="body1" sx={{
-                  fontSize: '1rem',
-                  fontWeight: 600,
-                  color: 'text.primary',
-                  textAlign: 'center'
-                }}>
-                  Yearly P&L
-                </Typography>
-              </Box>
-              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
-                <Typography
-                  variant="h5"
-                  sx={{
-                    fontWeight: 700,
-                    fontSize: { xs: '1.35rem', sm: '1.4rem', md: '1.5rem' },
-                    color: theme => {
-                      if (yearlyPnL > 0) return theme.palette.success.main;
-                      if (yearlyPnL < 0) return theme.palette.error.main;
-                      return theme.palette.mode === 'dark' ? 'grey.300' : 'text.primary';
-                    },
-                    textAlign: 'center'
-                  }}
-                >
-                  ${Math.abs(yearlyPnL).toLocaleString()}
-                </Typography>
-                <Box sx={{
-                  display: 'flex',
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 0.5,
-                }}>
-                  <Typography variant="body2" sx={{
-                    fontWeight: 500,
-                    color: 'text.secondary',
-                    fontSize: { xs: '0.85rem', sm: '0.9rem' },
-                    textAlign: 'center'
-                  }}>
-                    Growth
-                  </Typography>
-                  <Typography variant="body2" sx={{
-                    fontWeight: 700,
-                    color: theme => {
-                      if (yearlyPnL > 0) return theme.palette.success.main;
-                      if (yearlyPnL < 0) return theme.palette.error.main;
-                      return theme.palette.mode === 'dark' ? 'grey.300' : 'text.primary';
-                    },
-                    fontSize: '1rem',
-                    textAlign: 'center'
-                  }}>
-                    {yearlyGrowthPercentage}%
-                  </Typography>
-                </Box>
-              </Box>
-            </Box>
-            <Box>
-              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 1 }}>
-                <Box sx={{
-                  p: 0.7,
-                  borderRadius: 1,
-                  bgcolor: theme => alpha(theme.palette.success.main, 0.1),
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  mb: 1
-                }}>
-                  <EmojiEvents sx={{
-                    fontSize: { xs: '1.05rem', sm: '1.15rem', md: '1.2rem' },
-                    color: 'success.main'
-                  }} />
-                </Box>
-                <Typography variant="body1" sx={{
-                  fontSize: '1rem',
-                  fontWeight: 600,
-                  color: 'text.primary',
-                  textAlign: 'center'
-                }}>
-                  Win Rate
-                </Typography>
-              </Box>
-              <Typography variant="h5" sx={{
-                fontWeight: 700,
-                fontSize: { xs: '1.35rem', sm: '1.4rem', md: '1.5rem' },
-                color: parseFloat(yearlyWinRate) > 50 ? 'success.main' : 'text.primary',
-                textAlign: 'center'
-              }}>
-                {yearlyWinRate}%
-              </Typography>
-              <Typography variant="body1" sx={{
-                fontWeight: 500,
-                fontSize: '1rem',
-                color: 'text.secondary',
-                mt: 0.5,
-                textAlign: 'center'
-              }}>
-                {yearlyWinCount} Ws / {yearlyLossCount} Ls
-              </Typography>
-            </Box>
-            <Box>
-              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 1 }}>
-                <Box sx={{
-                  p: 0.7,
-                  borderRadius: 1,
-                  bgcolor: theme => alpha(theme.palette.info.main, 0.1),
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  mb: 1
-                }}>
-                  <CalendarMonth sx={{
-                    fontSize: { xs: '1.05rem', sm: '1.15rem', md: '1.2rem' },
-                    color: 'info.main'
-                  }} />
-                </Box>
-                <Typography variant="body1" sx={{
-                  fontSize: '1rem',
-                  fontWeight: 600,
-                  color: 'text.primary',
-                  textAlign: 'center'
-                }}>
-                  Total Trades
-                </Typography>
-              </Box>
-              <Typography variant="h5" sx={{
-                fontWeight: 700,
-                fontSize: { xs: '1.35rem', sm: '1.4rem', md: '1.5rem' },
-                color: 'text.primary',
-                textAlign: 'center'
-              }}>
-                {totalTrades}
-              </Typography>
-              <Typography variant="body1" sx={{
-                fontWeight: 500,
-                fontSize: '1rem',
-                color: 'text.secondary',
-                mt: 0.5,
-                textAlign: 'center'
-              }}>
-                Trades this year
-              </Typography>
-            </Box>
-          </Box>
-        </Paper>
-        <Typography
-          variant="h6"
-          sx={{
-            color: 'text.primary',
-            mb: { xs: 1.5, sm: 1.75, md: 2 },
-            fontSize: { xs: '1rem', sm: '1.05rem', md: '1.1rem' },
-            fontWeight: 600,
-            pl: 1
-          }}
-        >
-          Select a Month
-        </Typography>
-        <Box sx={{
-          display: 'grid',
-          gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' },
-          gap: { xs: 1, sm: 1.25, md: 1.5 }
-        }}>
-          {months.map((month, index) => {
-            const stats = monthlyStats.get(index)!;
-            const { monthPnL, targetProgress, growthPercentage, tradeCount } = stats;
-            const hasEntries = monthPnL !== 0;
-
-            return (
-              <Paper
-                key={month}
-                onClick={() => handleMonthSelect(index)}
-                elevation={0}
+            {bestMonth.pnl > 0 && (
+              <Box
                 sx={{
-                  p: { xs: 1.5, sm: 2, md: 2.5 },
-                  cursor: 'pointer',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: { xs: 0.75, sm: 0.85, md: 1 },
-                  height: '100%',
-                  bgcolor: theme => {
-                    if (hasEntries) {
-                      return theme.palette.mode === 'dark'
-                        ? alpha('#fff', 0.08)
-                        : alpha(theme.palette.primary.main, 0.04);
-                    }
-                    return theme.palette.mode === 'dark' ? 'transparent' : '#f5f5f5';
-                  },
-                  border: '1px solid',
-                  borderColor: theme =>
-                    currentMonth === index && currentYear === initialDate?.getFullYear()
-                      ? theme.palette.primary.main
-                      : theme.palette.mode === 'dark' ? alpha('#fff', 0.12) : theme.palette.grey[200],
-                  borderRadius: 2,
-                  transition: 'all 0.2s',
-                  position: 'relative',
-                  overflow: 'hidden',
-                  ...(currentMonth === index && currentYear === initialDate?.getFullYear() && {
-                    '&::before': {
-                      content: '""',
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      width: '100%',
-                      height: '4px',
-                      backgroundColor: 'primary.main',
-                    }
-                  }),
-                  '&:hover': {
-                    bgcolor: theme => theme.palette.mode === 'dark'
-                      ? alpha('#fff', 0.12)
-                      : alpha(theme.palette.primary.main, 0.08),
-                    borderColor: 'primary.main',
-                    transform: 'translateY(-2px)',
-                    boxShadow: theme => `0 4px 12px ${alpha(theme.palette.primary.main, 0.2)}`
-                  }
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 0.75,
+                  px: 1,
+                  py: 0.3,
+                  borderRadius: 999,
+                  backgroundColor: alpha(theme.palette.success.main, isDark ? 0.16 : 0.12),
+                  border: `1px solid ${alpha(theme.palette.success.main, isDark ? 0.4 : 0.3)}`,
                 }}
               >
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5, mr: 1 }}>
-                  <Typography
-                    variant="h6"
+                <EmojiEvents sx={{ fontSize: 14, color: theme.palette.success.main }} />
+                <Typography
+                  sx={{
+                    fontSize: '0.74rem',
+                    fontWeight: 600,
+                    color: theme.palette.text.secondary,
+                  }}
+                >
+                  Best:
+                </Typography>
+                <Typography
+                  sx={{
+                    fontSize: '0.74rem',
+                    fontWeight: 700,
+                    color: theme.palette.success.main,
+                    fontFamily: MONO_FONT,
+                  }}
+                >
+                  {bestMonth.name} · ${bestMonth.pnl.toLocaleString()}
+                </Typography>
+              </Box>
+            )}
+          </Box>
+
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' },
+              gap: 1,
+            }}
+          >
+            <StatTile
+              icon={<TrendingUp sx={{ fontSize: 14 }} />}
+              label="P&L"
+              accent={
+                yearlyPnL > 0
+                  ? theme.palette.success.main
+                  : yearlyPnL < 0
+                    ? theme.palette.error.main
+                    : violet
+              }
+              sub={
+                <Box component="span" sx={{ display: 'inline-flex', alignItems: 'baseline', gap: 0.5 }}>
+                  Growth
+                  <Box
+                    component="span"
                     sx={{
-                      color: theme =>
-                        currentMonth === index && currentYear === initialDate?.getFullYear()
-                          ? theme.palette.primary.main
-                          : theme.palette.text.primary,
+                      fontFamily: MONO_FONT,
                       fontWeight: 700,
-                      fontSize: { xs: '1rem', sm: '1.05rem', md: '1.1rem' },
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis'
+                      color:
+                        yearlyPnL > 0
+                          ? theme.palette.success.main
+                          : yearlyPnL < 0
+                            ? theme.palette.error.main
+                            : theme.palette.text.primary,
                     }}
                   >
-                    {month}
-                  </Typography>
+                    {yearlyGrowthPercentage}%
+                  </Box>
+                </Box>
+              }
+            >
+              {renderPnL(yearlyPnL, true)}
+            </StatTile>
 
-                  {targetProgress && hasEntries && (
-                    <Box sx={{ ml: 1 }}>
+            <StatTile
+              icon={<EmojiEvents sx={{ fontSize: 14 }} />}
+              label="Win rate"
+              accent={
+                parseFloat(yearlyWinRate) > 50
+                  ? theme.palette.success.main
+                  : theme.palette.text.secondary
+              }
+              sub={`${yearlyWinCount} W · ${yearlyLossCount} L`}
+            >
+              <Typography
+                sx={{
+                  fontFamily: MONO_FONT,
+                  fontWeight: 700,
+                  fontSize: { xs: '1.2rem', sm: '1.3rem' },
+                  color:
+                    parseFloat(yearlyWinRate) > 50
+                      ? theme.palette.success.main
+                      : theme.palette.text.primary,
+                  letterSpacing: '-0.01em',
+                }}
+              >
+                {yearlyWinRate}%
+              </Typography>
+            </StatTile>
+
+            <StatTile
+              icon={<CalendarMonth sx={{ fontSize: 14 }} />}
+              label="Trades"
+              sub="Trades this year"
+            >
+              <Typography
+                sx={{
+                  fontFamily: MONO_FONT,
+                  fontWeight: 700,
+                  fontSize: { xs: '1.2rem', sm: '1.3rem' },
+                  color: theme.palette.text.primary,
+                  letterSpacing: '-0.01em',
+                }}
+              >
+                {totalTrades}
+              </Typography>
+            </StatTile>
+          </Box>
+        </Box>
+
+        {/* ── Month grid ─────────────────────────────────────────────── */}
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <Typography sx={monoLabelSx}>Select a month</Typography>
+
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: {
+                xs: 'repeat(2, 1fr)',
+                sm: 'repeat(3, 1fr)',
+                md: 'repeat(4, 1fr)',
+              },
+              gap: 1,
+            }}
+          >
+            {months.map((month, index) => {
+              const stats = monthlyStats.get(index)!;
+              const { monthPnL, targetProgress, growthPercentage, tradeCount } = stats;
+              const hasEntries = monthPnL !== 0 || tradeCount > 0;
+              const isSelected = currentMonth === index && isInitialYear;
+              const positive = monthPnL > 0;
+              const negative = monthPnL < 0;
+
+              return (
+                <Box
+                  key={month}
+                  onClick={() => handleMonthSelect(index)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleMonthSelect(index);
+                    }
+                  }}
+                  sx={{
+                    cursor: 'pointer',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 0.75,
+                    p: 1.25,
+                    borderRadius: 1.5,
+                    backgroundColor: isSelected ? violetSoft : surfaceInset,
+                    border: `1px solid ${isSelected ? violetBorder : hairline}`,
+                    transition: 'all 120ms ease',
+                    position: 'relative',
+                    overflow: 'hidden',
+                    outline: 'none',
+                    '&:hover': {
+                      backgroundColor: isSelected ? violetSoft : surfaceInsetHover,
+                      borderColor: isSelected ? violetBorder : alpha(violet, 0.5),
+                    },
+                    '&:focus-visible': {
+                      borderColor: violet,
+                      boxShadow: `0 0 0 2px ${alpha(violet, 0.35)}`,
+                    },
+                  }}
+                >
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 0.5,
+                    }}
+                  >
+                    <Typography
+                      sx={{
+                        fontWeight: 700,
+                        fontSize: '0.88rem',
+                        color: isSelected ? violet : theme.palette.text.primary,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {isSmDown ? month.slice(0, 3) : month}
+                    </Typography>
+
+                    {targetProgress && hasEntries && (
                       <TargetBadge
                         progress={targetProgress.rawProgress}
                         isMet={targetProgress.isMet}
-                        tooltipText={`${targetProgress.isMet ? 'Monthly target achieved' : 'Progress towards monthly target'}: ${targetProgress.rawProgress.toFixed(0)}%`}
+                        tooltipText={`${
+                          targetProgress.isMet
+                            ? 'Monthly target achieved'
+                            : 'Progress towards monthly target'
+                        }: ${targetProgress.rawProgress.toFixed(0)}%`}
                       />
-                    </Box>
-                  )}
-                </Box>
-                {hasEntries && (
-                  <>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                    )}
+                  </Box>
+
+                  {hasEntries ? (
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
                       <Typography
-                        variant="h6"
                         sx={{
-                          color: monthPnL > 0 ? 'success.main' : 'error.main',
-                          fontSize: { xs: '1.1rem', sm: '1.15rem', md: '1.2rem' },
+                          fontFamily: MONO_FONT,
                           fontWeight: 700,
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 0.5
+                          fontSize: '0.95rem',
+                          letterSpacing: '-0.01em',
+                          color: positive
+                            ? theme.palette.success.main
+                            : negative
+                              ? theme.palette.error.main
+                              : theme.palette.text.primary,
+                          display: 'inline-flex',
+                          alignItems: 'baseline',
+                          gap: 0.4,
                         }}
                       >
                         ${Math.abs(monthPnL).toLocaleString()}
-                        <Box component="span" sx={{ fontSize: { xs: '0.8rem', sm: '0.85rem', md: '0.9rem' }, fontWeight: 600 }}>
-                          {monthPnL > 0 ? '↑' : '↓'}
+                        <Box component="span" sx={{ fontSize: '0.7rem', fontWeight: 600 }}>
+                          {positive ? '↑' : negative ? '↓' : ''}
                         </Box>
                       </Typography>
 
-                      <Box sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 0.5,
-                      }}>
-                        <Typography variant="caption" sx={{ fontWeight: 500, color: 'text.secondary', fontSize: '0.75rem' }}>
-                          Growth
-                        </Typography>
-                        <Typography variant="caption" sx={{
-                          fontWeight: 600,
-                          color: monthPnL > 0 ? 'success.main' : 'error.main',
-                          fontSize: '0.75rem'
-                        }}>
-                          {growthPercentage}%
-                        </Typography>
-                      </Box>
-
-                      <Box sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 0.5,
-                      }}>
-                        <Typography variant="caption" sx={{ fontWeight: 500, color: 'text.secondary', fontSize: '0.75rem' }}>
-                          Trades:
-                        </Typography>
-                        <Typography variant="caption" sx={{
-                          fontWeight: 600,
-                          color: 'text.primary',
-                          fontSize: '0.75rem'
-                        }}>
-                          {tradeCount}
-                        </Typography>
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 0.75,
+                          fontSize: '0.7rem',
+                          color: theme.palette.text.secondary,
+                          fontWeight: 500,
+                        }}
+                      >
+                        <Box component="span">
+                          <Box
+                            component="span"
+                            sx={{
+                              fontFamily: MONO_FONT,
+                              fontWeight: 700,
+                              color: positive
+                                ? theme.palette.success.main
+                                : negative
+                                  ? theme.palette.error.main
+                                  : theme.palette.text.primary,
+                            }}
+                          >
+                            {growthPercentage}%
+                          </Box>{' '}
+                          growth
+                        </Box>
+                        <Box
+                          component="span"
+                          sx={{
+                            width: 3,
+                            height: 3,
+                            borderRadius: '50%',
+                            backgroundColor: alpha(theme.palette.text.secondary, 0.5),
+                          }}
+                        />
+                        <Box component="span">
+                          <Box
+                            component="span"
+                            sx={{
+                              fontFamily: MONO_FONT,
+                              fontWeight: 700,
+                              color: theme.palette.text.primary,
+                            }}
+                          >
+                            {tradeCount}
+                          </Box>{' '}
+                          {tradeCount === 1 ? 'trade' : 'trades'}
+                        </Box>
                       </Box>
                     </Box>
-
-                  </>
-                )}
-              </Paper>
-            );
-          })}
+                  ) : (
+                    <Typography
+                      sx={{
+                        fontFamily: MONO_FONT,
+                        fontSize: '0.7rem',
+                        color: alpha(theme.palette.text.secondary, 0.7),
+                        fontWeight: 500,
+                      }}
+                    >
+                      No trades
+                    </Typography>
+                  )}
+                </Box>
+              );
+            })}
+          </Box>
         </Box>
       </Box>
     </BaseDialog>
