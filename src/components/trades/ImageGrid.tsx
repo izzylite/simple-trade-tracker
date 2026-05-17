@@ -43,6 +43,64 @@ interface ImageGridProps {
 const DEFAULT_COL_WIDTH = 100;
 const MIN_COL_WIDTH_PERCENT = 10; // Minimum width for a column
 
+/**
+ * CaptionField — self-contained multiline caption input.
+ *
+ * The parent (TradeFormDialog → TradeForm → ImageUploader → ImageGrid) rebuilds
+ * its image arrays + row layout on every keystroke, which can cause the
+ * controlled TextField to lose cursor position (backspace then jumps to the
+ * end and starts eating other characters).
+ *
+ * We solve it by owning the value locally and only resyncing from the parent
+ * when the image identity changes. Each keystroke updates local state first,
+ * so when the parent's re-render arrives the DOM already matches and React
+ * doesn't touch the cursor. We still propagate the change to the parent so
+ * the form data stays current.
+ */
+interface CaptionFieldProps {
+  imageId: string;
+  initial: string;
+  disabled: boolean;
+  onCommit: (value: string) => void;
+  sx?: any;
+}
+const CaptionField: React.FC<CaptionFieldProps> = React.memo(
+  ({ imageId, initial, disabled, onCommit, sx }) => {
+    const [value, setValue] = useState(initial);
+    const prevImageIdRef = useRef(imageId);
+
+    // Resync from props only when the image identity changes (new image
+    // loaded into this slot). Mid-typing prop updates from our own onCommit
+    // are intentionally ignored — local state is the source of truth.
+    useEffect(() => {
+      if (prevImageIdRef.current !== imageId) {
+        prevImageIdRef.current = imageId;
+        setValue(initial);
+      }
+    }, [imageId, initial]);
+
+    return (
+      <TextField
+        placeholder="Add a caption..."
+        value={value}
+        onChange={(e) => {
+          const next = e.target.value;
+          setValue(next);
+          onCommit(next);
+        }}
+        variant="standard"
+        multiline
+        minRows={1}
+        maxRows={20}
+        fullWidth
+        disabled={disabled}
+        sx={sx}
+      />
+    );
+  },
+);
+CaptionField.displayName = 'CaptionField';
+
 // Helper function to organize images into rows
 const organizeImagesIntoRows = (
   pendingImages: Array<PendingImage>,
@@ -762,28 +820,27 @@ const ImageGrid: React.FC<ImageGridProps> = ({
                                 </IconButton>
                                 </Box>
                                 {/* Caption Field - Multiline with smaller font */}
-                                <TextField
-                                    placeholder="Add a caption..."
-                                    value={pendingImg?.caption || ''}
-                                    onChange={(e) => onImageCaptionChange(pendingImages.findIndex(img => img.id === image.id), e.target.value, true)}
-                                    variant="standard"
-                                    multiline
-                                    minRows={1}
-                                    maxRows={20} // Large number to effectively disable scrolling
-                                    fullWidth
-                                    // Disable the field while image is uploading (pending images are always uploading)
+                                <CaptionField
+                                    imageId={image.id}
+                                    initial={pendingImg?.caption || ''}
                                     disabled={true}
+                                    onCommit={(value) =>
+                                        onImageCaptionChange(
+                                            pendingImages.findIndex(img => img.id === image.id),
+                                            value,
+                                            true,
+                                        )
+                                    }
                                     sx={{
                                         px: 1,
                                         py: 0.5,
                                         backgroundColor: theme.palette.background.paper,
-                                        fontSize: '0.75rem', // Smaller font size
+                                        fontSize: '0.75rem',
                                         '& .MuiInput-underline:before': { borderBottomColor: 'transparent' },
                                         '& .MuiInput-underline:after': { borderBottomColor: 'transparent' },
                                         '& .MuiInput-underline:hover:not(.Mui-disabled):before': { borderBottomColor: 'transparent' },
-                                        '& .MuiInputBase-input': { fontSize: '0.75rem' }, // Ensure input text is also smaller
-                                        '& .MuiInputBase-root': { overflow: 'visible' }, // Prevent scrollbars
-                                        // Style for disabled state
+                                        '& .MuiInputBase-input': { fontSize: '0.75rem' },
+                                        '& .MuiInputBase-root': { overflow: 'visible' },
                                         '&.Mui-disabled': {
                                             opacity: 0.7,
                                             '& .MuiInputBase-input': { color: 'text.disabled' }
@@ -827,28 +884,27 @@ const ImageGrid: React.FC<ImageGridProps> = ({
                                 </IconButton>
                                 </Box>
                                 {/* Caption Field - Multiline with smaller font */}
-                                <TextField
-                                    placeholder="Add a caption..."
-                                    value={uploadedImg?.caption || ''}
-                                    onChange={(e) => onImageCaptionChange(uploadedImages.findIndex(img => img.id === image.id), e.target.value, false)}
-                                    variant="standard"
-                                    multiline
-                                    minRows={1}
-                                    maxRows={20} // Large number to effectively disable scrolling
-                                    fullWidth
-                                    // Disable the field when any image is uploading
+                                <CaptionField
+                                    imageId={image.id}
+                                    initial={uploadedImg?.caption || ''}
                                     disabled={isAnyImageUploading() || (uploadedImg?.pending === true)}
+                                    onCommit={(value) =>
+                                        onImageCaptionChange(
+                                            uploadedImages.findIndex(img => img.id === image.id),
+                                            value,
+                                            false,
+                                        )
+                                    }
                                     sx={{
                                         px: 1,
                                         py: 0.5,
                                         backgroundColor: theme.palette.background.paper,
-                                        fontSize: '0.75rem', // Smaller font size
+                                        fontSize: '0.75rem',
                                         '& .MuiInput-underline:before': { borderBottomColor: 'transparent' },
                                         '& .MuiInput-underline:after': { borderBottomColor: 'transparent' },
                                         '& .MuiInput-underline:hover:not(.Mui-disabled):before': { borderBottomColor: 'transparent' },
-                                        '& .MuiInputBase-input': { fontSize: '0.75rem' }, // Ensure input text is also smaller
-                                        '& .MuiInputBase-root': { overflow: 'visible' }, // Prevent scrollbars
-                                        // Style for disabled state
+                                        '& .MuiInputBase-input': { fontSize: '0.75rem' },
+                                        '& .MuiInputBase-root': { overflow: 'visible' },
                                         '&.Mui-disabled': {
                                             opacity: 0.7,
                                             '& .MuiInputBase-input': { color: 'text.disabled' }
