@@ -148,26 +148,72 @@ This project uses specialized AI subagents for specific domains. Claude Code sho
 - **Background Tasks**: Cleanup and maintenance operations
 
 ### Source Directory Structure
-- `src/components/` - React UI components
-- `src/config/` - App configuration
-- `src/contexts/` - React Context providers (AuthContext, etc.)
-- `src/hooks/` - Custom React hooks
-- `src/pages/` - Route-level page components
-- `src/services/` - Data and API service layer
-- `src/styles/` - Global styles and theme
-- `src/types/` - TypeScript type definitions
-- `src/utils/` - Utility functions
-- `src/workers/` - Web workers
+
+The codebase is organized **feature-first** around the Five Core Pillars. Each
+pillar owns its components, hooks, services, types, contexts, and utils inside
+`src/features/<pillar>/`. Anything genuinely shared across pillars lives at
+`src/<root-folder>/`.
+
+**Pillar folders** (`src/features/<pillar>/`):
+- `notes/` — note CRUD, reminders, note editor, note viewers
+- `events/` — economic calendar, watchers, pinning, event notifications
+- `performance/` — charts, stats, tag-pattern analysis, scoring
+- `orion/` — AI chat UI, Orion tasks, memory audit, chat services
+- `calendar/` — trade entry/edit/list, calendar grid, tags, sharing, import
+
+Each pillar has the same internal shape (only the dirs it needs):
+`components/`, `hooks/`, `services/`, `types/`, `contexts/`, `utils/`,
+plus `workers/`, `data/` where relevant.
+
+**Shared at `src/` root** (cross-pillar / infrastructure):
+- `components/` — `Shimmer`, `AppLoadingProgress`, plus subfolders
+    `common/` (RichTextEditor, BaseDialog, etc.), `layout/`, `auth/`,
+    `notifications/`, `heroImage/`, `faq/`, `landing/`, and
+    `sidePanel/{SidePanel,SidePanelHeader,appRenderView}.tsx` (side-panel
+    infrastructure; pillar-specific content files live in
+    `features/<pillar>/components/sidePanel/`)
+- `contexts/` — `AuthStateContext`, `SupabaseAuthContext`,
+    `NotificationsContext`, `PanelMutexContext`, `SidePanelContext`
+- `services/` — `supabaseAuthService`, `supabaseStorageService`,
+    `notificationsService`, `unsplashCache`, plus `repositories/` (uniform
+    data layer — BaseRepository + per-entity repos)
+- `hooks/` — `useCurrentTime`, `useRealtimeSubscription`
+- `types/` — `notification.ts`, `theme.d.ts`
+- `utils/` — `logger`, `formatters`, `tagColors`, `fileValidation`,
+    `sessionTimeUtils`, `notificationSound`, `routePreload`,
+    `supabaseErrorHandler`
+- `workers/workerManager.ts` — generic web-worker infrastructure
+- `styles/` — `dialogStyles`, `dialogTokens`, `scrollbarStyles`, `zIndex`
+- `config/` — Supabase client config
+- `pages/` — route-level page components (1:1 with React Router routes)
+
+### Path imports
+
+`tsconfig.json` has `baseUrl: "src"`, so absolute imports work without a `@/`
+prefix.
+
+- **Within a pillar**: use relative imports (`./SiblingComponent`,
+    `../services/calendarService`)
+- **Cross-pillar / shared**: use absolute imports from `src/` (e.g.
+    `features/notes/types/note`, `features/events/services/economicCalendarService`,
+    `utils/logger`, `services/repositories/TradeRepository`)
+- **Third-party**: unchanged (`react`, `@mui/...`, etc.)
 
 ### Key Service Files
-- `src/services/calendarService.ts` - Core trade and calendar operations with Supabase
-- `src/services/supabaseStorageService.ts` - File upload/download with Supabase Storage
-- `src/services/supabaseAIChatService.ts` - AI chat service with Supabase edge functions
-- `src/services/performanceCalculationService.ts` - Trade performance metrics
-- `src/services/economicCalendarService.ts` - Economic event data
-- `src/services/tagService.ts` - Tag management
-- `src/services/notesService.ts` - Trade notes
-- `src/services/sharingService.ts` - Calendar/trade sharing
+
+Pillar-owned:
+- `src/features/calendar/services/calendarService.ts` — core trade and calendar operations
+- `src/features/notes/services/notesService.ts` — trade notes
+- `src/features/calendar/services/sharingService.ts` — calendar/trade sharing
+- `src/features/calendar/services/tagService.ts` — tag management
+- `src/features/orion/services/supabaseAIChatService.ts` — AI chat / Orion edge function bridge
+- `src/features/performance/services/performanceCalculationService.ts` — performance metrics
+- `src/features/events/services/economicCalendarService.ts` — economic event data
+
+Shared infrastructure:
+- `src/services/supabaseStorageService.ts` — file upload/download with Supabase Storage
+- `src/services/supabaseAuthService.ts` — authentication
+- `src/services/repositories/*.ts` — uniform Supabase data-access layer (`BaseRepository`, `CalendarRepository`, `TradeRepository`, `NoteRepository`, `EconomicEventRepository`, `ConversationRepository`, `ShareRepository`)
 
 ## Architecture Patterns
 
@@ -244,10 +290,13 @@ explicit-vs-implicit caching, currency canonicalization, etc.).
 - Use Unix timestamps for publishedAt/updatedAt fields
 
 ### Reuse Before Creating
-- **Always check `src/utils/` before writing a new utility function.** Search for existing helpers by keyword (e.g. `compressImage`, `validateFile`, `formatDate`) before adding new ones.
-- **Also check `src/services/` and `src/hooks/`** for existing logic that covers the same need.
+- **Always search before writing a new utility, hook, or service.** Look in BOTH the relevant pillar (`src/features/<pillar>/{utils,hooks,services}/`) AND the shared roots (`src/{utils,hooks,services}/`). Many helpers were extracted during the Five-Pillar reorg — check by keyword (e.g. `compressImage`, `validateFile`, `formatDate`) before adding new ones.
 - If a similar function exists but has a different return type or signature, prefer extending or wrapping it over duplicating it.
-- New utility functions belong in `src/utils/` in the most relevant existing file (e.g. image helpers → `fileValidation.ts`, formatters → `formatters.ts`).
+- **Where new code goes:**
+  - **Pillar-specific** logic (only one pillar uses it) → `src/features/<pillar>/{utils,hooks,services}/`. E.g. trade-form helpers → `features/calendar/utils/`; AI chat token estimation → `features/orion/utils/`.
+  - **Cross-pillar / infrastructure** (2+ pillars need it) → `src/{utils,hooks,services}/` shared roots. Image helpers → `utils/fileValidation.ts`; generic formatters → `utils/formatters.ts`; auth → `services/supabaseAuthService.ts`.
+  - **Data access** → add to or extend a repository under `src/services/repositories/`, never re-implement Supabase queries inline.
+- **Cross-pillar imports are allowed** but should be sparing. Use absolute paths (`features/notes/types/note`) for them.
 - **Extract shared logic within components too.** When 2+ event handlers, style objects, or render patterns repeat the same structure with different parameters, extract a reusable helper function or constant immediately — don't duplicate then refactor later. Example: a `togglePanel(viewId, drawerSetter)` instead of repeating the same panel open/close logic for every button.
 
 ### UI/UX Preferences
