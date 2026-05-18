@@ -5,8 +5,9 @@
  *                      Yahoo fallback, Frankfurter forex EOD last resort).
  * action="history"   — historical OHLC candles via Twelve Data /time_series
  *                      with Yahoo fallback for indices/futures/bonds/DXY.
- *                      Optional include_session_summary flag prepends an
- *                      Asia/London/NY H+L + sweep-state block.
+ *                      Optional include_summary flag prepends a market summary
+ *                      block: previous-day H/L + Asia/London/NY session H/L
+ *                      + breach state for each.
  * action="indicator" — RSI/MACD/ATR/BBANDS/EMA/SMA/VWAP via Twelve Data
  *                      per-indicator endpoints. Free-tier coverage:
  *                      forex/US-stocks/crypto. VWAP is intraday-only.
@@ -25,7 +26,7 @@ import { executeSymbolSearch } from "./search.ts";
 export const getMarketDataTool: GeminiFunctionDeclaration = {
   name: "get_market_data",
   description:
-    `Universal market data. Pick ONE \`action\`: "quote" (current price + day stats), "history" (OHLC candles for past dates / today's shape; opt-in include_session_summary for sweep-state on Asia/London/NY levels), "indicator" (RSI/MACD/ATR/BBANDS/EMA/SMA/VWAP), "search" (resolve company name → ticker). See TIER 4 MARKET DATA REFERENCE in the system prompt for the symbol catalog, indicator defaults, asset-class coverage caveats, and chart rules. Tool dispatcher validates per-action required params server-side.`,
+    `Universal market data. Pick ONE \`action\`: "quote" (current price + day stats), "history" (OHLC candles for past dates / today's shape; opt-in include_summary for PDH/PDL + Asia/London/NY session H/L + breach state), "indicator" (RSI/MACD/ATR/BBANDS/EMA/SMA/VWAP), "search" (resolve company name → ticker). See TIER 4 MARKET DATA REFERENCE in the system prompt for the symbol catalog, indicator defaults, asset-class coverage caveats, and chart rules. Tool dispatcher validates per-action required params server-side.`,
   parameters: {
     type: "object",
     properties: {
@@ -95,10 +96,10 @@ export const getMarketDataTool: GeminiFunctionDeclaration = {
         description:
           'action="history". Skip OHLC dump, return chart only. Implies a chart. Use for "show me the chart" requests.',
       },
-      include_session_summary: {
+      include_summary: {
         type: "boolean",
         description:
-          'action="history". Prepend an Asian/London/NY-AM/NY-PM H+L + sweep-state block (server-computed). Set true for "did we sweep Asian high/low", "where did London top out", "Asia range", "is NY above London high", "liquidity grab" — the server returns each session\'s high/low and classifies whether subsequent price action SWEPT (pierced + closed back inside), BROKE (pierced + still beyond), or left it INTACT. Forex / indices / futures / crypto only; single-name stocks silently skip (RTH-only, no overnight tape). Ignored when chart_only=true (chart_only returns just the image, no text annotations). Default false.',
+          'action="history". Prepend a server-computed market summary block: (1) previous trading day H/L (PDH/PDL) with breach state today, (2) Asian/London/NY-AM/NY-PM session H/L + session-on-session sweep state. Set true for "did we sweep Asian high/low" / "where did London top out" / "is NY above PDH" / "Asia range" / "liquidity grab" / "yesterday\'s high" / "any sweep of PDL today" — all answerable from one call. Each level is classified as SWEPT (pierced + closed back inside), BROKEN (pierced + still beyond), or INTACT. Walks back through weekend / holiday gaps so Monday queries get Friday\'s PDH/PDL. Forex / indices / futures / crypto only; single-name stocks silently skip (RTH-only, no overnight tape). Ignored when chart_only=true (chart_only returns just the image, no text annotations). Default false.',
       },
     },
     required: ["action"],
@@ -148,7 +149,7 @@ export async function executeGetMarketData(
       end_date: typeof args.end_date === "string" ? args.end_date : undefined,
       chart_only: args.chart_only === true,
       include_chart: args.include_chart === true,
-      include_session_summary: args.include_session_summary === true,
+      include_summary: args.include_summary === true,
     });
   }
 

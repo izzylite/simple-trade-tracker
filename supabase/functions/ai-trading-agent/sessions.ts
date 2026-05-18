@@ -280,6 +280,49 @@ export function getNextSessionWindow(
   return { session: next, start, end, inProgress: false };
 }
 
+/**
+ * Reference timestamp for the most recent COMPLETED FX trading day relative
+ * to `ref`. An "FX trading day" runs Asia open → NY PM close (~24h). The
+ * returned ref lands in the post-NY-PM / pre-Asia gap of that previous
+ * trading day, so `getSessionWindow(..., result)` returns its full session
+ * set in completed form.
+ *
+ * Weekend handling: Saturday + Sunday have no FX tape, so a Monday-or-Sunday
+ * ref walks back to Friday. Holiday gaps (CME / ICE outages, Christmas etc.)
+ * are NOT handled here — the caller verifies the returned ref actually has
+ * candle data and walks back further if needed.
+ *
+ *   Mon 13:00 UTC → Fri 21:30 / 22:30 UTC (skip Sat + Sun)
+ *   Sun 14:00 UTC → Fri 21:30 / 22:30 UTC (skip Sat)
+ *   Tue 13:00 UTC → Mon 21:30 / 22:30 UTC
+ */
+export function previousTradingDayRef(ref: Date): Date {
+  const dayMs = 86_400_000;
+  let candidate = new Date(ref.getTime() - dayMs);
+
+  // Walk back through weekend gaps (FX is closed Fri 22:00 → Sun 22:00 UTC).
+  while (candidate.getUTCDay() === 0 || candidate.getUTCDay() === 6) {
+    candidate = new Date(candidate.getTime() - dayMs);
+  }
+
+  // Anchor on the gap between NY PM close (21/22 UTC) and Asia open
+  // (22/23 UTC) of the prev-day, so the returned ref reads every session
+  // as completed.
+  const isDST = isDaylightSavingTime(candidate, "EU");
+  const hourMs = isDST ? 21.5 * 3_600_000 : 22.5 * 3_600_000;
+  return new Date(
+    Date.UTC(
+      candidate.getUTCFullYear(),
+      candidate.getUTCMonth(),
+      candidate.getUTCDate(),
+      0,
+      0,
+      0,
+      0,
+    ) + hourMs,
+  );
+}
+
 // =============================================================================
 // Asset class gating — sessions are only meaningful for 24h markets.
 // =============================================================================

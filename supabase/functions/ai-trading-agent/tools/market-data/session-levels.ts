@@ -1,13 +1,15 @@
 /**
- * get_market_data action="history" `include_session_summary` worker.
+ * get_market_data action="history" `include_summary` worker.
  *
- * Computes Asian/London/NY-AM/NY-PM H+L + sweep state for the given `ref`,
- * pulled from a single 15-min Twelve Data fetch covering earliestStart → ref.
+ * Computes:
+ *   - Previous trading day H/L (PDH/PDL) + breach state via today's tape.
+ *     Walks back through weekend gaps for Monday queries so PDH anchors on
+ *     Friday's full trading day, not Sunday's empty tape.
+ *   - Asian/London/NY-AM/NY-PM H+L for the given `ref` + session-on-session
+ *     sweep state (each session scored against the immediately-following
+ *     session in the FX cycle).
  *
- * The breach for each completed session is scored against the IMMEDIATELY
- * FOLLOWING session in the FX cycle (Asia → London → NY AM → NY PM → next
- * Asia), clipped to ref. This cap prevents yesterday's NY PM from being
- * evaluated against the full 16+ hours that followed.
+ * Single 15-min Twelve Data fetch covers prev-trading-day-Asia-start → ref.
  */
 
 import {
@@ -21,6 +23,7 @@ import {
   getSessionWindow,
   pipSize,
   pipUnit,
+  previousTradingDayRef,
   SCOPED_SESSIONS,
   type ScopedSession,
   type SessionWindow,
@@ -224,6 +227,120 @@ function formatBreachLine(
 }
 
 /**
+ * Previous trading day's H/L (PDH/PDL) + which session set them. Derived
+ * from the 4 prev-day session slices already in our fetch — no extra API hit.
+ */
+interface PreviousDayLevels {
+  pdh: number;
+  pdl: number;
+  pdhSession: ScopedSession;
+  pdlSession: ScopedSession;
+  /** UTC calendar date of the prev trading day, derived from NY PM's start. */
+  date: string;
+  rangePrice: number;
+  rangeUnits: number;
+}
+
+function computePreviousDay(
+  symbol: string,
+  prevWindows: SessionWindow[],
+  candles: Candle[],
+): PreviousDayLevels | null {
+  let pdh = -Infinity;
+  let pdl = Infinity;
+  let pdhSession: ScopedSession | null = null;
+  let pdlSession: ScopedSession | null = null;
+
+  for (const w of prevWindows) {
+    const slice = sliceCandlesInWindow(candles, w.start, w.end);
+    if (slice.length === 0) continue;
+    for (const c of slice) {
+      if (c.high > pdh) {
+        pdh = c.high;
+        pdhSession = w.session;
+      }
+      if (c.low < pdl) {
+        pdl = c.low;
+        pdlSession = w.session;
+      }
+    }
+  }
+  if (pdhSession === null || pdlSession === null) return null;
+
+  // Prev trading-day date label: NY PM's start sits within that day's UTC
+  // calendar date — the natural "what calendar day is this" anchor.
+  const nyPm = prevWindows.find((w) => w.session === "NY PM");
+  const date = (nyPm ?? prevWindows[0]).start.toISOString().slice(0, 10);
+
+  const rangePrice = pdh - pdl;
+  return {
+    pdh,
+    pdl,
+    pdhSession,
+    pdlSession,
+    date,
+    rangePrice,
+    rangeUnits: rangePrice / pipSize(symbol),
+  };
+}
+
+function formatPreviousDayLine(
+  prev: PreviousDayLevels,
+  fmt: (n: number) => string,
+  unit: "p" | "pt",
+): string {
+  const range = unit === "p"
+    ? `${prev.rangeUnits.toFixed(1)}p`
+    : `${prev.rangeUnits.toFixed(2)}pt`;
+  return (
+    `Prev day (${prev.date}): ` +
+    `H ${fmt(prev.pdh)} @ ${prev.pdhSession}  ` +
+    `L ${fmt(prev.pdl)} @ ${prev.pdlSession}  ` +
+    `R ${range}`
+  );
+}
+
+/**
+ * Format a PDH/PDL breach line. Like formatBreachLine but with explicit
+ * "PDH"/"PDL" labels (instead of generic H/L) and an "intact" annotation
+ * showing how close today's tape has come to testing the level.
+ */
+function formatPdLevelBreach(
+  label: "PDH" | "PDL",
+  breach: LevelBreach,
+  todayExtreme: number | null,
+  fmt: (n: number) => string,
+  symbol: string,
+): string {
+  const arrow = label === "PDH" ? "▲" : "▼";
+  const unit = pipUnit(symbol);
+  const pip = pipSize(symbol);
+
+  if (breach.state === "intact") {
+    const noun = label === "PDH" ? "high" : "low";
+    const tail = todayExtreme !== null
+      ? ` (today's ${noun} so far ${fmt(todayExtreme)})`
+      : "";
+    return `  ${arrow} ${label} ${fmt(breach.price)}: intact${tail}`;
+  }
+  const extreme = breach.extremePast!;
+  const dist = Math.abs(extreme - breach.price) / pip;
+  const distStr = unit === "p" ? `${dist.toFixed(1)}p` : `${dist.toFixed(2)}pt`;
+  if (breach.state === "swept") {
+    return (
+      `  ${arrow} ${label} ${fmt(breach.price)}: SWEPT — pierced to ${
+        fmt(extreme)
+      } (${distStr} past), closed back inside at ${fmt(breach.lastClose!)}`
+    );
+  }
+  return (
+    `  ${arrow} ${label} ${fmt(breach.price)}: BROKEN — through to ${
+      fmt(extreme)
+    } (${distStr} past), last close ${fmt(breach.lastClose!)}`
+  );
+}
+
+/**
  * Scope for one completed session's breach evaluation: the candles inside
  * the immediately-following session's window (clipped to `ref`). Returns
  * null when the next session hasn't started yet, so callers skip the
@@ -289,18 +406,35 @@ export async function executeGetSessionLevels(args: {
     }
   }
 
-  // Compute each session's UTC window relative to `ref`. We need candle data
-  // covering [earliest session start] → `ref` so we can also evaluate the
-  // breach state of each session against the activity that followed.
+  // Compute each session's UTC window relative to `ref`.
   const windows = sessions.map((s) => getSessionWindow(s, ref));
-  const earliestStart = windows.reduce(
+  const todayEarliestStart = windows.reduce(
     (acc, w) => (w.start.getTime() < acc.getTime() ? w.start : acc),
     windows[0].start,
   );
 
+  // Also resolve the previous trading day so we can compute PDH/PDL. Walk-
+  // back for weekends lives in previousTradingDayRef; we always compute
+  // ALL 4 prev-day windows (PDH/PDL only need max/min over them).
+  const prevDayRef = previousTradingDayRef(ref);
+  const prevWindows = SCOPED_SESSIONS.map((s) => getSessionWindow(s, prevDayRef));
+  const prevEarliestStart = prevWindows.reduce(
+    (acc, w) => (w.start.getTime() < acc.getTime() ? w.start : acc),
+    prevWindows[0].start,
+  );
+
+  // Extend fetch to cover both today's session windows AND yesterday's. For
+  // Monday queries the prev-day start is Thursday's Asia open (~Thu 22 UTC),
+  // so a Mon-NY-AM ref pulls ~5 days of data. Session-levels does max/min
+  // math on slices — never dumps OHLC text — so it isn't bounded by the
+  // OHLC-cap on candle count.
+  const fetchStart = prevEarliestStart.getTime() < todayEarliestStart.getTime()
+    ? prevEarliestStart
+    : todayEarliestStart;
+
   const toApiDate = (d: Date) =>
     d.toISOString().replace("T", " ").slice(0, 19);
-  const start_date = toApiDate(earliestStart);
+  const start_date = toApiDate(fetchStart);
   const end_date = toApiDate(ref);
 
   // CRITICAL: pass timezone="UTC" so candle datetimes are UTC-stamped.
@@ -317,7 +451,7 @@ export async function executeGetSessionLevels(args: {
   let chronological = false;
 
   if (candles === null) {
-    const period1 = Math.floor(earliestStart.getTime() / 1000);
+    const period1 = Math.floor(fetchStart.getTime() / 1000);
     const period2 = Math.floor(ref.getTime() / 1000);
     candles = await fetchYahooTimeSeries(symbol, {
       interval: SESSION_LEVELS_INTERVAL,
@@ -372,9 +506,10 @@ export async function executeGetSessionLevels(args: {
     if (lvl) levelLines.push(formatLevelsLine(lvl, fmt, unit));
   }
 
-  // Breach scope = immediately-following session's window (clipped to ref).
-  // Cap exists so yesterday's NY PM doesn't get evaluated against the entire
-  // 16h that followed; it gets evaluated against last night's Asia only.
+  // Session-on-session breach: each completed session scored against the
+  // immediately-following session's window (clipped to ref). Cap exists so
+  // yesterday's NY PM doesn't get evaluated against the entire 16h that
+  // followed — only against last night's Asia.
   const breachBlocks: string[] = [];
   for (const w of windows) {
     const lvl = levelsBySession.get(w.session);
@@ -400,14 +535,78 @@ export async function executeGetSessionLevels(args: {
     );
   }
 
+  // PDH/PDL: compute from prev-day session slices already in our fetch.
+  // Breach scope = today's tape since today's Asia opened (or whichever
+  // session in `windows` started first if Asia wasn't requested).
+  const prevDay = computePreviousDay(symbol, prevWindows, ordered);
+  let prevDayLine = "";
+  let prevDayBreach = "";
+  if (prevDay) {
+    prevDayLine = formatPreviousDayLine(prevDay, fmt, unit);
+
+    const todayTape = sliceCandlesInWindow(ordered, todayEarliestStart, ref);
+    if (todayTape.length > 0) {
+      let todayHigh = -Infinity;
+      let todayLow = Infinity;
+      for (const c of todayTape) {
+        if (c.high > todayHigh) todayHigh = c.high;
+        if (c.low < todayLow) todayLow = c.low;
+      }
+      const pdhBreach = classifyBreach(
+        "high",
+        prevDay.pdh,
+        todayTape,
+        threshold,
+      );
+      const pdlBreach = classifyBreach(
+        "low",
+        prevDay.pdl,
+        todayTape,
+        threshold,
+      );
+      const tapeStartHm = todayEarliestStart.toISOString().slice(11, 16);
+      prevDayBreach = (
+        `vs Prev day levels (today's tape since ${tapeStartHm} UTC, ` +
+        `${todayTape.length} bars):\n` +
+        `${
+          formatPdLevelBreach(
+            "PDH",
+            pdhBreach,
+            pdhBreach.state === "intact" ? todayHigh : null,
+            fmt,
+            symbol,
+          )
+        }\n` +
+        `${
+          formatPdLevelBreach(
+            "PDL",
+            pdlBreach,
+            pdlBreach.state === "intact" ? todayLow : null,
+            fmt,
+            symbol,
+          )
+        }`
+      );
+    }
+  }
+
   const lastClose = ordered[ordered.length - 1].close;
   const refIso = ref.toISOString().slice(0, 16) + "Z";
   const dayLine = `Reference: ${refIso}  |  Last close: ${fmt(lastClose)}`;
   const cls = classifyForSessions(symbol);
   const classNote = cls === "single_stock" ? "" : ` (${cls})`;
 
+  // Order: PDH/PDL line first, then session lines; PDH/PDL breach first,
+  // then session-on-session breaches. Matches how traders prioritize.
+  const allLevelLines = prevDayLine
+    ? [prevDayLine, ...levelLines]
+    : levelLines;
+  const allBreachBlocks = prevDayBreach
+    ? [prevDayBreach, ...breachBlocks]
+    : breachBlocks;
+
   return (
     `${symbol}${classNote} — Session Levels\n${dayLine}\n` +
-    `${levelLines.join("\n")}\n\n${breachBlocks.join("\n\n")}`
+    `${allLevelLines.join("\n")}\n\n${allBreachBlocks.join("\n\n")}`
   ).trimEnd();
 }

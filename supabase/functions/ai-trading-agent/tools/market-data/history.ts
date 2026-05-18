@@ -1,6 +1,6 @@
 /**
  * get_market_data action="history" — OHLC candles + optional chart + optional
- * session summary block.
+ * market summary block (PDH/PDL + Asia/London/NY session H/L + breach state).
  *
  * Provider chain:
  *   1. Twelve Data /time_series (forex / US stocks / crypto)
@@ -117,7 +117,7 @@ export async function executeGetMarketHistory(args: {
   end_date?: string;
   chart_only?: boolean;
   include_chart?: boolean;
-  include_session_summary?: boolean;
+  include_summary?: boolean;
 }): Promise<string> {
   const symbol = (args.symbol || "").trim();
   if (!symbol) return "Symbol is required.";
@@ -239,14 +239,15 @@ export async function executeGetMarketHistory(args: {
     return `${symbol} ${interval} — ${ordered.length} candles\nChart: ${chartUrl}`;
   }
 
-  // Opt-in session summary block — costs one extra 15-min fetch *per UTC day*
-  // in the history window. Silently skipped for single stocks. Capped so a
-  // 30-day query doesn't fan out into 30 API calls.
+  // Opt-in market summary block — PDH/PDL + Asia/London/NY session H/L + breach
+  // state. Costs one extra 15-min fetch per UTC day in the history window plus
+  // a previous-trading-day extension. Silently skipped for single stocks.
+  // Capped so a 30-day query doesn't fan out into 30 API calls.
   let sessionBlock = "";
-  if (args.include_session_summary) {
+  if (args.include_summary) {
     if (!symbolSupportsSessionLevels(symbol)) {
       sessionBlock =
-        `(session summary skipped — "${symbol}" is RTH-only; ` +
+        `(market summary skipped — "${symbol}" is RTH-only; ` +
         `Asian/London sessions don't apply to single-name stocks)\n\n`;
     } else {
       sessionBlock = await buildMultiDaySessionBlock(symbol, {
