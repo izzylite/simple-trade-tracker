@@ -98,7 +98,7 @@ export const getMarketDataTool: GeminiFunctionDeclaration = {
       include_session_summary: {
         type: "boolean",
         description:
-          'action="history". Prepend an Asian/London/NY-AM/NY-PM H+L + sweep-state block (server-computed). Set true for "did we sweep Asian high/low", "where did London top out", "Asia range", "is NY above London high", "liquidity grab" — the server returns each session\'s high/low and classifies whether subsequent price action SWEPT (pierced + closed back inside), BROKE (pierced + still beyond), or left it INTACT. Forex / indices / futures / crypto only; single-name stocks silently skip (RTH-only, no overnight tape). Default false.',
+          'action="history". Prepend an Asian/London/NY-AM/NY-PM H+L + sweep-state block (server-computed). Set true for "did we sweep Asian high/low", "where did London top out", "Asia range", "is NY above London high", "liquidity grab" — the server returns each session\'s high/low and classifies whether subsequent price action SWEPT (pierced + closed back inside), BROKE (pierced + still beyond), or left it INTACT. Forex / indices / futures / crypto only; single-name stocks silently skip (RTH-only, no overnight tape). Ignored when chart_only=true (chart_only returns just the image, no text annotations). Default false.',
       },
     },
     required: ["action"],
@@ -160,7 +160,7 @@ export async function executeGetMarketData(
     if (!indicator) {
       return (
         `get_market_data action="indicator" requires \`indicator\`. ` +
-        `Valid: RSI, MACD, ATR, BBANDS.`
+        `Valid: RSI, MACD, ATR, BBANDS, EMA, SMA, VWAP.`
       );
     }
     const interval = typeof args.interval === "string"
