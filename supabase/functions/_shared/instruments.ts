@@ -1,5 +1,9 @@
-// Shared instrument & currency catalog used by run-orion-task (writes
-// briefing metadata) and ai-trading-agent (validates Orion's filters).
+// Instrument & currency catalog. Currently only ai-trading-agent imports
+// from here (the get_recent_orion_briefings tool uses these to validate
+// Orion's `instrument` filter and resolve aliases). run-orion-task writes
+// the matching symbol/currency metadata into `orion_task_results.metadata`,
+// derived independently via run-orion-task/symbols.ts — both code paths
+// must stay aligned on the same Yahoo tickers and currency codes.
 //
 // IMPORTANT: keep INSTRUMENT_CATALOG in lockstep with YAHOO_SYMBOL_CATALOG in
 // src/components/orionTasks/CreateTaskDialog.tsx — that's the user-facing
