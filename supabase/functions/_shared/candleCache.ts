@@ -12,8 +12,11 @@
  *   - On read we look up every requested day, concatenate cached + any
  *     freshly-fetched candles, then slice to the user's exact window.
  *
- * Today's day is never cached (its bars are still forming). Any request
- * whose end is >= today UTC bypasses the cache entirely.
+ * Today's day is never WRITTEN to cache (its bars are still forming).
+ * But a mixed-range request (e.g. "last week through now") still caches
+ * its past UTC days — only today's bucket is held back from the upsert.
+ * Today's portion is fetched in the same provider call that covers the
+ * missing past days, so the mixed case costs one API credit, not two.
  */
 
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -70,6 +73,21 @@ function startOfUtcDayMs(ms: number): number {
 function toIsoDate(ms: number): string {
   // "YYYY-MM-DD" — Postgres DATE-compatible.
   return new Date(ms).toISOString().slice(0, 10);
+}
+
+/** UTC ms → "YYYY-MM-DD HH:mm:ss" (the format Twelve Data's start_date /
+ *  end_date params expect). */
+function msToApiDate(ms: number): string {
+  const d = new Date(ms);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return (
+    d.getUTCFullYear() + "-" +
+    pad(d.getUTCMonth() + 1) + "-" +
+    pad(d.getUTCDate()) + " " +
+    pad(d.getUTCHours()) + ":" +
+    pad(d.getUTCMinutes()) + ":" +
+    pad(d.getUTCSeconds())
+  );
 }
 
 /** Parse a Candle's datetime → UTC ms. Handles both daily-format
@@ -239,24 +257,61 @@ export async function getMarketHistory(
   supabase: SupabaseClient | undefined,
   req: CandleHistoryRequest,
 ): Promise<CandleHistoryResult | null> {
-  // No-cache paths: outputsize mode, malformed dates, no supabase client.
+  // Daily outputsize → past-window conversion.
+  //
+  // Orion frequently asks for "last week candles" as outputsize=7 at
+  // interval=1day, which would naively bypass the cache (no explicit
+  // start/end → sliding-from-now window). For daily-and-coarser intervals
+  // the "last N bars from now" semantics map cleanly to "last N closed
+  // UTC days" — today's daily bar is still forming, so dropping it AND
+  // anchoring to closed UTC dates gives the same answer the user wants
+  // AND populates the per-day cache. Sub-daily intervals keep the bypass
+  // because their forming-bar problem is genuine and intraday bars don't
+  // fit the per-UTC-day storage model anyway.
+  if (
+    !req.startDate &&
+    !req.endDate &&
+    req.outputsize !== undefined &&
+    req.outputsize > 0 &&
+    req.interval === "1day"
+  ) {
+    const todayUtcMs = startOfUtcDayMs(Date.now());
+    const endMs = todayUtcMs - 1;                       // last ms of yesterday
+    const startMs = todayUtcMs - req.outputsize * MS_PER_DAY;
+    req = {
+      ...req,
+      startDate: msToApiDate(startMs),
+      endDate: msToApiDate(endMs),
+      outputsize: undefined,
+    };
+  }
+
+  // No-cache paths: outputsize mode (anything not converted above),
+  // malformed dates, no supabase client.
   if (!req.startDate || !req.endDate || !supabase) {
     return fetchFromProviders(req);
   }
   const startMs = parseDateMs(req.startDate);
-  const endMs = parseDateMs(req.endDate);
-  if (Number.isNaN(startMs) || Number.isNaN(endMs) || endMs < startMs) {
+  const rawEndMs = parseDateMs(req.endDate);
+  if (Number.isNaN(startMs) || Number.isNaN(rawEndMs)) {
     return fetchFromProviders(req);
   }
 
-  // Anything reaching today (or future) UTC bypasses cache — today's
-  // bars are still forming and the "full day" doesn't exist yet.
-  const todayUtcMs = startOfUtcDayMs(Date.now());
-  if (endMs >= todayUtcMs) {
+  // Clamp request end to "now" so future-spanning requests can't drag
+  // the fetch window into territory the provider has no data for. After
+  // clamping, a fully-future range collapses to endMs < startMs → drop
+  // to the provider's own error handling.
+  const nowMs = Date.now();
+  const endMs = Math.min(rawEndMs, nowMs);
+  if (endMs < startMs) {
     return fetchFromProviders(req);
   }
 
-  // Past-only path. Enumerate UTC days in [startMs, endMs].
+  const todayUtcMs = startOfUtcDayMs(nowMs);
+  const todayDateStr = toIsoDate(todayUtcMs);
+
+  // Enumerate UTC days in [startMs, clamped endMs]. Today appears in
+  // the list iff the request reaches at least today's midnight UTC.
   const startDayMs = startOfUtcDayMs(startMs);
   const endDayMs = startOfUtcDayMs(endMs);
   const dayList: string[] = [];
@@ -264,55 +319,77 @@ export async function getMarketHistory(
     dayList.push(toIsoDate(d));
   }
 
-  const cachedRows = await readCacheRows(supabase, req, dayList);
+  // Cache only knows about past UTC days. Strictly < today, never ==.
+  const pastDaysInRange = dayList.filter((d) => d < todayDateStr);
+  const todayInRange = dayList.includes(todayDateStr);
+
+  const cachedRows = pastDaysInRange.length > 0
+    ? await readCacheRows(supabase, req, pastDaysInRange)
+    : [];
   const cachedByDay = new Map(cachedRows.map((r) => [r.cache_date, r]));
-  const missingDays = dayList.filter((d) => !cachedByDay.has(d));
+  const pastMissingDays = pastDaysInRange.filter((d) => !cachedByDay.has(d));
+
+  // We need a provider call when any past day is missing OR when the
+  // request touches today (today is never satisfied from cache).
+  const needsFetch = pastMissingDays.length > 0 || todayInRange;
 
   let fetched: CandleHistoryResult | null = null;
   const fetchedByDay = new Map<string, Candle[]>();
-  if (missingDays.length > 0) {
-    // Fetch the bounding range of all missing days, padded to full UTC
-    // days. Disjoint missing days re-fetch the cached days in the middle
-    // (data gets discarded, no DB write for those) — costs one extra API
-    // credit only in fragmented cases. Single-day and contiguous misses
-    // pay nothing extra.
-    const earliest = missingDays[0];
-    const latest = missingDays[missingDays.length - 1];
-    const fetchStartIso = `${earliest} 00:00:00`;
-    const fetchEndIso = `${latest} 23:59:59`;
+  if (needsFetch) {
+    // Fetch window:
+    //   start = earliest missing past day at 00:00 UTC, OR — if only
+    //           today's portion is needed — the user's start clamped
+    //           to today's midnight (no point asking for yesterday's
+    //           bars when we already have them cached).
+    //   end   = clamped endMs when today is in range (use the user's
+    //           actual end, don't fake 23:59:59 since today isn't done);
+    //           otherwise latest missing past day at 23:59:59 to expand
+    //           the response into a full-day cache row.
+    const fetchStartMs = pastMissingDays.length > 0
+      ? parseDateMs(`${pastMissingDays[0]} 00:00:00`)
+      : Math.max(startMs, todayUtcMs);
+    const fetchEndMs = todayInRange
+      ? endMs
+      : parseDateMs(
+        `${pastMissingDays[pastMissingDays.length - 1]} 23:59:59`,
+      );
+
     fetched = await fetchFromProviders({
       ...req,
-      startDate: fetchStartIso,
-      endDate: fetchEndIso,
+      startDate: msToApiDate(fetchStartMs),
+      endDate: msToApiDate(fetchEndMs),
     });
     if (fetched === null) return null;
 
-    // Bucket fetched bars by their UTC date — used both for the write
-    // payload below AND for the assembly loop. Days with no bars (market
-    // closed) won't appear in the bucket; we still write a `[]` row for
-    // every missing day so the next query gets an instant empty hit.
+    // Bucket the response by UTC date — used both for the write payload
+    // below AND for the assembly loop. Days with no bars (market closed)
+    // simply won't appear in the bucket; we still write a `[]` row for
+    // every past missing day so the next query gets an instant empty
+    // hit. Today's bucket is NEVER written — its bars are still forming.
     for (const c of fetched.candles) {
       const d = candleUtcDate(c);
       const list = fetchedByDay.get(d);
       if (list) list.push(c);
       else fetchedByDay.set(d, [c]);
     }
-    const nowIso = new Date().toISOString();
-    const writePayload = missingDays.map((d) => ({
-      symbol: req.symbol.toUpperCase(),
-      interval: req.interval,
-      timezone: req.timezone ?? "",
-      cache_date: d,
-      candles: fetchedByDay.get(d) ?? [],
-      source: fetched!.source,
-      fetched_at: nowIso,
-      accessed_at: nowIso,
-    }));
-    await writeCacheRows(supabase, writePayload);
+    if (pastMissingDays.length > 0) {
+      const nowIso = new Date().toISOString();
+      const writePayload = pastMissingDays.map((d) => ({
+        symbol: req.symbol.toUpperCase(),
+        interval: req.interval,
+        timezone: req.timezone ?? "",
+        cache_date: d,
+        candles: fetchedByDay.get(d) ?? [],
+        source: fetched!.source,
+        fetched_at: nowIso,
+        accessed_at: nowIso,
+      }));
+      await writeCacheRows(supabase, writePayload);
+    }
   }
 
-  // Assemble: walk day list in order, take each day's bars from cache
-  // when present, else from the fresh fetch's per-day bucket.
+  // Assemble: walk dayList in order; cached row wins for past days,
+  // fetched bucket fills in everything else (past misses + today).
   const allCandles: Candle[] = [];
   let pickedSource: CandleSource | null = null;
   for (const day of dayList) {
@@ -327,7 +404,7 @@ export async function getMarketHistory(
     }
   }
 
-  // Bump LRU for the cached days that contributed. Skipped on full miss.
+  // Bump LRU for cached past days that contributed.
   if (cachedRows.length > 0) {
     bumpAccessedAt(supabase, req, cachedRows.map((r) => r.cache_date));
   }
@@ -335,7 +412,7 @@ export async function getMarketHistory(
   return {
     candles: sliceCandles(allCandles, startMs, endMs),
     // Fall back to twelvedata if we had no data anywhere (empty result
-    // from an all-Saturday window). Caller treats this as cosmetic.
+    // from an all-closed window). Caller treats source as cosmetic.
     source: pickedSource ?? "twelvedata",
   };
 }
