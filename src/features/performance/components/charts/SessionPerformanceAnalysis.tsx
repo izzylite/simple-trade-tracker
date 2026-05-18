@@ -5,7 +5,7 @@ import {
 } from '@mui/material';
 import { Assessment as PerformanceIcon } from '@mui/icons-material';
 import { isSameMonth } from 'date-fns';
-import { Trade } from 'types/dualWrite';
+import { Trade } from 'features/calendar/types/dualWrite';
 import { formatValue } from 'utils/formatters';
 import { SESSION_COLORS } from 'utils/sessionTimeUtils';
 

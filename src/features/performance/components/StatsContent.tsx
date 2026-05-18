@@ -1,14 +1,14 @@
 import React from 'react';
 import { Box, Stack, Typography } from '@mui/material';
-import AccountStats from './AccountStats';
-import MonthlyStats from './MonthlyStats';
-import PerformanceCharts from './PerformanceCharts';
-import { Trade, Calendar } from 'types/dualWrite';
-import { DynamicRiskSettings } from 'utils/dynamicRiskUtils';
+import AccountStats from 'features/performance/components/AccountStats';
+import MonthlyStats from 'features/performance/components/MonthlyStats';
+import PerformanceCharts from 'features/performance/components/PerformanceCharts';
+import { Trade, Calendar } from 'features/calendar/types/dualWrite';
+import { DynamicRiskSettings } from 'features/calendar/utils/dynamicRiskUtils';
 import { EconomicCalendarFilterSettings } from 'features/events/hooks/useEconomicCalendarFilters';
 import { scrollbarStyles } from 'styles/scrollbarStyles';
 import { useTheme } from '@mui/material/styles';
-import { useOverviewPanelState } from '../contexts/OverviewPanelStateContext';
+import { useOverviewPanelState } from 'features/performance/contexts/OverviewPanelStateContext';
 
 export interface StatsContentProps {
   // Account stats

@@ -11,12 +11,12 @@ import {
   Typography
 } from '@mui/material';
 import { createTheme } from '@mui/material/styles';
-import { createAppTheme } from '../theme';
-import { TradeCalendar } from './TradeCalendarPage';
-import AppHeader from '../components/common/AppHeader';
-import { getSharedTradesWithCalendar } from '../services/sharingService';
-import { Trade, Calendar } from '../types/dualWrite';
-import { logger } from '../utils/logger';
+import { createAppTheme } from 'theme';
+import { TradeCalendar } from 'pages/TradeCalendarPage';
+import AppHeader from 'components/common/AppHeader';
+import { getSharedTradesWithCalendar } from 'features/calendar/services/sharingService';
+import { Trade, Calendar } from 'features/calendar/types/dualWrite';
+import { logger } from 'utils/logger';
 
 interface SharedCalendarData {
   calendar: Calendar;

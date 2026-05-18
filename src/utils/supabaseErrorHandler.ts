@@ -9,7 +9,7 @@
  *
  * @example
  * ```typescript
- * import { parseSupabaseError, handleSupabaseError } from './supabaseErrorHandler';
+ * import { parseSupabaseError, handleSupabaseError } from 'utils/supabaseErrorHandler';
  *
  * try {
  *   const result = await supabase.from('trades').select('*');
@@ -30,7 +30,7 @@
  * @see {@link docs/SERVICE_LAYER_DOCUMENTATION.md} for service integration
  */
 
-import { logger } from './logger';
+import { logger } from 'utils/logger';
 
 /**
  * Supabase error categories

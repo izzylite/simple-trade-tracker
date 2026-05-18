@@ -3,8 +3,8 @@
  * Handles user authentication using Supabase Auth with Google OAuth
  */
 
-import { supabase } from '../config/supabase';
-import { logger } from '../utils/logger'; 
+import { supabase } from 'config/supabase';
+import { logger } from 'utils/logger'; 
 import type { User, Session, AuthError } from '@supabase/supabase-js';
 
 export interface SupabaseUser {
@@ -166,7 +166,7 @@ class SupabaseAuthService {
             logger.info('New user detected, consuming pending invite code');
             try {
               // Import inviteService dynamically to avoid circular dependency
-              const { inviteService } = await import('./inviteService');
+              const { inviteService } = await import('features/calendar/services/inviteService');
               await inviteService.consumeInviteCode(pendingInviteCode);
               localStorage.removeItem('pendingInviteCode');
               logger.info('Invite code consumed successfully for new user');

@@ -16,9 +16,9 @@ import {
   useTheme,
   alpha
 } from '@mui/material';
-import BaseDialog from './BaseDialog';
-import { loggerControls, LogLevel } from '../../utils/logger';
-import { scrollbarStyles } from '../../styles/scrollbarStyles';
+import BaseDialog from 'components/common/BaseDialog';
+import { loggerControls, LogLevel } from 'utils/logger';
+import { scrollbarStyles } from 'styles/scrollbarStyles';
 
 interface DebugPanelProps {
   open: boolean;
@@ -69,7 +69,7 @@ const DebugPanel: React.FC<DebugPanelProps> = ({ open, onClose }) => {
   };
 
   const testLogs = () => {
-    const { debug, info, warn, error } = require('../../utils/logger');
+    const { debug, info, warn, error } = require('utils/logger');
     debug('This is a debug message');
     info('This is an info message');
     warn('This is a warning message');

@@ -29,12 +29,12 @@ import {
   ErrorOutline as ErrorOutlineIcon,
   CheckCircleOutline as CheckCircleOutlineIcon,
 } from '@mui/icons-material';
-import { useAuth } from '../../contexts/SupabaseAuthContext';
-import { inviteService } from '../../services/inviteService';
-import { logger } from '../../utils/logger';
-import { dialogProps } from '../../styles/dialogStyles';
-import { scrollbarStyles } from '../../styles/scrollbarStyles';
-import { useDialogTokens } from '../../styles/dialogTokens';
+import { useAuth } from 'contexts/SupabaseAuthContext';
+import { inviteService } from 'features/calendar/services/inviteService';
+import { logger } from 'utils/logger';
+import { dialogProps } from 'styles/dialogStyles';
+import { scrollbarStyles } from 'styles/scrollbarStyles';
+import { useDialogTokens } from 'styles/dialogTokens';
 
 interface LoginDialogProps {
   open: boolean;

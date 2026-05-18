@@ -9,9 +9,9 @@ import {
   CssBaseline
 } from '@mui/material';
 import { createTheme } from '@mui/material/styles';
-import { createAppTheme } from '../theme';
-import SharedTradeView from '../components/sharing/SharedTradeView';
-import AppHeader from '../components/common/AppHeader';
+import { createAppTheme } from 'theme';
+import SharedTradeView from 'features/calendar/components/sharing/SharedTradeView';
+import AppHeader from 'components/common/AppHeader';
 
 const SharedTradePage: React.FC = () => {
   const { shareId } = useParams<{ shareId: string }>();

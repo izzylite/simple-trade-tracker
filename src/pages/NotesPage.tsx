@@ -10,13 +10,13 @@ import {
 import { Visibility as VisibilityIcon } from '@mui/icons-material';
 
 import { Note } from 'features/notes/types/note';
-import { Calendar } from '../types/calendar';
-import { useAuthState } from '../contexts/AuthStateContext';
+import { Calendar } from 'features/calendar/types/calendar';
+import { useAuthState } from 'contexts/AuthStateContext';
 import { useUserPinnedEvents } from 'features/events/contexts/UserPinnedEventsContext';
-import { useSelectedCalendar } from '../contexts/SelectedCalendarContext';
+import { useSelectedCalendar } from 'features/calendar/contexts/SelectedCalendarContext';
 import { useNotes } from 'features/notes/hooks/useNotes';
-import { CalendarRepository } from '../services/repository/repositories/CalendarRepository';
-import { logger } from '../utils/logger';
+import { CalendarRepository } from 'services/repository/repositories/CalendarRepository';
+import { logger } from 'utils/logger';
 import * as notesService from 'features/notes/services/notesService';
 
 import NoteListPanel, {

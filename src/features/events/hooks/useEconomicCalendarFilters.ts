@@ -5,8 +5,8 @@
  */
 
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { Currency, ImpactLevel } from '../types/economicCalendar';
-import { Calendar } from 'types/calendar';
+import { Currency, ImpactLevel } from 'features/events/types/economicCalendar';
+import { Calendar } from 'features/calendar/types/calendar';
 import { logger } from 'utils/logger';
 
 export type ViewType = 'day' | 'week' | 'month';

@@ -4,7 +4,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-import { logger } from '../utils/logger';
+import { logger } from 'utils/logger';
 
 // Environment variables validation
 const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;

@@ -22,7 +22,7 @@ import {
   ExpandMore as ExpandMoreIcon,
   Language as LanguageIcon
 } from '@mui/icons-material';
-import { Citation } from '../../types/aiChat';
+import { Citation } from 'features/orion/types/aiChat';
 
 interface CitationsSectionProps {
   citations: Citation[];

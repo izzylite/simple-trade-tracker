@@ -1,8 +1,8 @@
 import React from 'react';
 import { HelpOutline as HelpOutlineIcon } from '@mui/icons-material';
 
-import UnifiedDrawer from '../common/UnifiedDrawer';
-import FAQContent from './FAQContent';
+import UnifiedDrawer from 'components/common/UnifiedDrawer';
+import FAQContent from 'components/faq/FAQContent';
 
 interface FAQDrawerProps {
   open: boolean;

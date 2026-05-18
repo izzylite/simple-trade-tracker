@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import { debounce } from '../utils/debounce';
+import { debounce } from 'components/common/RichTextEditor/utils/debounce';
 import { 
   getSelectionRect, 
   hasValidSelection, 
@@ -7,8 +7,8 @@ import {
   getToolbarDimensions, 
   isClickOutside,
   type Position 
-} from '../utils/selectionUtils';
-import { error } from '../../../../utils/logger';
+} from 'components/common/RichTextEditor/utils/selectionUtils';
+import { error } from 'utils/logger';
 
 interface UseFloatingToolbarProps {
   disabled: boolean;

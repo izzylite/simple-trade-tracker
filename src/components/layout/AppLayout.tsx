@@ -17,26 +17,26 @@ import {
   CalendarToday as CalendarIcon,
 } from '@mui/icons-material';
 import { Outlet } from 'react-router-dom';
-import SideNav, { SIDE_NAV_WIDTH } from './SideNav';
-import CalendarLockedOverlay from '../calendars/CalendarLockedOverlay';
-import { useCalendarsListPanel } from '../../contexts/CalendarsListPanelContext';
+import SideNav, { SIDE_NAV_WIDTH } from 'components/layout/SideNav';
+import CalendarLockedOverlay from 'features/calendar/components/calendars/CalendarLockedOverlay';
+import { useCalendarsListPanel } from 'features/calendar/contexts/CalendarsListPanelContext';
 // CalendarsListDrawer wraps CalendarsListContent for <lg viewports. Lazy
 // keeps both out of the main bundle until the drawer actually opens.
-import { useSelectedCalendar } from '../../contexts/SelectedCalendarContext';
-import SidePanel from '../sidePanel/SidePanel';
-import { useSidePanel } from '../../contexts/SidePanelContext';
-import { appRenderView } from '../sidePanel/appRenderView';
-import UnifiedDrawer from '../common/UnifiedDrawer';
+import { useSelectedCalendar } from 'features/calendar/contexts/SelectedCalendarContext';
+import SidePanel from 'components/sidePanel/SidePanel';
+import { useSidePanel } from 'contexts/SidePanelContext';
+import { appRenderView } from 'components/sidePanel/appRenderView';
+import UnifiedDrawer from 'components/common/UnifiedDrawer';
 // Eagerly imported so it can serve as the Suspense fallback for the lazy
 // CalendarsListContent chunk below — must be ready before that chunk arrives.
-import CalendarsPanelShimmer from '../sidePanel/content/CalendarsPanelShimmer';
+import CalendarsPanelShimmer from 'features/calendar/components/sidePanel/CalendarsPanelShimmer';
 
 // CalendarsListContent: pulls list-management UI + dialogs. Only rendered
 // when the inline panel opens (lg+) — keep it out of main bundle.
 const CalendarsListContent = lazy(
-  () => import('../sidePanel/content/CalendarsListContent')
+  () => import('features/calendar/components/sidePanel/CalendarsListContent')
 );
-const CalendarsListDrawer = lazy(() => import('../calendars/CalendarsListDrawer'));
+const CalendarsListDrawer = lazy(() => import('features/calendar/components/calendars/CalendarsListDrawer'));
 
 // Matches the local SidePanel width (sidePanel/SidePanel.tsx) so both global
 // panels feel consistent and align with the <lg drawer standard (450px).

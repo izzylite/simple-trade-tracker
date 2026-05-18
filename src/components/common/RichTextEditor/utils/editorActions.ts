@@ -1,5 +1,5 @@
 import { EditorState, RichUtils, Modifier } from 'draft-js';
-import { error } from '../../../../utils/logger';
+import { error } from 'utils/logger';
 
 /**
  * Toggle inline styles (bold, italic, underline) with focus preservation

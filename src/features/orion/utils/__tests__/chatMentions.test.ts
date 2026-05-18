@@ -1,4 +1,4 @@
-import { detectMentionTrigger } from '../chatMentions';
+import { detectMentionTrigger } from 'features/orion/utils/chatMentions';
 
 describe('detectMentionTrigger', () => {
   it('returns null when text has no trigger char', () => {
@@ -74,7 +74,7 @@ describe('detectMentionTrigger', () => {
   });
 });
 
-import { expandMentionsForSend, MessageSegment } from '../chatMentions';
+import { expandMentionsForSend, MessageSegment } from 'features/orion/utils/chatMentions';
 import { SLASH_COMMAND_TAG, STRATEGY_TAG } from 'features/notes/types/note';
 
 const notesMap = new Map<string, { title: string; content: string; tags: string[] }>([
@@ -150,7 +150,7 @@ describe('expandMentionsForSend', () => {
   });
 });
 
-import { stripReferencedBlocks } from '../chatMentions';
+import { stripReferencedBlocks } from 'features/orion/utils/chatMentions';
 
 describe('stripReferencedBlocks', () => {
   it('returns plain text unchanged', () => {
@@ -213,7 +213,7 @@ describe('expandMentionsForSend (length cap)', () => {
 });
 
 import { ContentState, EditorState, Modifier, SelectionState } from 'draft-js';
-import { extractSegments } from '../chatMentions';
+import { extractSegments } from 'features/orion/utils/chatMentions';
 
 function makeStateWithNoteMention(prefix: string, noteTitle: string, noteId: string, suffix: string) {
   let content = ContentState.createFromText(prefix);

@@ -11,8 +11,8 @@ import {
   Currency,
   EconomicEvent,
   ImpactLevel,
-} from '../types/economicCalendar';
-import { PinnedEvent } from 'types/dualWrite';
+} from 'features/events/types/economicCalendar';
+import { PinnedEvent } from 'features/calendar/types/dualWrite';
 import { useEventCountdownTime } from 'hooks/useCurrentTime';
 
 interface AllPinnedEventsContentProps {

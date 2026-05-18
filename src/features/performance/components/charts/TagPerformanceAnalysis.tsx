@@ -13,10 +13,10 @@ import {
 import { Box, Paper, Typography, useTheme, Button, alpha, Tooltip as MuiTooltip, CircularProgress } from '@mui/material';
 import { InfoOutlined } from '@mui/icons-material';
 import { format, isSameMonth } from 'date-fns';
-import { Trade } from 'types/dualWrite';
+import { Trade } from 'features/calendar/types/dualWrite';
 import { formatValue } from 'utils/formatters';
-import TagFilterDialog from 'components/TagFilterDialog';
-import { performanceCalculationService } from '../../services/performanceCalculationService';
+import TagFilterDialog from 'features/calendar/components/TagFilterDialog';
+import { performanceCalculationService } from 'features/performance/services/performanceCalculationService';
 
 interface TagPerformanceAnalysisProps { 
   trades: Trade[];

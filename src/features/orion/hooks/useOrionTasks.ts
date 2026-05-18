@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from 'config/supabase';
-import { orionTaskService } from '../services/orionTaskService';
+import { orionTaskService } from 'features/orion/services/orionTaskService';
 import { logger } from 'utils/logger';
 import { playTaskNotificationSound } from 'utils/notificationSound';
 import type {
@@ -9,7 +9,7 @@ import type {
   OrionTaskResult,
   TaskType,
   TaskConfig,
-} from '../types/orionTask';
+} from 'features/orion/types/orionTask';
 
 const PAGE_SIZE = 20;
 

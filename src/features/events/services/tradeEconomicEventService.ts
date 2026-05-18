@@ -1,11 +1,11 @@
 import { format, parseISO, isSameDay } from 'date-fns';
-import { economicCalendarService } from './economicCalendarService';
-import { TradeEconomicEvent } from 'types/dualWrite';
-import { EconomicEvent, ImpactLevel, Currency } from '../types/economicCalendar';
+import { economicCalendarService } from 'features/events/services/economicCalendarService';
+import { TradeEconomicEvent } from 'features/calendar/types/dualWrite';
+import { EconomicEvent, ImpactLevel, Currency } from 'features/events/types/economicCalendar';
 import { logger } from 'utils/logger';
-import { DEFAULT_FILTER_SETTINGS as DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS } from '../hooks/useEconomicCalendarFilters';
+import { DEFAULT_FILTER_SETTINGS as DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS } from 'features/events/hooks/useEconomicCalendarFilters';
 import { getSessionTimeRange, type TradingSession } from 'utils/sessionTimeUtils';
-import { cleanEventNameForPinning } from '../utils/eventNameUtils';
+import { cleanEventNameForPinning } from 'features/events/utils/eventNameUtils';
  
 
 // Currency pair mapping interface

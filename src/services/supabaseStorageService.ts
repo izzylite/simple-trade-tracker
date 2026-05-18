@@ -3,9 +3,9 @@
  * Handles file upload, download, and deletion operations using Supabase Storage
  */
 
-import { supabase } from '../config/supabase';
-import { logger } from '../utils/logger';
-import { TradeImage } from '../components/trades/TradeForm';
+import { supabase } from 'config/supabase';
+import { logger } from 'utils/logger';
+import { TradeImage } from 'features/calendar/components/trades/TradeForm';
 
 // Module-level cache for public URLs to reduce Supabase client calls
 const publicUrlCache = new Map<string, string>();

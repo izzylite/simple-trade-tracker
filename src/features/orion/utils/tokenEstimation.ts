@@ -9,7 +9,7 @@
  * Images: Gemini bills 258 tokens per low-res image tile; we use that as a
  * conservative per-image cost since users typically attach screenshots.
  */
-import type { ChatMessage } from '../types/aiChat';
+import type { ChatMessage } from 'features/orion/types/aiChat';
 
 const CHARS_PER_TOKEN = 4;
 const TOKENS_PER_IMAGE = 258;

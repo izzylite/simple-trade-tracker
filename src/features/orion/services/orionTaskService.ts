@@ -6,7 +6,7 @@ import type {
   TaskType,
   TaskStatus,
   TaskConfig,
-} from '../types/orionTask';
+} from 'features/orion/types/orionTask';
 
 export const orionTaskService = {
   async getTasks(userId: string, calendarId?: string): Promise<OrionTask[]> {

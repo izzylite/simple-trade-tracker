@@ -1,8 +1,8 @@
 // src/components/sidePanel/SidePanel.tsx
 import React from 'react';
 import { Box, alpha, useTheme } from '@mui/material';
-import { useSidePanel, SidePanelView } from '../../contexts/SidePanelContext';
-import SidePanelHeader from './SidePanelHeader';
+import { useSidePanel, SidePanelView } from 'contexts/SidePanelContext';
+import SidePanelHeader from 'components/sidePanel/SidePanelHeader';
 
 interface ViewConfig {
   title: string;

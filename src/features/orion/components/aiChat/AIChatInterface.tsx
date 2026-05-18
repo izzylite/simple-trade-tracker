@@ -5,7 +5,7 @@
  */
 
 import React, { useRef, useEffect, useCallback, useMemo, useState, forwardRef, useImperativeHandle } from 'react';
-import OrionIcon from './OrionIcon';
+import OrionIcon from 'features/orion/components/aiChat/OrionIcon';
 import {
   Box,
   IconButton,
@@ -23,8 +23,8 @@ import {
   KeyboardArrowDown as ScrollDownIcon
 } from '@mui/icons-material';
 import { useDialogTokens } from 'styles/dialogTokens';
-import ChatMessage from './ChatMessage';
-import ReminderSeparator from './ReminderSeparator';
+import ChatMessage from 'features/orion/components/aiChat/ChatMessage';
+import ReminderSeparator from 'features/orion/components/aiChat/ReminderSeparator';
 import CrossSessionReminderCard from 'components/notifications/CrossSessionReminderCard';
 import CrossSessionReminderBatchCard from 'components/notifications/CrossSessionReminderBatchCard';
 import { useNotificationsOptional } from 'contexts/NotificationsContext';
@@ -32,11 +32,11 @@ import {
   AppNotification,
   isReminderFiredPayload,
 } from 'types/notification';
-import AIChatMentionInput from './AIChatMentionInput';
-import type { AIChatMentionInputHandle, SystemCommand } from './AIChatMentionInput';
-import { ChatMessage as ChatMessageType, AttachedImage } from '../../types/aiChat';
-import { Trade } from 'types/trade';
-import { Calendar } from 'types/calendar';
+import AIChatMentionInput from 'features/orion/components/aiChat/AIChatMentionInput';
+import type { AIChatMentionInputHandle, SystemCommand } from 'features/orion/components/aiChat/AIChatMentionInput';
+import { ChatMessage as ChatMessageType, AttachedImage } from 'features/orion/types/aiChat';
+import { Trade } from 'features/calendar/types/trade';
+import { Calendar } from 'features/calendar/types/calendar';
 import { EconomicEvent } from 'features/events/types/economicCalendar';
 import { Note } from 'features/notes/types/note';
 import { scrollbarStyles } from 'styles/scrollbarStyles';
@@ -44,7 +44,7 @@ import { Z_INDEX } from 'styles/zIndex';
 import { logger } from 'utils/logger';
 import { compressImageToDataUrl } from 'utils/fileValidation';
 import * as notesService from 'features/notes/services/notesService';
-import { expandMentionsForSend, stripReferencedBlocks } from '../../utils/chatMentions';
+import { expandMentionsForSend, stripReferencedBlocks } from 'features/orion/utils/chatMentions';
 
 // Image limit for AI agent requests (must match backend MAX_IMAGES_PER_REQUEST)
 const MAX_IMAGES = 4;

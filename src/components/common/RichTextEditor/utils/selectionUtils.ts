@@ -2,7 +2,7 @@
  * Utility functions for handling text selection and positioning
  */
 
-import { error } from "../../../../utils/logger";
+import { error } from "utils/logger";
 
 export interface Position {
   top: number;

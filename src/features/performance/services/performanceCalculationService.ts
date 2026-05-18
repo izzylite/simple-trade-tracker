@@ -1,5 +1,5 @@
 import { logger } from 'utils/logger';
-import { Trade } from 'types/dualWrite';
+import { Trade } from 'features/calendar/types/dualWrite';
 
 export interface PerformanceCalculationResult {
   winLossStats: any;

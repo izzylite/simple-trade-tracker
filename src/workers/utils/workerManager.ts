@@ -8,7 +8,7 @@
  */
 
 import type { WorkerRequest, WorkerResponse } from 'features/performance/workers/types/workerMessages';
-import { logger } from '../../utils/logger';
+import { logger } from 'utils/logger';
 
 interface PendingRequest {
   resolve: (value: unknown) => void;

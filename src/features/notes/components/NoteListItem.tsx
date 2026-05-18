@@ -26,9 +26,9 @@ import {
   Person as ConvertToUserIcon,
 } from '@mui/icons-material';
 import { convertFromRaw } from 'draft-js';
-import { Note } from '../types/note';
-import { Calendar } from 'types/calendar';
-import { getTagDisplayLabel } from './NoteEditorDialogTags';
+import { Note } from 'features/notes/types/note';
+import { Calendar } from 'features/calendar/types/calendar';
+import { getTagDisplayLabel } from 'features/notes/components/NoteEditorDialogTags';
 import ConfirmationDialog from 'components/common/ConfirmationDialog';
 
 interface NoteListItemProps {

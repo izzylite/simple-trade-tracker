@@ -9,12 +9,12 @@ import {
   useTheme,
   useMediaQuery,
 } from '@mui/material';
-import { useNotifications } from '../../contexts/NotificationsContext';
-import { AppNotification } from '../../types/notification';
-import { scrollbarStyles } from '../../styles/scrollbarStyles';
-import NotificationRow from './NotificationRow';
-import NotificationsEmpty from './NotificationsEmpty';
-import ClearAllConfirmDialog from './ClearAllConfirmDialog';
+import { useNotifications } from 'contexts/NotificationsContext';
+import { AppNotification } from 'types/notification';
+import { scrollbarStyles } from 'styles/scrollbarStyles';
+import NotificationRow from 'components/notifications/NotificationRow';
+import NotificationsEmpty from 'components/notifications/NotificationsEmpty';
+import ClearAllConfirmDialog from 'components/notifications/ClearAllConfirmDialog';
 
 interface NotificationsPopoverProps {
   open: boolean;

@@ -19,15 +19,15 @@ import {
   PhotoLibrary as LibraryIcon,
   ArrowForward as ArrowIcon,
 } from '@mui/icons-material';
-import { uploadFile, getPublicUrl, optimizeImage } from '../../../../services/supabaseStorageService';
-import { supabase } from '../../../../config/supabase';
-import { UnsplashImagePicker } from '../../../heroImage';
-import { UnsplashImage } from '../../../../services/unsplashCache';
-import { FILE_SIZE_LIMITS, formatFileSize } from '../../../../utils/fileValidation';
-import { scrollbarStyles } from '../../../../styles/scrollbarStyles';
-import { Z_INDEX } from '../../../../styles/zIndex';
-import { dialogProps } from '../../../../styles/dialogStyles';
-import { useDialogTokens, MONO_FONT } from '../../../../styles/dialogTokens';
+import { uploadFile, getPublicUrl, optimizeImage } from 'services/supabaseStorageService';
+import { supabase } from 'config/supabase';
+import { UnsplashImagePicker } from 'components/heroImage';
+import { UnsplashImage } from 'services/unsplashCache';
+import { FILE_SIZE_LIMITS, formatFileSize } from 'utils/fileValidation';
+import { scrollbarStyles } from 'styles/scrollbarStyles';
+import { Z_INDEX } from 'styles/zIndex';
+import { dialogProps } from 'styles/dialogStyles';
+import { useDialogTokens, MONO_FONT } from 'styles/dialogTokens';
 import { v4 as uuidv4 } from 'uuid';
 
 interface ImageUploadDialogProps {

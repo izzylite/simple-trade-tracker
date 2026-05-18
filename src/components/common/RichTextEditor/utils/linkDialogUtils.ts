@@ -1,6 +1,6 @@
 import React from 'react';
 import { EditorState } from 'draft-js';
-import { getCurrentLink, trimSelection } from './linkUtils';
+import { getCurrentLink, trimSelection } from 'components/common/RichTextEditor/utils/linkUtils';
 
 /**
  * Handle link dialog opening and populate fields

@@ -17,9 +17,9 @@ import {
   InputAdornment,
 } from '@mui/material';
 import { Visibility, VisibilityOff, CheckCircle, Error as ErrorIcon } from '@mui/icons-material';
-import { useSupabaseAuth } from '../contexts/SupabaseAuthContext';
-import { logger } from '../utils/logger';
-import { supabase } from '../config/supabase';
+import { useSupabaseAuth } from 'contexts/SupabaseAuthContext';
+import { logger } from 'utils/logger';
+import { supabase } from 'config/supabase';
 
 const PasswordResetPage: React.FC = () => {
   const navigate = useNavigate();

@@ -6,8 +6,8 @@ import { getTagChipStyles, formatTagForDisplay, isGroupedTag, getTagGroup } from
 import { scrollbarStyles } from 'styles/scrollbarStyles';
 import { Z_INDEX } from 'styles/zIndex';
 import { useDialogTokens } from 'styles/dialogTokens';
-import type { MessageSegment } from '../../utils/chatMentions';
-import { detectMentionTrigger, extractSegments } from '../../utils/chatMentions';
+import type { MessageSegment } from 'features/orion/utils/chatMentions';
+import { detectMentionTrigger, extractSegments } from 'features/orion/utils/chatMentions';
 import { SLASH_COMMAND_TAG } from 'features/notes/types/note';
 
 export interface AIChatMentionInputHandle {

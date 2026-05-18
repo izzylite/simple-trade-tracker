@@ -3,12 +3,12 @@
  * Handles all database operations for economic calendar events
  */
 
-import { supabase } from '../../../config/supabase';
+import { supabase } from 'config/supabase';
 
-import { AbstractBaseRepository, RepositoryResult } from './BaseRepository';
+import { AbstractBaseRepository, RepositoryResult } from 'services/repository/repositories/BaseRepository';
 import { EconomicEvent, Currency, ImpactLevel } from 'features/events/types/economicCalendar';
-import { handleSupabaseError } from '../../../utils/supabaseErrorHandler';
-import { logger } from '../../../utils/logger';
+import { handleSupabaseError } from 'utils/supabaseErrorHandler';
+import { logger } from 'utils/logger';
 
 /**
  * Pagination options for fetching events

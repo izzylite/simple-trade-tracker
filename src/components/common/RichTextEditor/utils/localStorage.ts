@@ -2,7 +2,7 @@
  * Safe localStorage operations with error handling
  */
 
-import { warn } from '../../../../utils/logger';
+import { warn } from 'utils/logger';
 
 export interface ColorItem {
   label: string;

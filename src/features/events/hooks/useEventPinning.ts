@@ -8,9 +8,9 @@
  */
 
 import { useCallback } from 'react';
-import { Calendar } from 'types/calendar';
-import { EconomicEvent } from '../types/economicCalendar';
-import { useUserPinnedEvents } from '../contexts/UserPinnedEventsContext';
+import { Calendar } from 'features/calendar/types/calendar';
+import { EconomicEvent } from 'features/events/types/economicCalendar';
+import { useUserPinnedEvents } from 'features/events/contexts/UserPinnedEventsContext';
 
 interface UseEventPinningOptions {
   /** @deprecated Pinning is user-level — this prop is ignored. */

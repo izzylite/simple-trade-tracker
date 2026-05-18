@@ -19,40 +19,40 @@ import {
   ArrowForward as ArrowIcon,
 } from '@mui/icons-material';
 import { alpha } from '@mui/material/styles';
-import { dialogProps } from '../../styles/dialogStyles';
-import { scrollbarStyles } from '../../styles/scrollbarStyles';
-import { useDialogTokens } from '../../styles/dialogTokens';
+import { dialogProps } from 'styles/dialogStyles';
+import { scrollbarStyles } from 'styles/scrollbarStyles';
+import { useDialogTokens } from 'styles/dialogTokens';
 import { Editor, EditorState, Modifier, convertToRaw } from 'draft-js';
 import 'draft-js/dist/Draft.css';
 
 // Import utilities, constants, and hooks
-import { createEditorStateFromValue } from './RichTextEditor/utils/draftUtils';
-import { TEXT_COLORS, BACKGROUND_COLORS } from './RichTextEditor/constants/colors';
-import { useFloatingToolbar } from './RichTextEditor/hooks/useFloatingToolbar';
+import { createEditorStateFromValue } from 'components/common/RichTextEditor/utils/draftUtils';
+import { TEXT_COLORS, BACKGROUND_COLORS } from 'components/common/RichTextEditor/constants/colors';
+import { useFloatingToolbar } from 'components/common/RichTextEditor/hooks/useFloatingToolbar';
 
 // Import new utility functions
 import {
   getCurrentLink,
   createLinkEntity,
   removeLinkEntity
-} from './RichTextEditor/utils/linkUtils';
+} from 'components/common/RichTextEditor/utils/linkUtils';
 import {
   insertTagEntity,
   getAtMentionTrigger,
   replaceAtMentionWithTag
-} from './RichTextEditor/utils/tagEntityUtils';
+} from 'components/common/RichTextEditor/utils/tagEntityUtils';
 import {
   getNoteTrigger,
   replaceNoteTriggerWithLink,
-} from './RichTextEditor/utils/noteEntityUtils';
+} from 'components/common/RichTextEditor/utils/noteEntityUtils';
 import {
   getEventTrigger,
   replaceEventTriggerWithLink,
-} from './RichTextEditor/utils/eventEntityUtils';
+} from 'components/common/RichTextEditor/utils/eventEntityUtils';
 import {
   insertTradeLinkEntity,
   type TradeChipData,
-} from './RichTextEditor/utils/tradeEntityUtils';
+} from 'components/common/RichTextEditor/utils/tradeEntityUtils';
 import type {
   ImpactLevel,
   Currency,
@@ -66,23 +66,23 @@ import {
   clearFormatting,
   blockStyleFn,
   restoreScrollAndFocus
-} from './RichTextEditor/utils/editorActions';
-import { keyBindingFn, handleKeyCommand } from './RichTextEditor/utils/keyboardUtils';
-import { createStyleMap } from './RichTextEditor/utils/styleUtils';
+} from 'components/common/RichTextEditor/utils/editorActions';
+import { keyBindingFn, handleKeyCommand } from 'components/common/RichTextEditor/utils/keyboardUtils';
+import { createStyleMap } from 'components/common/RichTextEditor/utils/styleUtils';
 import {
   handleLinkDialogOpen,
   handleLinkDialogClose
-} from './RichTextEditor/utils/linkDialogUtils';
-import { createDecorator } from './RichTextEditor/utils/decoratorUtils';
+} from 'components/common/RichTextEditor/utils/linkDialogUtils';
+import { createDecorator } from 'components/common/RichTextEditor/utils/decoratorUtils';
 import {
   handleCalloutReturn,
   toggleCalloutBlock,
   type CalloutVariant,
-} from './RichTextEditor/utils/calloutUtils';
-import { insertImage, removeImageBlock } from './RichTextEditor/utils/imageUtils';
-import ImageBlock from './RichTextEditor/components/ImageBlock';
-import ImageUploadDialog from './RichTextEditor/components/ImageUploadDialog';
-import EditorToolbar from './RichTextEditor/components/EditorToolbar';
+} from 'components/common/RichTextEditor/utils/calloutUtils';
+import { insertImage, removeImageBlock } from 'components/common/RichTextEditor/utils/imageUtils';
+import ImageBlock from 'components/common/RichTextEditor/components/ImageBlock';
+import ImageUploadDialog from 'components/common/RichTextEditor/components/ImageUploadDialog';
+import EditorToolbar from 'components/common/RichTextEditor/components/EditorToolbar';
 
 export interface RichTextEditorProps {
   value?: string;

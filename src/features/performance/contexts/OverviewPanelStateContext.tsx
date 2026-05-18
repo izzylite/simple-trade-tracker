@@ -25,7 +25,7 @@ import React, {
   useMemo,
   useState,
 } from 'react';
-import type { TimePeriod } from '../components/PerformanceCharts';
+import type { TimePeriod } from 'features/performance/components/PerformanceCharts';
 
 interface OverviewPanelStateContextValue {
   timePeriod: TimePeriod;

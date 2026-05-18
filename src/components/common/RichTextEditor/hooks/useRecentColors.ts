@@ -4,8 +4,8 @@ import {
   saveRecentColors, 
   updateRecentColors,
   type ColorItem 
-} from '../utils/localStorage';
-import { STORAGE_KEYS } from '../constants/colors';
+} from 'components/common/RichTextEditor/utils/localStorage';
+import { STORAGE_KEYS } from 'components/common/RichTextEditor/constants/colors';
 
 /**
  * Custom hook to manage recently used colors

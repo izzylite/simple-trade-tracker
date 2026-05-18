@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Box } from '@mui/material';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useAuth } from '../contexts/SupabaseAuthContext';
-import LoginDialog from '../components/auth/LoginDialog';
-import LandingNav from '../components/landing/LandingNav';
-import LandingHero from '../components/landing/LandingHero';
-import LandingBento from '../components/landing/LandingBento';
-import LandingFeatureRows from '../components/landing/LandingFeatureRows';
-import { useSpotlight } from '../components/landing/landingHooks';
+import { useAuth } from 'contexts/SupabaseAuthContext';
+import LoginDialog from 'components/auth/LoginDialog';
+import LandingNav from 'components/landing/LandingNav';
+import LandingHero from 'components/landing/LandingHero';
+import LandingBento from 'components/landing/LandingBento';
+import LandingFeatureRows from 'components/landing/LandingFeatureRows';
+import { useSpotlight } from 'components/landing/landingHooks';
 
 const LandingPage: React.FC = () => {
     const navigate = useNavigate();

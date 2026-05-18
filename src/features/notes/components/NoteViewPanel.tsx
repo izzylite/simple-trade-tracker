@@ -21,15 +21,15 @@ import {
 } from '@mui/icons-material';
 import { formatDistanceToNow, format } from 'date-fns';
 
-import { Note } from '../types/note';
-import { Trade } from 'types/dualWrite';
-import { getTagDisplayLabel } from './NoteEditorDialogTags';
+import { Note } from 'features/notes/types/note';
+import { Trade } from 'features/calendar/types/dualWrite';
+import { getTagDisplayLabel } from 'features/notes/components/NoteEditorDialogTags';
 import RichTextViewer from 'components/common/RichTextEditor/RichTextViewer';
 import { scrollbarStyles } from 'styles/scrollbarStyles';
-import { getSharedTrade } from 'services/sharingService';
+import { getSharedTrade } from 'features/calendar/services/sharingService';
 import { logger } from 'utils/logger';
-import TradeGalleryDialog from 'components/TradeGalleryDialog';
-import ImageZoomDialog, { ImageZoomProp } from 'components/ImageZoomDialog';
+import TradeGalleryDialog from 'features/calendar/components/TradeGalleryDialog';
+import ImageZoomDialog, { ImageZoomProp } from 'features/calendar/components/ImageZoomDialog';
 
 interface NoteViewPanelProps {
   note: Note | null;

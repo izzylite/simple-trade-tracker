@@ -10,12 +10,12 @@ import {
   alpha,
 } from '@mui/material';
 import { Close as CloseIcon, Image as ImageIcon } from '@mui/icons-material';
-import UnsplashImagePicker from './UnsplashImagePicker';
-import { UnsplashImage } from '../../services/unsplashCache';
-import { scrollbarStyles } from '../../styles/scrollbarStyles';
-import { dialogProps } from '../../styles/dialogStyles';
-import { Z_INDEX } from '../../styles/zIndex';
-import { useDialogTokens } from '../../styles/dialogTokens';
+import UnsplashImagePicker from 'components/heroImage/UnsplashImagePicker';
+import { UnsplashImage } from 'services/unsplashCache';
+import { scrollbarStyles } from 'styles/scrollbarStyles';
+import { dialogProps } from 'styles/dialogStyles';
+import { Z_INDEX } from 'styles/zIndex';
+import { useDialogTokens } from 'styles/dialogTokens';
 
 export interface ImageAttribution {
   id: string;

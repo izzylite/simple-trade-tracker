@@ -37,18 +37,18 @@ import {
 } from '@mui/icons-material';
 import { EditorState, DraftInlineStyle } from 'draft-js';
 
-import { TEXT_COLORS, BACKGROUND_COLORS } from '../constants/colors';
-import { HEADING_OPTIONS } from '../constants/headings';
-import { useRecentColors } from '../hooks/useRecentColors';
-import { handleToolbarInteraction } from '../utils/styleUtils';
-import { getCurrentBlockType } from '../utils/editorActions';
-import { getCurrentLink } from '../utils/linkUtils';
+import { TEXT_COLORS, BACKGROUND_COLORS } from 'components/common/RichTextEditor/constants/colors';
+import { HEADING_OPTIONS } from 'components/common/RichTextEditor/constants/headings';
+import { useRecentColors } from 'components/common/RichTextEditor/hooks/useRecentColors';
+import { handleToolbarInteraction } from 'components/common/RichTextEditor/utils/styleUtils';
+import { getCurrentBlockType } from 'components/common/RichTextEditor/utils/editorActions';
+import { getCurrentLink } from 'components/common/RichTextEditor/utils/linkUtils';
 import {
   CALLOUT_VARIANTS,
   CALLOUT_LABELS,
   isCalloutBlockType,
   type CalloutVariant,
-} from '../utils/calloutUtils';
+} from 'components/common/RichTextEditor/utils/calloutUtils';
 
 const Z_INDEX = 2000;
 

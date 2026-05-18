@@ -15,9 +15,9 @@ import {
 } from '@mui/material';
 import { Close as CloseIcon } from '@mui/icons-material';
 
-import { Note, DayAbbreviation } from '../types/note';
+import { Note, DayAbbreviation } from 'features/notes/types/note';
 import type { Currency, ImpactLevel } from 'features/events/types/economicCalendar';
-import NoteEditorBody, { NoteEditorBodyHandle } from './NoteEditorBody';
+import NoteEditorBody, { NoteEditorBodyHandle } from 'features/notes/components/NoteEditorBody';
 
 // Re-export tag config for downstream consumers
 export {
@@ -25,8 +25,8 @@ export {
   getTagDisplayLabel,
   getTagSubtitle,
   getTagIcon,
-} from './NoteEditorDialogTags';
-export type { TagInfo } from './NoteEditorDialogTags';
+} from 'features/notes/components/NoteEditorDialogTags';
+export type { TagInfo } from 'features/notes/components/NoteEditorDialogTags';
 
 interface NoteEditorDialogProps {
   open: boolean;

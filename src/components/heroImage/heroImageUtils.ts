@@ -1,5 +1,5 @@
-import { Calendar } from '../../types/calendar';
-import { logger } from '../../utils/logger';
+import { Calendar } from 'features/calendar/types/calendar';
+import { logger } from 'utils/logger';
 
 /**
  * Updates the hero image URL for a calendar

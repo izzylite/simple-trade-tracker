@@ -13,10 +13,10 @@ import {
 import { Box, Paper, Typography, useTheme, Button, alpha, Tooltip as MuiTooltip, CircularProgress } from '@mui/material';
 import { InfoOutlined } from '@mui/icons-material';
 
-import { Trade } from 'types/dualWrite';
+import { Trade } from 'features/calendar/types/dualWrite';
 import { formatCurrency } from 'utils/formatters';
-import TagFilterDialog from 'components/TagFilterDialog';
-import { getTagDayOfWeekChartData } from '../../utils/chartDataUtils';
+import TagFilterDialog from 'features/calendar/components/TagFilterDialog';
+import { getTagDayOfWeekChartData } from 'features/performance/utils/chartDataUtils';
 
 interface TagDayOfWeekAnalysisProps { 
   trades: Trade[];

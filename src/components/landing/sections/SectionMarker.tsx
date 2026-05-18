@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Typography } from '@mui/material';
-import { ACCENT, HAIR, TNUM } from '../landingTokens';
+import { ACCENT, HAIR, TNUM } from 'components/landing/landingTokens';
 
 interface Props {
     label: string;

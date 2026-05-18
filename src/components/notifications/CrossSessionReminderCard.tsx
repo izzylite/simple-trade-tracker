@@ -2,9 +2,9 @@ import React, { useCallback } from 'react';
 import { Box, IconButton, Typography, alpha, useTheme } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { useNavigate } from 'react-router-dom';
-import { AppNotification, isReminderFiredPayload } from '../../types/notification';
-import { useNotifications } from '../../contexts/NotificationsContext';
-import { formatNotificationTime } from './timeAgo';
+import { AppNotification, isReminderFiredPayload } from 'types/notification';
+import { useNotifications } from 'contexts/NotificationsContext';
+import { formatNotificationTime } from 'components/notifications/timeAgo';
 
 interface CrossSessionReminderCardProps {
   notification: AppNotification;

@@ -4,60 +4,60 @@ import { ThemeProvider, CssBaseline, Box, Snackbar, Alert } from '@mui/material'
 import { createTheme } from '@mui/material/styles';
 import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import { Calendar } from './types/dualWrite';
-import { AuthProvider } from './contexts/SupabaseAuthContext';
-import { useAuthState, AuthStateProvider } from './contexts/AuthStateContext';
-import { TradeSyncProvider } from './contexts/TradeSyncContext';
-import { NotificationsProvider } from './contexts/NotificationsContext';
+import { Calendar } from 'features/calendar/types/dualWrite';
+import { AuthProvider } from 'contexts/SupabaseAuthContext';
+import { useAuthState, AuthStateProvider } from 'contexts/AuthStateContext';
+import { TradeSyncProvider } from 'features/calendar/contexts/TradeSyncContext';
+import { NotificationsProvider } from 'contexts/NotificationsContext';
 import { UserPinnedEventsProvider } from 'features/events/contexts/UserPinnedEventsContext';
-import ProtectedRoute from './components/auth/ProtectedRoute';
-import * as calendarService from './services/calendarService';
-import { createAppTheme } from './theme';
-import TradeLoadingIndicator from './components/TradeLoadingIndicator';
-import { useCalendars } from './hooks/useCalendars';
-import { logger } from './utils/logger';
+import ProtectedRoute from 'components/auth/ProtectedRoute';
+import * as calendarService from 'features/calendar/services/calendarService';
+import { createAppTheme } from 'theme';
+import TradeLoadingIndicator from 'features/calendar/components/TradeLoadingIndicator';
+import { useCalendars } from 'features/calendar/hooks/useCalendars';
+import { logger } from 'utils/logger';
 
 
-import AppLoadingProgress from './components/AppLoadingProgress';
+import AppLoadingProgress from 'components/AppLoadingProgress';
 
 
-import AppHeader from './components/common/AppHeader';
-import AppLayout from './components/layout/AppLayout';
-import type { CalendarFormData } from './components/CalendarFormDialog';
-import CalendarManagementDialogs from './components/calendars/CalendarManagementDialogs';
-import { useCalendarPanelActions } from './hooks/useCalendarPanelActions';
-import { SelectedCalendarProvider, useSelectedCalendar } from './contexts/SelectedCalendarContext';
+import AppHeader from 'components/common/AppHeader';
+import AppLayout from 'components/layout/AppLayout';
+import type { CalendarFormData } from 'features/calendar/components/CalendarFormDialog';
+import CalendarManagementDialogs from 'features/calendar/components/calendars/CalendarManagementDialogs';
+import { useCalendarPanelActions } from 'features/calendar/hooks/useCalendarPanelActions';
+import { SelectedCalendarProvider, useSelectedCalendar } from 'features/calendar/contexts/SelectedCalendarContext';
 import {
   CalendarsListPanelProvider,
   CalendarsListPanelActions,
-} from './contexts/CalendarsListPanelContext';
-import { SidePanelProvider, useSidePanel } from './contexts/SidePanelContext';
-import type { SidePanelView } from './contexts/SidePanelContext';
-import { TradeUIProvider } from './contexts/TradeUIContext';
-import { TradesProvider } from './contexts/TradesContext';
+} from 'features/calendar/contexts/CalendarsListPanelContext';
+import { SidePanelProvider, useSidePanel } from 'contexts/SidePanelContext';
+import type { SidePanelView } from 'contexts/SidePanelContext';
+import { TradeUIProvider } from 'features/calendar/contexts/TradeUIContext';
+import { TradesProvider } from 'features/calendar/contexts/TradesContext';
 import { AIChatProvider } from 'features/orion/contexts/AIChatContext';
-import { TradeViewerProvider } from './contexts/TradeViewerContext';
-import { TradeOperationsProvider } from './contexts/TradeOperationsContext';
+import { TradeViewerProvider } from 'features/calendar/contexts/TradeViewerContext';
+import { TradeOperationsProvider } from 'features/calendar/contexts/TradeOperationsContext';
 import { EventNotificationsProvider } from 'features/events/contexts/EventNotificationsContext';
-import { PanelMutexProvider, usePanelMutexSlot } from './contexts/PanelMutexContext';
-import { useCalendarsListPanel } from './contexts/CalendarsListPanelContext';
+import { PanelMutexProvider, usePanelMutexSlot } from 'contexts/PanelMutexContext';
+import { useCalendarsListPanel } from 'features/calendar/contexts/CalendarsListPanelContext';
 
 // Lazy load page components from pages directory
-const LandingPage = lazy(() => import('./pages/LandingPage'));
-const AboutPage = lazy(() => import('./pages/AboutPage'));
-const TradeCalendar = lazy(() => import('./pages/TradeCalendarPage').then(module => ({ default: module.TradeCalendar })));
-const SharedTradePage = lazy(() => import('./pages/SharedTradePage'));
-const SharedCalendarPage = lazy(() => import('./pages/SharedCalendarPage'));
+const LandingPage = lazy(() => import('pages/LandingPage'));
+const AboutPage = lazy(() => import('pages/AboutPage'));
+const TradeCalendar = lazy(() => import('pages/TradeCalendarPage').then(module => ({ default: module.TradeCalendar })));
+const SharedTradePage = lazy(() => import('pages/SharedTradePage'));
+const SharedCalendarPage = lazy(() => import('pages/SharedCalendarPage'));
 const SharedNotePage = lazy(
-  () => import('./pages/SharedNotePage')
+  () => import('pages/SharedNotePage')
 );
-const AuthCallback = lazy(() => import('./pages/AuthCallbackPage'));
-const PasswordResetPage = lazy(() => import('./pages/PasswordResetPage'));
-const CommunityPage = lazy(() => import('./pages/CommunityPage'));
-const PerformancePage = lazy(() => import('./pages/PerformancePage'));
-const NotesPage = lazy(() => import('./pages/NotesPage'));
-const EconomicEventsPage = lazy(() => import('./pages/EconomicEventsPage'));
-// const SupabaseAuthTest = lazy(() => import('./components/auth/SupabaseAuthTest')); // Commented out - for testing only
+const AuthCallback = lazy(() => import('pages/AuthCallbackPage'));
+const PasswordResetPage = lazy(() => import('pages/PasswordResetPage'));
+const CommunityPage = lazy(() => import('pages/CommunityPage'));
+const PerformancePage = lazy(() => import('pages/PerformancePage'));
+const NotesPage = lazy(() => import('pages/NotesPage'));
+const EconomicEventsPage = lazy(() => import('pages/EconomicEventsPage'));
+// const SupabaseAuthTest = lazy(() => import('components/auth/SupabaseAuthTest')); // Commented out - for testing only
 
 // Global app-level surfaces — lazy so AI chat (markdown/draft-js), trade
 // viewer dialogs, etc. don't block first paint. Wrapped in <Suspense
@@ -65,12 +65,12 @@ const EconomicEventsPage = lazy(() => import('./pages/EconomicEventsPage'));
 // invisible until the user interacts (no UI to skeleton).
 // CalendarFormDialog only mounts when user clicks Create. Eager import drags
 // MUI Dialog + form components into main bundle.
-const CalendarFormDialog = lazy(() => import('./components/CalendarFormDialog'));
+const CalendarFormDialog = lazy(() => import('features/calendar/components/CalendarFormDialog'));
 
 const GlobalAIChat = lazy(() => import('features/orion/components/aiChat/GlobalAIChat'));
 const GlobalAIChatFab = lazy(() => import('features/orion/components/aiChat/GlobalAIChatFab'));
-const GlobalTradeViewer = lazy(() => import('./components/trades/GlobalTradeViewer'));
-const GlobalTradeOperations = lazy(() => import('./components/trades/GlobalTradeOperations'));
+const GlobalTradeViewer = lazy(() => import('features/calendar/components/trades/GlobalTradeViewer'));
+const GlobalTradeOperations = lazy(() => import('features/calendar/components/trades/GlobalTradeOperations'));
 const GlobalEventNotifications = lazy(() => import('features/events/components/notifications/GlobalEventNotifications'));
 
 

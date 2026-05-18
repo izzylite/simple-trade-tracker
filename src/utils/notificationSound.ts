@@ -3,7 +3,7 @@
  * Plays a notification sound when called
  */
 
-import { logger } from './logger';
+import { logger } from 'utils/logger';
 
 // Fallback sound generation using Web Audio API
 const generateFallbackSound = (): Promise<void> => {

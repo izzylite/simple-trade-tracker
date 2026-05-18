@@ -1,5 +1,5 @@
 import { EditorState, ContentState, convertFromRaw, convertToRaw } from 'draft-js';
-import { warn, error } from '../../../../utils/logger';
+import { warn, error } from 'utils/logger';
 
 /**
  * Safely create an EditorState from a value string

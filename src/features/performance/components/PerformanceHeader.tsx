@@ -1,9 +1,9 @@
 import React from 'react';
 import { Box, Typography, useTheme } from '@mui/material';
 import { format } from 'date-fns';
-import PerfPill, { PerfPillOption } from './PerfPill';
-import { TimePeriod } from './PerformanceCharts';
-import PeriodPicker from './PeriodPicker';
+import PerfPill, { PerfPillOption } from 'features/performance/components/PerfPill';
+import { TimePeriod } from 'features/performance/components/PerformanceCharts';
+import PeriodPicker from 'features/performance/components/PeriodPicker';
 
 const PILL_OPTIONS: ReadonlyArray<PerfPillOption<TimePeriod>> = [
   { label: 'Month', value: 'month' },

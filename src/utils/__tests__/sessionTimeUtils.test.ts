@@ -1,4 +1,4 @@
-import { deriveTradeDateForSession, getSessionForTimestamp } from '../sessionTimeUtils';
+import { deriveTradeDateForSession, getSessionForTimestamp } from 'utils/sessionTimeUtils';
 
 describe('getSessionForTimestamp', () => {
   // DST active (July) — EU DST: Asia 22-07, London 07-12, NY AM 12-17, NY PM 17-21

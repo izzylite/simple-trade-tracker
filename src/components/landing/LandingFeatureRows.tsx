@@ -1,8 +1,8 @@
 import React from 'react';
 import { Box, Button, Container, Stack, Typography } from '@mui/material';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
-import { useReveal, revealSx } from './landingHooks';
-import SectionMarker from './sections/SectionMarker';
+import { useReveal, revealSx } from 'components/landing/landingHooks';
+import SectionMarker from 'components/landing/sections/SectionMarker';
 
 const ACCENT = '#7c3aed';
 const HAIR = '1px solid rgba(255,255,255,0.08)';

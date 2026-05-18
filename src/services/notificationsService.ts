@@ -1,6 +1,6 @@
-import { supabase } from '../config/supabase';
-import { AppNotification } from '../types/notification';
-import { logger } from '../utils/logger';
+import { supabase } from 'config/supabase';
+import { AppNotification } from 'types/notification';
+import { logger } from 'utils/logger';
 
 const NOTIFICATIONS_PAGE_SIZE = 100;
 

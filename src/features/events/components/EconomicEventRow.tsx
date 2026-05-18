@@ -32,7 +32,7 @@ import {
 
 import { format, isAfter, parseISO } from 'date-fns';
 
-import { EconomicEvent, ImpactLevel } from '../types/economicCalendar';
+import { EconomicEvent, ImpactLevel } from 'features/events/types/economicCalendar';
 
 // ─── Time helpers ─────────────────────────────────────────────────────────────
 // Live in this file (not EconomicEventsView) so importing this row

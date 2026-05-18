@@ -25,8 +25,8 @@ import {
   Note as NoteIcon
 } from '@mui/icons-material';
 import DOMPurify from 'dompurify';
-import ImageZoomDialog, { ImageZoomProp } from 'components/ImageZoomDialog';
-import type { Trade } from 'types/trade';
+import ImageZoomDialog, { ImageZoomProp } from 'features/calendar/components/ImageZoomDialog';
+import type { Trade } from 'features/calendar/types/trade';
 import type { EconomicEvent } from 'features/events/types/economicCalendar';
 import type { Note } from 'features/notes/types/note';
 import { getTagChipStyles } from 'utils/tagColors';

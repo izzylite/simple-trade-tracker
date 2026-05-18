@@ -8,7 +8,7 @@ import {
   useTheme,
   alpha,
 } from '@mui/material';
-import FAQDrawer from '../components/faq/FAQDrawer';
+import FAQDrawer from 'components/faq/FAQDrawer';
 
 // Bumped manually per release. CRA does not expose npm_package_version, and
 // importing package.json from outside `src` falls outside the tsconfig include.

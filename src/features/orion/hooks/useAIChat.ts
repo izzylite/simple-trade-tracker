@@ -10,17 +10,17 @@ import {
   ChatMessage as ChatMessageType,
   AIConversation,
   AttachedImage
-} from '../types/aiChat';
-import { Calendar } from 'types/calendar';
-import { Trade } from 'types/trade';
-import { supabaseAIChatService } from '../services/supabaseAIChatService';
-import { generateConversationTitle } from '../utils/conversationTitle';
+} from 'features/orion/types/aiChat';
+import { Calendar } from 'features/calendar/types/calendar';
+import { Trade } from 'features/calendar/types/trade';
+import { supabaseAIChatService } from 'features/orion/services/supabaseAIChatService';
+import { generateConversationTitle } from 'features/orion/utils/conversationTitle';
 import {
   ConversationRepository,
   ConversationPaginationOptions
 } from 'services/repository/repositories/ConversationRepository';
 import { logger } from 'utils/logger';
-import { estimateConversationTokens } from '../utils/tokenEstimation';
+import { estimateConversationTokens } from 'features/orion/utils/tokenEstimation';
 import { supabase } from 'config/supabase';
 
 const CONVERSATIONS_PAGE_SIZE = 15;

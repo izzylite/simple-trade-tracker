@@ -2,14 +2,14 @@ import React, { useCallback, useRef, useState } from 'react';
 import { Box, IconButton, Tooltip, alpha, useTheme } from '@mui/material';
 import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
 import { useNavigate } from 'react-router-dom';
-import { useNotifications } from '../../contexts/NotificationsContext';
+import { useNotifications } from 'contexts/NotificationsContext';
 import {
   AppNotification,
   isOrionTaskResultPayload,
   isReminderFiredPayload,
-} from '../../types/notification';
-import NotificationsPopover from './NotificationsPopover';
-import { SELECTED_CALENDAR_STORAGE_KEY } from '../../contexts/SelectedCalendarContext';
+} from 'types/notification';
+import NotificationsPopover from 'components/notifications/NotificationsPopover';
+import { SELECTED_CALENDAR_STORAGE_KEY } from 'features/calendar/contexts/SelectedCalendarContext';
 
 const NotificationsBell: React.FC = () => {
   const theme = useTheme();

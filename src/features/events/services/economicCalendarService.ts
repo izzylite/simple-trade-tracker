@@ -7,7 +7,7 @@ import {
   EconomicEvent,
   Currency,
   ImpactLevel
-} from '../types/economicCalendar';
+} from 'features/events/types/economicCalendar';
 import { log, error, logger } from 'utils/logger';
 import { EconomicEventRepository } from 'services/repository/repositories/EconomicEventRepository';
 

@@ -16,7 +16,7 @@ import {
 import { alpha } from '@mui/material/styles';
 import { InfoOutlined, TrendingUp, TrendingDown, TrendingFlat } from '@mui/icons-material';
 import { format, isValid } from 'date-fns';
-import { Trade } from 'types/dualWrite';
+import { Trade } from 'features/calendar/types/dualWrite';
 import { formatValue, formatCount } from 'utils/formatters';
 import { scrollbarStyles } from 'styles/scrollbarStyles';
 

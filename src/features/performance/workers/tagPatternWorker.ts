@@ -6,7 +6,7 @@
  */
 
 import { createInlineWorker, WorkerManager } from 'workers/utils/workerManager';
-import type { Trade } from 'types/dualWrite';
+import type { Trade } from 'features/calendar/types/dualWrite';
 
 export interface GenerateTagCombinationsRequest {
   trades: Trade[];

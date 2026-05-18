@@ -8,7 +8,7 @@
 
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useSelectedCalendar } from 'contexts/SelectedCalendarContext';
+import { useSelectedCalendar } from 'features/calendar/contexts/SelectedCalendarContext';
 import { format } from 'date-fns';
 import {
   Box,
@@ -27,9 +27,9 @@ import {
   Analytics,
   ViewCarousel as GalleryIcon,
 } from '@mui/icons-material';
-import { Trade, Calendar } from 'types/dualWrite';
+import { Trade, Calendar } from 'features/calendar/types/dualWrite';
 import { formatCurrency } from 'utils/formatters';
-import { calculateTargetProgress } from 'utils/statsUtils';
+import { calculateTargetProgress } from 'features/calendar/utils/statsUtils';
 
 interface MonthlyStatsProps {
   trades: Trade[];
@@ -44,7 +44,7 @@ interface MonthlyStatsProps {
     title?: string,
   ) => void;
   calendarId?: string;
-  dynamicRiskSettings?: import('utils/dynamicRiskUtils').DynamicRiskSettings;
+  dynamicRiskSettings?: import('features/calendar/utils/dynamicRiskUtils').DynamicRiskSettings;
   onUpdateTradeProperty?: (
     tradeId: string,
     updateCallback: (trade: Trade) => Trade,

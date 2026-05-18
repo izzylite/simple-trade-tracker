@@ -7,20 +7,20 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { supabase } from '../config/supabase';
-import { useAuthState } from './AuthStateContext';
-import { AppNotification } from '../types/notification';
+import { supabase } from 'config/supabase';
+import { useAuthState } from 'contexts/AuthStateContext';
+import { AppNotification } from 'types/notification';
 import {
   clearAllNotifications,
   dismissNotification as dismissNotificationApi,
   fetchNotifications,
   markAllNotificationsRead,
   markNotificationsRead,
-} from '../services/notificationsService';
-import { _internal as notificationsInternal } from '../services/notificationsService';
+} from 'services/notificationsService';
+import { _internal as notificationsInternal } from 'services/notificationsService';
 import { orionTaskService } from 'features/orion/services/orionTaskService';
-import { isOrionTaskResultPayload } from '../types/notification';
-import { logger } from '../utils/logger';
+import { isOrionTaskResultPayload } from 'types/notification';
+import { logger } from 'utils/logger';
 
 /**
  * A surface registers a route handler while it can intercept notification

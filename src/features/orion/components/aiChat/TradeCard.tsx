@@ -22,7 +22,7 @@ import {
 } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
 import { format } from 'date-fns';
-import { Trade } from 'types/trade';
+import { Trade } from 'features/calendar/types/trade';
 import {
   getTagChipStyles,
   isGroupedTag,

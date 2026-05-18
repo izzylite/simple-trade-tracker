@@ -36,17 +36,17 @@ import {
   ArrowForward as ArrowIcon,
 } from '@mui/icons-material';
 
-import { Trade } from '../../../../types/dualWrite';
-import { getSharedTrade } from '../../../../services/sharingService';
-import { logger } from '../../../../utils/logger';
-import { Z_INDEX } from '../../../../styles/zIndex';
-import { useDialogTokens, MONO_FONT } from '../../../../styles/dialogTokens';
-import { dialogProps } from '../../../../styles/dialogStyles';
-import { isInternalTradeLink } from '../utils/linkUtils';
-import type { TradeChipData } from '../utils/tradeEntityUtils';
-import type { RichTextEditorHandle } from '../../RichTextEditor';
-import TradeGalleryDialog from '../../../TradeGalleryDialog';
-import ImageZoomDialog, { ImageZoomProp } from '../../../ImageZoomDialog';
+import { Trade } from 'features/calendar/types/dualWrite';
+import { getSharedTrade } from 'features/calendar/services/sharingService';
+import { logger } from 'utils/logger';
+import { Z_INDEX } from 'styles/zIndex';
+import { useDialogTokens, MONO_FONT } from 'styles/dialogTokens';
+import { dialogProps } from 'styles/dialogStyles';
+import { isInternalTradeLink } from 'components/common/RichTextEditor/utils/linkUtils';
+import type { TradeChipData } from 'components/common/RichTextEditor/utils/tradeEntityUtils';
+import type { RichTextEditorHandle } from 'components/common/RichTextEditor';
+import TradeGalleryDialog from 'features/calendar/components/TradeGalleryDialog';
+import ImageZoomDialog, { ImageZoomProp } from 'features/calendar/components/ImageZoomDialog';
 
 export interface UseTradeLinkInsertionResult {
   /** Pass to <RichTextEditor onInsertTradeLink>. */

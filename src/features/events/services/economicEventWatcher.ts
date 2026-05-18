@@ -7,8 +7,8 @@
  * Temporarily disabled to fix TypeScript errors during migration.
  */
 
-import { EconomicEvent, Currency, ImpactLevel } from '../types/economicCalendar';
-import { economicCalendarService } from './economicCalendarService';
+import { EconomicEvent, Currency, ImpactLevel } from 'features/events/types/economicCalendar';
+import { economicCalendarService } from 'features/events/services/economicCalendarService';
 import { endOfDay, format, startOfDay } from 'date-fns';
 import { error, log, logger } from 'utils/logger';
 import { supabase } from 'config/supabase';

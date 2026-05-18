@@ -7,7 +7,7 @@ import {
   AbstractBaseRepository,
   RepositoryConfig,
   RepositoryResult
-} from './BaseRepository';
+} from 'services/repository/repositories/BaseRepository';
 import {
   AIConversation,
   SerializableAIConversation,
@@ -444,7 +444,7 @@ export class ConversationRepository extends AbstractBaseRepository<AIConversatio
       };
     } catch (error) {
       logger.error('Error setting conversation pinned:', error);
-      const { parseSupabaseError } = await import('../../../utils/supabaseErrorHandler');
+      const { parseSupabaseError } = await import('utils/supabaseErrorHandler');
       return {
         success: false,
         error: parseSupabaseError(error, 'Setting conversation pinned'),
@@ -478,7 +478,7 @@ export class ConversationRepository extends AbstractBaseRepository<AIConversatio
       };
     } catch (error) {
       logger.error('Error deleting conversations by calendar ID:', error);
-      const { parseSupabaseError } = await import('../../../utils/supabaseErrorHandler');
+      const { parseSupabaseError } = await import('utils/supabaseErrorHandler');
       return {
         success: false,
         error: parseSupabaseError(error, 'Deleting conversations by calendar ID'),

@@ -3,8 +3,8 @@
  */
 
 import { useEffect, useCallback, useRef, useMemo } from 'react';
-import { economicEventWatcher } from '../services/economicEventWatcher';
-import { EconomicEvent } from '../types/economicCalendar';
+import { economicEventWatcher } from 'features/events/services/economicEventWatcher';
+import { EconomicEvent } from 'features/events/types/economicCalendar';
 import { error, log } from 'utils/logger';
 
 interface UseEconomicEventWatcherProps {

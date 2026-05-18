@@ -12,7 +12,7 @@ import {
   Box,
   Typography
 } from '@mui/material';
-import { Z_INDEX } from '../../styles/zIndex';
+import { Z_INDEX } from 'styles/zIndex';
 
 // Text Field
 interface TextInputProps extends Omit<TextFieldProps, 'label'> {

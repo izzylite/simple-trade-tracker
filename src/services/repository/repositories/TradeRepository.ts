@@ -7,21 +7,21 @@ import {
   AbstractBaseRepository,
   RepositoryConfig,
   RepositoryResult
-} from './BaseRepository';
-import { Trade } from '../../../types/dualWrite';
-import { logger } from '../../../utils/logger';
+} from 'services/repository/repositories/BaseRepository';
+import { Trade } from 'features/calendar/types/dualWrite';
+import { logger } from 'utils/logger';
 
 // Supabase imports
-import { supabase } from '../../../config/supabase';
+import { supabase } from 'config/supabase';
 
 
 // Storage imports
-import { uploadTradeImage } from '../../supabaseStorageService';
-import { TradeImage } from '../../../components/trades/TradeForm';
+import { uploadTradeImage } from 'services/supabaseStorageService';
+import { TradeImage } from 'features/calendar/components/trades/TradeForm';
 
 // Economic events imports
 import { tradeEconomicEventService, getRelevantCurrenciesFromTags } from 'features/events/services/tradeEconomicEventService';
-import { TradeEconomicEvent } from '../../../types/dualWrite';
+import { TradeEconomicEvent } from 'features/calendar/types/dualWrite';
 
  
 

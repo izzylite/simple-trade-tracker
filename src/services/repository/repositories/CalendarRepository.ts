@@ -6,12 +6,12 @@
 import {
   AbstractBaseRepository,
   RepositoryConfig
-} from './BaseRepository';
-import { Calendar, Trade } from '../../../types/dualWrite';
-import { logger } from '../../../utils/logger';
+} from 'services/repository/repositories/BaseRepository';
+import { Calendar, Trade } from 'features/calendar/types/dualWrite';
+import { logger } from 'utils/logger';
 
 // Supabase imports
-import { supabase } from '../../../config/supabase';
+import { supabase } from 'config/supabase';
 
 
 /**

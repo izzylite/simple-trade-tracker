@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Box, Tooltip, useTheme } from '@mui/material';
-import { Trade } from 'types/dualWrite';
-import PerfCard from './PerfCard';
+import { Trade } from 'features/calendar/types/dualWrite';
+import PerfCard from 'features/performance/components/PerfCard';
 
 interface WeekdayWinRateProps {
   trades: Trade[];

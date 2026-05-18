@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Container, useTheme, alpha, Paper } from '@mui/material';
-import { LoginPromptContent } from './LoginDialog';
+import { LoginPromptContent } from 'components/auth/LoginDialog';
 
 interface LoginPromptProps {
   title?: string;

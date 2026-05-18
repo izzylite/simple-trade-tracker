@@ -2,7 +2,7 @@ import React from 'react';
 import { Box, Paper, Typography, Tooltip, useTheme, Stack, alpha } from '@mui/material';
 import { InfoOutlined } from '@mui/icons-material';
 import { formatCurrency, formatCount } from 'utils/formatters';
-import { Trade } from 'types/dualWrite';
+import { Trade } from 'features/calendar/types/dualWrite';
 
 interface WinLossStatsProps {
   winLossStats: {

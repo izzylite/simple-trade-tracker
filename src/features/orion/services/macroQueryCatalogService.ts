@@ -1,6 +1,6 @@
 import { supabase } from 'config/supabase';
 import { logger } from 'utils/logger';
-import type { MacroQueryEntry, Market } from '../data/macroQueryCatalog';
+import type { MacroQueryEntry, Market } from 'features/orion/data/macroQueryCatalog';
 
 /**
  * Macro query catalog service.

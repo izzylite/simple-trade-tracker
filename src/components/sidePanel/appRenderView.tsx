@@ -2,8 +2,8 @@ import React from 'react';
 import {
   HelpOutline as HelpOutlineIcon,
 } from '@mui/icons-material';
-import { SidePanelView } from '../../contexts/SidePanelContext';
-import FAQContent from '../faq/FAQContent';
+import { SidePanelView } from 'contexts/SidePanelContext';
+import FAQContent from 'components/faq/FAQContent';
 
 export interface SidePanelViewConfig {
   title: string;

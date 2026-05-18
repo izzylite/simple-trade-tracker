@@ -19,7 +19,7 @@ import {
   TrendingDown as TrendingDownIcon,
   Remove as NeutralIcon
 } from '@mui/icons-material';
-import { EconomicEvent, ImpactLevel, Currency } from '../../types/economicCalendar';
+import { EconomicEvent, ImpactLevel, Currency } from 'features/events/types/economicCalendar';
 import { alpha } from '@mui/material/styles';
 import { format, parseISO } from 'date-fns';
 

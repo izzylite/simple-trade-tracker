@@ -5,7 +5,7 @@ import {
   ArrowBack as ArrowBackIcon,
   Close as CloseIcon,
 } from '@mui/icons-material';
-import { useSidePanel } from '../../contexts/SidePanelContext';
+import { useSidePanel } from 'contexts/SidePanelContext';
 
 interface SidePanelHeaderProps {
   title: string;

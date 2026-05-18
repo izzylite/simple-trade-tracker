@@ -23,14 +23,14 @@ import {
 } from '@mui/icons-material';
 import { useTheme, alpha } from '@mui/material/styles';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../../contexts/SupabaseAuthContext';
-import { error } from '../../utils/logger';
-import DebugPanel from './DebugPanel';
-import NotificationsBell from '../notifications/NotificationsBell';
-import HeaderCalendarSelector from './HeaderCalendarSelector';
+import { useAuth } from 'contexts/SupabaseAuthContext';
+import { error } from 'utils/logger';
+import DebugPanel from 'components/common/DebugPanel';
+import NotificationsBell from 'components/notifications/NotificationsBell';
+import HeaderCalendarSelector from 'components/common/HeaderCalendarSelector';
 
 // Login dialog opens only on user action; lazy keeps auth UI out of main bundle.
-const LoginDialog = lazy(() => import('../auth/LoginDialog'));
+const LoginDialog = lazy(() => import('components/auth/LoginDialog'));
 
 // Discord icon component
 const DiscordIcon = (props: any) => (

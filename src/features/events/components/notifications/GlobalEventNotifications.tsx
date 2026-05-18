@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box } from '@mui/material';
-import EconomicEventNotification from './EconomicEventNotification';
-import { useEventNotifications } from '../../contexts/EventNotificationsContext';
+import EconomicEventNotification from 'features/events/components/notifications/EconomicEventNotification';
+import { useEventNotifications } from 'features/events/contexts/EventNotificationsContext';
 
 /**
  * App-level mount for the economic event notification slider stack.

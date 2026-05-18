@@ -37,15 +37,15 @@ import {
   Edit as EditIcon,
   EventNote as EventNoteIcon,
 } from '@mui/icons-material';
-import { Note } from '../../types/note';
+import { Note } from 'features/notes/types/note';
 import { Z_INDEX } from 'styles/zIndex';
 import { scrollbarStyles } from 'styles/scrollbarStyles';
 import RichTextEditor from 'components/common/RichTextEditor';
-import NoteEditorDialog from '../NoteEditorDialog';
-import { getSharedTrade } from 'services/sharingService';
-import { Trade } from 'types/dualWrite';
-import TradeGalleryDialog from 'components/TradeGalleryDialog';
-import ImageZoomDialog, { ImageZoomProp } from 'components/ImageZoomDialog';
+import NoteEditorDialog from 'features/notes/components/NoteEditorDialog';
+import { getSharedTrade } from 'features/calendar/services/sharingService';
+import { Trade } from 'features/calendar/types/dualWrite';
+import TradeGalleryDialog from 'features/calendar/components/TradeGalleryDialog';
+import ImageZoomDialog, { ImageZoomProp } from 'features/calendar/components/ImageZoomDialog';
 import { logger } from 'utils/logger';
 
 interface NotesBottomSheetProps {

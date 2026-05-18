@@ -9,11 +9,11 @@ import { alpha } from '@mui/material/styles';
 import { Editor, EditorState } from 'draft-js';
 import 'draft-js/dist/Draft.css';
 
-import { createEditorStateFromValue } from './utils/draftUtils';
-import { createStyleMap } from './utils/styleUtils';
-import { blockStyleFn } from './utils/editorActions';
-import { createDecorator } from './utils/decoratorUtils';
-import { TEXT_COLORS, BACKGROUND_COLORS } from './constants/colors';
+import { createEditorStateFromValue } from 'components/common/RichTextEditor/utils/draftUtils';
+import { createStyleMap } from 'components/common/RichTextEditor/utils/styleUtils';
+import { blockStyleFn } from 'components/common/RichTextEditor/utils/editorActions';
+import { createDecorator } from 'components/common/RichTextEditor/utils/decoratorUtils';
+import { TEXT_COLORS, BACKGROUND_COLORS } from 'components/common/RichTextEditor/constants/colors';
 
 interface RichTextViewerProps {
   content: string;

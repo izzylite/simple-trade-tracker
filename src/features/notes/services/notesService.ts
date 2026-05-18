@@ -3,7 +3,7 @@
  * Simple service for Notion-style notes
  */
 
-import { CreateNoteInput, Note, UpdateNoteInput } from "../types/note";
+import { CreateNoteInput, Note, UpdateNoteInput } from "features/notes/types/note";
 import { logger } from "utils/logger";
 import {
   NoteQueryOptions,

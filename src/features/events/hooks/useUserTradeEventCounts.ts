@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuthState } from 'contexts/AuthStateContext';
-import { EconomicEvent } from '../types/economicCalendar';
+import { EconomicEvent } from 'features/events/types/economicCalendar';
 import {
   EventCountKey,
   fetchUserTradeCountsByEventKey,
   makeEventCountKey,
-} from '../services/userTradeEventCountsService';
+} from 'features/events/services/userTradeEventCountsService';
 
 interface UseUserTradeEventCountsResult {
   getCountForEvent: (ev: EconomicEvent) => number;

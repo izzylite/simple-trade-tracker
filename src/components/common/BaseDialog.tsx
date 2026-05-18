@@ -10,10 +10,10 @@ import {
   useTheme,
 } from '@mui/material';
 import { Close as CloseIcon } from '@mui/icons-material';
-import { dialogProps } from '../../styles/dialogStyles';
-import { scrollbarStyles } from '../../styles/scrollbarStyles';
-import { Z_INDEX } from '../../styles/zIndex';
-import { useDialogTokens } from '../../styles/dialogTokens';
+import { dialogProps } from 'styles/dialogStyles';
+import { scrollbarStyles } from 'styles/scrollbarStyles';
+import { Z_INDEX } from 'styles/zIndex';
+import { useDialogTokens } from 'styles/dialogTokens';
 
 export interface BaseDialogProps extends Omit<DialogProps, 'title'> {
   open: boolean;

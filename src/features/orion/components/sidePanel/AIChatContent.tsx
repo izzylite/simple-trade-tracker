@@ -30,30 +30,30 @@ import {
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import EconomicEventShimmer from 'features/events/components/EconomicEventShimmer';
-import AIChatInterface, { AIChatInterfaceRef, QuestionTemplate } from '../aiChat/AIChatInterface';
-import { AIConversation } from '../../types/aiChat';
-import { Trade } from 'types/trade';
-import { Calendar } from 'types/calendar';
+import AIChatInterface, { AIChatInterfaceRef, QuestionTemplate } from 'features/orion/components/aiChat/AIChatInterface';
+import { AIConversation } from 'features/orion/types/aiChat';
+import { Trade } from 'features/calendar/types/trade';
+import { Calendar } from 'features/calendar/types/calendar';
 import { EconomicEvent } from 'features/events/types/economicCalendar';
 import { scrollbarStyles } from 'styles/scrollbarStyles';
 import { useDialogTokens, MONO_FONT } from 'styles/dialogTokens';
 import { logger } from 'utils/logger';
-import { stripReferencedBlocks } from '../../utils/chatMentions';
+import { stripReferencedBlocks } from 'features/orion/utils/chatMentions';
 import { useAuthState } from 'contexts/AuthStateContext';
-import { useAIChat, UseAIChatReturn } from '../../hooks/useAIChat';
+import { useAIChat, UseAIChatReturn } from 'features/orion/hooks/useAIChat';
 import { useReminderScheduler } from 'features/notes/hooks/useReminderScheduler';
 import EconomicEventDetailDialog
   from 'features/events/components/EconomicEventDetailDialog';
 import NoteEditorDialog from 'features/notes/components/NoteEditorDialog';
 import ConfirmationDialog from 'components/common/ConfirmationDialog';
-import RemindersPanel from '../aiChat/RemindersPanel';
-import MemoryLogsPanel from '../aiChat/MemoryLogsPanel';
+import RemindersPanel from 'features/orion/components/aiChat/RemindersPanel';
+import MemoryLogsPanel from 'features/orion/components/aiChat/MemoryLogsPanel';
 import { Note, SLASH_COMMAND_TAG, GUIDELINE_TAG } from 'features/notes/types/note';
 import * as notesService from 'features/notes/services/notesService';
 import { ConversationRepository }
   from 'services/repository/repositories/ConversationRepository';
-import type { SystemCommand } from '../aiChat/AIChatMentionInput';
-import { TradeOperationsProps } from 'types/tradeOperations';
+import type { SystemCommand } from 'features/orion/components/aiChat/AIChatMentionInput';
+import { TradeOperationsProps } from 'features/calendar/types/tradeOperations';
 import { Z_INDEX } from 'styles/zIndex';
 
 export interface AIChatContentProps {

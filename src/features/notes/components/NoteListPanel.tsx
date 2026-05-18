@@ -42,9 +42,9 @@ import {
   RISK_MANAGEMENT_TAG,
   SLASH_COMMAND_TAG,
   GENERAL_TAG,
-} from '../types/note';
+} from 'features/notes/types/note';
 import { scrollbarStyles } from 'styles/scrollbarStyles';
-import { getTagDisplayLabel } from './NoteEditorDialogTags';
+import { getTagDisplayLabel } from 'features/notes/components/NoteEditorDialogTags';
 
 /** Lifecycle tab — mutually exclusive, drives useNotes activeTab. */
 export type NotesTab = 'all' | 'pinned' | 'archived';

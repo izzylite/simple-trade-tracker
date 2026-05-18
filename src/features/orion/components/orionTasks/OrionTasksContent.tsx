@@ -22,17 +22,17 @@ import { scrollbarStyles } from 'styles/scrollbarStyles';
 import { useDialogTokens, MONO_FONT } from 'styles/dialogTokens';
 import EconomicEventShimmer from 'features/events/components/EconomicEventShimmer';
 import ConfirmationDialog from 'components/common/ConfirmationDialog';
-import TaskResultCard from './TaskResultCard';
-import CreateTaskDialog from './CreateTaskDialog';
+import TaskResultCard from 'features/orion/components/orionTasks/TaskResultCard';
+import CreateTaskDialog from 'features/orion/components/orionTasks/CreateTaskDialog';
 import type {
   OrionTask,
   OrionTaskResult,
   TaskType,
   TaskConfig,
-} from '../../types/orionTask';
-import { TASK_TYPE_LABELS, TASK_TYPE_COLORS } from '../../types/orionTask';
-import type { Calendar, Trade } from 'types/dualWrite';
-import type { TradeOperationsProps } from 'types/tradeOperations';
+} from 'features/orion/types/orionTask';
+import { TASK_TYPE_LABELS, TASK_TYPE_COLORS } from 'features/orion/types/orionTask';
+import type { Calendar, Trade } from 'features/calendar/types/dualWrite';
+import type { TradeOperationsProps } from 'features/calendar/types/tradeOperations';
 
 interface OrionTasksContentProps {
   tasks: OrionTask[];

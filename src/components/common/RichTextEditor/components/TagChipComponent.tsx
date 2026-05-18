@@ -3,7 +3,7 @@ import { useTheme } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import LocalOfferIcon from '@mui/icons-material/LocalOfferOutlined';
 import { ContentState } from 'draft-js';
-import { getTagColor, isGroupedTag, getTagGroup, getTagName } from '../../../../utils/tagColors';
+import { getTagColor, isGroupedTag, getTagGroup, getTagName } from 'utils/tagColors';
 
 interface TagChipProps {
   contentState: ContentState;

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Container, Stack, Typography } from '@mui/material';
-import { ACCENT, HAIR, PAPER, TNUM, WIN, LOSS } from '../landingTokens';
-import { useReveal, revealSx, useReducedMotion } from '../landingHooks';
-import SectionMarker from './SectionMarker';
+import { ACCENT, HAIR, PAPER, TNUM, WIN, LOSS } from 'components/landing/landingTokens';
+import { useReveal, revealSx, useReducedMotion } from 'components/landing/landingHooks';
+import SectionMarker from 'components/landing/sections/SectionMarker';
 
 /* ─────────────────────────────────────────────
    Calendar showcase — 3-month switcher

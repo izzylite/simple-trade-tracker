@@ -6,13 +6,13 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { Box } from '@mui/material';
-import { useReminderNotes } from './useReminderNotes';
-import NoteCard from './NoteCard';
-import PlaceholderNoteCard from './PlaceholderNoteCard';
-import NotesBottomSheet from './NotesBottomSheet';
+import { useReminderNotes } from 'features/notes/components/reminders/useReminderNotes';
+import NoteCard from 'features/notes/components/reminders/NoteCard';
+import PlaceholderNoteCard from 'features/notes/components/reminders/PlaceholderNoteCard';
+import NotesBottomSheet from 'features/notes/components/reminders/NotesBottomSheet';
 import { Z_INDEX } from 'styles/zIndex';
-import { Note } from '../../types/note';
-import { Calendar } from 'types/calendar';
+import { Note } from 'features/notes/types/note';
+import { Calendar } from 'features/calendar/types/calendar';
 import { useUserPinnedEvents } from 'features/events/contexts/UserPinnedEventsContext';
 import { SIDE_NAV_WIDTH } from 'components/layout/SideNav';
 

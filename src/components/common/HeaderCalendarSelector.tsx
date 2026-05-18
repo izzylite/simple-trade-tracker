@@ -1,11 +1,11 @@
 // src/components/common/HeaderCalendarSelector.tsx
 import React, { useMemo } from 'react';
 import { useNavigate, useMatch } from 'react-router-dom';
-import { useAuthState } from '../../contexts/AuthStateContext';
-import { useCalendars } from '../../hooks/useCalendars';
-import { useSelectedCalendar } from '../../contexts/SelectedCalendarContext';
-import { useCalendarsListPanelOptional } from '../../contexts/CalendarsListPanelContext';
-import CalendarSelectorBar, { CalendarSelectorItem } from './CalendarSelectorBar';
+import { useAuthState } from 'contexts/AuthStateContext';
+import { useCalendars } from 'features/calendar/hooks/useCalendars';
+import { useSelectedCalendar } from 'features/calendar/contexts/SelectedCalendarContext';
+import { useCalendarsListPanelOptional } from 'features/calendar/contexts/CalendarsListPanelContext';
+import CalendarSelectorBar, { CalendarSelectorItem } from 'components/common/CalendarSelectorBar';
 
 /**
  * Header-mounted calendar selector. Drives the global SelectedCalendarContext

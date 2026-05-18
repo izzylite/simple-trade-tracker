@@ -26,11 +26,11 @@ import {
   Cached as CachedIcon,
   Image as ImageIcon,
 } from '@mui/icons-material';
-import Shimmer from '../Shimmer';
-import { unsplashCache, UnsplashImage } from '../../services/unsplashCache';
-import { logger } from '../../utils/logger';
-import { scrollbarStyles } from '../../styles/scrollbarStyles';
-import { useDialogTokens, MONO_FONT } from '../../styles/dialogTokens';
+import Shimmer from 'components/Shimmer';
+import { unsplashCache, UnsplashImage } from 'services/unsplashCache';
+import { logger } from 'utils/logger';
+import { scrollbarStyles } from 'styles/scrollbarStyles';
+import { useDialogTokens, MONO_FONT } from 'styles/dialogTokens';
 
 const DEFAULT_POPULAR_SEARCHES = [
   'trading charts',

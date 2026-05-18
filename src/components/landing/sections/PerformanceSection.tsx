@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Box, Container, Stack, Typography } from '@mui/material';
-import { ACCENT, ACCENT_SOFT, HAIR, RULE, TNUM, WIN } from '../landingTokens';
-import { useReveal, revealSx, useCounter } from '../landingHooks';
-import SectionMarker from './SectionMarker';
+import { ACCENT, ACCENT_SOFT, HAIR, RULE, TNUM, WIN } from 'components/landing/landingTokens';
+import { useReveal, revealSx, useCounter } from 'components/landing/landingHooks';
+import SectionMarker from 'components/landing/sections/SectionMarker';
 
 /* ─────────────────────────────────────────────
    Performance — narrative + equity curve + stats

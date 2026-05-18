@@ -28,15 +28,15 @@ import {
   ExpandLess as ExpandLessIcon,
 } from '@mui/icons-material';
 import ReactMarkdown from 'react-markdown';
-import { EconomicEvent } from '../types/economicCalendar';
-import { Trade, Calendar } from 'types/dualWrite';
-import TradeList from 'components/trades/TradeList';
-import { cleanEventNameForPinning, eventMatchV1 } from '../utils/eventNameUtils';
-import { useUserPinnedEvents } from '../contexts/UserPinnedEventsContext';
+import { EconomicEvent } from 'features/events/types/economicCalendar';
+import { Trade, Calendar } from 'features/calendar/types/dualWrite';
+import TradeList from 'features/calendar/components/trades/TradeList';
+import { cleanEventNameForPinning, eventMatchV1 } from 'features/events/utils/eventNameUtils';
+import { useUserPinnedEvents } from 'features/events/contexts/UserPinnedEventsContext';
 import { useAuthState } from 'contexts/AuthStateContext';
-import { useCalendars } from 'hooks/useCalendars';
+import { useCalendars } from 'features/calendar/hooks/useCalendars';
 import { getSessionForTimestamp, SESSION_COLORS } from 'utils/sessionTimeUtils';
-import { TradeOperationsProps } from 'types/tradeOperations';
+import { TradeOperationsProps } from 'features/calendar/types/tradeOperations';
 import Shimmer from 'components/Shimmer';
 import { supabaseAIChatService } from 'features/orion/services/supabaseAIChatService';
 import { supabase } from 'config/supabase';
@@ -101,7 +101,7 @@ const EconomicEventDetailPanel: React.FC<EconomicEventDetailPanelProps> = ({
       setIsLoadingTrades(true);
       hasInitialLoad.current = false;
       try {
-        const calendarServiceModule = await import('services/calendarService');
+        const calendarServiceModule = await import('features/calendar/services/calendarService');
         const cleanedName = cleanEventNameForPinning(event.event_name);
         const trades = await calendarServiceModule
           .getTradeRepository()

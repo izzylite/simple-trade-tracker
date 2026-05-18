@@ -16,8 +16,8 @@ import {
   Chip
 } from '@mui/material';
 import { Google as GoogleIcon } from '@mui/icons-material';
-import { SupabaseAuthProvider, useSupabaseAuth } from '../../contexts/SupabaseAuthContext';
-import { logger } from '../../utils/logger';
+import { SupabaseAuthProvider, useSupabaseAuth } from 'contexts/SupabaseAuthContext';
+import { logger } from 'utils/logger';
 
 const SupabaseAuthTestContent: React.FC = () => {
   const { user, loading, signInWithGoogle, signOut, isAuthenticated, getAccessToken } = useSupabaseAuth();

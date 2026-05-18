@@ -43,22 +43,22 @@ import {
   endOfWeek,
 } from 'date-fns';
 
-import { useEconomicEvents } from '../hooks/useEconomicEvents';
+import { useEconomicEvents } from 'features/events/hooks/useEconomicEvents';
 import { useEventCountdownTime } from 'hooks/useCurrentTime';
-import { useUserPinnedEvents } from '../contexts/UserPinnedEventsContext';
-import { useUserTradeEventCounts } from '../hooks/useUserTradeEventCounts';
-import { useEventsPanelState } from '../contexts/EventsPanelStateContext';
-import { Calendar } from 'types/calendar';
-import { Currency, EconomicEvent, ImpactLevel } from '../types/economicCalendar';
-import { TradeOperationsProps } from 'types/tradeOperations';
-import { isEventPinned } from '../utils/eventNameUtils';
+import { useUserPinnedEvents } from 'features/events/contexts/UserPinnedEventsContext';
+import { useUserTradeEventCounts } from 'features/events/hooks/useUserTradeEventCounts';
+import { useEventsPanelState } from 'features/events/contexts/EventsPanelStateContext';
+import { Calendar } from 'features/calendar/types/calendar';
+import { Currency, EconomicEvent, ImpactLevel } from 'features/events/types/economicCalendar';
+import { TradeOperationsProps } from 'features/calendar/types/tradeOperations';
+import { isEventPinned } from 'features/events/utils/eventNameUtils';
 import {
   DEFAULT_FILTER_SETTINGS,
   EconomicCalendarFilterSettings,
-} from '../hooks/useEconomicCalendarFilters';
-import EconomicEventShimmer from './EconomicEventShimmer';
-import EconomicEventDetailDialog from './EconomicEventDetailDialog';
-import EconomicEventRow, { impactColor } from './EconomicEventRow';
+} from 'features/events/hooks/useEconomicCalendarFilters';
+import EconomicEventShimmer from 'features/events/components/EconomicEventShimmer';
+import EconomicEventDetailDialog from 'features/events/components/EconomicEventDetailDialog';
+import EconomicEventRow, { impactColor } from 'features/events/components/EconomicEventRow';
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
@@ -112,7 +112,7 @@ const HUB_TABS: Array<{ value: HubTab; label: string }> = [
 // `formatTime` and `computeTimeInfo` live in EconomicEventRow now —
 // keeping them here too caused a circular import (Row imports them from
 // View, View imports Row). Re-exported for any future external caller.
-export { formatTime, computeTimeInfo } from './EconomicEventRow';
+export { formatTime, computeTimeInfo } from 'features/events/components/EconomicEventRow';
 
 /** A "release" is an event whose actual figure has already published. */
 export const isReleaseEvent = (e: EconomicEvent): boolean =>

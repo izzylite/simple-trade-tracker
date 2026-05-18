@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, CircularProgress } from '@mui/material';
-import { useAuth } from '../../contexts/SupabaseAuthContext';
-import LoginPrompt from './LoginPrompt';
+import { useAuth } from 'contexts/SupabaseAuthContext';
+import LoginPrompt from 'components/auth/LoginPrompt';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;

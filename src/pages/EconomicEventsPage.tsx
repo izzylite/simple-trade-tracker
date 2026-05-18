@@ -37,10 +37,10 @@ import {
 } from 'date-fns';
 
 import { useEconomicEvents } from 'features/events/hooks/useEconomicEvents';
-import { useEventCountdownTime } from '../hooks/useCurrentTime';
+import { useEventCountdownTime } from 'hooks/useCurrentTime';
 import { useUserPinnedEvents } from 'features/events/contexts/UserPinnedEventsContext';
-import { useTradesContext } from '../contexts/TradesContext';
-import { useTradeOperations } from '../contexts/TradeOperationsContext';
+import { useTradesContext } from 'features/calendar/contexts/TradesContext';
+import { useTradeOperations } from 'features/calendar/contexts/TradeOperationsContext';
 import {
   DEFAULT_FILTER_SETTINGS,
   EconomicCalendarFilterSettings,
@@ -51,12 +51,12 @@ import {
   useSidePanel,
   SidePanelView,
   EventDetailView,
-} from '../contexts/SidePanelContext';
-import { usePanelMutexSlot } from '../contexts/PanelMutexContext';
-import SidePanel from '../components/sidePanel/SidePanel';
+} from 'contexts/SidePanelContext';
+import { usePanelMutexSlot } from 'contexts/PanelMutexContext';
+import SidePanel from 'components/sidePanel/SidePanel';
 import { Currency, EconomicEvent, ImpactLevel } from 'features/events/types/economicCalendar';
 import { isEventPinned } from 'features/events/utils/eventNameUtils';
-import { PinnedEvent } from '../types/dualWrite';
+import { PinnedEvent } from 'features/calendar/types/dualWrite';
 import EconomicEventRow, {
   ImpactBars,
   formatTime,
@@ -64,14 +64,14 @@ import EconomicEventRow, {
 } from 'features/events/components/EconomicEventRow';
 import EconomicEventDetailDialog from 'features/events/components/EconomicEventDetailDialog';
 import EconomicEventDetailPanel from 'features/events/components/EconomicEventDetailPanel';
-import TradeGalleryDialog from '../components/TradeGalleryDialog';
-import ImageZoomDialog from '../components/ImageZoomDialog';
+import TradeGalleryDialog from 'features/calendar/components/TradeGalleryDialog';
+import ImageZoomDialog from 'features/calendar/components/ImageZoomDialog';
 import NotesContent from 'features/notes/components/sidePanel/NotesContent';
 import NotesDrawer from 'features/notes/components/NotesDrawer';
 import { useEventPageTradeOps } from 'features/events/hooks/useEventPageTradeOps';
 import AllPinnedEventsContent from 'features/events/components/AllPinnedEventsContent';
 import EconomicEventShimmer from 'features/events/components/EconomicEventShimmer';
-import { Z_INDEX } from '../styles/zIndex';
+import { Z_INDEX } from 'styles/zIndex';
 
 const APP_HEADER_HEIGHT = 64;
 // App.tsx sets pb: 0 for /events (isViewportLockedPage) so the page can

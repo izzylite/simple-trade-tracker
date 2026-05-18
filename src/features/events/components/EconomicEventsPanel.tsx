@@ -38,28 +38,28 @@ import {
 } from '@mui/icons-material';
 import { isToday, parseISO } from 'date-fns';
 
-import { Trade } from 'types/dualWrite';
+import { Trade } from 'features/calendar/types/dualWrite';
 import {
   Currency,
   EconomicEvent,
   ImpactLevel,
-} from '../types/economicCalendar';
+} from 'features/events/types/economicCalendar';
 import {
   DEFAULT_FILTER_SETTINGS as DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS,
   EconomicCalendarFilterSettings,
-} from '../hooks/useEconomicCalendarFilters';
-import { economicCalendarService } from '../services/economicCalendarService';
-import { tradeEconomicEventService } from '../services/tradeEconomicEventService';
-import { useEventPinning } from '../hooks/useEventPinning';
-import { useUserPinnedEvents } from '../contexts/UserPinnedEventsContext';
+} from 'features/events/hooks/useEconomicCalendarFilters';
+import { economicCalendarService } from 'features/events/services/economicCalendarService';
+import { tradeEconomicEventService } from 'features/events/services/tradeEconomicEventService';
+import { useEventPinning } from 'features/events/hooks/useEventPinning';
+import { useUserPinnedEvents } from 'features/events/contexts/UserPinnedEventsContext';
 import { useEventCountdownTime } from 'hooks/useCurrentTime';
 import { useRealtimeSubscription } from 'hooks/useRealtimeSubscription';
-import { isEventPinned } from '../utils/eventNameUtils';
+import { isEventPinned } from 'features/events/utils/eventNameUtils';
 import { scrollbarStyles } from 'styles/scrollbarStyles';
 import { formatCount } from 'utils/formatters';
 import { logger } from 'utils/logger';
-import EconomicEventShimmer from './EconomicEventShimmer';
-import EconomicEventRow, { impactColor } from './EconomicEventRow';
+import EconomicEventShimmer from 'features/events/components/EconomicEventShimmer';
+import EconomicEventRow, { impactColor } from 'features/events/components/EconomicEventRow';
 
 // Same width tier as NoteViewerPanel / OrionPanel — keeps the slide-in
 // slot consistent when the three panels share the right rail.

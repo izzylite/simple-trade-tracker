@@ -5,9 +5,9 @@
 
 import { useState, useEffect } from 'react';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
-import { economicCalendarService } from '../services/economicCalendarService';
-import { Currency, ImpactLevel } from '../types/economicCalendar';
-import { DEFAULT_FILTER_SETTINGS as DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS } from './useEconomicCalendarFilters';
+import { economicCalendarService } from 'features/events/services/economicCalendarService';
+import { Currency, ImpactLevel } from 'features/events/types/economicCalendar';
+import { DEFAULT_FILTER_SETTINGS as DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS } from 'features/events/hooks/useEconomicCalendarFilters';
 import { error as logError, log, warn } from 'utils/logger';
 
 interface UseHighImpactEventsProps {

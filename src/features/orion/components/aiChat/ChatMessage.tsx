@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import OrionIcon from './OrionIcon';
+import OrionIcon from 'features/orion/components/aiChat/OrionIcon';
 import {
   Box,
   Paper,
@@ -16,11 +16,11 @@ import {
   useTheme,
   alpha
 } from '@mui/material';
-import HtmlMessageRenderer from './HtmlMessageRenderer';
-import CitationsSection from './CitationsSection';
-import MarkdownRenderer from './MarkdownRenderer';
-import ToolUsageChip from './ToolUsageChip';
-import { useBriefingEmbedded } from '../../hooks/useBriefingEmbedded';
+import HtmlMessageRenderer from 'features/orion/components/aiChat/HtmlMessageRenderer';
+import CitationsSection from 'features/orion/components/aiChat/CitationsSection';
+import MarkdownRenderer from 'features/orion/components/aiChat/MarkdownRenderer';
+import ToolUsageChip from 'features/orion/components/aiChat/ToolUsageChip';
+import { useBriefingEmbedded } from 'features/orion/hooks/useBriefingEmbedded';
 import {
   ContentCopy as CopyIcon,
   CheckCircle as CheckIcon,
@@ -31,14 +31,14 @@ import {
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon
 } from '@mui/icons-material';
-import { stripReferencedBlocks } from '../../utils/chatMentions';
-import { ChatMessage as ChatMessageType } from '../../types/aiChat';
-import { Trade } from 'types/trade';
+import { stripReferencedBlocks } from 'features/orion/utils/chatMentions';
+import { ChatMessage as ChatMessageType } from 'features/orion/types/aiChat';
+import { Trade } from 'features/calendar/types/trade';
 import { EconomicEvent } from 'features/events/types/economicCalendar';
 import { format } from 'date-fns';
 import { logger } from 'utils/logger';
 import { getTagChipStyles } from 'utils/tagColors';
-import ImageZoomDialog, { ImageZoomProp } from 'components/ImageZoomDialog';
+import ImageZoomDialog, { ImageZoomProp } from 'features/calendar/components/ImageZoomDialog';
 
 interface ChatMessageProps {
   message: ChatMessageType;

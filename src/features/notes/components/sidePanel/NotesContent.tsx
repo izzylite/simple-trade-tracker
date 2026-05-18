@@ -34,20 +34,20 @@ import {
 } from '@mui/icons-material';
 
 import RoundedTabs from 'components/common/RoundedTabs';
-import NoteListItem from '../NoteListItem';
-import NotesTagView from '../NotesTagView';
-import { useNotesViewMode } from '../../hooks/useNotesViewMode';
+import NoteListItem from 'features/notes/components/NoteListItem';
+import NotesTagView from 'features/notes/components/NotesTagView';
+import { useNotesViewMode } from 'features/notes/hooks/useNotesViewMode';
 import EconomicEventShimmer from 'features/events/components/EconomicEventShimmer';
-import NoteEditorDialog from '../NoteEditorDialog';
-import NoteViewerDialog from '../NoteViewerDialog';
-import { Note } from '../../types/note';
-import { Calendar } from 'types/calendar';
-import * as notesService from '../../services/notesService';
+import NoteEditorDialog from 'features/notes/components/NoteEditorDialog';
+import NoteViewerDialog from 'features/notes/components/NoteViewerDialog';
+import { Note } from 'features/notes/types/note';
+import { Calendar } from 'features/calendar/types/calendar';
+import * as notesService from 'features/notes/services/notesService';
 import { logger } from 'utils/logger';
 import { useAuthState } from 'contexts/AuthStateContext';
 import { CalendarRepository } from 'services/repository/repositories/CalendarRepository';
 import { scrollbarStyles } from 'styles/scrollbarStyles';
-import { useNotes } from '../../hooks/useNotes';
+import { useNotes } from 'features/notes/hooks/useNotes';
 import type { Currency, ImpactLevel } from 'features/events/types/economicCalendar';
 
 export interface NotesContentProps {

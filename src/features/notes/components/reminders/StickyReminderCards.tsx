@@ -21,9 +21,9 @@ import {
   brown, grey, blueGrey,
 } from '@mui/material/colors';
 import type { Theme } from '@mui/material';
-import { Note } from '../../types/note';
-import { Calendar } from 'types/calendar';
-import NotesBottomSheet from './NotesBottomSheet';
+import { Note } from 'features/notes/types/note';
+import { Calendar } from 'features/calendar/types/calendar';
+import NotesBottomSheet from 'features/notes/components/reminders/NotesBottomSheet';
 import { useUserPinnedEvents } from 'features/events/contexts/UserPinnedEventsContext';
 
 export interface StickyReminderCardsProps {

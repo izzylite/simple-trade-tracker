@@ -9,7 +9,7 @@ import {
   getUniqueTagGroups,
   filterTagsByGroup,
   getTagName
-} from '../../utils/tagColors';
+} from 'utils/tagColors';
 
 interface TagsDisplayProps {
   tags: string[];

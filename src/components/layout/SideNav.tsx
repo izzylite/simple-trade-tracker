@@ -19,11 +19,11 @@ import {
   InfoOutlined as AboutIcon,
 } from '@mui/icons-material';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { SELECTED_CALENDAR_STORAGE_KEY } from '../../contexts/SelectedCalendarContext';
-import { preloadRoute } from '../../utils/routePreload';
-import { useAuth } from '../../contexts/SupabaseAuthContext';
-import { useCalendars } from '../../hooks/useCalendars';
-import type { Calendar } from '../../types/dualWrite';
+import { SELECTED_CALENDAR_STORAGE_KEY } from 'features/calendar/contexts/SelectedCalendarContext';
+import { preloadRoute } from 'utils/routePreload';
+import { useAuth } from 'contexts/SupabaseAuthContext';
+import { useCalendars } from 'features/calendar/hooks/useCalendars';
+import type { Calendar } from 'features/calendar/types/dualWrite';
 
 export const SIDE_NAV_WIDTH = 92;
 const APP_HEADER_HEIGHT = 64;

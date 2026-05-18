@@ -22,7 +22,7 @@
  */
 
 import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
-import { supabaseAuthService, type SupabaseUser } from '../services/supabaseAuthService';
+import { supabaseAuthService, type SupabaseUser } from 'services/supabaseAuthService';
 
 interface AuthStateContextType {
   user: SupabaseUser | null;

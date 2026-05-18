@@ -32,18 +32,18 @@ import type {
   MarketResearchConfig,
   CoachingTone,
   OrionTask,
-} from '../../types/orionTask';
+} from 'features/orion/types/orionTask';
 import {
   TASK_TYPE_LABELS,
   buildDefaultConfigs,
   detectBrowserTimezone,
-} from '../../types/orionTask';
+} from 'features/orion/types/orionTask';
 import {
   filterMacroQueries,
   type MacroQueryEntry,
   type Market,
-} from '../../data/macroQueryCatalog';
-import { getMacroQueryCatalog } from '../../services/macroQueryCatalogService';
+} from 'features/orion/data/macroQueryCatalog';
+import { getMacroQueryCatalog } from 'features/orion/services/macroQueryCatalogService';
 import { logger } from 'utils/logger';
 import BaseDialog from 'components/common/BaseDialog';
 import { Z_INDEX } from 'styles/zIndex';

@@ -21,7 +21,7 @@ import { supabase, supabaseUrl } from 'config/supabase';
 import {
   getReminders,
   type Reminder,
-} from '../services/remindersService';
+} from 'features/notes/services/remindersService';
 import { useRealtimeSubscription } from 'hooks/useRealtimeSubscription';
 import { logger } from 'utils/logger';
 

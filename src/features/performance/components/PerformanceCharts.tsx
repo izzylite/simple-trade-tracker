@@ -1,31 +1,31 @@
 import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { format } from 'date-fns';
 import { Box, Typography, useTheme, useMediaQuery, Paper, Alert, Button, CircularProgress } from '@mui/material';
-import { Trade, Calendar } from 'types/dualWrite';
-import ImageZoomDialog, { ImageZoomProp } from 'components/ImageZoomDialog';
-import { DynamicRiskSettings } from 'utils/dynamicRiskUtils';
-import TagPatternAnalysis from './TagPatternAnalysis';
+import { Trade, Calendar } from 'features/calendar/types/dualWrite';
+import ImageZoomDialog, { ImageZoomProp } from 'features/calendar/components/ImageZoomDialog';
+import { DynamicRiskSettings } from 'features/calendar/utils/dynamicRiskUtils';
+import TagPatternAnalysis from 'features/performance/components/TagPatternAnalysis';
 import RoundedTabs from 'components/common/RoundedTabs';
-import KpiStrip from './KpiStrip';
-import WeekdayWinRate from './WeekdayWinRate';
+import KpiStrip from 'features/performance/components/KpiStrip';
+import WeekdayWinRate from 'features/performance/components/WeekdayWinRate';
 import { logger } from 'utils/logger';
-import { getFilteredTrades, getNormalizedDate } from '../utils/chartDataUtils';
+import { getFilteredTrades, getNormalizedDate } from 'features/performance/utils/chartDataUtils';
 import {
   PerformanceCalculationResult
-} from '../services/performanceCalculationService';
+} from 'features/performance/services/performanceCalculationService';
 import { supabase } from 'config/supabase';
 import { EconomicCalendarFilterSettings, DEFAULT_FILTER_SETTINGS as DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS } from 'features/events/hooks/useEconomicCalendarFilters';
-import { TradeOperationsProps } from 'types/tradeOperations';
-import PnLChartsWrapper from './charts/PnLChartsWrapper';
-import WinLossStats from './charts/WinLossStats';
-import TagPerformanceAnalysis from './charts/TagPerformanceAnalysis';
-import TagDayOfWeekAnalysis from './charts/TagDayOfWeekAnalysis';
-import SessionPerformanceAnalysis from './charts/SessionPerformanceAnalysis';
-import TradesListDialog from './charts/TradesListDialog';
-import RiskRewardChart from './charts/RiskRewardChart';
+import { TradeOperationsProps } from 'features/calendar/types/tradeOperations';
+import PnLChartsWrapper from 'features/performance/components/charts/PnLChartsWrapper';
+import WinLossStats from 'features/performance/components/charts/WinLossStats';
+import TagPerformanceAnalysis from 'features/performance/components/charts/TagPerformanceAnalysis';
+import TagDayOfWeekAnalysis from 'features/performance/components/charts/TagDayOfWeekAnalysis';
+import SessionPerformanceAnalysis from 'features/performance/components/charts/SessionPerformanceAnalysis';
+import TradesListDialog from 'features/performance/components/charts/TradesListDialog';
+import RiskRewardChart from 'features/performance/components/charts/RiskRewardChart';
 import EconomicEventCorrelationAnalysis from 'features/events/components/charts/EconomicEventCorrelationAnalysis';
-import { useTradeSyncContextOptional } from 'contexts/TradeSyncContext';
-import { normalizeTradeDates } from 'utils/tradeUtils';
+import { useTradeSyncContextOptional } from 'features/calendar/contexts/TradeSyncContext';
+import { normalizeTradeDates } from 'features/calendar/utils/tradeUtils';
 
 // Type definition needed for module-level constants
 export type TimePeriod = 'month' | 'quarter' | 'ytd' | 'year' | 'all';

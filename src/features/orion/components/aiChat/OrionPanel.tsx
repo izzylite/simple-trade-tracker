@@ -40,16 +40,16 @@ import {
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 
-import { AIConversation, ChatMessage as ChatMessageType, AttachedImage } from '../../types/aiChat';
-import { Trade } from 'types/trade';
-import { Calendar } from 'types/calendar';
+import { AIConversation, ChatMessage as ChatMessageType, AttachedImage } from 'features/orion/types/aiChat';
+import { Trade } from 'features/calendar/types/trade';
+import { Calendar } from 'features/calendar/types/calendar';
 import { EconomicEvent } from 'features/events/types/economicCalendar';
 import { Note } from 'features/notes/types/note';
 import { scrollbarStyles } from 'styles/scrollbarStyles';
 import { Z_INDEX } from 'styles/zIndex';
 import Shimmer from 'components/Shimmer';
-import OrionIcon from './OrionIcon';
-import AIChatInterface, { QuestionTemplate } from './AIChatInterface';
+import OrionIcon from 'features/orion/components/aiChat/OrionIcon';
+import AIChatInterface, { QuestionTemplate } from 'features/orion/components/aiChat/AIChatInterface';
 
 // Same width tier as NoteViewerPanel — keeps the slide-in slot
 // consistent when both panels share the right rail (mutex: one open at

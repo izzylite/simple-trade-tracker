@@ -10,7 +10,7 @@ import {
   endOfQuarter,
   startOfYear,
 } from 'date-fns';
-import { Trade } from 'types/dualWrite';
+import { Trade } from 'features/calendar/types/dualWrite';
 import { Theme } from '@mui/material';
 
 export type TimePeriod = 'month' | 'quarter' | 'ytd' | 'year' | 'all';

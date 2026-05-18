@@ -4,7 +4,7 @@ import {
   SelectedCalendarProvider,
   useSelectedCalendar,
   SELECTED_CALENDAR_STORAGE_KEY,
-} from '../SelectedCalendarContext';
+} from 'features/calendar/contexts/SelectedCalendarContext';
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
   <SelectedCalendarProvider>{children}</SelectedCalendarProvider>

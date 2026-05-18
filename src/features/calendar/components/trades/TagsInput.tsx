@@ -1,0 +1,207 @@
+import React, { useState } from 'react';
+import {
+  Autocomplete,
+  TextField,
+  Chip,
+  Box,
+  Tooltip,
+  Button,
+  Snackbar,
+  Alert
+} from '@mui/material';
+import { useTheme } from '@mui/material/styles';
+import {
+  getTagChipStyles,
+  formatTagForDisplay,
+  isGroupedTag,
+  getTagGroup
+} from 'utils/tagColors';
+import TagFormDialog from '../TagFormDialog';
+import { scrollbarStyles } from 'styles/scrollbarStyles';
+import { Z_INDEX } from 'styles/zIndex';
+
+interface TagsInputProps {
+  tags: string[];
+  allTags: string[];
+  onTagsChange: (event: React.SyntheticEvent, value: string[]) => void;
+  calendarId: string;
+  onTagUpdated?: (oldTag: string, newTag: string) => Promise<{ success: boolean; tradesUpdated: number }>;
+}
+
+const TagsInput: React.FC<TagsInputProps> = ({
+  tags,
+  allTags,
+  onTagsChange,
+  calendarId,
+  onTagUpdated
+}) => {
+  const theme = useTheme();
+  const [tagToEdit, setTagToEdit] = useState<string | null>(null);
+  const [showWarning, setShowWarning] = useState(false);
+
+  const handleTagEditSuccess = (oldTag: string, newTag: string, tradesUpdated: number) => {
+    if (onTagUpdated) {
+      onTagUpdated(oldTag, newTag);
+    }
+  };
+
+  const handleTagDelete = (deletedTag: string, tradesUpdated: number) => {
+    // Remove the deleted tag from current tags if it exists
+    if (tags.includes(deletedTag)) {
+      const updatedTags = tags.filter(tag => tag !== deletedTag);
+      // Create a synthetic event for the onTagsChange callback
+      // Using 'unknown' first to avoid TypeScript strict type checking
+      const syntheticEvent = {} as unknown as React.SyntheticEvent;
+      onTagsChange(syntheticEvent, updatedTags);
+    }
+
+    if (onTagUpdated) {
+      onTagUpdated(deletedTag, ''); // Pass empty string to indicate deletion
+    }
+  };
+
+  // Validate and filter tags to prevent multiple colons
+  const handleTagsChangeWithValidation = (event: React.SyntheticEvent, value: string[]) => {
+    const validTags: string[] = [];
+    let hasInvalidTags = false;
+
+    value.forEach(tag => {
+      // Count colons in the tag
+      const colonCount = (tag.match(/:/g) || []).length;
+
+      if (colonCount <= 1) {
+        validTags.push(tag);
+      } else {
+        hasInvalidTags = true;
+      }
+    });
+
+    // Show warning if invalid tags were filtered out
+    if (hasInvalidTags) {
+      setShowWarning(true);
+    }
+
+    // Call the original handler with filtered tags
+    onTagsChange(event, validTags);
+  };
+
+  return (
+    <>
+      <Autocomplete
+        multiple
+        freeSolo
+        options={allTags}
+        value={tags || []}
+        onChange={handleTagsChangeWithValidation}
+        slotProps={{
+          popper: {
+            sx: { zIndex: Z_INDEX.DIALOG_POPUP }
+          },
+          listbox: {
+            sx: {
+              ...scrollbarStyles(theme)
+            }
+          }
+        }}
+        renderTags={(value, getTagProps) =>
+          value.map((option, index) => {
+            const { key, ...otherProps } = getTagProps({ index });
+            return (
+              <Chip
+                key={key}
+                label={formatTagForDisplay(option, false)}
+                {...otherProps}
+                sx={getTagChipStyles(option, theme)}
+                title={isGroupedTag(option) ? `Group: ${getTagGroup(option)}` : undefined}
+              />
+            );
+          })
+        }
+        renderOption={(props, option) => {
+          const { key, ...restProps } = props;
+          return (
+            <li key={key} {...restProps}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  {isGroupedTag(option) && (
+                    <Chip
+                      label={getTagGroup(option)}
+                      size="small"
+                      sx={{
+                        ...getTagChipStyles(option, theme),
+                        height: '18px',
+                        fontSize: '0.7rem'
+                      }}
+                    />
+                  )}
+                  {formatTagForDisplay(option, true)}
+                </Box>
+                <Tooltip title="Edit this tag across all trades">
+                  <Button
+                    size="small"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setTagToEdit(option);
+                    }}
+                    sx={{
+                      color: theme.palette.text.secondary,
+                      '&:hover': {
+                        color: theme.palette.primary.main
+                      }
+                    }}
+                  >
+                    Edit
+                  </Button>
+                </Tooltip>
+              </Box>
+            </li>
+          );
+        }}
+        renderInput={(params) => (
+          <TextField
+            {...params}
+            label="Tags"
+            placeholder="Add tags"
+            slotProps={{
+              htmlInput: {
+                ...params.inputProps,
+                id: 'trade-tags-input'
+              }
+            }}
+          />
+        )}
+      />
+
+      {tagToEdit && (
+        <TagFormDialog
+          open={!!tagToEdit}
+          onClose={() => setTagToEdit(null)}
+          editTag={tagToEdit}
+          calendarId={calendarId}
+          allTags={allTags}
+          onEditSuccess={handleTagEditSuccess}
+          onDelete={handleTagDelete}
+          onTagUpdated={onTagUpdated}
+        />
+      )}
+
+      <Snackbar
+        open={showWarning}
+        autoHideDuration={4000}
+        onClose={() => setShowWarning(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        sx={{ zIndex: Z_INDEX.DIALOG_POPUP }}
+      >
+        <Alert
+          onClose={() => setShowWarning(false)}
+          severity="warning"
+          sx={{ width: '100%' }}
+        >
+          Tags can only contain one colon (:) for category formatting. Invalid tags were removed.
+        </Alert>
+      </Snackbar>
+    </>
+  );
+};
+
+export default React.memo(TagsInput);

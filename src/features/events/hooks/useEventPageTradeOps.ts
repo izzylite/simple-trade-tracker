@@ -1,8 +1,8 @@
 import { useCallback, useState } from 'react';
-import { Trade } from 'types/dualWrite';
-import { TradeOperationsProps } from 'types/tradeOperations';
-import { getTradeById, updateTrade } from 'services/calendarService';
-import { ImageZoomProp } from 'components/ImageZoomDialog';
+import { Trade } from 'features/calendar/types/dualWrite';
+import { TradeOperationsProps } from 'features/calendar/types/tradeOperations';
+import { getTradeById, updateTrade } from 'features/calendar/services/calendarService';
+import { ImageZoomProp } from 'features/calendar/components/ImageZoomDialog';
 import { logger } from 'utils/logger';
 
 interface UseEventPageTradeOpsReturn {

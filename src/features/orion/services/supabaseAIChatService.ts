@@ -6,9 +6,9 @@
 
 import { supabase, supabaseUrl } from 'config/supabase';
 import { logger } from 'utils/logger';
-import type { Trade } from 'types/trade';
-import type { Calendar } from 'types/calendar';
-import type { ChatMessage as ChatMessageType, AttachedImage } from '../types/aiChat';
+import type { Trade } from 'features/calendar/types/trade';
+import type { Calendar } from 'features/calendar/types/calendar';
+import type { ChatMessage as ChatMessageType, AttachedImage } from 'features/orion/types/aiChat';
 
 
 export interface AgentResponse {

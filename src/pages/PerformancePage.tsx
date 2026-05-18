@@ -5,11 +5,11 @@ import {
   CircularProgress,
   useTheme,
 } from '@mui/material';
-import { useAuthState } from '../contexts/AuthStateContext';
-import { useCalendars } from '../hooks/useCalendars';
-import { Calendar } from '../types/calendar';
+import { useAuthState } from 'contexts/AuthStateContext';
+import { useCalendars } from 'features/calendar/hooks/useCalendars';
+import { Calendar } from 'features/calendar/types/calendar';
 import PerformanceCharts, { TimePeriod } from 'features/performance/components/PerformanceCharts';
-import { useSelectedCalendar } from '../contexts/SelectedCalendarContext';
+import { useSelectedCalendar } from 'features/calendar/contexts/SelectedCalendarContext';
 import PerformanceHeader from 'features/performance/components/PerformanceHeader';
 
 const SWITCH_SPINNER_MS = 350;

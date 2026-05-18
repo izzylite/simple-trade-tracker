@@ -1,7 +1,7 @@
-import { Trade } from 'types/dualWrite';
-import { TagCombination, TagPatternInsight, TagPatternAnalysis } from '../types/score';
+import { Trade } from 'features/calendar/types/dualWrite';
+import { TagCombination, TagPatternInsight, TagPatternAnalysis } from 'features/performance/types/score';
 import { subDays, isAfter } from 'date-fns';
-import { generateTagCombinationsInWorker } from '../workers/tagPatternWorker';
+import { generateTagCombinationsInWorker } from 'features/performance/workers/tagPatternWorker';
 import { logger } from 'utils/logger';
 
 /**

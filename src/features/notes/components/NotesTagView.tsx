@@ -2,14 +2,14 @@ import React, { useMemo, useState } from 'react';
 import { Box, Collapse, Typography, IconButton } from '@mui/material';
 import { ExpandLess, ExpandMore, LabelOutlined } from '@mui/icons-material';
 
-import NoteListItem from './NoteListItem';
+import NoteListItem from 'features/notes/components/NoteListItem';
 import {
   getTagDisplayLabel,
   getTagSubtitle,
   getTagIcon,
-} from './NoteEditorDialogTags';
-import { Note } from '../types/note';
-import { Calendar } from 'types/calendar';
+} from 'features/notes/components/NoteEditorDialogTags';
+import { Note } from 'features/notes/types/note';
+import { Calendar } from 'features/calendar/types/calendar';
 
 const UNTAGGED = '__untagged';
 const UNTAGGED_LABEL = 'Untagged';

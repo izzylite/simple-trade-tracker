@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { Box, Paper } from '@mui/material';
-import CumulativePnLChart from './CumulativePnLChart';
-import DailyPnLChart from './DailyPnLChart';
-import PnLHeatmap from './PnLHeatmap';
+import CumulativePnLChart from 'features/performance/components/charts/CumulativePnLChart';
+import DailyPnLChart from 'features/performance/components/charts/DailyPnLChart';
+import PnLHeatmap from 'features/performance/components/charts/PnLHeatmap';
 import RoundedTabs, { TabPanel } from 'components/common/RoundedTabs';
-import { Trade } from 'types/dualWrite';
-import { TimePeriod } from '../../utils/chartDataUtils';
+import { Trade } from 'features/calendar/types/dualWrite';
+import { TimePeriod } from 'features/performance/utils/chartDataUtils';
 
 interface PnLChartsWrapperProps {
   chartData: any[];

@@ -23,7 +23,7 @@ import {
   grey,
   blueGrey,
 } from '@mui/material/colors';
-import { Note } from '../../types/note';
+import { Note } from 'features/notes/types/note';
 
 interface NoteCardProps {
   note: Note;

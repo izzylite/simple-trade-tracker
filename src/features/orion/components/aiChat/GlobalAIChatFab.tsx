@@ -3,7 +3,7 @@ import { Badge, Box, Fab, Tooltip, alpha, useTheme } from '@mui/material';
 import { SmartToy as AIIcon } from '@mui/icons-material';
 import { useLocation } from 'react-router-dom';
 import { useAuthState } from 'contexts/AuthStateContext';
-import { useAIChat } from '../../contexts/AIChatContext';
+import { useAIChat } from 'features/orion/contexts/AIChatContext';
 import { useAnyPanelOpen } from 'contexts/PanelMutexContext';
 
 /**

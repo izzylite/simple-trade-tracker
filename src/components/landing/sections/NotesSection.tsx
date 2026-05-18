@@ -1,8 +1,8 @@
 import React from 'react';
 import { Box, Container, Stack, Typography } from '@mui/material';
-import { ACCENT, HAIR, RULE, TNUM, WIN } from '../landingTokens';
-import { useReveal, revealSx } from '../landingHooks';
-import SectionMarker from './SectionMarker';
+import { ACCENT, HAIR, RULE, TNUM, WIN } from 'components/landing/landingTokens';
+import { useReveal, revealSx } from 'components/landing/landingHooks';
+import SectionMarker from 'components/landing/sections/SectionMarker';
 
 /* Notes — typographic spread, no demo card.
    The journal voice IS the demo: pulled-quote bias line + numbered hunting list

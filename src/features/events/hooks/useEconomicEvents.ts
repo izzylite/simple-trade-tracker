@@ -6,8 +6,8 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
-import { EconomicEvent, Currency, ImpactLevel } from '../types/economicCalendar';
-import { economicCalendarService } from '../services/economicCalendarService';
+import { EconomicEvent, Currency, ImpactLevel } from 'features/events/types/economicCalendar';
+import { economicCalendarService } from 'features/events/services/economicCalendarService';
 import { logger } from 'utils/logger';
 import { supabase } from 'config/supabase';
 

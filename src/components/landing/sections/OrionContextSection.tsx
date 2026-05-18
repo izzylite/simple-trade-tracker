@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Box, Container, Stack, Typography } from '@mui/material';
-import { ACCENT, HAIR, PAPER, TNUM, WIN, LOSS } from '../landingTokens';
-import { useReveal, revealSx, useTypewriter, useReducedMotion } from '../landingHooks';
-import SectionMarker from './SectionMarker';
+import { ACCENT, HAIR, PAPER, TNUM, WIN, LOSS } from 'components/landing/landingTokens';
+import { useReveal, revealSx, useTypewriter, useReducedMotion } from 'components/landing/landingHooks';
+import SectionMarker from 'components/landing/sections/SectionMarker';
 
 /* ─────────────────────────────────────────────
    Orion · Context Advantage

@@ -37,14 +37,14 @@ import {
   Tooltip as RechartsTooltip,
 } from 'recharts';
 
-import { Trade } from 'types/dualWrite';
-import TradeList from 'components/trades/TradeList';
-import { startOfNextDay } from 'components/trades/TradeFormDialog';
-import { calculateCumulativePnLToDateAsync } from 'utils/dynamicRiskUtils';
+import { Trade } from 'features/calendar/types/dualWrite';
+import TradeList from 'features/calendar/components/trades/TradeList';
+import { startOfNextDay } from 'features/calendar/components/trades/TradeFormDialog';
+import { calculateCumulativePnLToDateAsync } from 'features/calendar/utils/dynamicRiskUtils';
 import { logger } from 'utils/logger';
 import { formatCurrency, formatCount } from 'utils/formatters';
-import { getTagDayOfWeekChartData } from '../../utils/chartDataUtils';
-import { TradeOperationsProps } from 'types/tradeOperations';
+import { getTagDayOfWeekChartData } from 'features/performance/utils/chartDataUtils';
+import { TradeOperationsProps } from 'features/calendar/types/tradeOperations';
 import { BaseDialog } from 'components/common';
 import { useDialogTokens } from 'styles/dialogTokens';
 

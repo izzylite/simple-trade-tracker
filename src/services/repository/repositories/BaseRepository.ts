@@ -3,8 +3,8 @@
  * Defines the contract for all data repositories using Supabase
  */
 
-import { BaseEntity } from '../../../types/dualWrite';
-import { SupabaseError, SupabaseErrorCategory } from '../../../utils/supabaseErrorHandler';
+import { BaseEntity } from 'features/calendar/types/dualWrite';
+import { SupabaseError, SupabaseErrorCategory } from 'utils/supabaseErrorHandler';
 
 /**
  * Configuration for repository operations
@@ -127,7 +127,7 @@ export abstract class AbstractBaseRepository<T extends BaseEntity> implements Ba
       success: successfulResults.length === entities.length,
       data: allData,
       error: successfulResults.length === 0 ?
-        (await import('../../../utils/supabaseErrorHandler')).parseSupabaseError(
+        (await import('utils/supabaseErrorHandler')).parseSupabaseError(
           new Error('All batch create operations failed'),
           'Batch create operation'
         ) : undefined,
@@ -146,7 +146,7 @@ export abstract class AbstractBaseRepository<T extends BaseEntity> implements Ba
       success: successfulResults.length === updates.length,
       data: allData,
       error: successfulResults.length === 0 ?
-        (await import('../../../utils/supabaseErrorHandler')).parseSupabaseError(
+        (await import('utils/supabaseErrorHandler')).parseSupabaseError(
           new Error('All batch update operations failed'),
           'Batch update operation'
         ) : undefined,
@@ -164,7 +164,7 @@ export abstract class AbstractBaseRepository<T extends BaseEntity> implements Ba
       success: successfulResults.length > 0,
       data: true,
       error: successfulResults.length === 0 ?
-        (await import('../../../utils/supabaseErrorHandler')).parseSupabaseError(
+        (await import('utils/supabaseErrorHandler')).parseSupabaseError(
           new Error('All batch delete operations failed'),
           'Batch delete operation'
         ) : undefined,
@@ -181,7 +181,7 @@ export abstract class AbstractBaseRepository<T extends BaseEntity> implements Ba
     operationType: string,
     context: string
   ): Promise<T> {
-    const { handleSupabaseError, getErrorRecoveryStrategy } = await import('../../../utils/supabaseErrorHandler');
+    const { handleSupabaseError, getErrorRecoveryStrategy } = await import('utils/supabaseErrorHandler');
     let lastError: any = null;
 
     for (let attempt = 1; attempt <= this.config.retryAttempts; attempt++) {

@@ -1,8 +1,8 @@
 import React from 'react';
 import { Box, IconButton, Tooltip, Typography, alpha, useTheme } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import { AppNotification } from '../../types/notification';
-import { formatNotificationTime } from './timeAgo';
+import { AppNotification } from 'types/notification';
+import { formatNotificationTime } from 'components/notifications/timeAgo';
 
 interface NotificationRowProps {
   notification: AppNotification;

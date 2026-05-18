@@ -4,7 +4,7 @@ import { alpha } from '@mui/material/styles';
 import CallMadeIcon from '@mui/icons-material/CallMadeOutlined';
 import CallReceivedIcon from '@mui/icons-material/CallReceivedOutlined';
 import { ContentState } from 'draft-js';
-import type { TradeChipData } from '../utils/tradeEntityUtils';
+import type { TradeChipData } from 'components/common/RichTextEditor/utils/tradeEntityUtils';
 
 interface TradeLinkProps {
   contentState: ContentState;

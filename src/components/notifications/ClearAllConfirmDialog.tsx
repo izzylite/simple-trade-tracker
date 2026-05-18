@@ -1,5 +1,5 @@
 import React from 'react';
-import ConfirmationDialog from '../common/ConfirmationDialog';
+import ConfirmationDialog from 'components/common/ConfirmationDialog';
 
 interface ClearAllConfirmDialogProps {
   open: boolean;

@@ -23,8 +23,8 @@ import {
   AutoAwesome as AutoAwesomeIcon,
 } from '@mui/icons-material';
 
-import { scrollbarStyles } from '../../styles/scrollbarStyles';
-import { FAQS, FAQ_CATEGORIES, FAQCategoryId, FAQItem } from './faqData';
+import { scrollbarStyles } from 'styles/scrollbarStyles';
+import { FAQS, FAQ_CATEGORIES, FAQCategoryId, FAQItem } from 'components/faq/faqData';
 
 type CategoryFilter = FAQCategoryId | 'all';
 

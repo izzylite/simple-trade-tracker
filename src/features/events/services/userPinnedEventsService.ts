@@ -7,7 +7,7 @@
  */
 
 import { supabase } from 'config/supabase';
-import { PinnedEvent } from 'types/dualWrite';
+import { PinnedEvent } from 'features/calendar/types/dualWrite';
 import { logger } from 'utils/logger';
 
 export async function getUserPinnedEvents(

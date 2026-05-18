@@ -14,23 +14,23 @@ type Loader = () => Promise<unknown>;
 const LOADERS: Array<{ match: (path: string) => boolean; load: Loader }> = [
   {
     match: (p) => p === '/' || p === '/dashboard' || p.startsWith('/calendar/'),
-    load: () => import('../pages/TradeCalendarPage'),
+    load: () => import('pages/TradeCalendarPage'),
   },
   {
     match: (p) => p.startsWith('/performance'),
-    load: () => import('../pages/PerformancePage'),
+    load: () => import('pages/PerformancePage'),
   },
   {
     match: (p) => p.startsWith('/notes'),
-    load: () => import('../pages/NotesPage'),
+    load: () => import('pages/NotesPage'),
   },
   {
     match: (p) => p.startsWith('/events'),
-    load: () => import('../pages/EconomicEventsPage'),
+    load: () => import('pages/EconomicEventsPage'),
   },
   {
     match: (p) => p.startsWith('/about'),
-    load: () => import('../pages/AboutPage'),
+    load: () => import('pages/AboutPage'),
   },
 ];
 

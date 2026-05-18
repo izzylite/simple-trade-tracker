@@ -5,7 +5,7 @@ import {
   Container,
   Toolbar
 } from '@mui/material';
-import AnimatedBackground from '../components/common/AnimatedBackground';
+import AnimatedBackground from 'components/common/AnimatedBackground';
 
 interface CommunityPageProps {
   onToggleTheme: () => void;

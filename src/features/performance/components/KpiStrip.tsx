@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Box, useTheme } from '@mui/material';
 import { formatCurrency, formatPercentage } from 'utils/formatters';
-import { PerformanceCalculationResult } from '../services/performanceCalculationService';
+import { PerformanceCalculationResult } from 'features/performance/services/performanceCalculationService';
 
 interface KpiStripProps {
   performanceData: PerformanceCalculationResult | null;

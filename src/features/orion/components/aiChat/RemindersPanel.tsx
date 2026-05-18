@@ -24,8 +24,8 @@ import {
 } from 'features/notes/services/remindersService';
 import { useRealtimeSubscription } from 'hooks/useRealtimeSubscription';
 import { logger } from 'utils/logger';
-import ReminderListItem from './ReminderListItem';
-import ReminderBatchListItem from './ReminderBatchListItem';
+import ReminderListItem from 'features/orion/components/aiChat/ReminderListItem';
+import ReminderBatchListItem from 'features/orion/components/aiChat/ReminderBatchListItem';
 import EconomicEventShimmer from 'features/events/components/EconomicEventShimmer';
 
 /**

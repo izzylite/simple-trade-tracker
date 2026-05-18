@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import OrionIcon from './OrionIcon';
+import OrionIcon from 'features/orion/components/aiChat/OrionIcon';
 import {
   Box,
   IconButton,
@@ -28,19 +28,19 @@ import {
 import ManageSearchIcon from '@mui/icons-material/ManageSearch';
 import { format } from 'date-fns';
 import { v5 as uuidv5 } from 'uuid';
-import { Trade } from 'types/trade';
-import { Calendar } from 'types/calendar';
-import { TradeOperationsProps } from 'types/tradeOperations';
+import { Trade } from 'features/calendar/types/trade';
+import { Calendar } from 'features/calendar/types/calendar';
+import { TradeOperationsProps } from 'features/calendar/types/tradeOperations';
 import { Z_INDEX } from 'styles/zIndex';
 import { useDialogTokens } from 'styles/dialogTokens';
-import AIChatContent from '../sidePanel/AIChatContent';
-import { UseAIChatReturn, useAIChat } from '../../hooks/useAIChat';
+import AIChatContent from 'features/orion/components/sidePanel/AIChatContent';
+import { UseAIChatReturn, useAIChat } from 'features/orion/hooks/useAIChat';
 import { ConversationRepository } from 'services/repository/repositories/ConversationRepository';
 import { logger } from 'utils/logger';
 import { TabPanel } from 'components/common/RoundedTabs';
-import OrionTasksContent from '../orionTasks/OrionTasksContent';
-import type { AITasksBundle, OrionTaskResult } from '../../types/orionTask';
-import { TASK_TYPE_LABELS } from '../../types/orionTask';
+import OrionTasksContent from 'features/orion/components/orionTasks/OrionTasksContent';
+import type { AITasksBundle, OrionTaskResult } from 'features/orion/types/orionTask';
+import { TASK_TYPE_LABELS } from 'features/orion/types/orionTask';
 import { useAuth } from 'contexts/SupabaseAuthContext';
 import { createNote } from 'features/notes/services/notesService';
 

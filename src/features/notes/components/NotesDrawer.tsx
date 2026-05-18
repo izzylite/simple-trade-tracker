@@ -8,7 +8,7 @@ import React from 'react';
 import { Notes as NotesIcon } from '@mui/icons-material';
 
 import UnifiedDrawer from 'components/common/UnifiedDrawer';
-import NotesContent, { NotesContentProps } from './sidePanel/NotesContent';
+import NotesContent, { NotesContentProps } from 'features/notes/components/sidePanel/NotesContent';
 
 interface NotesDrawerProps extends NotesContentProps {
   open: boolean;

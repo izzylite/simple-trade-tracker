@@ -27,7 +27,7 @@ import {
   GENERAL_TAG,
   STRATEGY_TAG,
   INSIGHT_TAG,
-} from '../types/note';
+} from 'features/notes/types/note';
 
 export interface TagInfo {
   label: string;

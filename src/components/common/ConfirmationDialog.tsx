@@ -17,9 +17,9 @@ import {
   CheckCircleOutline as SuccessIcon,
   InfoOutlined as InfoIcon,
 } from '@mui/icons-material';
-import { dialogProps } from '../../styles/dialogStyles';
-import { Z_INDEX } from '../../styles/zIndex';
-import { useDialogTokens } from '../../styles/dialogTokens';
+import { dialogProps } from 'styles/dialogStyles';
+import { Z_INDEX } from 'styles/zIndex';
+import { useDialogTokens } from 'styles/dialogTokens';
 
 type ConfirmColor = 'primary' | 'error' | 'warning' | 'success' | 'info';
 

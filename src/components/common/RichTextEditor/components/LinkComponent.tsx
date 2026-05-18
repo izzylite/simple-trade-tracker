@@ -3,7 +3,7 @@ import { useTheme } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
 import { ContentState } from 'draft-js';
-import { isInternalTradeLink } from '../utils/linkUtils';
+import { isInternalTradeLink } from 'components/common/RichTextEditor/utils/linkUtils';
 
 interface LinkProps {
   contentState: ContentState;

@@ -31,9 +31,9 @@ import { useNavigate } from 'react-router-dom';
 import {
   AppNotification,
   isReminderFiredPayload,
-} from '../../types/notification';
-import { useNotifications } from '../../contexts/NotificationsContext';
-import { formatNotificationTime } from './timeAgo';
+} from 'types/notification';
+import { useNotifications } from 'contexts/NotificationsContext';
+import { formatNotificationTime } from 'components/notifications/timeAgo';
 
 interface CrossSessionReminderBatchCardProps {
   // Sorted descending by created_at (newest first). All share batchId.

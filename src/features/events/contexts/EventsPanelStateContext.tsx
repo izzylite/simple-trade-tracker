@@ -23,8 +23,8 @@ import React, {
   useState,
 } from 'react';
 import { addDays, addWeeks, startOfWeek } from 'date-fns';
-import { EconomicEvent } from '../types/economicCalendar';
-import { HubTab } from '../components/EconomicEventsView';
+import { EconomicEvent } from 'features/events/types/economicCalendar';
+import { HubTab } from 'features/events/components/EconomicEventsView';
 
 interface EventsPanelStateContextValue {
   // Week + day selection

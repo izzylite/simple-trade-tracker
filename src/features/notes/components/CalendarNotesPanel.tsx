@@ -20,10 +20,10 @@
 import React from 'react';
 import { Box } from '@mui/material';
 
-import { useNotesPanelState } from '../contexts/NotesPanelStateContext';
+import { useNotesPanelState } from 'features/notes/contexts/NotesPanelStateContext';
 
-import NoteListPanel from './NoteListPanel';
-import NoteEditorDialog from './NoteEditorDialog';
+import NoteListPanel from 'features/notes/components/NoteListPanel';
+import NoteEditorDialog from 'features/notes/components/NoteEditorDialog';
 
 const CalendarNotesPanel: React.FC = () => {
   const {

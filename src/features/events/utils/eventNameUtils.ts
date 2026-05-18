@@ -2,8 +2,8 @@
  * Utility functions for cleaning and processing economic event names
  */
 
-import { PinnedEvent, TradeEconomicEvent } from "types/dualWrite";
-import { EconomicEvent } from "../types/economicCalendar";
+import { PinnedEvent, TradeEconomicEvent } from "features/calendar/types/dualWrite";
+import { EconomicEvent } from "features/events/types/economicCalendar";
 
 /**
  * Clean event name for pinning by removing parentheses content and normalizing

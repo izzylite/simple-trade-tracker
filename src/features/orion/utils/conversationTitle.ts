@@ -10,7 +10,7 @@
  * backend can store it on the conversation row.
  */
 
-import { stripReferencedBlocks } from './chatMentions';
+import { stripReferencedBlocks } from 'features/orion/utils/chatMentions';
 
 /**
  * Bare invocations (entire message is just `[Referenced command:]` /

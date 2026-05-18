@@ -5,8 +5,8 @@
  * All data must be serializable (no functions, Date objects converted to strings).
  */
 
-import type { Trade } from 'types/dualWrite';
-import type { TimePeriod, ChartDataPoint } from '../../utils/chartDataUtils';
+import type { Trade } from 'features/calendar/types/dualWrite';
+import type { TimePeriod, ChartDataPoint } from 'features/performance/utils/chartDataUtils';
 
 // ============================================================================
 // Base Message Types

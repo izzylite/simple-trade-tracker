@@ -8,7 +8,7 @@
  */
 
 import { supabase } from 'config/supabase';
-import { cleanEventNameForPinning } from '../utils/eventNameUtils';
+import { cleanEventNameForPinning } from 'features/events/utils/eventNameUtils';
 
 export type EventCountKey = string; // `${cleanedName.toLowerCase()}|${currency}|${impact}`
 

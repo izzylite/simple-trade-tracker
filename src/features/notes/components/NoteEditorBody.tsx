@@ -96,19 +96,19 @@ import EditorToolbar from 'components/common/RichTextEditor/components/EditorToo
 import ImagePickerDialog from 'components/heroImage/ImagePickerDialog';
 import ConfirmationDialog from 'components/common/ConfirmationDialog';
 import { useAuthState } from 'contexts/AuthStateContext';
-import * as notesService from '../services/notesService';
+import * as notesService from 'features/notes/services/notesService';
 import {
   Note,
   ReminderType,
   DayAbbreviation,
   GUIDELINE_TAG,
   GAME_PLAN_TAG,
-} from '../types/note';
+} from 'features/notes/types/note';
 import { scrollbarStyles } from 'styles/scrollbarStyles';
 import { logger } from 'utils/logger';
 import { isGroupedTag, getTagName, getTagGroup } from 'utils/tagColors';
-import NoteShareButton from './NoteShareButton';
-import { useNoteNavigation } from '../hooks/useNoteNavigation';
+import NoteShareButton from 'features/notes/components/NoteShareButton';
+import { useNoteNavigation } from 'features/notes/hooks/useNoteNavigation';
 import { getContentAsJson } from 'components/common/RichTextEditor/utils/draftUtils';
 import { IMPACT_COLORS, CURRENCY_FLAGS } from 'features/events/types/economicCalendar';
 import type { ImpactLevel, Currency } from 'features/events/types/economicCalendar';
@@ -116,7 +116,7 @@ import {
   DEFAULT_NOTE_TAGS_MAP,
   getTagDisplayLabel,
   getTagSubtitle,
-} from './NoteEditorDialogTags';
+} from 'features/notes/components/NoteEditorDialogTags';
 
 // Full day names for game plan titles
 const DAY_FULL_NAMES: Record<DayAbbreviation, string> = {

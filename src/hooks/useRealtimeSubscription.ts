@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { RealtimeChannel, REALTIME_SUBSCRIBE_STATES } from '@supabase/supabase-js';
-import { supabase } from '../config/supabase';
-import { logger } from '../utils/logger';
+import { supabase } from 'config/supabase';
+import { logger } from 'utils/logger';
 
 interface UseRealtimeSubscriptionOptions {
   channelName: string;

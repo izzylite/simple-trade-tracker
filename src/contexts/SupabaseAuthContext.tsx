@@ -4,8 +4,8 @@
  */
 
 import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
-import { supabaseAuthService, type SupabaseUser, type AuthState } from '../services/supabaseAuthService';
-import { logger } from '../utils/logger';
+import { supabaseAuthService, type SupabaseUser, type AuthState } from 'services/supabaseAuthService';
+import { logger } from 'utils/logger';
 
 interface SupabaseAuthContextType {
   user: SupabaseUser | null;

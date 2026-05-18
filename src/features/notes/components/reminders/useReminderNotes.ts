@@ -6,8 +6,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { format } from 'date-fns';
-import { Note, DayAbbreviation } from '../../types/note';
-import { getReminderNotesForDay } from '../../services/notesService';
+import { Note, DayAbbreviation } from 'features/notes/types/note';
+import { getReminderNotesForDay } from 'features/notes/services/notesService';
 import { logger } from 'utils/logger';
 import { supabase } from 'config/supabase';
 

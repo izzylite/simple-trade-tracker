@@ -13,20 +13,20 @@ import {
   CssBaseline,
 } from '@mui/material';
 import { createTheme } from '@mui/material/styles';
-import { createAppTheme } from '../theme';
+import { createAppTheme } from 'theme';
 import { format } from 'date-fns';
-import AppHeader from '../components/common/AppHeader';
+import AppHeader from 'components/common/AppHeader';
 import RichTextViewer from
-  '../components/common/RichTextEditor/RichTextViewer';
+  'components/common/RichTextEditor/RichTextViewer';
 import {
   getSharedNote,
   getSharedTrade,
   SharedNoteData,
-} from '../services/sharingService';
-import { Trade } from '../types/dualWrite';
-import TradeGalleryDialog from '../components/TradeGalleryDialog';
-import ImageZoomDialog, { ImageZoomProp } from '../components/ImageZoomDialog';
-import { logger } from '../utils/logger';
+} from 'features/calendar/services/sharingService';
+import { Trade } from 'features/calendar/types/dualWrite';
+import TradeGalleryDialog from 'features/calendar/components/TradeGalleryDialog';
+import ImageZoomDialog, { ImageZoomProp } from 'features/calendar/components/ImageZoomDialog';
+import { logger } from 'utils/logger';
 
 const SharedNotePage: React.FC = () => {
   const { shareId } = useParams<{ shareId: string }>();

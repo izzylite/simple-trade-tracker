@@ -25,10 +25,10 @@ import {
   SmartToy as AIIcon,
 } from '@mui/icons-material';
 
-import { Note } from '../types/note';
+import { Note } from 'features/notes/types/note';
 import { scrollbarStyles } from 'styles/scrollbarStyles';
 import { Z_INDEX } from 'styles/zIndex';
-import NoteViewerContent from './NoteViewerContent';
+import NoteViewerContent from 'features/notes/components/NoteViewerContent';
 
 interface NoteViewerDialogProps {
   open: boolean;

@@ -4,7 +4,7 @@ import { Insights as StatsIcon } from '@mui/icons-material';
 import UnifiedDrawer from 'components/common/UnifiedDrawer';
 import StatsContent, {
   StatsContentProps,
-} from './StatsContent';
+} from 'features/performance/components/StatsContent';
 
 interface StatsDrawerProps extends StatsContentProps {
   open: boolean;

@@ -10,10 +10,10 @@ import React, {
 import {
   useEconomicEventWatcher,
   useEconomicEventsUpdates,
-} from '../hooks/useEconomicEventWatcher';
-import { useTradesContext } from 'contexts/TradesContext';
+} from 'features/events/hooks/useEconomicEventWatcher';
+import { useTradesContext } from 'features/calendar/contexts/TradesContext';
 import { playNotificationSound } from 'utils/notificationSound';
-import type { EconomicEvent } from '../types/economicCalendar';
+import type { EconomicEvent } from 'features/events/types/economicCalendar';
 
 /**
  * App-level controller for economic event notifications. Owns the watcher

@@ -63,16 +63,16 @@ import {
   isSameWeek,
   isToday
 } from 'date-fns';
-import { formatCurrency, formatCount } from '../utils/formatters';
-import { Trade } from '../types/trade';
-import DayDialog from '../components/trades/DayDialog';
-import SelectDateDialog from '../components/SelectDateDialog';
+import { formatCurrency, formatCount } from 'utils/formatters';
+import { Trade } from 'features/calendar/types/trade';
+import DayDialog from 'features/calendar/components/trades/DayDialog';
+import SelectDateDialog from 'features/calendar/components/SelectDateDialog';
 
-import TagFilterDialog from '../components/TagFilterDialog';
-import TagManagementDrawer from '../components/TagManagementDrawer';
-import SearchDrawer from '../components/SearchDrawer';
-import TargetBadge from '../components/TargetBadge';
-import { CalendarCell, WeekdayHeader } from '../components/CalendarGrid';
+import TagFilterDialog from 'features/calendar/components/TagFilterDialog';
+import TagManagementDrawer from 'features/calendar/components/TagManagementDrawer';
+import SearchDrawer from 'features/calendar/components/SearchDrawer';
+import TargetBadge from 'features/calendar/components/TargetBadge';
+import { CalendarCell, WeekdayHeader } from 'features/calendar/components/CalendarGrid';
 
 import {
   StyledCalendarDay,
@@ -82,18 +82,18 @@ import {
   TradeAmount,
   TradeCount,
 
-} from '../components/StyledComponents';
+} from 'features/calendar/components/StyledComponents';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import PageActionBar from '../components/common/PageActionBar';
-import { Calendar } from '../types/calendar';
-import { CalendarRepository } from '../services/repository/repositories/CalendarRepository';
-import CalendarFormDialog, { CalendarFormData } from '../components/CalendarFormDialog';
-import ShareButton from '../components/sharing/ShareButton';
-import { exportTrades } from '../utils/tradeExportImport';
+import PageActionBar from 'components/common/PageActionBar';
+import { Calendar } from 'features/calendar/types/calendar';
+import { CalendarRepository } from 'services/repository/repositories/CalendarRepository';
+import CalendarFormDialog, { CalendarFormData } from 'features/calendar/components/CalendarFormDialog';
+import ShareButton from 'features/calendar/components/sharing/ShareButton';
+import { exportTrades } from 'features/calendar/utils/tradeExportImport';
 import NoteEditorDialog from 'features/notes/components/NoteEditorDialog';
 import CalendarNotesPanel from 'features/notes/components/CalendarNotesPanel';
-import UnifiedDrawer from '../components/common/UnifiedDrawer';
+import UnifiedDrawer from 'components/common/UnifiedDrawer';
 import {
   StackedNotesWidget,
   StickyReminderCards,
@@ -101,24 +101,24 @@ import {
 } from 'features/notes/components/reminders';
 import NotesBottomSheet from 'features/notes/components/reminders/NotesBottomSheet';
 import * as notesService from 'features/notes/services/notesService';
-import * as calendarService from '../services/calendarService';
+import * as calendarService from 'features/calendar/services/calendarService';
 import { Note, DayAbbreviation } from 'features/notes/types/note';
 
-import { DynamicRiskSettings } from '../utils/dynamicRiskUtils';
-import { Z_INDEX } from '../styles/zIndex';
+import { DynamicRiskSettings } from 'features/calendar/utils/dynamicRiskUtils';
+import { Z_INDEX } from 'styles/zIndex';
 
-import FloatingMonthNavigation from '../components/FloatingMonthNavigation';
-import { calculateDayStats, calculateTargetProgress } from '../utils/statsUtils';
+import FloatingMonthNavigation from 'features/calendar/components/FloatingMonthNavigation';
+import { calculateDayStats, calculateTargetProgress } from 'features/calendar/utils/statsUtils';
 import { DEFAULT_FILTER_SETTINGS as DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS } from 'features/events/hooks/useEconomicCalendarFilters';
 import EconomicEventsView from 'features/events/components/EconomicEventsView';
 import { useEconomicEventsUpdates } from 'features/events/hooks/useEconomicEventWatcher';
-import { TradeOperationsProps } from '../types/tradeOperations';
+import { TradeOperationsProps } from 'features/calendar/types/tradeOperations';
 import { EconomicEvent } from 'features/events/types/economicCalendar';
 import { useHighImpactEvents } from 'features/events/hooks/useHighImpactEvents';
-import { log, logger } from '../utils/logger';
-import { useTradesContext } from '../contexts/TradesContext';
-import { useTradeOperations } from '../contexts/TradeOperationsContext';
-import { useTradeViewer } from '../contexts/TradeViewerContext';
+import { log, logger } from 'utils/logger';
+import { useTradesContext } from 'features/calendar/contexts/TradesContext';
+import { useTradeOperations } from 'features/calendar/contexts/TradeOperationsContext';
+import { useTradeViewer } from 'features/calendar/contexts/TradeViewerContext';
 import { useUserPinnedEvents } from 'features/events/contexts/UserPinnedEventsContext';
 import {
   SidePanelProvider,
@@ -126,24 +126,24 @@ import {
   SidePanelView,
   DayTradesView,
   EconomicCalendarView,
-} from '../contexts/SidePanelContext';
-import { usePanelMutexSlot } from '../contexts/PanelMutexContext';
-import { SearchPanelStateProvider } from '../contexts/SearchPanelStateContext';
+} from 'contexts/SidePanelContext';
+import { usePanelMutexSlot } from 'contexts/PanelMutexContext';
+import { SearchPanelStateProvider } from 'features/calendar/contexts/SearchPanelStateContext';
 import { OverviewPanelStateProvider } from 'features/performance/contexts/OverviewPanelStateContext';
 import { EventsPanelStateProvider } from 'features/events/contexts/EventsPanelStateContext';
 import { NotesPanelStateProvider } from 'features/notes/contexts/NotesPanelStateContext';
-import { TagsPanelStateProvider } from '../contexts/TagsPanelStateContext';
-import SidePanel from '../components/sidePanel/SidePanel';
-import SearchContent from '../components/sidePanel/content/SearchContent';
-import TagManagementContent from '../components/sidePanel/content/TagManagementContent';
-import DayTradesContent from '../components/sidePanel/content/DayTradesContent';
+import { TagsPanelStateProvider } from 'features/calendar/contexts/TagsPanelStateContext';
+import SidePanel from 'components/sidePanel/SidePanel';
+import SearchContent from 'features/calendar/components/sidePanel/SearchContent';
+import TagManagementContent from 'features/calendar/components/sidePanel/TagManagementContent';
+import DayTradesContent from 'features/calendar/components/sidePanel/DayTradesContent';
 import StatsContent from 'features/performance/components/StatsContent';
 import StatsDrawer from 'features/performance/components/StatsDrawer';
 
 // Lazy-load: ImportMappingDialog pulls xlsx + multi-step wizard. Only mount
 // when the user actually opens the import flow.
 const ImportMappingDialog = React.lazy(() =>
-  import('../components/import/ImportMappingDialog').then((m) => ({
+  import('features/calendar/components/import/ImportMappingDialog').then((m) => ({
     default: m.ImportMappingDialog,
   }))
 );

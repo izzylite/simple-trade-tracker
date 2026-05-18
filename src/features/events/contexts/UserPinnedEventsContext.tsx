@@ -22,13 +22,13 @@ import {
   getUserPinnedEvents,
   setUserPinnedEvents,
   subscribeToUserPinnedEvents,
-} from '../services/userPinnedEventsService';
-import { EconomicEvent } from '../types/economicCalendar';
-import { PinnedEvent } from 'types/dualWrite';
+} from 'features/events/services/userPinnedEventsService';
+import { EconomicEvent } from 'features/events/types/economicCalendar';
+import { PinnedEvent } from 'features/calendar/types/dualWrite';
 import {
   cleanEventNameForPinning,
   isEventPinned,
-} from '../utils/eventNameUtils';
+} from 'features/events/utils/eventNameUtils';
 import { logger } from 'utils/logger';
 
 interface UserPinnedEventsValue {
