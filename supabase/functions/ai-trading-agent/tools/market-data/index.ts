@@ -150,7 +150,7 @@ export async function executeGetMarketData(
       chart_only: args.chart_only === true,
       include_chart: args.include_chart === true,
       include_summary: args.include_summary === true,
-    });
+    }, supabase);
   }
 
   if (action === "indicator") {

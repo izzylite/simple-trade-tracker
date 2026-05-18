@@ -12,11 +12,9 @@
  * Single 15-min Twelve Data fetch covers prev-trading-day-Asia-start → ref.
  */
 
-import {
-  type Candle,
-  fetchTimeSeries,
-} from "../../../_shared/twelvedata.ts";
-import { fetchYahooTimeSeries } from "../../../_shared/prices.ts";
+import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import type { Candle } from "../../../_shared/twelvedata.ts";
+import { getMarketHistory } from "../../../_shared/candleCache.ts";
 import {
   classifyForSessions,
   getNextSessionWindow,
@@ -373,7 +371,7 @@ export async function executeGetSessionLevels(args: {
   symbol: string;
   sessions?: string[];
   ref?: Date; // injectable for tests
-}): Promise<string> {
+}, supabase?: SupabaseClient): Promise<string> {
   const symbol = (args.symbol || "").trim();
   if (!symbol) {
     return `get_market_data action="session_levels" requires \`symbol\`.`;
@@ -442,24 +440,22 @@ export async function executeGetSessionLevels(args: {
   // (e.g. ^GSPC → America/New_York), and our UTC-window slicer would
   // assign every candle to the wrong session. Yahoo's fallback already
   // emits UTC via `new Date(ts*1000).toISOString()`.
-  let candles: Candle[] | null = await fetchTimeSeries(symbol, {
+  //
+  // Wrapper returns oldest→newest and caches the call when end_date is
+  // before today UTC (true for every synthetic past `ref` produced by
+  // history.ts's buildMultiDaySessionBlock).
+  const period1 = Math.floor(fetchStart.getTime() / 1000);
+  const period2 = Math.floor(ref.getTime() / 1000);
+  const fetched = await getMarketHistory(supabase, {
+    symbol,
     interval: SESSION_LEVELS_INTERVAL,
     startDate: start_date,
     endDate: end_date,
     timezone: "UTC",
+    period1,
+    period2,
   });
-  let chronological = false;
-
-  if (candles === null) {
-    const period1 = Math.floor(fetchStart.getTime() / 1000);
-    const period2 = Math.floor(ref.getTime() / 1000);
-    candles = await fetchYahooTimeSeries(symbol, {
-      interval: SESSION_LEVELS_INTERVAL,
-      period1,
-      period2,
-    });
-    chronological = true;
-  }
+  const candles: Candle[] | null = fetched?.candles ?? null;
 
   if (candles === null) {
     return (
@@ -476,7 +472,8 @@ export async function executeGetSessionLevels(args: {
     );
   }
 
-  const ordered = chronological ? candles : [...candles].reverse();
+  // Wrapper already returns oldest→newest.
+  const ordered = candles;
 
   // Compute each window's levels. Drop windows that yielded zero candles
   // (off-tape sessions like Asia on Saturday).

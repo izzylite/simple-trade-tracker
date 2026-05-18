@@ -12,11 +12,9 @@
  *   - MAX_CHART_CANDLES = 2000 for chart_only (no text dump, just an image)
  */
 
-import {
-  type Candle,
-  fetchTimeSeries,
-} from "../../../_shared/twelvedata.ts";
-import { fetchYahooTimeSeries } from "../../../_shared/prices.ts";
+import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import type { Candle } from "../../../_shared/twelvedata.ts";
+import { getMarketHistory } from "../../../_shared/candleCache.ts";
 import {
   isDaylightSavingTime,
   symbolSupportsSessionLevels,
@@ -58,6 +56,7 @@ const MAX_SESSION_SUMMARY_DAYS = 5;
 async function buildMultiDaySessionBlock(
   symbol: string,
   args: { start_date?: string; end_date?: string },
+  supabase?: SupabaseClient,
 ): Promise<string> {
   const dayMs = 86_400_000;
   const now = new Date();
@@ -98,7 +97,7 @@ async function buildMultiDaySessionBlock(
   if (refs.length === 0) return "";
 
   const blocks = await Promise.all(
-    refs.map((ref) => executeGetSessionLevels({ symbol, ref })),
+    refs.map((ref) => executeGetSessionLevels({ symbol, ref }, supabase)),
   );
 
   const truncationNote = totalDays > MAX_SESSION_SUMMARY_DAYS
@@ -118,7 +117,7 @@ export async function executeGetMarketHistory(args: {
   chart_only?: boolean;
   include_chart?: boolean;
   include_summary?: boolean;
-}): Promise<string> {
+}, supabase?: SupabaseClient): Promise<string> {
   const symbol = (args.symbol || "").trim();
   if (!symbol) return "Symbol is required.";
 
@@ -164,21 +163,18 @@ export async function executeGetMarketHistory(args: {
     ? parseSec(args.start_date!)
     : nowSec - wantSize * 3 * INTERVAL_MINUTES[interval] * 60;
 
-  // Primary: Twelve Data (forex / US stocks / crypto). Newest→oldest order.
-  let candles: Candle[] | null = await fetchTimeSeries(symbol, {
+  // Twelve Data primary, Yahoo fallback, with shared past-window cache.
+  // Wrapper normalizes to oldest→newest regardless of source.
+  const fetched = await getMarketHistory(supabase, {
+    symbol,
     interval,
     outputsize,
     startDate: args.start_date,
     endDate: args.end_date,
+    period1,
+    period2,
   });
-  let chronological = false; // Twelve Data is newest→oldest
-
-  // Fallback: Yahoo (DXY, indices, futures, bonds — everything Twelve can't).
-  // Yahoo returns oldest→newest.
-  if (candles === null && !Number.isNaN(period1) && !Number.isNaN(period2)) {
-    candles = await fetchYahooTimeSeries(symbol, { interval, period1, period2 });
-    chronological = true;
-  }
+  const candles: Candle[] | null = fetched?.candles ?? null;
 
   if (candles === null) {
     if (interval === "2h" || interval === "4h") {
@@ -204,13 +200,12 @@ export async function executeGetMarketHistory(args: {
     );
   }
 
-  // Normalize to oldest→newest, then cap. For outputsize mode keep the last
-  // `wantSize`; for window mode keep the last `candleCap`.
-  const asc = chronological ? [...candles] : [...candles].reverse();
+  // Wrapper already returns oldest→newest. Cap output:
+  // outputsize mode → last `wantSize`; window mode → last `candleCap`.
   const keep = hasWindow ? candleCap : wantSize;
-  const ordered = asc.slice(-keep);
-  const truncatedNote = asc.length > ordered.length
-    ? `\n(showing last ${ordered.length} of ${asc.length} candles)`
+  const ordered = candles.slice(-keep);
+  const truncatedNote = candles.length > ordered.length
+    ? `\n(showing last ${ordered.length} of ${candles.length} candles)`
     : "";
 
   // Render a chart only when asked: chart_only mode always wants one;
@@ -253,7 +248,7 @@ export async function executeGetMarketHistory(args: {
       sessionBlock = await buildMultiDaySessionBlock(symbol, {
         start_date: args.start_date,
         end_date: args.end_date,
-      });
+      }, supabase);
     }
   }
 
