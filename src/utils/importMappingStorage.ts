@@ -5,7 +5,6 @@
 
 import { ImportMappingTemplate, ColumnMapping } from '../types/import';
 import { warn, error as logError } from './logger';
-import { calculateSimilarity } from './columnDetection';
 
 const STORAGE_KEY = 'trade_import_mappings';
 const MAX_TEMPLATES = 50; // Limit to prevent storage overflow
@@ -124,117 +123,6 @@ export function updateTemplateLastUsed(templateId: string): void {
 }
 
 /**
- * Calculate similarity between two column lists
- */
-function calculateColumnListSimilarity(columns1: string[], columns2: string[]): number {
-  if (columns1.length === 0 || columns2.length === 0) return 0;
-
-  // Calculate how many columns match
-  let matchCount = 0;
-  const normalizedColumns2 = columns2.map(c => c.toLowerCase().trim());
-
-  for (const col1 of columns1) {
-    const normalized1 = col1.toLowerCase().trim();
-
-    // Exact match
-    if (normalizedColumns2.includes(normalized1)) {
-      matchCount++;
-      continue;
-    }
-
-    // Similar match (using similarity function from columnDetection)
-    const bestSimilarity = Math.max(
-      ...normalizedColumns2.map(col2 => {
-        const s1 = normalized1;
-        const s2 = col2;
-
-        // Simple similarity check
-        if (s1 === s2) return 1;
-        if (s1.includes(s2) || s2.includes(s1)) return 0.8;
-
-        // Levenshtein-like approximation
-        const len1 = s1.length;
-        const len2 = s2.length;
-        const maxLen = Math.max(len1, len2);
-
-        let matches = 0;
-        for (let i = 0; i < Math.min(len1, len2); i++) {
-          if (s1[i] === s2[i]) matches++;
-        }
-
-        return matches / maxLen;
-      })
-    );
-
-    if (bestSimilarity >= 0.7) {
-      matchCount += bestSimilarity;
-    }
-  }
-
-  // Calculate similarity score (0-1)
-  const avgLength = (columns1.length + columns2.length) / 2;
-  return matchCount / avgLength;
-}
-
-/**
- * Find the best matching template for given file columns
- */
-export function findMatchingTemplate(
-  fileColumns: string[],
-  minSimilarity: number = 0.7
-): ImportMappingTemplate | null {
-  try {
-    const templates = loadMappingTemplates();
-
-    if (templates.length === 0) return null;
-
-    // Calculate similarity for each template
-    const scored = templates.map(template => ({
-      template,
-      similarity: calculateColumnListSimilarity(fileColumns, template.fileColumns)
-    }));
-
-    // Sort by similarity
-    scored.sort((a, b) => b.similarity - a.similarity);
-
-    // Return best match if above threshold
-    const best = scored[0];
-    if (best.similarity >= minSimilarity) {
-      return best.template;
-    }
-
-    return null;
-  } catch (err) {
-    logError('Failed to find matching template:', err);
-    return null;
-  }
-}
-
-/**
- * Get recently used templates (sorted by last used date)
- */
-export function getRecentTemplates(limit: number = 5): ImportMappingTemplate[] {
-  try {
-    const templates = loadMappingTemplates();
-
-    // Filter templates that have been used
-    const usedTemplates = templates.filter(t => t.lastUsed);
-
-    // Sort by last used date (most recent first)
-    usedTemplates.sort((a, b) => {
-      const aDate = a.lastUsed || a.createdAt;
-      const bDate = b.lastUsed || b.createdAt;
-      return bDate.getTime() - aDate.getTime();
-    });
-
-    return usedTemplates.slice(0, limit);
-  } catch (err) {
-    logError('Failed to get recent templates:', err);
-    return [];
-  }
-}
-
-/**
  * Export templates to JSON file
  */
 export function exportTemplates(): void {
@@ -292,15 +180,3 @@ export function importTemplates(jsonData: string): number {
   }
 }
 
-/**
- * Clear all saved templates
- */
-export function clearAllTemplates(): boolean {
-  try {
-    localStorage.removeItem(STORAGE_KEY);
-    return true;
-  } catch (err) {
-    logError('Failed to clear templates:', err);
-    return false;
-  }
-}

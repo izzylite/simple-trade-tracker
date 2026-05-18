@@ -238,34 +238,9 @@ export const useHighImpactEvents = ({
 };
 
 /**
- * Utility function to clear cache for specific calendar or all calendars
- * Can also clear cache for specific currencies
- */
-export const clearHighImpactEventsCache = (calendarId?: string, currencies?: string[]) => {
-  const keys = Object.keys(localStorage);
-  const keysToRemove = keys.filter(key => {
-    if (!key.startsWith(CACHE_PREFIX)) return false;
-
-    if (calendarId) {
-      if (!key.includes(`_${calendarId}_`)) return false;
-    }
-
-    if (currencies) {
-      const currenciesHash = currencies.sort().join('-');
-      if (!key.includes(`_${currenciesHash}`)) return false;
-    }
-
-    return true;
-  });
-
-  keysToRemove.forEach(key => localStorage.removeItem(key));
-  log(`🗑️ Cleared ${keysToRemove.length} cached high-impact event entries`);
-};
-
-/**
  * Clear cache entries for old currency combinations when currencies change
  */
-export const clearOldCurrencyCache = (calendarId: string, newCurrencies: string[]) => {
+const clearOldCurrencyCache = (calendarId: string, newCurrencies: string[]) => {
   const keys = Object.keys(localStorage);
   const newCurrenciesHash = newCurrencies.sort().join('-');
 
@@ -281,84 +256,6 @@ export const clearOldCurrencyCache = (calendarId: string, newCurrencies: string[
   if (keysToRemove.length > 0) {
     log(`🧹 Cleared ${keysToRemove.length} old currency cache entries for calendar ${calendarId}`);
   }
-};
-
-/**
- * Utility function to get cache info for debugging
- */
-export const getHighImpactEventsCacheInfo = (calendarId?: string) => {
-  const keys = Object.keys(localStorage);
-  const cacheKeys = keys.filter(key => {
-    if (!key.startsWith(CACHE_PREFIX)) return false;
-    if (calendarId) {
-      return key.includes(`_${calendarId}_`);
-    }
-    return true;
-  });
-
-  const now = Date.now();
-
-  return cacheKeys.map(key => {
-    const data = localStorage.getItem(key);
-    let cacheInfo: any = {
-      key,
-      size: data ? data.length : 0
-    };
-
-    if (key.includes('_expiry')) {
-      const expiryTime = parseInt(data || '0');
-      const isExpired = now > expiryTime;
-      const isPermanent = expiryTime > now + (300 * 24 * 60 * 60 * 1000); // > 300 days
-
-      cacheInfo.isExpired = isExpired;
-      cacheInfo.isPermanent = isPermanent;
-      cacheInfo.expiresAt = isPermanent ? 'Never' : new Date(expiryTime).toLocaleString();
-    } else if (key.includes('_meta')) {
-      try {
-        const meta = JSON.parse(data || '{}');
-        cacheInfo.eventCount = meta.eventCount;
-        cacheInfo.monthType = meta.monthType;
-        cacheInfo.lastUpdated = new Date(meta.lastUpdated).toLocaleString();
-      } catch (e) {
-        // Ignore parse errors
-      }
-    }
-
-    return cacheInfo;
-  });
-};
-
-/**
- * Get cache strategy explanation for a given date
- */
-export const getCacheStrategyInfo = (targetDate: Date) => {
-  const now = new Date();
-  const currentMonth = now.getMonth();
-  const currentYear = now.getFullYear();
-  const targetMonth = targetDate.getMonth();
-  const targetYear = targetDate.getFullYear();
-
-  if (targetYear < currentYear || (targetYear === currentYear && targetMonth < currentMonth)) {
-    return {
-      type: 'previous',
-      description: 'Previous month - cached permanently (events never change)',
-      refreshStrategy: 'Never refreshes automatically'
-    };
-  }
-
-  if (targetYear === currentYear && targetMonth === currentMonth) {
-    return {
-      type: 'current',
-      description: 'Current month - refreshes weekly on Sunday',
-      refreshStrategy: 'Refreshes every Sunday to catch new events'
-    };
-  }
-
-  return {
-    type: 'future',
-    description: 'Future month - refreshes daily',
-    refreshStrategy: 'Refreshes daily as events may be added/updated'
-  };
 };
 
 /**

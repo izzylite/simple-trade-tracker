@@ -3,7 +3,7 @@
  * Auto-detects column mappings from file headers
  */
 
-import { TradeField, ColumnMapping, ColumnSuggestion } from '../types/import';
+import { TradeField, ColumnMapping } from '../types/import';
 
 /**
  * Mapping patterns for each trade field
@@ -180,8 +180,9 @@ const FIELD_PATTERNS: Record<TradeField, string[]> = {
 /**
  * Calculate similarity score between two strings (0-1)
  * Uses Levenshtein distance normalized
+ * Internal helper used by findBestFieldMatch.
  */
-export function calculateSimilarity(str1: string, str2: string): number {
+function calculateSimilarity(str1: string, str2: string): number {
   const s1 = str1.toLowerCase().trim();
   const s2 = str2.toLowerCase().trim();
 
@@ -288,123 +289,6 @@ export function detectColumnMapping(fileColumns: string[]): ColumnMapping[] {
   }
 
   return mappings;
-}
-
-/**
- * Get suggestions for unmapped columns
- */
-export function getSuggestedMapping(fileColumn: string, alreadyMappedFields: TradeField[]): ColumnSuggestion {
-  const { field, confidence, reason } = findBestFieldMatch(fileColumn);
-
-  // If field is already mapped, don't suggest it
-  if (field && alreadyMappedFields.includes(field)) {
-    return {
-      fileColumn,
-      suggestedField: null,
-      confidence: 0,
-      reason: 'field already mapped'
-    };
-  }
-
-  return {
-    fileColumn,
-    suggestedField: field,
-    confidence,
-    reason
-  };
-}
-
-/**
- * Analyze sample data to help with field detection
- * Returns enhanced suggestions based on data patterns
- */
-export function analyzeColumnData(
-  fileColumn: string,
-  sampleValues: any[]
-): {
-  likelyType: 'date' | 'number' | 'string' | 'boolean' | 'unknown';
-  suggestedField: TradeField | null;
-  confidence: number;
-} {
-  // Filter out null/undefined values
-  const validValues = sampleValues.filter(v => v !== null && v !== undefined && v !== '');
-
-  if (validValues.length === 0) {
-    return {
-      likelyType: 'unknown',
-      suggestedField: null,
-      confidence: 0
-    };
-  }
-
-  // Analyze data types
-  let dateCount = 0;
-  let numberCount = 0;
-  let booleanCount = 0;
-  let stringCount = 0;
-
-  for (const value of validValues) {
-    if (typeof value === 'number' || !isNaN(parseFloat(String(value)))) {
-      numberCount++;
-    } else if (value instanceof Date || !isNaN(Date.parse(String(value)))) {
-      dateCount++;
-    } else if (typeof value === 'boolean' || ['true', 'false', 'yes', 'no', '1', '0'].includes(String(value).toLowerCase())) {
-      booleanCount++;
-    } else {
-      stringCount++;
-    }
-  }
-
-  const total = validValues.length;
-  let likelyType: 'date' | 'number' | 'string' | 'boolean' | 'unknown';
-
-  // Determine most likely type (need >70% confidence)
-  if (dateCount / total > 0.7) {
-    likelyType = 'date';
-  } else if (numberCount / total > 0.7) {
-    likelyType = 'number';
-  } else if (booleanCount / total > 0.7) {
-    likelyType = 'boolean';
-  } else if (stringCount / total > 0.7) {
-    likelyType = 'string';
-  } else {
-    likelyType = 'unknown';
-  }
-
-  // Get base field suggestion
-  const { field: suggestedField, confidence } = findBestFieldMatch(fileColumn);
-
-  // Boost confidence if data type matches expected field type
-  let adjustedConfidence = confidence;
-  if (suggestedField) {
-    const expectedTypes: Record<TradeField, Array<'date' | 'number' | 'string' | 'boolean'>> = {
-      trade_date: ['date'],
-      amount: ['number'],
-      trade_type: ['string'],
-      name: ['string'],
-      entry_price: ['number'],
-      exit_price: ['number'],
-      stop_loss: ['number'],
-      take_profit: ['number'],
-      risk_to_reward: ['number'],
-      partials_taken: ['boolean'],
-      session: ['string'],
-      notes: ['string'],
-      tags: ['string'],
-      images: ['string']
-    };
-
-    const expectedType = expectedTypes[suggestedField];
-    if (expectedType && likelyType !== 'unknown' && expectedType.includes(likelyType)) {
-      adjustedConfidence = Math.min(100, adjustedConfidence + 20);
-    }
-  }
-
-  return {
-    likelyType,
-    suggestedField,
-    confidence: adjustedConfidence
-  };
 }
 
 /**

@@ -24,7 +24,7 @@ export const SESSION_COLORS: Record<TradingSession, string> = {
  * Uses actual DST transition rules for better accuracy
  * Supports both EU/UK and US DST rules
  */
-export function isDaylightSavingTime(date: Date, region: 'EU' | 'US' = 'EU'): boolean {
+function isDaylightSavingTime(date: Date, region: 'EU' | 'US' = 'EU'): boolean {
   const year = date.getFullYear();
   const month = date.getMonth();
   const day = date.getDate();

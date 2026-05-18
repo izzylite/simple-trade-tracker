@@ -180,7 +180,7 @@ export const TASK_TYPE_COLORS: Record<TaskType, string> = {
  * rename a catalog entry here, update the matching query string in the DB
  * (or vice versa) or new tasks will fire uncached one-off strings.
  */
-export const MARKET_RESEARCH_STARTER_QUERIES = [
+const MARKET_RESEARCH_STARTER_QUERIES = [
   'Federal Reserve OR FOMC speech statement policy today',
   'geopolitical tension war sanctions markets today',
   'White House OR US President statement market impact today',
@@ -218,6 +218,3 @@ export function buildDefaultConfigs(timezone: string): Record<TaskType, TaskConf
   };
 }
 
-/** @deprecated Use `buildDefaultConfigs(detectBrowserTimezone())` so time-based
- *  tasks pick up the user's local TZ instead of silently defaulting to UTC. */
-export const DEFAULT_CONFIGS: Record<TaskType, TaskConfig> = buildDefaultConfigs('UTC');

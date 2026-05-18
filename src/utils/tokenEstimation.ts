@@ -14,7 +14,7 @@ import type { ChatMessage } from '../types/aiChat';
 const CHARS_PER_TOKEN = 4;
 const TOKENS_PER_IMAGE = 258;
 
-export const estimateMessageTokens = (msg: ChatMessage): number => {
+const estimateMessageTokens = (msg: ChatMessage): number => {
   let chars = (msg.content ?? '').length;
   if (msg.reasoning) chars += msg.reasoning.length;
   const imageCount = msg.images?.length ?? 0;

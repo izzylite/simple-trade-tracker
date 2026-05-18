@@ -114,18 +114,6 @@ export interface ChatError {
   trade_type?: 'win' | 'loss' | 'breakeven';
 }
 
-export interface InlineReference {
-  type: 'trade' | 'event';
-  id: string;
-  trade_type?: 'win' | 'loss' | 'breakeven';
-}
-
-export interface DisplayItem {
-  id: string;
-  type: 'trade' | 'event';
-  trade_type?: 'win' | 'loss' | 'breakeven';
-}
-
 export interface Citation {
   id: string;
   url: string;

@@ -59,60 +59,7 @@ export interface CalendarStats {
 // =====================================================
 // NOTE: Calendar statistics are now automatically calculated by Supabase
 // via database triggers (see migration 005_auto_calculate_calendar_stats.sql)
-// The calculateCalendarStats function has been removed - stats are read directly from the calendar object
-
-// Cache for memoized calendar stats
-const statsCache = new Map<string, CalendarStats>();
-
-/**
- * Get calendar statistics from calendar object
- * Returns CalendarStats with snake_case properties matching database schema
- * Results are cached based on calendar ID and updated_at timestamp
- */
-export const getCalendarStats = (calendar: Calendar): CalendarStats => {
-  // Check cache using calendar ID and updated_at as key
-  const cacheKey = `${calendar.id}:${calendar.updated_at?.toString() || 'no-timestamp'}`;
-
-  if (statsCache.has(cacheKey)) {
-    return statsCache.get(cacheKey)!;
-  }
-
-  // Compute stats
-  const stats: CalendarStats = {
-    total_pnl: calendar.total_pnl || 0,
-    win_rate: calendar.win_rate || 0,
-    total_trades: calendar.total_trades || 0,
-    growth_percentage: calendar.pnl_performance || 0,
-    avg_win: calendar.avg_win || 0,
-    avg_loss: calendar.avg_loss || 0,
-    profit_factor: calendar.profit_factor || 0,
-    max_drawdown: calendar.max_drawdown || 0,
-    drawdown_recovery_needed: calendar.drawdown_recovery_needed || 0,
-    drawdown_duration: calendar.drawdown_duration || 0,
-    drawdown_start_date: calendar.drawdown_start_date || null,
-    drawdown_end_date: calendar.drawdown_end_date || null,
-    weekly_progress: calendar.weekly_progress || 0,
-    monthly_progress: calendar.monthly_progress || 0,
-    yearly_progress: calendar.target_progress || 0,
-    current_balance: calendar.current_balance || calendar.account_balance || 0,
-    initial_balance: calendar.account_balance || 0,
-    win_count: calendar.win_count || 0,
-    loss_count: calendar.loss_count || 0,
-    target_progress: calendar.target_progress || 0,
-    pnl_performance: calendar.pnl_performance || 0,
-    weekly_pnl: calendar.weekly_pnl || 0,
-    monthly_pnl: calendar.monthly_pnl || 0,
-    yearly_pnl: calendar.yearly_pnl || 0,
-    weekly_pnl_percentage: calendar.weekly_pnl_percentage || 0,
-    monthly_pnl_percentage: calendar.monthly_pnl_percentage || 0,
-    yearly_pnl_percentage: calendar.yearly_pnl_percentage || 0
-  };
-
-  // Store in cache
-  statsCache.set(cacheKey, stats);
-
-  return stats;
-};
+// Stats are read directly from the calendar object (see CalendarStats interface).
 
 // =====================================================
 // CALENDAR CRUD OPERATIONS
@@ -339,23 +286,6 @@ export const unlinkCalendar = async (calendarId: string): Promise<void> => {
   } catch (error) {
     logger.error('Error unlinking calendar:', error);
     throw error;
-  }
-};
-
-/**
- * Get the linked calendar for a given calendar (if any)
- */
-export const getLinkedCalendar = async (calendarId: string): Promise<Calendar | null> => {
-  try {
-    const calendar = await getCalendar(calendarId);
-    if (!calendar?.linked_to_calendar_id) {
-      return null;
-    }
-
-    return await getCalendar(calendar.linked_to_calendar_id);
-  } catch (error) {
-    logger.error('Error getting linked calendar:', error);
-    return null;
   }
 };
 

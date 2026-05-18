@@ -66,12 +66,7 @@ export function eventMatchV1(event1: EconomicEvent, event2: PinnedEvent): boolea
    && event1.impact === event2.impact && event1.currency === event2.currency;
 }
 
-export function eventMatchV2(event1: TradeEconomicEvent, event2: PinnedEvent): boolean { 
-  return cleanEventNameForPinning(event1.name).toLowerCase() === cleanEventNameForPinning(event2.event).toLowerCase()
-   && event1.impact === event2.impact && event1.currency === event2.currency;
-}
-
-export function eventMatchV3(event1: TradeEconomicEvent, event2: EconomicEvent): boolean { 
+export function eventMatchV3(event1: TradeEconomicEvent, event2: EconomicEvent): boolean {
   return cleanEventNameForPinning(event1.name).toLowerCase() === cleanEventNameForPinning(event2.event_name).toLowerCase()
    && event1.impact === event2.impact && event1.currency === event2.currency;
 }

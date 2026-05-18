@@ -147,25 +147,3 @@ export const CURRENCY_FLAGS: Record<Currency, string> = {
   'ALL': '🌍'
 };
 
-export const DEFAULT_FILTERS: EconomicCalendarFilters = {
-  currencies: ['USD', 'EUR', 'GBP', 'JPY'],
-  impacts: ['High', 'Medium'],
-  dateRange: {
-    start: new Date().toISOString().split('T')[0],
-    end: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-  },
-  searchTerm: '',
-  showPastEvents: false
-};
-
-export const DEFAULT_SETTINGS: EconomicCalendarSettings = {
-  autoRefresh: true,
-  refreshInterval: 30,
-  notifications: {
-    enabled: false,
-    highImpactOnly: true,
-    minutesBefore: 15
-  },
-  timezone: 'America/New_York',
-  defaultCurrencies: ['USD', 'EUR', 'GBP', 'JPY']
-};

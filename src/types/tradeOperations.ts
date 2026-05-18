@@ -83,32 +83,3 @@ export interface TradeOperationsProps {
   economicFilter?: (calendarId: string) => EconomicCalendarFilterSettings;
 }
 
-/**
- * Helper type for components that need both TradeOperationsProps
- * and their own specific props
- */
-export type WithTradeOperations<T> = T & {
-  tradeOperations?: TradeOperationsProps;
-};
-
-/**
- * Extract trade operations from props object for passing to child components
- */
-export function extractTradeOperations(props: TradeOperationsProps): TradeOperationsProps {
-  return {
-    onUpdateTradeProperty: props.onUpdateTradeProperty,
-    onEditTrade: props.onEditTrade,
-    onDeleteTrade: props.onDeleteTrade,
-    onDeleteMultipleTrades: props.onDeleteMultipleTrades,
-    onZoomImage: props.onZoomImage,
-    onOpenGalleryMode: props.onOpenGalleryMode,
-    onSharedTradeClick: props.onSharedTradeClick,
-    onUpdateCalendarProperty: props.onUpdateCalendarProperty,
-    isTradeUpdating: props.isTradeUpdating,
-    deletingTradeIds: props.deletingTradeIds,
-    calendarId: props.calendarId,
-    calendar: props.calendar,
-    isReadOnly: props.isReadOnly,
-    economicFilter: props.economicFilter,
-  };
-}

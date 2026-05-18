@@ -266,24 +266,6 @@ export const unpinNote = async (noteId: string): Promise<void> => {
 };
 
 /**
- * Move a note to a different calendar
- */
-export const moveNoteToCalendar = async (
-  noteId: string,
-  calendarId: string,
-): Promise<void> => {
-  try {
-    const success = await noteRepository.moveNoteToCalendar(noteId, calendarId);
-    if (!success) {
-      throw new Error("Failed to move note to calendar");
-    }
-  } catch (error) {
-    logger.error("Error moving note to calendar:", error);
-    throw error;
-  }
-};
-
-/**
  * Get reminder notes for a specific day of the week
  * Returns notes that should be shown as reminders for the given day
  */

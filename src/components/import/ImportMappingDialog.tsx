@@ -40,7 +40,6 @@ import {
 } from '../../utils/columnDetection';
 import { validateImportData } from '../../utils/importValidation';
 import {
-  findMatchingTemplate,
   saveMappingTemplate,
   updateTemplateLastUsed,
 } from '../../utils/importMappingStorage';

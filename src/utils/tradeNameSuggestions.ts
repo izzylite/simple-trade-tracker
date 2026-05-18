@@ -63,7 +63,7 @@ export const fetchAndGenerateTradeNameSuggestions = async (
  * @param maxSuggestions Maximum number of suggestions to return
  * @returns Array of suggested trade names
  */
-export const generateTradeNameSuggestions = (
+const generateTradeNameSuggestions = (
   allTrades: Trade[],
   currentInput: string = '',
   maxSuggestions: number = 10
@@ -138,7 +138,7 @@ export const generateTradeNameSuggestions = (
  * @param maxSuggestions Maximum number of suggestions to return
  * @returns Array of contextual trade name suggestions
  */
-export const generateContextualTradeNameSuggestions = (
+const generateContextualTradeNameSuggestions = (
   allTrades: Trade[],
   currentTags: string[] = [],
   currentSession?: string,
@@ -197,7 +197,7 @@ export const generateContextualTradeNameSuggestions = (
  * @param currentInput Current input value
  * @returns Array of common trade name patterns
  */
-export const generateCommonTradeNamePatterns = (currentInput: string = ''): string[] => {
+const generateCommonTradeNamePatterns = (currentInput: string = ''): string[] => {
   const commonPatterns = [
     // Currency pairs
     'EURUSD Long',
