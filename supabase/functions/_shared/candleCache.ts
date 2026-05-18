@@ -257,17 +257,22 @@ export async function getMarketHistory(
   supabase: SupabaseClient | undefined,
   req: CandleHistoryRequest,
 ): Promise<CandleHistoryResult | null> {
-  // Daily outputsize → past-window conversion.
+  // Daily outputsize → past-and-today window conversion.
   //
-  // Orion frequently asks for "last week candles" as outputsize=7 at
-  // interval=1day, which would naively bypass the cache (no explicit
-  // start/end → sliding-from-now window). For daily-and-coarser intervals
-  // the "last N bars from now" semantics map cleanly to "last N closed
-  // UTC days" — today's daily bar is still forming, so dropping it AND
-  // anchoring to closed UTC dates gives the same answer the user wants
-  // AND populates the per-day cache. Sub-daily intervals keep the bypass
-  // because their forming-bar problem is genuine and intraday bars don't
-  // fit the per-UTC-day storage model anyway.
+  // Orion asks for "last week candles" as outputsize=7 at interval=1day.
+  // We rewrite the request to an explicit window of [today − (N−1) days,
+  // now] so the mixed-range cache path below can cache the N−1 closed
+  // past days while still fetching today's in-progress bar in the SAME
+  // provider call (one API credit). Today's bucket is held back from
+  // the upsert because the forming bar would go stale within minutes.
+  //
+  // We INCLUDE today (vs. the older "last N closed past days" framing)
+  // because Orion needs the current intraday level for narration like
+  // "price is currently at X" — dropping today silently hid that.
+  //
+  // Sub-daily intervals keep the bypass at the next check: per-UTC-day
+  // rows don't fit intraday bar densities, and outputsize semantics
+  // there (last N minutes/hours) are too volatile to cache usefully.
   if (
     !req.startDate &&
     !req.endDate &&
@@ -276,8 +281,8 @@ export async function getMarketHistory(
     req.interval === "1day"
   ) {
     const todayUtcMs = startOfUtcDayMs(Date.now());
-    const endMs = todayUtcMs - 1;                       // last ms of yesterday
-    const startMs = todayUtcMs - req.outputsize * MS_PER_DAY;
+    const startMs = todayUtcMs - (req.outputsize - 1) * MS_PER_DAY;
+    const endMs = Date.now();
     req = {
       ...req,
       startDate: msToApiDate(startMs),
