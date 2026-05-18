@@ -536,15 +536,17 @@ export async function executeGetSessionLevels(args: {
   }
 
   // PDH/PDL: compute from prev-day session slices already in our fetch.
-  // Breach scope = today's tape since today's Asia opened (or whichever
-  // session in `windows` started first if Asia wasn't requested).
+  // Breach scope = today's full trading day so far, anchored on today's
+  // Asia open. This is independent of which sessions the user requested
+  // via `sessions` — PDH/PDL tracks the full day, not the user's slice.
   const prevDay = computePreviousDay(symbol, prevWindows, ordered);
   let prevDayLine = "";
   let prevDayBreach = "";
   if (prevDay) {
     prevDayLine = formatPreviousDayLine(prevDay, fmt, unit);
 
-    const todayTape = sliceCandlesInWindow(ordered, todayEarliestStart, ref);
+    const todayAsiaStart = getSessionWindow("Asia", ref).start;
+    const todayTape = sliceCandlesInWindow(ordered, todayAsiaStart, ref);
     if (todayTape.length > 0) {
       let todayHigh = -Infinity;
       let todayLow = Infinity;
@@ -564,7 +566,7 @@ export async function executeGetSessionLevels(args: {
         todayTape,
         threshold,
       );
-      const tapeStartHm = todayEarliestStart.toISOString().slice(11, 16);
+      const tapeStartHm = todayAsiaStart.toISOString().slice(11, 16);
       prevDayBreach = (
         `vs Prev day levels (today's tape since ${tapeStartHm} UTC, ` +
         `${todayTape.length} bars):\n` +
