@@ -2,10 +2,10 @@ import React, { useEffect, useMemo, useRef, useState, forwardRef, useImperativeH
 import { Editor, EditorState, ContentState, CompositeDecorator, Modifier, SelectionState } from 'draft-js';
 import { Box, Chip, Popper, Paper, List, ListItem, ListItemButton, Typography, useTheme, alpha } from '@mui/material';
 import { Tag as TagIcon, Notes as NotesIcon, Bolt as BoltIcon } from '@mui/icons-material';
-import { getTagChipStyles, formatTagForDisplay, isGroupedTag, getTagGroup } from '../../utils/tagColors';
-import { scrollbarStyles } from '../../styles/scrollbarStyles';
-import { Z_INDEX } from '../../styles/zIndex';
-import { useDialogTokens } from '../../styles/dialogTokens';
+import { getTagChipStyles, formatTagForDisplay, isGroupedTag, getTagGroup } from 'utils/tagColors';
+import { scrollbarStyles } from 'styles/scrollbarStyles';
+import { Z_INDEX } from 'styles/zIndex';
+import { useDialogTokens } from 'styles/dialogTokens';
 import type { MessageSegment } from '../../utils/chatMentions';
 import { detectMentionTrigger, extractSegments } from '../../utils/chatMentions';
 import { SLASH_COMMAND_TAG } from 'features/notes/types/note';

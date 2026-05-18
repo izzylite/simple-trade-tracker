@@ -4,10 +4,10 @@
  * Handles HTML formatting and citations from the edge function
  */
 
-import { supabase, supabaseUrl } from '../config/supabase';
-import { logger } from '../utils/logger';
-import type { Trade } from '../types/trade';
-import type { Calendar } from '../types/calendar';
+import { supabase, supabaseUrl } from 'config/supabase';
+import { logger } from 'utils/logger';
+import type { Trade } from 'types/trade';
+import type { Calendar } from 'types/calendar';
 import type { ChatMessage as ChatMessageType, AttachedImage } from '../types/aiChat';
 
 

@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../config/supabase';
+import { supabase } from 'config/supabase';
 import { orionTaskService } from '../services/orionTaskService';
-import { logger } from '../utils/logger';
-import { playTaskNotificationSound } from '../utils/notificationSound';
+import { logger } from 'utils/logger';
+import { playTaskNotificationSound } from 'utils/notificationSound';
 import type {
   AITasksBundle,
   OrionTask,

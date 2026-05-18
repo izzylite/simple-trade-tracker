@@ -18,10 +18,10 @@ import {
 } from '@mui/icons-material';
 import { IconButton, Tooltip } from '@mui/material';
 import { format, isToday, isYesterday } from 'date-fns';
-import { scrollbarStyles } from '../../styles/scrollbarStyles';
-import { useDialogTokens, MONO_FONT } from '../../styles/dialogTokens';
+import { scrollbarStyles } from 'styles/scrollbarStyles';
+import { useDialogTokens, MONO_FONT } from 'styles/dialogTokens';
 import EconomicEventShimmer from 'features/events/components/EconomicEventShimmer';
-import ConfirmationDialog from '../common/ConfirmationDialog';
+import ConfirmationDialog from 'components/common/ConfirmationDialog';
 import TaskResultCard from './TaskResultCard';
 import CreateTaskDialog from './CreateTaskDialog';
 import type {
@@ -31,8 +31,8 @@ import type {
   TaskConfig,
 } from '../../types/orionTask';
 import { TASK_TYPE_LABELS, TASK_TYPE_COLORS } from '../../types/orionTask';
-import type { Calendar, Trade } from '../../types/dualWrite';
-import type { TradeOperationsProps } from '../../types/tradeOperations';
+import type { Calendar, Trade } from 'types/dualWrite';
+import type { TradeOperationsProps } from 'types/tradeOperations';
 
 interface OrionTasksContentProps {
   tasks: OrionTask[];

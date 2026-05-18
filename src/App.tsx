@@ -35,7 +35,7 @@ import { SidePanelProvider, useSidePanel } from './contexts/SidePanelContext';
 import type { SidePanelView } from './contexts/SidePanelContext';
 import { TradeUIProvider } from './contexts/TradeUIContext';
 import { TradesProvider } from './contexts/TradesContext';
-import { AIChatProvider } from './contexts/AIChatContext';
+import { AIChatProvider } from 'features/orion/contexts/AIChatContext';
 import { TradeViewerProvider } from './contexts/TradeViewerContext';
 import { TradeOperationsProvider } from './contexts/TradeOperationsContext';
 import { EventNotificationsProvider } from 'features/events/contexts/EventNotificationsContext';
@@ -67,8 +67,8 @@ const EconomicEventsPage = lazy(() => import('./pages/EconomicEventsPage'));
 // MUI Dialog + form components into main bundle.
 const CalendarFormDialog = lazy(() => import('./components/CalendarFormDialog'));
 
-const GlobalAIChat = lazy(() => import('./components/aiChat/GlobalAIChat'));
-const GlobalAIChatFab = lazy(() => import('./components/aiChat/GlobalAIChatFab'));
+const GlobalAIChat = lazy(() => import('features/orion/components/aiChat/GlobalAIChat'));
+const GlobalAIChatFab = lazy(() => import('features/orion/components/aiChat/GlobalAIChatFab'));
 const GlobalTradeViewer = lazy(() => import('./components/trades/GlobalTradeViewer'));
 const GlobalTradeOperations = lazy(() => import('./components/trades/GlobalTradeOperations'));
 const GlobalEventNotifications = lazy(() => import('features/events/components/notifications/GlobalEventNotifications'));

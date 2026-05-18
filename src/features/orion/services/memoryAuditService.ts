@@ -1,4 +1,4 @@
-import { supabase } from '../config/supabase';
+import { supabase } from 'config/supabase';
 import { AGENT_MEMORY_TAG } from 'features/notes/types/note';
 
 export interface MemoryAuditRow {

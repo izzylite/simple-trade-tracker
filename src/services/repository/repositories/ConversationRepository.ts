@@ -13,10 +13,10 @@ import {
   SerializableAIConversation,
   ChatMessage,
   SerializableChatMessage
-} from '../../../types/aiChat';
-import { logger } from '../../../utils/logger';
-import { supabase } from '../../../config/supabase';
-import { generateConversationTitle } from '../../../utils/conversationTitle';
+} from 'features/orion/types/aiChat';
+import { logger } from 'utils/logger';
+import { supabase } from 'config/supabase';
+import { generateConversationTitle } from 'features/orion/utils/conversationTitle';
 
 /**
  * Pagination options for conversation queries

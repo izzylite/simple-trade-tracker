@@ -25,11 +25,11 @@ import {
   Note as NoteIcon
 } from '@mui/icons-material';
 import DOMPurify from 'dompurify';
-import ImageZoomDialog, { ImageZoomProp } from '../ImageZoomDialog';
-import type { Trade } from '../../types/trade';
+import ImageZoomDialog, { ImageZoomProp } from 'components/ImageZoomDialog';
+import type { Trade } from 'types/trade';
 import type { EconomicEvent } from 'features/events/types/economicCalendar';
 import type { Note } from 'features/notes/types/note';
-import { getTagChipStyles } from '../../utils/tagColors';
+import { getTagChipStyles } from 'utils/tagColors';
 
 // Convert inline reference tags to placeholder <span> elements that survive
 // DOMPurify and can host React chips via createPortal. Spans render as

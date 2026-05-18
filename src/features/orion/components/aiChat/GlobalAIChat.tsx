@@ -2,16 +2,16 @@ import React, { useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import AIChatDrawer from './AIChatDrawer';
 import { useAIChat } from '../../contexts/AIChatContext';
-import { useTradesContext } from '../../contexts/TradesContext';
-import { useTradeViewer } from '../../contexts/TradeViewerContext';
-import { useNotifications } from '../../contexts/NotificationsContext';
-import { usePanelMutexSlot } from '../../contexts/PanelMutexContext';
-import { useTradeOperations } from '../../contexts/TradeOperationsContext';
+import { useTradesContext } from 'contexts/TradesContext';
+import { useTradeViewer } from 'contexts/TradeViewerContext';
+import { useNotifications } from 'contexts/NotificationsContext';
+import { usePanelMutexSlot } from 'contexts/PanelMutexContext';
+import { useTradeOperations } from 'contexts/TradeOperationsContext';
 import {
   isOrionTaskResultPayload,
   isReminderFiredPayload,
-} from '../../types/notification';
-import { TradeOperationsProps } from '../../types/tradeOperations';
+} from 'types/notification';
+import { TradeOperationsProps } from 'types/tradeOperations';
 
 /**
  * App-level renderer for the AI chat drawer. Mounted once inside the global

@@ -22,8 +22,8 @@ import HistoryEduIcon from '@mui/icons-material/HistoryEdu';
 import PsychologyIcon from '@mui/icons-material/Psychology';
 import EconomicEventShimmer from 'features/events/components/EconomicEventShimmer';
 import { getMemoryAudit, getMemoryNote, type MemoryAuditRow } from '../../services/memoryAuditService';
-import { scrollbarStyles } from '../../styles/scrollbarStyles';
-import { logger } from '../../utils/logger';
+import { scrollbarStyles } from 'styles/scrollbarStyles';
+import { logger } from 'utils/logger';
 
 interface MemoryLogsPanelProps {
   calendarId: string | undefined;

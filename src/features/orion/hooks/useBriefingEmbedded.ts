@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { getTradeRepository } from '../services/calendarService';
+import { getTradeRepository } from 'services/calendarService';
 import { economicCalendarService } from 'features/events/services/economicCalendarService';
 import { getNote } from 'features/notes/services/notesService';
-import type { Trade } from '../types/trade';
+import type { Trade } from 'types/trade';
 import type { EconomicEvent } from 'features/events/types/economicCalendar';
 import type { Note } from 'features/notes/types/note';
-import { logger } from '../utils/logger';
+import { logger } from 'utils/logger';
 
 /**
  * Parse <trade-ref>, <event-ref>, <note-ref> IDs out of a briefing's stored

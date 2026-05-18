@@ -33,12 +33,12 @@ import {
 } from '@mui/icons-material';
 import { stripReferencedBlocks } from '../../utils/chatMentions';
 import { ChatMessage as ChatMessageType } from '../../types/aiChat';
-import { Trade } from '../../types/trade';
+import { Trade } from 'types/trade';
 import { EconomicEvent } from 'features/events/types/economicCalendar';
 import { format } from 'date-fns';
-import { logger } from '../../utils/logger';
-import { getTagChipStyles } from '../../utils/tagColors';
-import ImageZoomDialog, { ImageZoomProp } from '../ImageZoomDialog';
+import { logger } from 'utils/logger';
+import { getTagChipStyles } from 'utils/tagColors';
+import ImageZoomDialog, { ImageZoomProp } from 'components/ImageZoomDialog';
 
 interface ChatMessageProps {
   message: ChatMessageType;

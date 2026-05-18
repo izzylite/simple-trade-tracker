@@ -44,10 +44,10 @@ import {
   type Market,
 } from '../../data/macroQueryCatalog';
 import { getMacroQueryCatalog } from '../../services/macroQueryCatalogService';
-import { logger } from '../../utils/logger';
-import BaseDialog from '../common/BaseDialog';
-import { Z_INDEX } from '../../styles/zIndex';
-import { useDialogTokens, MONO_FONT } from '../../styles/dialogTokens';
+import { logger } from 'utils/logger';
+import BaseDialog from 'components/common/BaseDialog';
+import { Z_INDEX } from 'styles/zIndex';
+import { useDialogTokens, MONO_FONT } from 'styles/dialogTokens';
 
 // Backfill fields on legacy task configs so the form never sees undefined
 // arrays. Preserves prior `custom_topics` by merging them into `macro_queries`

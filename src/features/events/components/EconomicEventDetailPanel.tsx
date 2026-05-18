@@ -38,7 +38,7 @@ import { useCalendars } from 'hooks/useCalendars';
 import { getSessionForTimestamp, SESSION_COLORS } from 'utils/sessionTimeUtils';
 import { TradeOperationsProps } from 'types/tradeOperations';
 import Shimmer from 'components/Shimmer';
-import { supabaseAIChatService } from 'services/supabaseAIChatService';
+import { supabaseAIChatService } from 'features/orion/services/supabaseAIChatService';
 import { supabase } from 'config/supabase';
 
 interface EconomicEventDetailPanelProps {

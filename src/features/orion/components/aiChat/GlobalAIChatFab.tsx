@@ -2,9 +2,9 @@ import React from 'react';
 import { Badge, Box, Fab, Tooltip, alpha, useTheme } from '@mui/material';
 import { SmartToy as AIIcon } from '@mui/icons-material';
 import { useLocation } from 'react-router-dom';
-import { useAuthState } from '../../contexts/AuthStateContext';
+import { useAuthState } from 'contexts/AuthStateContext';
 import { useAIChat } from '../../contexts/AIChatContext';
-import { useAnyPanelOpen } from '../../contexts/PanelMutexContext';
+import { useAnyPanelOpen } from 'contexts/PanelMutexContext';
 
 /**
  * Floating "Open Orion" button mounted once at App level. Shows on every

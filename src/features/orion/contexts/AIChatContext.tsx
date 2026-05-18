@@ -5,11 +5,11 @@ import React, {
   useMemo,
   useState,
 } from 'react';
-import { Trade } from '../types/dualWrite';
+import { Trade } from 'types/dualWrite';
 import { AITasksBundle } from '../types/orionTask';
 import { useOrionTasks } from '../hooks/useOrionTasks';
-import { useAuthState } from './AuthStateContext';
-import { useTradesContextOptional } from './TradesContext';
+import { useAuthState } from 'contexts/AuthStateContext';
+import { useTradesContextOptional } from 'contexts/TradesContext';
 
 /**
  * App-level controller for the single AI chat drawer instance.

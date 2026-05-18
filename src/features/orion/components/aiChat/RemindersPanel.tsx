@@ -22,8 +22,8 @@ import {
   cancelReminderBatch,
   type Reminder,
 } from 'features/notes/services/remindersService';
-import { useRealtimeSubscription } from '../../hooks/useRealtimeSubscription';
-import { logger } from '../../utils/logger';
+import { useRealtimeSubscription } from 'hooks/useRealtimeSubscription';
+import { logger } from 'utils/logger';
 import ReminderListItem from './ReminderListItem';
 import ReminderBatchListItem from './ReminderBatchListItem';
 import EconomicEventShimmer from 'features/events/components/EconomicEventShimmer';

@@ -18,7 +18,7 @@ import {
   markNotificationsRead,
 } from '../services/notificationsService';
 import { _internal as notificationsInternal } from '../services/notificationsService';
-import { orionTaskService } from '../services/orionTaskService';
+import { orionTaskService } from 'features/orion/services/orionTaskService';
 import { isOrionTaskResultPayload } from '../types/notification';
 import { logger } from '../utils/logger';
 

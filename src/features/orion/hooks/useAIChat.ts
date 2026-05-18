@@ -11,17 +11,17 @@ import {
   AIConversation,
   AttachedImage
 } from '../types/aiChat';
-import { Calendar } from '../types/calendar';
-import { Trade } from '../types/trade';
+import { Calendar } from 'types/calendar';
+import { Trade } from 'types/trade';
 import { supabaseAIChatService } from '../services/supabaseAIChatService';
 import { generateConversationTitle } from '../utils/conversationTitle';
 import {
   ConversationRepository,
   ConversationPaginationOptions
-} from '../services/repository/repositories/ConversationRepository';
-import { logger } from '../utils/logger';
+} from 'services/repository/repositories/ConversationRepository';
+import { logger } from 'utils/logger';
 import { estimateConversationTokens } from '../utils/tokenEstimation';
-import { supabase } from '../config/supabase';
+import { supabase } from 'config/supabase';
 
 const CONVERSATIONS_PAGE_SIZE = 15;
 
