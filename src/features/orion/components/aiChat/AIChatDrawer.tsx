@@ -35,7 +35,7 @@ import { Z_INDEX } from 'styles/zIndex';
 import { useDialogTokens } from 'styles/dialogTokens';
 import AIChatContent from 'features/orion/components/sidePanel/AIChatContent';
 import { UseAIChatReturn, useAIChat } from 'features/orion/hooks/useAIChat';
-import { ConversationRepository } from 'services/repository/repositories/ConversationRepository';
+import { ConversationRepository } from 'services/repositories/ConversationRepository';
 import { logger } from 'utils/logger';
 import { TabPanel } from 'components/common/RoundedTabs';
 import OrionTasksContent from 'features/orion/components/orionTasks/OrionTasksContent';

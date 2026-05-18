@@ -9,7 +9,7 @@ import {
   ImpactLevel
 } from 'features/events/types/economicCalendar';
 import { log, error, logger } from 'utils/logger';
-import { EconomicEventRepository } from 'services/repository/repositories/EconomicEventRepository';
+import { EconomicEventRepository } from 'services/repositories/EconomicEventRepository';
 
 /* eslint-disable */
 

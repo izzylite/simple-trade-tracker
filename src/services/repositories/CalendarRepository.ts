@@ -6,7 +6,7 @@
 import {
   AbstractBaseRepository,
   RepositoryConfig
-} from 'services/repository/repositories/BaseRepository';
+} from 'services/repositories/BaseRepository';
 import { Calendar, Trade } from 'features/calendar/types/dualWrite';
 import { logger } from 'utils/logger';
 

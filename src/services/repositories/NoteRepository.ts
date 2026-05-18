@@ -3,7 +3,7 @@
  * Handles Supabase operations for simple notes
  */
 
-import { AbstractBaseRepository, RepositoryConfig, RepositoryResult } from "services/repository/repositories/BaseRepository";
+import { AbstractBaseRepository, RepositoryConfig, RepositoryResult } from "services/repositories/BaseRepository";
 import { Note, GAME_PLAN_TAG, AGENT_MEMORY_TAG } from "features/notes/types/note";
 import { logger } from "utils/logger";
 import { supabase } from "config/supabase";

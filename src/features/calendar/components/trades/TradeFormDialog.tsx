@@ -31,7 +31,7 @@ import { error, log, logger } from 'utils/logger';
 import { validateFiles, FILE_SIZE_LIMITS } from 'utils/fileValidation';
 import { formatTagsWithCapitalizedGroups } from 'utils/tagColors';
 import { Z_INDEX } from 'styles/zIndex';
-import { TradeRepository } from 'services/repository/repositories/TradeRepository';
+import { TradeRepository } from 'services/repositories/TradeRepository';
 import { deriveTradeDateForSession } from 'utils/sessionTimeUtils';
 import { useUserPinnedEvents } from 'features/events/contexts/UserPinnedEventsContext';
 

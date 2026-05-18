@@ -6,7 +6,7 @@
 
 import { Trade, Calendar } from '../types/dualWrite';
 import { logger } from 'utils/logger';
-import { shareRepository, ShareLinkResult, SharedTradeData, SharedCalendarData, SharedNoteData } from 'services/repository/repositories/ShareRepository';
+import { shareRepository, ShareLinkResult, SharedTradeData, SharedCalendarData, SharedNoteData } from 'services/repositories/ShareRepository';
 import { supabase } from 'config/supabase';
 
 // Export types for use in components

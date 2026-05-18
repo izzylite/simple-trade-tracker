@@ -7,7 +7,7 @@ import {
   AbstractBaseRepository,
   RepositoryConfig,
   RepositoryResult
-} from 'services/repository/repositories/BaseRepository';
+} from 'services/repositories/BaseRepository';
 import {
   AIConversation,
   SerializableAIConversation,

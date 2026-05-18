@@ -7,7 +7,7 @@
  */
 
 import { supabase, supabaseUrl } from 'config/supabase';
-import { RepositoryResult } from 'services/repository/repositories/BaseRepository';
+import { RepositoryResult } from 'services/repositories/BaseRepository';
 import { Trade, Calendar } from 'features/calendar/types/dualWrite';
 import { handleSupabaseError } from 'utils/supabaseErrorHandler';
 import { logger } from 'utils/logger';

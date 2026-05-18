@@ -9,7 +9,7 @@ import {
   NoteQueryOptions,
   NoteQueryResult,
   NoteRepository,
-} from "services/repository/repositories/NoteRepository";
+} from "services/repositories/NoteRepository";
 
 const noteRepository = new NoteRepository();
 

@@ -1,5 +1,5 @@
 import { Trade } from '../types/dualWrite';
-import { TradeRepository } from 'services/repository/repositories/TradeRepository';
+import { TradeRepository } from 'services/repositories/TradeRepository';
 import { logger } from 'utils/logger';
 
 /**

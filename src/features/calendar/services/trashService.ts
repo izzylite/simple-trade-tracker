@@ -6,7 +6,7 @@
 
 import { Calendar } from '../types/dualWrite';
 import { logger } from 'utils/logger';
-import { CalendarRepository } from 'services/repository/repositories/CalendarRepository';
+import { CalendarRepository } from 'services/repositories/CalendarRepository';
 
 const calendarRepository = new CalendarRepository();
 const TRASH_RETENTION_DAYS = 30;

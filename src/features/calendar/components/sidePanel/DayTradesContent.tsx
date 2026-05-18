@@ -22,7 +22,7 @@ import { DayHeader, TradeList, ProgressSection } from '../trades';
 import { startOfNextDay } from '../trades/TradeFormDialog';
 import { calculateCumulativePnLToDateAsync } from '../../utils/dynamicRiskUtils';
 import { TradeOperationsProps } from '../../types/tradeOperations';
-import { TradeRepository } from 'services/repository/repositories/TradeRepository';
+import { TradeRepository } from 'services/repositories/TradeRepository';
 import { logger } from 'utils/logger';
 import EconomicEventsView from 'features/events/components/EconomicEventsView';
 import UnifiedDrawer from 'components/common/UnifiedDrawer';

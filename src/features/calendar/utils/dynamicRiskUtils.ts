@@ -1,5 +1,5 @@
 import { Trade, Calendar } from '../types/dualWrite';
-import { TradeRepository } from 'services/repository/repositories/TradeRepository';
+import { TradeRepository } from 'services/repositories/TradeRepository';
 
 /**
  * Dynamic risk settings interface

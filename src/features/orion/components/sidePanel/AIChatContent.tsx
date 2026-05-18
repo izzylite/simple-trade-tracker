@@ -51,7 +51,7 @@ import MemoryLogsPanel from 'features/orion/components/aiChat/MemoryLogsPanel';
 import { Note, SLASH_COMMAND_TAG, GUIDELINE_TAG } from 'features/notes/types/note';
 import * as notesService from 'features/notes/services/notesService';
 import { ConversationRepository }
-  from 'services/repository/repositories/ConversationRepository';
+  from 'services/repositories/ConversationRepository';
 import type { SystemCommand } from 'features/orion/components/aiChat/AIChatMentionInput';
 import { TradeOperationsProps } from 'features/calendar/types/tradeOperations';
 import { Z_INDEX } from 'styles/zIndex';

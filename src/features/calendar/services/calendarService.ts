@@ -9,8 +9,8 @@ import { Calendar, Trade } from '../types/dualWrite';
 import { logger } from 'utils/logger';
 
 // Import repositories
-import { CalendarRepository } from 'services/repository/repositories/CalendarRepository';
-import { TradeRepository } from 'services/repository/repositories/TradeRepository';
+import { CalendarRepository } from 'services/repositories/CalendarRepository';
+import { TradeRepository } from 'services/repositories/TradeRepository';
 
 // Create repository instances
 const calendarRepository = new CalendarRepository();

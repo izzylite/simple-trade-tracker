@@ -45,7 +45,7 @@ import { Calendar } from 'features/calendar/types/calendar';
 import * as notesService from 'features/notes/services/notesService';
 import { logger } from 'utils/logger';
 import { useAuthState } from 'contexts/AuthStateContext';
-import { CalendarRepository } from 'services/repository/repositories/CalendarRepository';
+import { CalendarRepository } from 'services/repositories/CalendarRepository';
 import { scrollbarStyles } from 'styles/scrollbarStyles';
 import { useNotes } from 'features/notes/hooks/useNotes';
 import type { Currency, ImpactLevel } from 'features/events/types/economicCalendar';

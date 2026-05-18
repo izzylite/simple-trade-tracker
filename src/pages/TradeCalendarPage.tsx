@@ -87,7 +87,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 
 import PageActionBar from 'components/common/PageActionBar';
 import { Calendar } from 'features/calendar/types/calendar';
-import { CalendarRepository } from 'services/repository/repositories/CalendarRepository';
+import { CalendarRepository } from 'services/repositories/CalendarRepository';
 import CalendarFormDialog, { CalendarFormData } from 'features/calendar/components/CalendarFormDialog';
 import ShareButton from 'features/calendar/components/sharing/ShareButton';
 import { exportTrades } from 'features/calendar/utils/tradeExportImport';

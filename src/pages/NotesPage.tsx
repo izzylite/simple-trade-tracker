@@ -15,7 +15,7 @@ import { useAuthState } from 'contexts/AuthStateContext';
 import { useUserPinnedEvents } from 'features/events/contexts/UserPinnedEventsContext';
 import { useSelectedCalendar } from 'features/calendar/contexts/SelectedCalendarContext';
 import { useNotes } from 'features/notes/hooks/useNotes';
-import { CalendarRepository } from 'services/repository/repositories/CalendarRepository';
+import { CalendarRepository } from 'services/repositories/CalendarRepository';
 import { logger } from 'utils/logger';
 import * as notesService from 'features/notes/services/notesService';
 

@@ -14,7 +14,7 @@ import {
 import { alpha } from '@mui/material/styles';
 import { format, startOfDay, startOfWeek, endOfWeek } from 'date-fns';
 import { Trade, Calendar } from '../../types/dualWrite';
-import { TradeRepository } from 'services/repository/repositories/TradeRepository';
+import { TradeRepository } from 'services/repositories/TradeRepository';
 import { calculateCumulativePnLToDateAsync } from '../../utils/dynamicRiskUtils';
 import { logger } from 'utils/logger';
 

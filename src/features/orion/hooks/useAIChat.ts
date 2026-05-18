@@ -18,7 +18,7 @@ import { generateConversationTitle } from 'features/orion/utils/conversationTitl
 import {
   ConversationRepository,
   ConversationPaginationOptions
-} from 'services/repository/repositories/ConversationRepository';
+} from 'services/repositories/ConversationRepository';
 import { logger } from 'utils/logger';
 import { estimateConversationTokens } from 'features/orion/utils/tokenEstimation';
 import { supabase } from 'config/supabase';
