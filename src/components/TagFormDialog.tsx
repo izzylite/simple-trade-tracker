@@ -246,11 +246,15 @@ const TagFormDialog: React.FC<TagFormDialogProps> = ({
                         return;
                     }
                     if (user?.id) {
-                        await tagService.saveTagDefinition(
+                        // Move the definition row from the old tag_name to the new one.
+                        // saveTagDefinition would have orphaned the old row (keyed by name)
+                        // and its "skip if unchanged" guard would also have no-op'd when
+                        // the user renamed without editing the definition.
+                        await tagService.renameTagDefinition(
                             user.id,
+                            editTag,
                             fullTag,
                             definition,
-                            originalDefinition,
                         );
                     }
                     onEditSuccess?.(editTag, fullTag, result.tradesUpdated || 0);
@@ -357,6 +361,11 @@ const TagFormDialog: React.FC<TagFormDialogProps> = ({
             if (!result.success) {
                 setError('Failed to delete tag');
                 return;
+            }
+            // Drop the definition row too; otherwise it lingers and would
+            // re-attach if the same tag name is created later.
+            if (user?.id) {
+                await tagService.deleteTagDefinition(user.id, editTag);
             }
             onDelete(editTag, result.tradesUpdated || 0);
             onClose();

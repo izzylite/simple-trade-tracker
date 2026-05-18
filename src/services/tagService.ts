@@ -147,6 +147,48 @@ export const tagService = {
   },
 
   /**
+   * Moves a definition from oldTag to newTag, or deletes it if newTag is empty.
+   *
+   * Use this whenever a tag is renamed or deleted via update-tag. The plain
+   * saveTagDefinition() can't be used here because:
+   *   1. It keys by tag_name, so calling it with the new tag would orphan the
+   *      old row instead of renaming it.
+   *   2. Its "skip if definition unchanged" guard would no-op when the user
+   *      renames a tag without editing the description, leaving the new tag
+   *      with no definition at all.
+   */
+  async renameTagDefinition(
+    userId: string,
+    oldTag: string,
+    newTag: string,
+    definition: string
+  ): Promise<void> {
+    if (!userId || !oldTag) return;
+
+    // Always remove the old row first. If oldTag had no definition this is a no-op.
+    await this.deleteTagDefinition(userId, oldTag);
+
+    // Delete-only case (rename to empty / tag removal): nothing more to do.
+    const trimmedNew = newTag.trim();
+    const trimmedDef = definition.trim();
+    if (!trimmedNew || !trimmedDef) return;
+
+    const { error } = await supabase
+      .from('tag_definitions')
+      .upsert({
+        user_id: userId,
+        tag_name: trimmedNew,
+        definition: trimmedDef,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'user_id,tag_name' });
+
+    if (error) {
+      logger.error('Error saving renamed tag definition:', error);
+      throw error;
+    }
+  },
+
+  /**
    * Deletes a tag definition
    */
   async deleteTagDefinition(userId: string, tagName: string): Promise<void> {

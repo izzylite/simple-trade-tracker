@@ -1,242 +1,122 @@
 /**
  * Update Tag Edge Function
- * Replaces Firebase updateTagV2 callable function
  *
- * Updates tags across all trades in a calendar with support for:
- * - Group name changes (Category:Tag format)
- * - Tag deletion and replacement
- * - Calendar metadata updates
- * - Batch processing with transactions
- */  
-import { createAuthenticatedClient, errorResponse, successResponse, handleCors, log, parseJsonBody } from '../_shared/supabase.ts';
-import type { AuthenticatedRequest } from '../_shared/supabase.ts';
-import { updateTradeTagsWithGroupNameChange, extractTagsFromTrades, formatTagWithCapitalizedGroup } from '../_shared/utils.ts';
-import type { Calendar, Trade, UpdateTagRequest } from '../_shared/types.ts';
+ * Renames a tag (or a tag group, e.g. "Setup:A" → "Strategy:A") across every trade
+ * in a calendar, then refreshes calendar metadata (tags array, required_tag_groups,
+ * excluded_tags_from_patterns) and triggers exactly one year_stats recompute.
+ *
+ * Previously this issued N individual UPDATE statements (one per affected trade),
+ * each of which fired the per-row trigger_trade_changes webhook, spawning N
+ * concurrent handle-trade-changes invocations that all raced to update the same
+ * calendars row. With ~500 trades this hit Postgres statement_timeout (57014).
+ *
+ * Now: one SQL RPC (bulk_update_tag_in_calendar) does all writes inside a
+ * transaction with app.skip_trade_webhook = 'true', then we explicitly recompute
+ * year_stats once per affected calendar.
+ */
+import { createAuthenticatedClient, createServiceClient, errorResponse, successResponse, handleCors, log, parseJsonBody } from '../_shared/supabase.ts';
+import { extractTagsFromTrades, formatTagWithCapitalizedGroup } from '../_shared/utils.ts';
+import { updateYearStats } from '../_shared/yearStats.ts';
+import type { UpdateTagRequest } from '../_shared/types.ts';
 
-/**
- * Helper function to update tags array with group name changes
- * Used for calendar metadata (tags, excluded_tags_from_patterns, requiredTagGroups)
- */ function updateTagsArray(tags: string[], oldTag: string, newTag: string): string[] {
-  if (!Array.isArray(tags)) return [];
-  const oldGroup = oldTag.includes(':') ? oldTag.split(':')[0] : null;
-  const newGroup = newTag && newTag.includes(':') ? newTag.split(':')[0] : null;
-  const isGroupNameChange = oldGroup && newGroup && oldGroup !== newGroup;
-  let updatedTags = [...tags];
-  if (isGroupNameChange) {
-    // Group name change - update all tags in the old group
-    updatedTags = updatedTags.map((tag) => {
-      if (tag === oldTag) {
-        // Direct match - replace with new tag
-        return newTag.trim() === '' ? null : newTag.trim();
-      } else if (tag.includes(':') && tag.split(':')[0] === oldGroup) {
-        // Same group - update group name but keep tag name
-        const tagName = tag.split(':')[1];
-        return `${newGroup}:${tagName}`;
-      }
-      return tag;
-    }).filter((tag) => tag !== null) as string[];
-  } else {
-    // Not a group name change - just replace the specific tag
-    const tagIndex = updatedTags.indexOf(oldTag);
-    if (tagIndex !== -1) {
-      if (newTag.trim() === '') {
-        updatedTags.splice(tagIndex, 1);
-      } else {
-        updatedTags[tagIndex] = newTag.trim();
-      }
-    }
-  }
-  // Remove duplicates and sort
-  return [...new Set(updatedTags)].sort();
-}
-/**
- * Update tags in calendar metadata (tags, excluded_tags_from_patterns, requiredTagGroups)
- */ async function updateCalendarMetadata(supabase: AuthenticatedRequest['supabase'], calendarId: string, calendarData: Calendar, oldTag: string, newTag: string): Promise<void> {
-  try {
-    log('Updating calendar metadata');
-    const updateData: Record<string, unknown> = {
-      updated_at: new Date().toISOString()
-    };
-    // Update required tag groups when a group name changes
-    if (calendarData.required_tag_groups && Array.isArray(calendarData.required_tag_groups)) {
-      const oldGroup = oldTag.includes(':') ? oldTag.split(':')[0] : null;
-      const newGroup = newTag && newTag.includes(':') ? newTag.split(':')[0] : null;
-      if (oldGroup && newGroup && oldGroup !== newGroup) {
-        // Group name changed, update it in required_tag_groups
-        updateData.required_tag_groups = calendarData.required_tag_groups.map((group) => group === oldGroup ? newGroup : group);
-        log(`Updated required tag group: ${oldGroup} → ${newGroup}`);
-      }
-    }
-    // Update calendar tags array
-    if (calendarData.tags && Array.isArray(calendarData.tags)) {
-      updateData.tags = updateTagsArray(calendarData.tags, oldTag, newTag);
-      log(`Updated calendar tags array`);
-    }
-    // Propagate the rename into the tag-pattern exclusion list.
-    if (Array.isArray(calendarData.excluded_tags_from_patterns)) {
-      updateData.excluded_tags_from_patterns = updateTagsArray(
-        calendarData.excluded_tags_from_patterns,
-        oldTag,
-        newTag,
-      );
-      log('Updated excluded_tags_from_patterns');
-    }
-    // Update the calendar
-    // Cast to satisfy TypeScript in edge runtime (no generated DB types)
-    const { error } = await supabase
-      .from('calendars')
-      .update(updateData as never)
-      .eq('id', calendarId);
-    if (error) {
-      throw error;
-    }
-    log('Calendar metadata updated successfully');
-  } catch (error) {
-    log('Error updating calendar metadata', 'error', error);
-    throw error;
-  }
-}
-
-/**
- * Update tags in all trades for the calendar
- */ async function updateTradesTags(supabase: AuthenticatedRequest['supabase'], calendarId: string, oldTag: string, newTag: string): Promise<number> {
-  try {
-    log(`Updating trades tags: ${oldTag} → ${newTag}`);
-    // Get only necessary fields for this calendar
-    const { data: trades, error: fetchError } = await supabase
-      .from('trades')
-      .select('id,tags')
-      .eq('calendar_id', calendarId);
-    if (fetchError) {
-      throw fetchError;
-    }
-    if (!trades || trades.length === 0) {
-      log('No trades found for calendar');
-      return 0;
-    }
-    log(`Found ${trades.length} trades to process`);
-    let totalTradesUpdated = 0;
-    const batchSize = 100;
-    // Process trades in batches
-    for (let i = 0; i < trades.length; i += batchSize) {
-      const batch = trades.slice(i, i + batchSize);
-      const updates: Array<{ id: string; tags: string[]; updated_at: string }> = [];
-      batch.forEach((trade: Trade) => {
-        const result = updateTradeTagsWithGroupNameChange(trade, oldTag, newTag);
-        if (result.updated && trade.tags) {
-          updates.push({
-            id: trade.id,
-            tags: trade.tags,
-            updated_at: new Date().toISOString()
-          });
-          totalTradesUpdated += result.updated_count;
-        }
-      });
-      // Update this batch if there are changes
-      if (updates.length > 0) {
-        for (const update of updates) {
-          const { error } = await supabase
-            .from('trades')
-            .update({
-              tags: update.tags,
-              updated_at: update.updated_at
-            } as never)
-            .eq('id', update.id);
-          if (error) {
-            log(`Error updating trade ${update.id}`, 'error', error);
-          }
-        }
-        log(`Updated batch of ${updates.length} trades`);
-      }
-    }
-    log(`Total trades updated: ${totalTradesUpdated}`);
-    return totalTradesUpdated;
-  } catch (error) {
-    log('Error updating trades tags', 'error', error);
-    throw error;
-  }
-}
-
-/**
- * Main Edge Function handler
- */ Deno.serve(async (req) => {
-  // Handle CORS preflight requests
+Deno.serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
+
   try {
     if (req.method !== 'POST') {
       return errorResponse('Method Not Allowed', 405);
     }
+
     log('Update tag request received');
-    // Authenticate user
+
     const authResult = await createAuthenticatedClient(req);
     if (!authResult) {
       return errorResponse('Authentication required', 401);
     }
     const { user, supabase } = authResult;
-    // Parse request body
+
     const payload = await parseJsonBody<UpdateTagRequest>(req);
     if (!payload) {
       return errorResponse('Invalid JSON payload', 400);
     }
+
     const { calendar_id: calendarId, old_tag: rawOldTag, new_tag: rawNewTag } = payload;
-    const oldTag = typeof rawOldTag === 'string' ? rawOldTag.trim() : rawOldTag as string;
-    // Capitalize the group name in newTag
+    const oldTag = typeof rawOldTag === 'string' ? rawOldTag.trim() : (rawOldTag as string);
     const newTag = typeof rawNewTag === 'string'
       ? formatTagWithCapitalizedGroup(rawNewTag.trim())
-      : rawNewTag as string;
-    // Validate required parameters
+      : (rawNewTag as string);
+
     if (!calendarId || !oldTag || newTag === undefined || newTag === null) {
       return errorResponse('Missing required parameters: calendarId, oldTag, or newTag', 400);
     }
-    // If oldTag and newTag are the same, no update needed
+
     if (oldTag === newTag) {
       log('oldTag and newTag are identical, no update needed');
-      return successResponse({
-        success: true,
-        tradesUpdated: 0
-      });
+      return successResponse({ success: true, tradesUpdated: 0 });
     }
-    log('Processing tag update', 'info', {
-      calendarId,
-      oldTag,
-      newTag,
-      userId: user.id
+
+    log('Processing tag update', 'info', { calendarId, oldTag, newTag, userId: user.id });
+
+    // Single RPC does all writes (trades + calendar metadata + linked-calendar sync)
+    // with the skip-webhook GUC set, so we don't trigger the per-row webhook storm.
+    // The RPC enforces calendar ownership against auth.uid().
+    const { data: result, error: rpcError } = await supabase.rpc('bulk_update_tag_in_calendar', {
+      p_calendar_id: calendarId,
+      p_old_tag: oldTag,
+      p_new_tag: newTag,
     });
-    // Get calendar (RLS enforces ownership)
-    const { data: calendar, error: calendarError } = await supabase
-      .from('calendars')
-      .select('*')
-      .eq('id', calendarId)
-      .single();
-    if (calendarError || !calendar) {
-      return errorResponse('Calendar not found', 404);
+
+    if (rpcError) {
+      log('bulk_update_tag_in_calendar RPC failed', 'error', rpcError);
+      const status = rpcError.message?.includes('Not authorized') ? 403
+        : rpcError.message?.includes('not found') ? 404
+        : 500;
+      return errorResponse(rpcError.message || 'Failed to update tags', status);
     }
-    // Perform the tag updates
-    const [tradesUpdated] = await Promise.all([
-      // Update trades tags
-      updateTradesTags(supabase, calendarId, oldTag, newTag),
-      // Update calendar metadata
-      updateCalendarMetadata(supabase, calendarId, calendar, oldTag, newTag)
-    ]);
-    // After updating trades, refresh the calendar's tag list
-    const { data: updatedTrades, error: tradesError } = await supabase.from('trades').select('tags').eq('calendar_id', calendarId);
-    if (!tradesError && updatedTrades) {
-      const allTags = extractTagsFromTrades(updatedTrades);
-      await supabase
+
+    const tradesUpdated = (result as { trades_updated?: number })?.trades_updated ?? 0;
+    const linkedTradesUpdated = (result as { linked_trades_updated?: number })?.linked_trades_updated ?? 0;
+    const linkedCalendarId = (result as { linked_calendar_id?: string | null })?.linked_calendar_id ?? null;
+
+    log('Bulk tag update completed', 'info', { tradesUpdated, linkedTradesUpdated, linkedCalendarId });
+
+    // Refresh the calendar's tags array from the current trade tags. The RPC
+    // already applied the rename transform, but a full re-derive from trades
+    // catches any pre-existing drift between calendar.tags and actual tags-in-use.
+    // Use service client because authenticated client may not be able to read all
+    // trades depending on RLS shape. The RPC already verified ownership.
+    const service = createServiceClient();
+    const { data: tradeRows, error: tradesErr } = await service
+      .from('trades')
+      .select('tags')
+      .eq('calendar_id', calendarId);
+    if (!tradesErr && tradeRows) {
+      const allTags = extractTagsFromTrades(tradeRows as Array<{ tags?: string[] | null }> as never);
+      await service
         .from('calendars')
-        .update({
-          tags: allTags,
-          updated_at: new Date().toISOString()
-        } as never)
+        .update({ tags: allTags, updated_at: new Date().toISOString() } as never)
         .eq('id', calendarId);
       log(`Refreshed calendar tags: ${allTags.length} unique tags`);
     }
+
+    // Trigger exactly one year_stats recompute per affected calendar. Skip the
+    // coalesce guard since we just mutated trades and need fresh stats. Run the
+    // linked-calendar recompute in parallel.
+    const recomputes: Promise<unknown>[] = [
+      updateYearStats(calendarId, { coalesce: false }),
+    ];
+    if (linkedCalendarId && linkedTradesUpdated > 0) {
+      recomputes.push(updateYearStats(linkedCalendarId, { coalesce: false }));
+    }
+    await Promise.all(recomputes);
+
     log(`Tag update completed successfully: ${tradesUpdated} trades updated`);
     return successResponse({
       success: true,
       tradesUpdated,
-      message: `Successfully updated ${tradesUpdated} trades`
+      linkedTradesUpdated,
+      message: `Successfully updated ${tradesUpdated} trades`,
     });
   } catch (error) {
     log('Error processing tag update', 'error', error);

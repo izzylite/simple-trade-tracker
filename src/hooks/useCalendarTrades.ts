@@ -964,7 +964,12 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
         logger.log(
           `✅ Tag updated successfully: ${data.tradesUpdated} trades affected`,
         );
-        // Real-time subscription will handle the UI update via broadcast
+        // Patch local state immediately. The broadcast path is unreliable for bulk
+        // tag renames: a single SQL UPDATE in bulk_update_tag_in_calendar fires N
+        // realtime broadcasts back-to-back after commit, which can overwhelm the
+        // channel and drop events. Idempotent — any broadcasts that do arrive
+        // re-apply the same change harmlessly.
+        tagUpdateUIState(oldTag, newTag);
         return { success: true, tradesUpdated: data.tradesUpdated || 0 };
       } else {
         logger.error("Tag update failed:", data?.message || "Unknown error");
@@ -1096,10 +1101,6 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
   }, [calendarId, setTradesFromArray, generateRangeCacheKey, getCachedTrades, setCachedTrades]);
 
   function tagUpdateUIState(oldTag: string, newTag: string) {
-    // Use calendar from hook state
-    if (!calendar) {
-      throw new Error(`Calendar with ID ${calendarId} not found`);
-    }
     logger.log(`Updating trades for tag change: ${oldTag} -> ${newTag}`);
     // Helper function to update tags in an array, handling group name changes
     const updateTagsWithGroupNameChange = (tags: string[]) => {
@@ -1221,13 +1222,17 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
       // Update cache for all affected trades
       updatedTrades.forEach((trade) => updateTradeInCache(trade));
 
-      // Update local state immediately
-      setCalendar({
-        ...calendar,
-        tags: updateTagsWithGroupNameChange(calendar.tags || []),
-        required_tag_groups: updateRequiredTagGroups(
-          calendar.required_tag_groups || [],
-        ),
+      // Update local calendar state. Functional setState so we read the latest
+      // value even if this helper was captured by an older useCallback closure.
+      setCalendar((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          tags: updateTagsWithGroupNameChange(prev.tags || []),
+          required_tag_groups: updateRequiredTagGroups(
+            prev.required_tag_groups || [],
+          ),
+        };
       });
     });
   }
