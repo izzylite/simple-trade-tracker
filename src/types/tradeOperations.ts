@@ -1,6 +1,6 @@
 import { Trade } from './trade';
 import { Calendar } from './calendar';
-import { EconomicCalendarFilterSettings } from '../hooks/useEconomicCalendarFilters';
+import { EconomicCalendarFilterSettings } from 'features/events/hooks/useEconomicCalendarFilters';
 
 /**
  * Shared interface for trade-related operations and callbacks.

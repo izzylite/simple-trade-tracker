@@ -26,7 +26,7 @@ import { useRealtimeSubscription } from '../../hooks/useRealtimeSubscription';
 import { logger } from '../../utils/logger';
 import ReminderListItem from './ReminderListItem';
 import ReminderBatchListItem from './ReminderBatchListItem';
-import EconomicEventShimmer from '../economicCalendar/EconomicEventShimmer';
+import EconomicEventShimmer from 'features/events/components/EconomicEventShimmer';
 
 /**
  * Solo: one card per reminder (batch_id null OR batch with only one pending

@@ -56,7 +56,7 @@ interface MonthlyStatsProps {
   onEditTrade?: (trade: Trade) => void;
   economicFilter?: (
     calendarId: string,
-  ) => import('../hooks/useEconomicCalendarFilters').EconomicCalendarFilterSettings;
+  ) => import('features/events/hooks/useEconomicCalendarFilters').EconomicCalendarFilterSettings;
   maxDailyDrawdown?: number;
   pnlBeforeMonth?: number;
   isPnlLoading?: boolean;

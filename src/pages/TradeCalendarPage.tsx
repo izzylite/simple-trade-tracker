@@ -109,17 +109,17 @@ import { Z_INDEX } from '../styles/zIndex';
 
 import FloatingMonthNavigation from '../components/FloatingMonthNavigation';
 import { calculateDayStats, calculateTargetProgress } from '../utils/statsUtils';
-import { DEFAULT_FILTER_SETTINGS as DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS } from '../hooks/useEconomicCalendarFilters';
-import EconomicEventsView from '../components/economicCalendar/EconomicEventsView';
-import { useEconomicEventsUpdates } from '../hooks/useEconomicEventWatcher';
+import { DEFAULT_FILTER_SETTINGS as DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS } from 'features/events/hooks/useEconomicCalendarFilters';
+import EconomicEventsView from 'features/events/components/EconomicEventsView';
+import { useEconomicEventsUpdates } from 'features/events/hooks/useEconomicEventWatcher';
 import { TradeOperationsProps } from '../types/tradeOperations';
-import { EconomicEvent } from '../types/economicCalendar';
-import { useHighImpactEvents } from '../hooks/useHighImpactEvents';
+import { EconomicEvent } from 'features/events/types/economicCalendar';
+import { useHighImpactEvents } from 'features/events/hooks/useHighImpactEvents';
 import { log, logger } from '../utils/logger';
 import { useTradesContext } from '../contexts/TradesContext';
 import { useTradeOperations } from '../contexts/TradeOperationsContext';
 import { useTradeViewer } from '../contexts/TradeViewerContext';
-import { useUserPinnedEvents } from '../contexts/UserPinnedEventsContext';
+import { useUserPinnedEvents } from 'features/events/contexts/UserPinnedEventsContext';
 import {
   SidePanelProvider,
   useSidePanel,
@@ -130,7 +130,7 @@ import {
 import { usePanelMutexSlot } from '../contexts/PanelMutexContext';
 import { SearchPanelStateProvider } from '../contexts/SearchPanelStateContext';
 import { OverviewPanelStateProvider } from '../contexts/OverviewPanelStateContext';
-import { EventsPanelStateProvider } from '../contexts/EventsPanelStateContext';
+import { EventsPanelStateProvider } from 'features/events/contexts/EventsPanelStateContext';
 import { NotesPanelStateProvider } from 'features/notes/contexts/NotesPanelStateContext';
 import { TagsPanelStateProvider } from '../contexts/TagsPanelStateContext';
 import SidePanel from '../components/sidePanel/SidePanel';

@@ -16,7 +16,7 @@ import {
 import { Close as CloseIcon } from '@mui/icons-material';
 
 import { Note, DayAbbreviation } from '../types/note';
-import type { Currency, ImpactLevel } from 'types/economicCalendar';
+import type { Currency, ImpactLevel } from 'features/events/types/economicCalendar';
 import NoteEditorBody, { NoteEditorBodyHandle } from './NoteEditorBody';
 
 // Re-export tag config for downstream consumers

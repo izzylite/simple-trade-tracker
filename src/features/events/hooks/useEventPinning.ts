@@ -8,7 +8,7 @@
  */
 
 import { useCallback } from 'react';
-import { Calendar } from '../types/calendar';
+import { Calendar } from 'types/calendar';
 import { EconomicEvent } from '../types/economicCalendar';
 import { useUserPinnedEvents } from '../contexts/UserPinnedEventsContext';
 

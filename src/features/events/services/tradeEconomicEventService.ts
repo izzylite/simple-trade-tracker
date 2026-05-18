@@ -1,10 +1,10 @@
 import { format, parseISO, isSameDay } from 'date-fns';
 import { economicCalendarService } from './economicCalendarService';
-import { TradeEconomicEvent } from '../types/dualWrite';
+import { TradeEconomicEvent } from 'types/dualWrite';
 import { EconomicEvent, ImpactLevel, Currency } from '../types/economicCalendar';
-import { logger } from '../utils/logger';
+import { logger } from 'utils/logger';
 import { DEFAULT_FILTER_SETTINGS as DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS } from '../hooks/useEconomicCalendarFilters';
-import { getSessionTimeRange, type TradingSession } from '../utils/sessionTimeUtils';
+import { getSessionTimeRange, type TradingSession } from 'utils/sessionTimeUtils';
 import { cleanEventNameForPinning } from '../utils/eventNameUtils';
  
 

@@ -12,7 +12,7 @@ import { Visibility as VisibilityIcon } from '@mui/icons-material';
 import { Note } from 'features/notes/types/note';
 import { Calendar } from '../types/calendar';
 import { useAuthState } from '../contexts/AuthStateContext';
-import { useUserPinnedEvents } from '../contexts/UserPinnedEventsContext';
+import { useUserPinnedEvents } from 'features/events/contexts/UserPinnedEventsContext';
 import { useSelectedCalendar } from '../contexts/SelectedCalendarContext';
 import { useNotes } from 'features/notes/hooks/useNotes';
 import { CalendarRepository } from '../services/repository/repositories/CalendarRepository';

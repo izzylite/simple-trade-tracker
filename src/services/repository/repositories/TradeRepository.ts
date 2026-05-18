@@ -20,7 +20,7 @@ import { uploadTradeImage } from '../../supabaseStorageService';
 import { TradeImage } from '../../../components/trades/TradeForm';
 
 // Economic events imports
-import { tradeEconomicEventService, getRelevantCurrenciesFromTags } from '../../tradeEconomicEventService';
+import { tradeEconomicEventService, getRelevantCurrenciesFromTags } from 'features/events/services/tradeEconomicEventService';
 import { TradeEconomicEvent } from '../../../types/dualWrite';
 
  
@@ -313,7 +313,7 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
       }
 
       // Import cleanEventNameForPinning here to avoid circular dependencies
-      const { cleanEventNameForPinning } = await import('../../../utils/eventNameUtils');
+      const { cleanEventNameForPinning } = await import('features/events/utils/eventNameUtils');
 
       // Create parallel count queries for each event
       // Each query uses the JSONB containment operator (cs) to count on server-side

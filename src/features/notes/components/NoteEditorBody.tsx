@@ -110,8 +110,8 @@ import { isGroupedTag, getTagName, getTagGroup } from 'utils/tagColors';
 import NoteShareButton from './NoteShareButton';
 import { useNoteNavigation } from '../hooks/useNoteNavigation';
 import { getContentAsJson } from 'components/common/RichTextEditor/utils/draftUtils';
-import { IMPACT_COLORS, CURRENCY_FLAGS } from 'types/economicCalendar';
-import type { ImpactLevel, Currency } from 'types/economicCalendar';
+import { IMPACT_COLORS, CURRENCY_FLAGS } from 'features/events/types/economicCalendar';
+import type { ImpactLevel, Currency } from 'features/events/types/economicCalendar';
 import {
   DEFAULT_NOTE_TAGS_MAP,
   getTagDisplayLabel,

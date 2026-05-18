@@ -36,16 +36,16 @@ import {
   startOfWeek,
 } from 'date-fns';
 
-import { useEconomicEvents } from '../hooks/useEconomicEvents';
+import { useEconomicEvents } from 'features/events/hooks/useEconomicEvents';
 import { useEventCountdownTime } from '../hooks/useCurrentTime';
-import { useUserPinnedEvents } from '../contexts/UserPinnedEventsContext';
+import { useUserPinnedEvents } from 'features/events/contexts/UserPinnedEventsContext';
 import { useTradesContext } from '../contexts/TradesContext';
 import { useTradeOperations } from '../contexts/TradeOperationsContext';
 import {
   DEFAULT_FILTER_SETTINGS,
   EconomicCalendarFilterSettings,
-} from '../hooks/useEconomicCalendarFilters';
-import { useUserTradeEventCounts } from '../hooks/useUserTradeEventCounts';
+} from 'features/events/hooks/useEconomicCalendarFilters';
+import { useUserTradeEventCounts } from 'features/events/hooks/useUserTradeEventCounts';
 import {
   SidePanelProvider,
   useSidePanel,
@@ -54,23 +54,23 @@ import {
 } from '../contexts/SidePanelContext';
 import { usePanelMutexSlot } from '../contexts/PanelMutexContext';
 import SidePanel from '../components/sidePanel/SidePanel';
-import { Currency, EconomicEvent, ImpactLevel } from '../types/economicCalendar';
-import { isEventPinned } from '../utils/eventNameUtils';
+import { Currency, EconomicEvent, ImpactLevel } from 'features/events/types/economicCalendar';
+import { isEventPinned } from 'features/events/utils/eventNameUtils';
 import { PinnedEvent } from '../types/dualWrite';
 import EconomicEventRow, {
   ImpactBars,
   formatTime,
   impactColor,
-} from '../components/economicCalendar/EconomicEventRow';
-import EconomicEventDetailDialog from '../components/economicCalendar/EconomicEventDetailDialog';
-import EconomicEventDetailPanel from '../components/economicCalendar/EconomicEventDetailPanel';
+} from 'features/events/components/EconomicEventRow';
+import EconomicEventDetailDialog from 'features/events/components/EconomicEventDetailDialog';
+import EconomicEventDetailPanel from 'features/events/components/EconomicEventDetailPanel';
 import TradeGalleryDialog from '../components/TradeGalleryDialog';
 import ImageZoomDialog from '../components/ImageZoomDialog';
 import NotesContent from 'features/notes/components/sidePanel/NotesContent';
 import NotesDrawer from 'features/notes/components/NotesDrawer';
-import { useEventPageTradeOps } from '../hooks/useEventPageTradeOps';
-import AllPinnedEventsContent from '../components/economicCalendar/AllPinnedEventsContent';
-import EconomicEventShimmer from '../components/economicCalendar/EconomicEventShimmer';
+import { useEventPageTradeOps } from 'features/events/hooks/useEventPageTradeOps';
+import AllPinnedEventsContent from 'features/events/components/AllPinnedEventsContent';
+import EconomicEventShimmer from 'features/events/components/EconomicEventShimmer';
 import { Z_INDEX } from '../styles/zIndex';
 
 const APP_HEADER_HEIGHT = 64;

@@ -7,7 +7,7 @@
  * by eventMatchV3 and isEventPinned.
  */
 
-import { supabase } from '../config/supabase';
+import { supabase } from 'config/supabase';
 import { cleanEventNameForPinning } from '../utils/eventNameUtils';
 
 export type EventCountKey = string; // `${cleanedName.toLowerCase()}|${currency}|${impact}`

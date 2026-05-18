@@ -13,7 +13,7 @@ import NotesBottomSheet from './NotesBottomSheet';
 import { Z_INDEX } from 'styles/zIndex';
 import { Note } from '../../types/note';
 import { Calendar } from 'types/calendar';
-import { useUserPinnedEvents } from 'contexts/UserPinnedEventsContext';
+import { useUserPinnedEvents } from 'features/events/contexts/UserPinnedEventsContext';
 import { SIDE_NAV_WIDTH } from 'components/layout/SideNav';
 
 interface StackedNotesWidgetProps {

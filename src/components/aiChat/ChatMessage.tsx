@@ -34,7 +34,7 @@ import {
 import { stripReferencedBlocks } from '../../utils/chatMentions';
 import { ChatMessage as ChatMessageType } from '../../types/aiChat';
 import { Trade } from '../../types/trade';
-import { EconomicEvent } from '../../types/economicCalendar';
+import { EconomicEvent } from 'features/events/types/economicCalendar';
 import { format } from 'date-fns';
 import { logger } from '../../utils/logger';
 import { getTagChipStyles } from '../../utils/tagColors';

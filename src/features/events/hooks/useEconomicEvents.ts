@@ -8,8 +8,8 @@ import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 import { EconomicEvent, Currency, ImpactLevel } from '../types/economicCalendar';
 import { economicCalendarService } from '../services/economicCalendarService';
-import { logger } from '../utils/logger';
-import { supabase } from '../config/supabase';
+import { logger } from 'utils/logger';
+import { supabase } from 'config/supabase';
 
 export type ViewType = 'day' | 'week' | 'month';
 

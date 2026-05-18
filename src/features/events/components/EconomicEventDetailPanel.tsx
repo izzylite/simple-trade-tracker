@@ -28,18 +28,18 @@ import {
   ExpandLess as ExpandLessIcon,
 } from '@mui/icons-material';
 import ReactMarkdown from 'react-markdown';
-import { EconomicEvent } from '../../types/economicCalendar';
-import { Trade, Calendar } from '../../types/dualWrite';
-import TradeList from '../trades/TradeList';
-import { cleanEventNameForPinning, eventMatchV1 } from '../../utils/eventNameUtils';
-import { useUserPinnedEvents } from '../../contexts/UserPinnedEventsContext';
-import { useAuthState } from '../../contexts/AuthStateContext';
-import { useCalendars } from '../../hooks/useCalendars';
-import { getSessionForTimestamp, SESSION_COLORS } from '../../utils/sessionTimeUtils';
-import { TradeOperationsProps } from '../../types/tradeOperations';
-import Shimmer from '../Shimmer';
-import { supabaseAIChatService } from '../../services/supabaseAIChatService';
-import { supabase } from '../../config/supabase';
+import { EconomicEvent } from '../types/economicCalendar';
+import { Trade, Calendar } from 'types/dualWrite';
+import TradeList from 'components/trades/TradeList';
+import { cleanEventNameForPinning, eventMatchV1 } from '../utils/eventNameUtils';
+import { useUserPinnedEvents } from '../contexts/UserPinnedEventsContext';
+import { useAuthState } from 'contexts/AuthStateContext';
+import { useCalendars } from 'hooks/useCalendars';
+import { getSessionForTimestamp, SESSION_COLORS } from 'utils/sessionTimeUtils';
+import { TradeOperationsProps } from 'types/tradeOperations';
+import Shimmer from 'components/Shimmer';
+import { supabaseAIChatService } from 'services/supabaseAIChatService';
+import { supabase } from 'config/supabase';
 
 interface EconomicEventDetailPanelProps {
   event: EconomicEvent;
@@ -101,7 +101,7 @@ const EconomicEventDetailPanel: React.FC<EconomicEventDetailPanelProps> = ({
       setIsLoadingTrades(true);
       hasInitialLoad.current = false;
       try {
-        const calendarServiceModule = await import('../../services/calendarService');
+        const calendarServiceModule = await import('services/calendarService');
         const cleanedName = cleanEventNameForPinning(event.event_name);
         const trades = await calendarServiceModule
           .getTradeRepository()

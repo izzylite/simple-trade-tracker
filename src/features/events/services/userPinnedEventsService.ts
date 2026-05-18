@@ -6,9 +6,9 @@
  * across calendars instead of fragmenting per strategy.
  */
 
-import { supabase } from '../config/supabase';
-import { PinnedEvent } from '../types/dualWrite';
-import { logger } from '../utils/logger';
+import { supabase } from 'config/supabase';
+import { PinnedEvent } from 'types/dualWrite';
+import { logger } from 'utils/logger';
 
 export async function getUserPinnedEvents(
   userId: string

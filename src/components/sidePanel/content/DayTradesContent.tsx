@@ -24,7 +24,7 @@ import { calculateCumulativePnLToDateAsync } from '../../../utils/dynamicRiskUti
 import { TradeOperationsProps } from '../../../types/tradeOperations';
 import { TradeRepository } from '../../../services/repository/repositories/TradeRepository';
 import { logger } from '../../../utils/logger';
-import EconomicEventsView from '../../economicCalendar/EconomicEventsView';
+import EconomicEventsView from 'features/events/components/EconomicEventsView';
 import UnifiedDrawer from '../../common/UnifiedDrawer';
 
 export interface DayTradesContentProps {

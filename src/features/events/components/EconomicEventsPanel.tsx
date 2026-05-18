@@ -38,26 +38,26 @@ import {
 } from '@mui/icons-material';
 import { isToday, parseISO } from 'date-fns';
 
-import { Trade } from '../../types/dualWrite';
+import { Trade } from 'types/dualWrite';
 import {
   Currency,
   EconomicEvent,
   ImpactLevel,
-} from '../../types/economicCalendar';
+} from '../types/economicCalendar';
 import {
   DEFAULT_FILTER_SETTINGS as DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS,
   EconomicCalendarFilterSettings,
-} from '../../hooks/useEconomicCalendarFilters';
-import { economicCalendarService } from '../../services/economicCalendarService';
-import { tradeEconomicEventService } from '../../services/tradeEconomicEventService';
-import { useEventPinning } from '../../hooks/useEventPinning';
-import { useUserPinnedEvents } from '../../contexts/UserPinnedEventsContext';
-import { useEventCountdownTime } from '../../hooks/useCurrentTime';
-import { useRealtimeSubscription } from '../../hooks/useRealtimeSubscription';
-import { isEventPinned } from '../../utils/eventNameUtils';
-import { scrollbarStyles } from '../../styles/scrollbarStyles';
-import { formatCount } from '../../utils/formatters';
-import { logger } from '../../utils/logger';
+} from '../hooks/useEconomicCalendarFilters';
+import { economicCalendarService } from '../services/economicCalendarService';
+import { tradeEconomicEventService } from '../services/tradeEconomicEventService';
+import { useEventPinning } from '../hooks/useEventPinning';
+import { useUserPinnedEvents } from '../contexts/UserPinnedEventsContext';
+import { useEventCountdownTime } from 'hooks/useCurrentTime';
+import { useRealtimeSubscription } from 'hooks/useRealtimeSubscription';
+import { isEventPinned } from '../utils/eventNameUtils';
+import { scrollbarStyles } from 'styles/scrollbarStyles';
+import { formatCount } from 'utils/formatters';
+import { logger } from 'utils/logger';
 import EconomicEventShimmer from './EconomicEventShimmer';
 import EconomicEventRow, { impactColor } from './EconomicEventRow';
 

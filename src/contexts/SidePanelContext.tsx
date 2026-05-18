@@ -1,6 +1,6 @@
 // src/contexts/SidePanelContext.tsx
 import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react';
-import { EconomicEvent } from '../types/economicCalendar';
+import { EconomicEvent } from 'features/events/types/economicCalendar';
 
 // -- Types --
 

@@ -6,8 +6,8 @@
 
 import { TradeImage } from '../components/trades/TradeForm';
 import { ImageAttribution } from '../components/heroImage';
-import { EconomicCalendarFilterSettings } from '../hooks/useEconomicCalendarFilters';
-import { ImpactLevel, Currency } from './economicCalendar';
+import { EconomicCalendarFilterSettings } from 'features/events/hooks/useEconomicCalendarFilters';
+import { ImpactLevel, Currency } from 'features/events/types/economicCalendar';
 
 // =====================================================
 // CORE INTERFACES

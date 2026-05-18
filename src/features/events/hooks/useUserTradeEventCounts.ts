@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useAuthState } from '../contexts/AuthStateContext';
+import { useAuthState } from 'contexts/AuthStateContext';
 import { EconomicEvent } from '../types/economicCalendar';
 import {
   EventCountKey,

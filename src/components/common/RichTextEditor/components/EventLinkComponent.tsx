@@ -6,11 +6,11 @@ import { ContentState } from 'draft-js';
 import {
   IMPACT_COLORS,
   CURRENCY_FLAGS,
-} from '../../../../types/economicCalendar';
+} from 'features/events/types/economicCalendar';
 import type {
   ImpactLevel,
   Currency,
-} from '../../../../types/economicCalendar';
+} from 'features/events/types/economicCalendar';
 
 interface EventLinkProps {
   contentState: ContentState;

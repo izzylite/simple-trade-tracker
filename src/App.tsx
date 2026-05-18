@@ -9,7 +9,7 @@ import { AuthProvider } from './contexts/SupabaseAuthContext';
 import { useAuthState, AuthStateProvider } from './contexts/AuthStateContext';
 import { TradeSyncProvider } from './contexts/TradeSyncContext';
 import { NotificationsProvider } from './contexts/NotificationsContext';
-import { UserPinnedEventsProvider } from './contexts/UserPinnedEventsContext';
+import { UserPinnedEventsProvider } from 'features/events/contexts/UserPinnedEventsContext';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import * as calendarService from './services/calendarService';
 import { createAppTheme } from './theme';
@@ -38,7 +38,7 @@ import { TradesProvider } from './contexts/TradesContext';
 import { AIChatProvider } from './contexts/AIChatContext';
 import { TradeViewerProvider } from './contexts/TradeViewerContext';
 import { TradeOperationsProvider } from './contexts/TradeOperationsContext';
-import { EventNotificationsProvider } from './contexts/EventNotificationsContext';
+import { EventNotificationsProvider } from 'features/events/contexts/EventNotificationsContext';
 import { PanelMutexProvider, usePanelMutexSlot } from './contexts/PanelMutexContext';
 import { useCalendarsListPanel } from './contexts/CalendarsListPanelContext';
 
@@ -71,7 +71,7 @@ const GlobalAIChat = lazy(() => import('./components/aiChat/GlobalAIChat'));
 const GlobalAIChatFab = lazy(() => import('./components/aiChat/GlobalAIChatFab'));
 const GlobalTradeViewer = lazy(() => import('./components/trades/GlobalTradeViewer'));
 const GlobalTradeOperations = lazy(() => import('./components/trades/GlobalTradeOperations'));
-const GlobalEventNotifications = lazy(() => import('./components/notifications/GlobalEventNotifications'));
+const GlobalEventNotifications = lazy(() => import('features/events/components/notifications/GlobalEventNotifications'));
 
 
 // Loading component for Suspense

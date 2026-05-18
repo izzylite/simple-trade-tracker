@@ -37,7 +37,7 @@ import type { AIChatMentionInputHandle, SystemCommand } from './AIChatMentionInp
 import { ChatMessage as ChatMessageType, AttachedImage } from '../../types/aiChat';
 import { Trade } from '../../types/trade';
 import { Calendar } from '../../types/calendar';
-import { EconomicEvent } from '../../types/economicCalendar';
+import { EconomicEvent } from 'features/events/types/economicCalendar';
 import { Note } from 'features/notes/types/note';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import { Z_INDEX } from '../../styles/zIndex';

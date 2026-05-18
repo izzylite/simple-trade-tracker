@@ -27,21 +27,21 @@ import {
   EventOutlined,
 } from '@mui/icons-material';
 import ReactMarkdown from 'react-markdown';
-import { EconomicEvent } from '../../types/economicCalendar';
-import { Trade } from '../../types/dualWrite';
-import { BaseDialog } from '../common';
-import { useDialogTokens, MONO_FONT } from '../../styles/dialogTokens';
-import TradeList from '../trades/TradeList';
-import { cleanEventNameForPinning, eventMatchV1 } from '../../utils/eventNameUtils';
-import { useUserPinnedEvents } from '../../contexts/UserPinnedEventsContext';
-import { useAuthState } from '../../contexts/AuthStateContext';
-import { useCalendars } from '../../hooks/useCalendars';
-import { getSessionForTimestamp, SESSION_COLORS } from '../../utils/sessionTimeUtils';
-import { TradeOperationsProps } from '../../types/tradeOperations';
-import { Z_INDEX } from '../../styles/zIndex';
-import Shimmer from '../Shimmer';
-import { supabaseAIChatService } from '../../services/supabaseAIChatService';
-import { supabase } from '../../config/supabase';
+import { EconomicEvent } from '../types/economicCalendar';
+import { Trade } from 'types/dualWrite';
+import { BaseDialog } from 'components/common';
+import { useDialogTokens, MONO_FONT } from 'styles/dialogTokens';
+import TradeList from 'components/trades/TradeList';
+import { cleanEventNameForPinning, eventMatchV1 } from '../utils/eventNameUtils';
+import { useUserPinnedEvents } from '../contexts/UserPinnedEventsContext';
+import { useAuthState } from 'contexts/AuthStateContext';
+import { useCalendars } from 'hooks/useCalendars';
+import { getSessionForTimestamp, SESSION_COLORS } from 'utils/sessionTimeUtils';
+import { TradeOperationsProps } from 'types/tradeOperations';
+import { Z_INDEX } from 'styles/zIndex';
+import Shimmer from 'components/Shimmer';
+import { supabaseAIChatService } from 'services/supabaseAIChatService';
+import { supabase } from 'config/supabase';
 
 interface EconomicEventDetailDialogProps {
   open: boolean;
@@ -138,7 +138,7 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
       setIsLoadingTrades(true);
       hasInitialLoad.current = false;
       try {
-        const calendarServiceModule = await import('../../services/calendarService');
+        const calendarServiceModule = await import('services/calendarService');
         const cleanedName = cleanEventNameForPinning(event.event_name);
         const repo = calendarServiceModule.getTradeRepository();
 

@@ -14,7 +14,7 @@ import {
   PerformanceCalculationResult
 } from '../services/performanceCalculationService';
 import { supabase } from '../config/supabase';
-import { EconomicCalendarFilterSettings, DEFAULT_FILTER_SETTINGS as DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS } from '../hooks/useEconomicCalendarFilters';
+import { EconomicCalendarFilterSettings, DEFAULT_FILTER_SETTINGS as DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS } from 'features/events/hooks/useEconomicCalendarFilters';
 import { TradeOperationsProps } from '../types/tradeOperations';
 import PnLChartsWrapper from './charts/PnLChartsWrapper';
 import WinLossStats from './charts/WinLossStats';
@@ -23,7 +23,7 @@ import TagDayOfWeekAnalysis from './charts/TagDayOfWeekAnalysis';
 import SessionPerformanceAnalysis from './charts/SessionPerformanceAnalysis';
 import TradesListDialog from './charts/TradesListDialog';
 import RiskRewardChart from './charts/RiskRewardChart';
-import EconomicEventCorrelationAnalysis from './charts/EconomicEventCorrelationAnalysis';
+import EconomicEventCorrelationAnalysis from 'features/events/components/charts/EconomicEventCorrelationAnalysis';
 import { useTradeSyncContextOptional } from '../contexts/TradeSyncContext';
 import { normalizeTradeDates } from '../utils/tradeUtils';
 

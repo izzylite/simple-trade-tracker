@@ -10,7 +10,7 @@ import EventLinkComponent from '../components/EventLinkComponent';
 import { findEventLinkEntities } from './eventEntityUtils';
 import TradeLinkComponent from '../components/TradeLinkComponent';
 import { findTradeLinkEntities } from './tradeEntityUtils';
-import type { ImpactLevel, Currency } from '../../../../types/economicCalendar';
+import type { ImpactLevel, Currency } from 'features/events/types/economicCalendar';
 
 /**
  * Create decorator factory for links and tag chips with props

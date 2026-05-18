@@ -11,8 +11,8 @@ import {
   useEconomicEventWatcher,
   useEconomicEventsUpdates,
 } from '../hooks/useEconomicEventWatcher';
-import { useTradesContext } from './TradesContext';
-import { playNotificationSound } from '../utils/notificationSound';
+import { useTradesContext } from 'contexts/TradesContext';
+import { playNotificationSound } from 'utils/notificationSound';
 import type { EconomicEvent } from '../types/economicCalendar';
 
 /**

@@ -17,19 +17,19 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { useAuthState } from './AuthStateContext';
+import { useAuthState } from 'contexts/AuthStateContext';
 import {
   getUserPinnedEvents,
   setUserPinnedEvents,
   subscribeToUserPinnedEvents,
 } from '../services/userPinnedEventsService';
 import { EconomicEvent } from '../types/economicCalendar';
-import { PinnedEvent } from '../types/dualWrite';
+import { PinnedEvent } from 'types/dualWrite';
 import {
   cleanEventNameForPinning,
   isEventPinned,
 } from '../utils/eventNameUtils';
-import { logger } from '../utils/logger';
+import { logger } from 'utils/logger';
 
 interface UserPinnedEventsValue {
   /** Authoritative pinned events for the current user. */

@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { getTradeRepository } from '../services/calendarService';
-import { economicCalendarService } from '../services/economicCalendarService';
+import { economicCalendarService } from 'features/events/services/economicCalendarService';
 import { getNote } from 'features/notes/services/notesService';
 import type { Trade } from '../types/trade';
-import type { EconomicEvent } from '../types/economicCalendar';
+import type { EconomicEvent } from 'features/events/types/economicCalendar';
 import type { Note } from 'features/notes/types/note';
 import { logger } from '../utils/logger';
 

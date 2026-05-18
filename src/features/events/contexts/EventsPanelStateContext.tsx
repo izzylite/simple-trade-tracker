@@ -24,7 +24,7 @@ import React, {
 } from 'react';
 import { addDays, addWeeks, startOfWeek } from 'date-fns';
 import { EconomicEvent } from '../types/economicCalendar';
-import { HubTab } from '../components/economicCalendar/EconomicEventsView';
+import { HubTab } from '../components/EconomicEventsView';
 
 interface EventsPanelStateContextValue {
   // Week + day selection

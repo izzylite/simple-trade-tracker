@@ -5,7 +5,7 @@
 import { useEffect, useCallback, useRef, useMemo } from 'react';
 import { economicEventWatcher } from '../services/economicEventWatcher';
 import { EconomicEvent } from '../types/economicCalendar';
-import { error, log } from '../utils/logger';
+import { error, log } from 'utils/logger';
 
 interface UseEconomicEventWatcherProps {
   calendarId?: string;

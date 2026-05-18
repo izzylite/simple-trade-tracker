@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box } from '@mui/material';
-import Shimmer from '../Shimmer';
+import Shimmer from 'components/Shimmer';
 
 interface EconomicEventShimmerProps {
   count?: number;

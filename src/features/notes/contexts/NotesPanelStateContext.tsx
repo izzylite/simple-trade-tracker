@@ -24,7 +24,7 @@ import React, {
 } from 'react';
 
 import { Note } from '../types/note';
-import type { Currency, ImpactLevel } from 'types/economicCalendar';
+import type { Currency, ImpactLevel } from 'features/events/types/economicCalendar';
 import { useAuthState } from 'contexts/AuthStateContext';
 import { useNotes } from '../hooks/useNotes';
 import * as notesService from '../services/notesService';

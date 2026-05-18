@@ -30,8 +30,8 @@ import RichTextEditor, { RichTextEditorHandle } from '../common/RichTextEditor';
 import { useTradeLinkInsertion } from '../common/RichTextEditor/hooks/useTradeLinkInsertion';
 import RoundedTabs, { TabPanel } from '../common/RoundedTabs';
 import { fetchAndGenerateTradeNameSuggestions } from '../../utils/tradeNameSuggestions';
-import { Currency } from '../../types/economicCalendar';
-import { CURRENCY_PAIRS } from '../../services/tradeEconomicEventService';
+import { Currency } from 'features/events/types/economicCalendar';
+import { CURRENCY_PAIRS } from 'features/events/services/tradeEconomicEventService';
 import { Z_INDEX } from '../../styles/zIndex';
 
 export const DEFAULT_PAIRS_TAG_GROUP = "Pairs"

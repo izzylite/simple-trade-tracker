@@ -29,12 +29,12 @@ import {
   PushPinOutlined as PushPinOutlinedIcon,
 } from '@mui/icons-material';
 import { format } from 'date-fns';
-import EconomicEventShimmer from '../../economicCalendar/EconomicEventShimmer';
+import EconomicEventShimmer from 'features/events/components/EconomicEventShimmer';
 import AIChatInterface, { AIChatInterfaceRef, QuestionTemplate } from '../../aiChat/AIChatInterface';
 import { AIConversation } from '../../../types/aiChat';
 import { Trade } from '../../../types/trade';
 import { Calendar } from '../../../types/calendar';
-import { EconomicEvent } from '../../../types/economicCalendar';
+import { EconomicEvent } from 'features/events/types/economicCalendar';
 import { scrollbarStyles } from '../../../styles/scrollbarStyles';
 import { useDialogTokens, MONO_FONT } from '../../../styles/dialogTokens';
 import { logger } from '../../../utils/logger';
@@ -43,7 +43,7 @@ import { useAuthState } from '../../../contexts/AuthStateContext';
 import { useAIChat, UseAIChatReturn } from '../../../hooks/useAIChat';
 import { useReminderScheduler } from 'features/notes/hooks/useReminderScheduler';
 import EconomicEventDetailDialog
-  from '../../economicCalendar/EconomicEventDetailDialog';
+  from 'features/events/components/EconomicEventDetailDialog';
 import NoteEditorDialog from 'features/notes/components/NoteEditorDialog';
 import ConfirmationDialog from '../../common/ConfirmationDialog';
 import RemindersPanel from '../../aiChat/RemindersPanel';

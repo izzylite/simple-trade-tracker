@@ -24,7 +24,7 @@ import type { Theme } from '@mui/material';
 import { Note } from '../../types/note';
 import { Calendar } from 'types/calendar';
 import NotesBottomSheet from './NotesBottomSheet';
-import { useUserPinnedEvents } from 'contexts/UserPinnedEventsContext';
+import { useUserPinnedEvents } from 'features/events/contexts/UserPinnedEventsContext';
 
 export interface StickyReminderCardsProps {
   notes: Note[];

@@ -56,7 +56,7 @@ import {
 import type {
   ImpactLevel,
   Currency,
-} from '../../types/economicCalendar';
+} from 'features/events/types/economicCalendar';
 import {
   toggleInlineStyle,
   toggleBlockType,

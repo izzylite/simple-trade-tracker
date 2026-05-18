@@ -37,7 +37,7 @@ import RoundedTabs from 'components/common/RoundedTabs';
 import NoteListItem from '../NoteListItem';
 import NotesTagView from '../NotesTagView';
 import { useNotesViewMode } from '../../hooks/useNotesViewMode';
-import EconomicEventShimmer from 'components/economicCalendar/EconomicEventShimmer';
+import EconomicEventShimmer from 'features/events/components/EconomicEventShimmer';
 import NoteEditorDialog from '../NoteEditorDialog';
 import NoteViewerDialog from '../NoteViewerDialog';
 import { Note } from '../../types/note';
@@ -48,7 +48,7 @@ import { useAuthState } from 'contexts/AuthStateContext';
 import { CalendarRepository } from 'services/repository/repositories/CalendarRepository';
 import { scrollbarStyles } from 'styles/scrollbarStyles';
 import { useNotes } from '../../hooks/useNotes';
-import type { Currency, ImpactLevel } from 'types/economicCalendar';
+import type { Currency, ImpactLevel } from 'features/events/types/economicCalendar';
 
 export interface NotesContentProps {
   /** Controls whether data fetching and hooks are active (replaces `open` from drawer) */

@@ -43,19 +43,19 @@ import {
   endOfWeek,
 } from 'date-fns';
 
-import { useEconomicEvents } from '../../hooks/useEconomicEvents';
-import { useEventCountdownTime } from '../../hooks/useCurrentTime';
-import { useUserPinnedEvents } from '../../contexts/UserPinnedEventsContext';
-import { useUserTradeEventCounts } from '../../hooks/useUserTradeEventCounts';
-import { useEventsPanelState } from '../../contexts/EventsPanelStateContext';
-import { Calendar } from '../../types/calendar';
-import { Currency, EconomicEvent, ImpactLevel } from '../../types/economicCalendar';
-import { TradeOperationsProps } from '../../types/tradeOperations';
-import { isEventPinned } from '../../utils/eventNameUtils';
+import { useEconomicEvents } from '../hooks/useEconomicEvents';
+import { useEventCountdownTime } from 'hooks/useCurrentTime';
+import { useUserPinnedEvents } from '../contexts/UserPinnedEventsContext';
+import { useUserTradeEventCounts } from '../hooks/useUserTradeEventCounts';
+import { useEventsPanelState } from '../contexts/EventsPanelStateContext';
+import { Calendar } from 'types/calendar';
+import { Currency, EconomicEvent, ImpactLevel } from '../types/economicCalendar';
+import { TradeOperationsProps } from 'types/tradeOperations';
+import { isEventPinned } from '../utils/eventNameUtils';
 import {
   DEFAULT_FILTER_SETTINGS,
   EconomicCalendarFilterSettings,
-} from '../../hooks/useEconomicCalendarFilters';
+} from '../hooks/useEconomicCalendarFilters';
 import EconomicEventShimmer from './EconomicEventShimmer';
 import EconomicEventDetailDialog from './EconomicEventDetailDialog';
 import EconomicEventRow, { impactColor } from './EconomicEventRow';

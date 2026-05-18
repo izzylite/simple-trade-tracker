@@ -10,8 +10,8 @@
 import { EconomicEvent, Currency, ImpactLevel } from '../types/economicCalendar';
 import { economicCalendarService } from './economicCalendarService';
 import { endOfDay, format, startOfDay } from 'date-fns';
-import { error, log, logger } from '../utils/logger';
-import { supabase } from '../config/supabase';
+import { error, log, logger } from 'utils/logger';
+import { supabase } from 'config/supabase';
 
 /* eslint-disable */
 

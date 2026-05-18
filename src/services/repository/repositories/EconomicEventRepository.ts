@@ -6,7 +6,7 @@
 import { supabase } from '../../../config/supabase';
 
 import { AbstractBaseRepository, RepositoryResult } from './BaseRepository';
-import { EconomicEvent, Currency, ImpactLevel } from '../../../types/economicCalendar';
+import { EconomicEvent, Currency, ImpactLevel } from 'features/events/types/economicCalendar';
 import { handleSupabaseError } from '../../../utils/supabaseErrorHandler';
 import { logger } from '../../../utils/logger';
 

@@ -29,14 +29,14 @@ import {
   EventNote,
   Search as SearchIcon
 } from '@mui/icons-material';
-import { Trade, TradeEconomicEvent, Calendar } from '../../types/dualWrite';
+import { Trade, TradeEconomicEvent, Calendar } from 'types/dualWrite';
 import { ImpactLevel, Currency } from '../../types/economicCalendar';
 import { cleanEventNameForPinning } from '../../utils/eventNameUtils';
-import { formatValue } from '../../utils/formatters';
+import { formatValue } from 'utils/formatters';
 
-import RoundedTabs from '../common/RoundedTabs';
+import RoundedTabs from 'components/common/RoundedTabs';
 import { getCurrenciesForPair } from '../../services/tradeEconomicEventService';
-import { getSessionForTimestamp } from '../../utils/sessionTimeUtils';
+import { getSessionForTimestamp } from 'utils/sessionTimeUtils';
 
 // Helper function to get flag URL
 const getFlagUrl = (flagCode?: string, size: string = 'w40'): string => {

@@ -20,7 +20,7 @@ import { IconButton, Tooltip } from '@mui/material';
 import { format, isToday, isYesterday } from 'date-fns';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import { useDialogTokens, MONO_FONT } from '../../styles/dialogTokens';
-import EconomicEventShimmer from '../economicCalendar/EconomicEventShimmer';
+import EconomicEventShimmer from 'features/events/components/EconomicEventShimmer';
 import ConfirmationDialog from '../common/ConfirmationDialog';
 import TaskResultCard from './TaskResultCard';
 import CreateTaskDialog from './CreateTaskDialog';

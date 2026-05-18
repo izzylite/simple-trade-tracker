@@ -3,8 +3,8 @@
  * Based on MyFXBook data structure
  */
 
-import { Calendar } from "./calendar";
-import { TradeOperationsProps } from "./tradeOperations";
+import { Calendar } from "types/calendar";
+import { TradeOperationsProps } from "types/tradeOperations";
 
 export type ImpactLevel = 'Low' | 'Medium' | 'High' | 'Holiday' | 'Non-Economic';
 

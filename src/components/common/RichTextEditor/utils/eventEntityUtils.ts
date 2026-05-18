@@ -4,7 +4,7 @@ import {
   ContentState,
   SelectionState,
 } from 'draft-js';
-import { ImpactLevel, Currency } from '../../../../types/economicCalendar';
+import { ImpactLevel, Currency } from 'features/events/types/economicCalendar';
 
 /**
  * Find EVENT_LINK entities in a content block for the decorator

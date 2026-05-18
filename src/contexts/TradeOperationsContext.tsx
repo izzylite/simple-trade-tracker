@@ -13,7 +13,7 @@ import {
   createEditTradeData,
 } from '../components/trades/tradeFormHelpers';
 import type { NewTradeForm } from '../components/trades/TradeForm';
-import { DEFAULT_FILTER_SETTINGS } from '../hooks/useEconomicCalendarFilters';
+import { DEFAULT_FILTER_SETTINGS } from 'features/events/hooks/useEconomicCalendarFilters';
 
 /**
  * App-level controller for trade mutating operations. Owns the edit/add
