@@ -14,8 +14,9 @@ FUNCTIONS_NEEDING_TESTS=(
     "refresh-economic-calendar"
     "cleanup-expired-calendars"
     "auto-refresh-economic-calendar"
-    "get-shared-trade"
-    "get-shared-calendar"
+    "generate-share-link"
+    "get-shared-link"
+    "deactivate-share-link"
 )
 
 # Create basic test template

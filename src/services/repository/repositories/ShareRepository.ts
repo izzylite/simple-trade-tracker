@@ -1,7 +1,9 @@
 /**
  * Share Repository
- * Handles all database operations for share link generation and management
- * Replaces edge functions with direct database operations
+ * Thin client over the consolidated share-link edge functions:
+ *   - generate-share-link    (auth required, type=trade|calendar|note)
+ *   - get-shared-link        (public, type=trade|calendar|note)
+ *   - deactivate-share-link  (auth required, type=trade|calendar|note)
  */
 
 import { supabase, supabaseUrl } from '../../../config/supabase';
@@ -10,27 +12,18 @@ import { Trade, Calendar } from '../../../types/dualWrite';
 import { handleSupabaseError } from '../../../utils/supabaseErrorHandler';
 import { logger } from '../../../utils/logger';
 
-/**
- * Share link generation result
- */
 export interface ShareLinkResult {
   shareLink: string;
   shareId: string;
   directLink: string;
 }
 
-/**
- * Shared trade data for public viewing
- */
 export interface SharedTradeData {
   trade: Trade;
   viewCount: number;
   sharedAt: Date;
 }
 
-/**
- * Shared calendar data for public viewing
- */
 export interface SharedCalendarData {
   calendar: Calendar;
   trades: Trade[];
@@ -40,9 +33,6 @@ export interface SharedCalendarData {
   };
 }
 
-/**
- * Shared note data for public viewing
- */
 export interface SharedNoteData {
   title: string;
   content: string;
@@ -53,245 +43,129 @@ export interface SharedNoteData {
   shared_at: Date;
 }
 
-/**
- * Generate a unique share ID
- * Matches the pattern from edge function utils
- */
-function generateShareId(type: 'trade' | 'calendar', id: string): string {
-  const prefix = type === 'trade' ? 'share' : 'calendar_share';
-  return `${prefix}_${id}`;
+type ShareType = 'trade' | 'calendar' | 'note';
+
+interface InvokeShareResult<T> {
+  data?: T;
+  success?: boolean;
+  error?: string;
 }
 
 /**
- * Share Repository - handles all share link operations
+ * Public (unauthenticated) edge-function read. Returns null on 404 so callers
+ * can render a "link expired" state without throwing.
  */
-export class ShareRepository {
-  private readonly BASE_URL = process.env.REACT_APP_BASE_URL || 'https://journotrades.com';
+async function fetchPublicShare<T>(payload: object): Promise<T | null> {
+  const response = await fetch(`${supabaseUrl}/functions/v1/get-shared-link`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
 
-  /**
-   * Generate a share link for a trade
-   */
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    throw new Error(`Edge function error: ${response.status}`);
+  }
+
+  const result = (await response.json()) as InvokeShareResult<T>;
+  return (result.data ?? (result as unknown as T)) ?? null;
+}
+
+export class ShareRepository {
   async generateTradeShareLink(
     calendarId: string,
     tradeId: string,
-    userId: string
+    _userId: string,
   ): Promise<RepositoryResult<ShareLinkResult>> {
     try {
       logger.log(`Generating share link for trade ${tradeId}`);
 
-      // Verify calendar ownership
-      const { data: calendar, error: calendarError } = await supabase
-        .from('calendars')
-        .select('user_id')
-        .eq('id', calendarId)
-        .single();
+      const { data, error } = await supabase.functions.invoke<
+        InvokeShareResult<ShareLinkResult>
+      >('generate-share-link', {
+        body: { type: 'trade', calendarId, tradeId },
+      });
 
-      if (calendarError || !calendar) {
-        throw new Error('Calendar not found');
-      }
+      if (error) throw error;
+      const payload = data?.data;
+      if (!payload) throw new Error(data?.error || 'Failed to generate share link');
 
-      if (calendar.user_id !== userId) {
-        throw new Error('Unauthorized access to calendar');
-      }
-
-      // Verify trade exists
-      const { data: trade, error: tradeError } = await supabase
-        .from('trades')
-        .select('id')
-        .eq('id', tradeId)
-        .eq('calendar_id', calendarId)
-        .single();
-
-      if (tradeError || !trade) {
-        throw new Error('Trade not found in calendar');
-      }
-
-      // Generate share ID and link
-      const shareId = generateShareId('trade', `${calendarId}_${tradeId}`);
-      const shareLink = `${this.BASE_URL}/shared/${shareId}`;
-
-      // Update trade with sharing information
-      const { error: updateError } = await supabase
-        .from('trades')
-        .update({
-          share_id: shareId,
-          share_link: shareLink,
-          is_shared: true,
-          shared_at: new Date().toISOString()
-        })
-        .eq('id', tradeId);
-
-      if (updateError) {
-        throw updateError;
-      }
-
-      logger.log(`Generated share link for trade ${tradeId}: ${shareLink}`);
-
-      return {
-        success: true,
-        data: {
-          shareLink,
-          shareId,
-          directLink: shareLink
-        },
-        timestamp: new Date()
-      };
+      return { success: true, data: payload, timestamp: new Date() };
     } catch (error: any) {
       const supabaseError = handleSupabaseError(
         error,
         `Generating share link for trade ${tradeId}`,
-        'generateTradeShareLink'
+        'generateTradeShareLink',
       );
-
       logger.error('Failed to generate trade share link:', supabaseError);
-
       return {
         success: false,
         error: supabaseError,
         operation: 'generateTradeShareLink',
-        timestamp: new Date()
+        timestamp: new Date(),
       };
     }
   }
 
-  /**
-   * Generate a share link for a calendar
-   */
   async generateCalendarShareLink(
     calendarId: string,
-    userId: string
+    _userId: string,
   ): Promise<RepositoryResult<ShareLinkResult>> {
     try {
       logger.log(`Generating share link for calendar ${calendarId}`);
 
-      // Verify calendar ownership
-      const { data: calendar, error: calendarError } = await supabase
-        .from('calendars')
-        .select('user_id')
-        .eq('id', calendarId)
-        .single();
+      const { data, error } = await supabase.functions.invoke<
+        InvokeShareResult<ShareLinkResult>
+      >('generate-share-link', {
+        body: { type: 'calendar', calendarId },
+      });
 
-      if (calendarError || !calendar) {
-        throw new Error('Calendar not found');
-      }
+      if (error) throw error;
+      const payload = data?.data;
+      if (!payload) throw new Error(data?.error || 'Failed to generate share link');
 
-      if (calendar.user_id !== userId) {
-        throw new Error('Unauthorized access to calendar');
-      }
-
-      // Generate share ID and link
-      const shareId = generateShareId('calendar', calendarId);
-      const shareLink = `${this.BASE_URL}/shared-calendar/${shareId}`;
-
-      // Update calendar with sharing information
-      const { error: updateError } = await supabase
-        .from('calendars')
-        .update({
-          share_id: shareId,
-          share_link: shareLink,
-          is_shared: true,
-          shared_at: new Date().toISOString()
-        })
-        .eq('id', calendarId);
-
-      if (updateError) {
-        throw updateError;
-      }
-
-      logger.log(`Generated share link for calendar ${calendarId}: ${shareLink}`);
-
-      return {
-        success: true,
-        data: {
-          shareLink,
-          shareId,
-          directLink: shareLink
-        },
-        timestamp: new Date()
-      };
+      return { success: true, data: payload, timestamp: new Date() };
     } catch (error: any) {
       const supabaseError = handleSupabaseError(
         error,
         `Generating share link for calendar ${calendarId}`,
-        'generateCalendarShareLink'
+        'generateCalendarShareLink',
       );
-
       logger.error('Failed to generate calendar share link:', supabaseError);
-
       return {
         success: false,
         error: supabaseError,
         operation: 'generateCalendarShareLink',
-        timestamp: new Date()
+        timestamp: new Date(),
       };
     }
   }
 
-  /**
-   * Generate a share link for a note
-   */
   async generateNoteShareLink(
     noteId: string,
-    userId: string
+    _userId: string,
   ): Promise<RepositoryResult<ShareLinkResult>> {
     try {
       logger.log(`Generating share link for note ${noteId}`);
 
-      // Verify note ownership directly via user_id
-      const { data: note, error: noteError } = await supabase
-        .from('notes')
-        .select('id, user_id, by_assistant')
-        .eq('id', noteId)
-        .single();
+      const { data, error } = await supabase.functions.invoke<
+        InvokeShareResult<ShareLinkResult>
+      >('generate-share-link', {
+        body: { type: 'note', noteId },
+      });
 
-      if (noteError || !note) {
-        throw new Error('Note not found');
-      }
+      if (error) throw error;
+      const payload = data?.data;
+      if (!payload) throw new Error(data?.error || 'Failed to generate share link');
 
-      if (note.user_id !== userId) {
-        throw new Error('Unauthorized access to note');
-      }
-
-      if (note.by_assistant) {
-        throw new Error('AI-created notes cannot be shared');
-      }
-
-      const shareId = `note_share_${noteId}`;
-      const shareLink = `${this.BASE_URL}/shared-note/${shareId}`;
-
-      const { error: updateError } = await supabase
-        .from('notes')
-        .update({
-          share_id: shareId,
-          share_link: shareLink,
-          is_shared: true,
-          shared_at: new Date().toISOString(),
-        })
-        .eq('id', noteId);
-
-      if (updateError) {
-        throw updateError;
-      }
-
-      logger.log(
-        `Generated share link for note ${noteId}: ${shareLink}`
-      );
-
-      return {
-        success: true,
-        data: { shareLink, shareId, directLink: shareLink },
-        timestamp: new Date(),
-      };
+      return { success: true, data: payload, timestamp: new Date() };
     } catch (error: any) {
       const supabaseError = handleSupabaseError(
         error,
         `Generating share link for note ${noteId}`,
-        'generateNoteShareLink'
+        'generateNoteShareLink',
       );
-      logger.error(
-        'Failed to generate note share link:',
-        supabaseError
-      );
+      logger.error('Failed to generate note share link:', supabaseError);
       return {
         success: false,
         error: supabaseError,
@@ -301,367 +175,154 @@ export class ShareRepository {
     }
   }
 
-  /**
-   * Deactivate a share link for a trade
-   */
   async deactivateTradeShareLink(
     shareId: string,
-    userId: string
+    _userId: string,
   ): Promise<RepositoryResult<boolean>> {
-    try {
-      logger.log(`Deactivating trade share link ${shareId}`);
-
-      // Get trade and verify ownership
-      const { data: trade, error: tradeError } = await supabase
-        .from('trades')
-        .select('id, calendar_id, calendars(user_id)')
-        .eq('share_id', shareId)
-        .single();
-
-      if (tradeError || !trade) {
-        throw new Error('Shared trade not found');
-      }
-
-      // @ts-ignore - Supabase join typing
-      if (trade.calendars?.user_id !== userId) {
-        throw new Error('You do not have permission to modify this shared trade');
-      }
-
-      // Clear sharing information
-      const { error: updateError } = await supabase
-        .from('trades')
-        .update({
-          share_id: null,
-          share_link: null,
-          is_shared: false,
-          shared_at: null
-        })
-        .eq('share_id', shareId);
-
-      if (updateError) {
-        throw updateError;
-      }
-
-      logger.log(`Deactivated trade share link ${shareId}`);
-
-      return {
-        success: true,
-        data: true,
-        timestamp: new Date()
-      };
-    } catch (error: any) {
-      const supabaseError = handleSupabaseError(
-        error,
-        `Deactivating trade share link ${shareId}`,
-        'deactivateTradeShareLink'
-      );
-
-      logger.error('Failed to deactivate trade share link:', supabaseError);
-
-      return {
-        success: false,
-        error: supabaseError,
-        operation: 'deactivateTradeShareLink',
-        timestamp: new Date()
-      };
-    }
+    return this.deactivateShare('trade', shareId, 'deactivateTradeShareLink');
   }
 
-  /**
-   * Deactivate a share link for a calendar
-   */
   async deactivateCalendarShareLink(
     shareId: string,
-    userId: string
+    _userId: string,
   ): Promise<RepositoryResult<boolean>> {
-    try {
-      logger.log(`Deactivating calendar share link ${shareId}`);
-
-      // Get calendar and verify ownership
-      const { data: calendar, error: calendarError } = await supabase
-        .from('calendars')
-        .select('id, user_id')
-        .eq('share_id', shareId)
-        .single();
-
-      if (calendarError || !calendar) {
-        throw new Error('Shared calendar not found');
-      }
-
-      if (calendar.user_id !== userId) {
-        throw new Error('You do not have permission to modify this shared calendar');
-      }
-
-      // Clear sharing information
-      const { error: updateError } = await supabase
-        .from('calendars')
-        .update({
-          share_id: null,
-          share_link: null,
-          is_shared: false,
-          shared_at: null
-        })
-        .eq('share_id', shareId);
-
-      if (updateError) {
-        throw updateError;
-      }
-
-      logger.log(`Deactivated calendar share link ${shareId}`);
-
-      return {
-        success: true,
-        data: true,
-        timestamp: new Date()
-      };
-    } catch (error: any) {
-      const supabaseError = handleSupabaseError(
-        error,
-        `Deactivating calendar share link ${shareId}`,
-        'deactivateCalendarShareLink'
-      );
-
-      logger.error('Failed to deactivate calendar share link:', supabaseError);
-
-      return {
-        success: false,
-        error: supabaseError,
-        operation: 'deactivateCalendarShareLink',
-        timestamp: new Date()
-      };
-    }
+    return this.deactivateShare('calendar', shareId, 'deactivateCalendarShareLink');
   }
 
-  /**
-   * Deactivate a share link for a note
-   */
   async deactivateNoteShareLink(
     shareId: string,
-    userId: string
+    _userId: string,
+  ): Promise<RepositoryResult<boolean>> {
+    return this.deactivateShare('note', shareId, 'deactivateNoteShareLink');
+  }
+
+  private async deactivateShare(
+    type: ShareType,
+    shareId: string,
+    operation: string,
   ): Promise<RepositoryResult<boolean>> {
     try {
-      logger.log(`Deactivating note share link ${shareId}`);
+      logger.log(`Deactivating ${type} share link ${shareId}`);
 
-      const { data: note, error: noteError } = await supabase
-        .from('notes')
-        .select('id, user_id')
-        .eq('share_id', shareId)
-        .single();
+      const { error } = await supabase.functions.invoke('deactivate-share-link', {
+        body: { type, shareId },
+      });
 
-      if (noteError || !note) {
-        throw new Error('Shared note not found');
-      }
+      if (error) throw error;
 
-      if (note.user_id !== userId) {
-        throw new Error(
-          'You do not have permission to modify this shared note'
-        );
-      }
-
-      const { error: updateError } = await supabase
-        .from('notes')
-        .update({
-          share_id: null,
-          share_link: null,
-          is_shared: false,
-          shared_at: null,
-        })
-        .eq('share_id', shareId);
-
-      if (updateError) {
-        throw updateError;
-      }
-
-      logger.log(`Deactivated note share link ${shareId}`);
-
-      return {
-        success: true,
-        data: true,
-        timestamp: new Date(),
-      };
+      logger.log(`Deactivated ${type} share link ${shareId}`);
+      return { success: true, data: true, timestamp: new Date() };
     } catch (error: any) {
       const supabaseError = handleSupabaseError(
         error,
-        `Deactivating note share link ${shareId}`,
-        'deactivateNoteShareLink'
+        `Deactivating ${type} share link ${shareId}`,
+        operation,
       );
-      logger.error(
-        'Failed to deactivate note share link:',
-        supabaseError
-      );
+      logger.error(`Failed to deactivate ${type} share link:`, supabaseError);
       return {
         success: false,
         error: supabaseError,
-        operation: 'deactivateNoteShareLink',
+        operation,
         timestamp: new Date(),
       };
     }
   }
 
-  /**
-   * Get a shared trade by share ID (for public viewing)
-   * This will be used by the public shared trade page
-   * Uses edge function to bypass RLS policies for unauthenticated access
-   */
   async getSharedTrade(shareId: string): Promise<RepositoryResult<SharedTradeData | null>> {
     try {
       logger.log(`Fetching shared trade ${shareId}`);
+      const data = await fetchPublicShare<{
+        trade: Trade;
+        viewCount?: number;
+        sharedAt: string;
+      }>({ type: 'trade', shareId });
 
-      // Call edge function instead of direct query to bypass RLS
-      const response = await fetch(`${supabaseUrl}/functions/v1/get-shared-trade`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ shareId })
-      });
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          return {
-            success: true,
-            data: null,
-            timestamp: new Date()
-          };
-        }
-        throw new Error(`Edge function error: ${response.status}`);
-      }
-
-      const result = await response.json();
-
-      // Edge function wraps response in { success: true, data: {...} }
-      const responseData = result.data || result;
+      if (!data) return { success: true, data: null, timestamp: new Date() };
 
       return {
         success: true,
         data: {
-          trade: responseData.trade as Trade,
-          viewCount: responseData.viewCount || 0,
-          sharedAt: new Date(responseData.sharedAt)
+          trade: data.trade,
+          viewCount: data.viewCount || 0,
+          sharedAt: new Date(data.sharedAt),
         },
-        timestamp: new Date()
+        timestamp: new Date(),
       };
     } catch (error: any) {
       const supabaseError = handleSupabaseError(
         error,
         `Fetching shared trade ${shareId}`,
-        'getSharedTrade'
+        'getSharedTrade',
       );
-
       logger.error('Failed to get shared trade:', supabaseError);
-
       return {
         success: false,
         error: supabaseError,
         operation: 'getSharedTrade',
-        timestamp: new Date()
+        timestamp: new Date(),
       };
     }
   }
 
-  /**
-   * Get a shared calendar by share ID (for public viewing)
-   * This will be used by the public shared calendar page
-   * Uses direct Supabase queries - RLS policies allow public read access to shared calendars
-   */
-  async getSharedCalendar(shareId: string): Promise<RepositoryResult<SharedCalendarData | null>> {
+  async getSharedCalendar(
+    shareId: string,
+  ): Promise<RepositoryResult<SharedCalendarData | null>> {
     try {
       logger.log(`Fetching shared calendar ${shareId}`);
+      const data = await fetchPublicShare<{
+        calendar: Calendar;
+        trades: Trade[];
+        shareInfo: { viewCount: number; sharedAt: string };
+      }>({ type: 'calendar', shareId });
 
-      // Query calendar directly - RLS allows public read of shared calendars
-      const { data: calendar, error: calendarError } = await supabase
-        .from('calendars')
-        .select('*')
-        .eq('share_id', shareId)
-        .eq('is_shared', true)
-        .single();
-
-      if (calendarError || !calendar) {
-        if (calendarError?.code === 'PGRST116') {
-          // No rows returned
-          return {
-            success: true,
-            data: null,
-            timestamp: new Date()
-          };
-        }
-        throw calendarError || new Error('Calendar not found');
-      }
-
-      // Increment view count using database function (SECURITY DEFINER allows this)
-      const { data: viewCountResult } = await supabase
-        .rpc('increment_shared_calendar_view_count', { p_share_id: shareId });
-
-      const viewCount = viewCountResult?.viewCount || (calendar.share_view_count || 0) + 1;
-
-      // Note: Trades are NOT fetched here - useCalendarTrades will fetch them directly
-      // via Supabase using the updated RLS policy that allows public read of trades
-      // belonging to shared calendars
+      if (!data) return { success: true, data: null, timestamp: new Date() };
 
       return {
         success: true,
         data: {
-          calendar: calendar as Calendar,
-          trades: [], // Trades will be fetched by useCalendarTrades
+          calendar: data.calendar,
+          // Trades are also fetched lazily by useCalendarTrades; the edge
+          // function returns the full list here so initial paint has data.
+          trades: data.trades || [],
           shareInfo: {
-            viewCount,
-            sharedAt: new Date(calendar.shared_at)
-          }
+            viewCount: data.shareInfo?.viewCount ?? 0,
+            sharedAt: new Date(data.shareInfo?.sharedAt ?? data.calendar.shared_at),
+          },
         },
-        timestamp: new Date()
+        timestamp: new Date(),
       };
     } catch (error: any) {
       const supabaseError = handleSupabaseError(
         error,
         `Fetching shared calendar ${shareId}`,
-        'getSharedCalendar'
+        'getSharedCalendar',
       );
-
       logger.error('Failed to get shared calendar:', supabaseError);
-
       return {
         success: false,
         error: supabaseError,
         operation: 'getSharedCalendar',
-        timestamp: new Date()
+        timestamp: new Date(),
       };
     }
   }
-  /**
-   * Get a shared note by share ID (for public viewing)
-   * Uses edge function to bypass RLS policies for
-   * unauthenticated access
-   */
+
   async getSharedNote(
-    shareId: string
+    shareId: string,
   ): Promise<RepositoryResult<SharedNoteData | null>> {
     try {
       logger.log(`Fetching shared note ${shareId}`);
+      const data = await fetchPublicShare<{
+        title: string;
+        content: string;
+        cover_image: string | null;
+        color: string | null;
+        tags?: string[];
+        created_at: string;
+        shared_at: string;
+      }>({ type: 'note', shareId });
 
-      const response = await fetch(
-        `${supabaseUrl}/functions/v1/get-shared-note`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ shareId }),
-        }
-      );
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          return {
-            success: true,
-            data: null,
-            timestamp: new Date(),
-          };
-        }
-        throw new Error(
-          `Edge function error: ${response.status}`
-        );
-      }
-
-      const result = await response.json();
-      const data = result.data || result;
+      if (!data) return { success: true, data: null, timestamp: new Date() };
 
       return {
         success: true,
@@ -680,12 +341,9 @@ export class ShareRepository {
       const supabaseError = handleSupabaseError(
         error,
         `Fetching shared note ${shareId}`,
-        'getSharedNote'
+        'getSharedNote',
       );
-      logger.error(
-        'Failed to get shared note:',
-        supabaseError
-      );
+      logger.error('Failed to get shared note:', supabaseError);
       return {
         success: false,
         error: supabaseError,
@@ -696,5 +354,4 @@ export class ShareRepository {
   }
 }
 
-// Export singleton instance
 export const shareRepository = new ShareRepository();

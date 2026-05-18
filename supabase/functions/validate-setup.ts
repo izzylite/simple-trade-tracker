@@ -79,8 +79,9 @@ async function validateDirectoryStructure(): Promise<ValidationResult> {
     'refresh-economic-calendar',
     'cleanup-expired-calendars',
     'auto-refresh-economic-calendar',
-    'get-shared-trade',
-    'get-shared-calendar'
+    'generate-share-link',
+    'get-shared-link',
+    'deactivate-share-link'
   ]
   
   for (const dir of requiredDirs) {

@@ -70,11 +70,14 @@ supabase functions deploy process-economic-events --no-verify-jwt
 supabase functions deploy refresh-economic-calendar --no-verify-jwt
 supabase functions deploy cleanup-expired-calendars --no-verify-jwt
 supabase functions deploy auto-refresh-economic-calendar --no-verify-jwt
-supabase functions deploy get-shared-trade --no-verify-jwt
-supabase functions deploy get-shared-calendar --no-verify-jwt
+supabase functions deploy generate-share-link
+supabase functions deploy get-shared-link --no-verify-jwt
+supabase functions deploy deactivate-share-link
 ```
 
-**Note**: Share link generation and deactivation are now handled by ShareRepository in the frontend service layer
+**Note**: `get-shared-link` must be deployed with `--no-verify-jwt` because it serves
+unauthenticated public viewers. `generate-share-link` and `deactivate-share-link`
+require a logged-in user and should keep JWT verification on.
 
 ## Post-Deployment Configuration
 
@@ -122,13 +125,10 @@ ALTER DATABASE postgres SET app.service_role_key = 'your-actual-service-role-key
 - **cleanup-expired-calendars**: Daily cleanup of expired calendars (2 AM UTC)
 - **auto-refresh-economic-calendar**: Periodic economic data refresh (every 30 minutes)
 
-### Sharing Functions
-- **generate-trade-share-link**: Creates shareable trade links
-- **get-shared-trade**: Retrieves shared trade data
-- **deactivate-shared-trade**: Deactivates trade shares
-- **generate-calendar-share-link**: Creates shareable calendar links
-- **get-shared-calendar**: Retrieves shared calendar data
-- **deactivate-shared-calendar**: Deactivates calendar shares
+### Sharing Functions (Consolidated)
+- **generate-share-link**: Creates a share link for a trade, calendar, or note. Body: `{ type, calendarId?, tradeId?, noteId? }`
+- **get-shared-link**: Public read for shared trades/calendars/notes. Body: `{ type, shareId }`
+- **deactivate-share-link**: Clears share flags on the source row. Body: `{ type, shareId }`
 
 ## Verification
 
@@ -140,10 +140,9 @@ supabase functions list
 ### 2. Test Functions
 ```bash
 # Test a simple function
-curl -X POST 'https://your-project-ref.supabase.co/functions/v1/get-shared-trade' \
-  -H 'Authorization: Bearer your-anon-key' \
+curl -X POST 'https://your-project-ref.supabase.co/functions/v1/get-shared-link' \
   -H 'Content-Type: application/json' \
-  -d '{"shareId": "test-share-id"}'
+  -d '{"type": "trade", "shareId": "test-share-id"}'
 ```
 
 ### 3. Monitor Logs
