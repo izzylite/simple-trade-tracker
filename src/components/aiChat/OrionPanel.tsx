@@ -44,7 +44,7 @@ import { AIConversation, ChatMessage as ChatMessageType, AttachedImage } from '.
 import { Trade } from '../../types/trade';
 import { Calendar } from '../../types/calendar';
 import { EconomicEvent } from '../../types/economicCalendar';
-import { Note } from '../../types/note';
+import { Note } from 'features/notes/types/note';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import { Z_INDEX } from '../../styles/zIndex';
 import Shimmer from '../Shimmer';

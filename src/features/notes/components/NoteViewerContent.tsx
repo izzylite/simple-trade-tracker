@@ -14,14 +14,14 @@ import {
   alpha,
 } from '@mui/material';
 import { format } from 'date-fns';
-import { Note } from '../../types/note';
-import { Trade } from '../../types/dualWrite';
+import { Note } from '../types/note';
+import { Trade } from 'types/dualWrite';
 import { getTagDisplayLabel } from './NoteEditorDialogTags';
-import RichTextViewer from '../common/RichTextEditor/RichTextViewer';
-import { getSharedTrade } from '../../services/sharingService';
-import { logger } from '../../utils/logger';
-import TradeGalleryDialog from '../TradeGalleryDialog';
-import ImageZoomDialog, { ImageZoomProp } from '../ImageZoomDialog';
+import RichTextViewer from 'components/common/RichTextEditor/RichTextViewer';
+import { getSharedTrade } from 'services/sharingService';
+import { logger } from 'utils/logger';
+import TradeGalleryDialog from 'components/TradeGalleryDialog';
+import ImageZoomDialog, { ImageZoomProp } from 'components/ImageZoomDialog';
 
 interface NoteViewerContentProps {
   note: Note;

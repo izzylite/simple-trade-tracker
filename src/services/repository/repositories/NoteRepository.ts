@@ -4,7 +4,7 @@
  */
 
 import { AbstractBaseRepository, RepositoryConfig, RepositoryResult } from "./BaseRepository";
-import { Note, GAME_PLAN_TAG, AGENT_MEMORY_TAG } from "../../../types/note";
+import { Note, GAME_PLAN_TAG, AGENT_MEMORY_TAG } from "features/notes/types/note";
 import { logger } from "../../../utils/logger";
 import { supabase } from "../../../config/supabase";
 

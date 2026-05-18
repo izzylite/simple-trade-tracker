@@ -89,29 +89,29 @@ import { formatDistanceToNow } from 'date-fns';
 import { EditorState } from 'draft-js';
 import RichTextEditor, {
   RichTextEditorHandle,
-} from '../common/RichTextEditor';
-import { useTradeLinkInsertion } from '../common/RichTextEditor/hooks/useTradeLinkInsertion';
-import { Z_INDEX } from '../../styles/zIndex';
-import EditorToolbar from '../common/RichTextEditor/components/EditorToolbar';
-import ImagePickerDialog from '../heroImage/ImagePickerDialog';
-import ConfirmationDialog from '../common/ConfirmationDialog';
-import { useAuthState } from '../../contexts/AuthStateContext';
-import * as notesService from '../../services/notesService';
+} from 'components/common/RichTextEditor';
+import { useTradeLinkInsertion } from 'components/common/RichTextEditor/hooks/useTradeLinkInsertion';
+import { Z_INDEX } from 'styles/zIndex';
+import EditorToolbar from 'components/common/RichTextEditor/components/EditorToolbar';
+import ImagePickerDialog from 'components/heroImage/ImagePickerDialog';
+import ConfirmationDialog from 'components/common/ConfirmationDialog';
+import { useAuthState } from 'contexts/AuthStateContext';
+import * as notesService from '../services/notesService';
 import {
   Note,
   ReminderType,
   DayAbbreviation,
   GUIDELINE_TAG,
   GAME_PLAN_TAG,
-} from '../../types/note';
-import { scrollbarStyles } from '../../styles/scrollbarStyles';
-import { logger } from '../../utils/logger';
-import { isGroupedTag, getTagName, getTagGroup } from '../../utils/tagColors';
+} from '../types/note';
+import { scrollbarStyles } from 'styles/scrollbarStyles';
+import { logger } from 'utils/logger';
+import { isGroupedTag, getTagName, getTagGroup } from 'utils/tagColors';
 import NoteShareButton from './NoteShareButton';
-import { useNoteNavigation } from '../../hooks/useNoteNavigation';
-import { getContentAsJson } from '../common/RichTextEditor/utils/draftUtils';
-import { IMPACT_COLORS, CURRENCY_FLAGS } from '../../types/economicCalendar';
-import type { ImpactLevel, Currency } from '../../types/economicCalendar';
+import { useNoteNavigation } from '../hooks/useNoteNavigation';
+import { getContentAsJson } from 'components/common/RichTextEditor/utils/draftUtils';
+import { IMPACT_COLORS, CURRENCY_FLAGS } from 'types/economicCalendar';
+import type { ImpactLevel, Currency } from 'types/economicCalendar';
 import {
   DEFAULT_NOTE_TAGS_MAP,
   getTagDisplayLabel,

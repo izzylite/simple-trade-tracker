@@ -26,10 +26,10 @@ import {
   Person as ConvertToUserIcon,
 } from '@mui/icons-material';
 import { convertFromRaw } from 'draft-js';
-import { Note } from '../../types/note';
-import { Calendar } from '../../types/calendar';
+import { Note } from '../types/note';
+import { Calendar } from 'types/calendar';
 import { getTagDisplayLabel } from './NoteEditorDialogTags';
-import ConfirmationDialog from '../common/ConfirmationDialog';
+import ConfirmationDialog from 'components/common/ConfirmationDialog';
 
 interface NoteListItemProps {
   note: Note;

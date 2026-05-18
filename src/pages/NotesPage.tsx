@@ -9,23 +9,23 @@ import {
 } from '@mui/material';
 import { Visibility as VisibilityIcon } from '@mui/icons-material';
 
-import { Note } from '../types/note';
+import { Note } from 'features/notes/types/note';
 import { Calendar } from '../types/calendar';
 import { useAuthState } from '../contexts/AuthStateContext';
 import { useUserPinnedEvents } from '../contexts/UserPinnedEventsContext';
 import { useSelectedCalendar } from '../contexts/SelectedCalendarContext';
-import { useNotes } from '../hooks/useNotes';
+import { useNotes } from 'features/notes/hooks/useNotes';
 import { CalendarRepository } from '../services/repository/repositories/CalendarRepository';
 import { logger } from '../utils/logger';
-import * as notesService from '../services/notesService';
+import * as notesService from 'features/notes/services/notesService';
 
 import NoteListPanel, {
   NotesTab,
   NotesTagPill,
-} from '../components/notes/NoteListPanel';
-import NoteViewPanel from '../components/notes/NoteViewPanel';
-import NoteMetaPanel from '../components/notes/NoteMetaPanel';
-import NoteEditorBody, { NoteEditorBodyHandle } from '../components/notes/NoteEditorBody';
+} from 'features/notes/components/NoteListPanel';
+import NoteViewPanel from 'features/notes/components/NoteViewPanel';
+import NoteMetaPanel from 'features/notes/components/NoteMetaPanel';
+import NoteEditorBody, { NoteEditorBodyHandle } from 'features/notes/components/NoteEditorBody';
 
 const APP_HEADER_HEIGHT = 64;
 

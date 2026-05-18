@@ -24,7 +24,7 @@ import {
 import { format, parseISO } from 'date-fns';
 import { Trade, Calendar } from '../types/dualWrite';
 import { EconomicEvent } from '../types/economicCalendar';
-import { Note, DayAbbreviation } from '../types/note';
+import { Note, DayAbbreviation } from 'features/notes/types/note';
 import TradeDetailExpanded from './TradeDetailExpanded';
 import { scrollbarStyles } from '../styles/scrollbarStyles';
 import { TradeOperationsProps } from '../types/tradeOperations';
@@ -35,14 +35,14 @@ import { useAuthState } from '../contexts/AuthStateContext';
 import Shimmer from './Shimmer';
 import EconomicEventDetailDialog from './economicCalendar/EconomicEventDetailDialog';
 import EconomicEventsPanel from './economicCalendar/EconomicEventsPanel';
-import NoteViewerPanel from './notes/NoteViewerPanel';
+import NoteViewerPanel from 'features/notes/components/NoteViewerPanel';
 import { logger } from '../utils/logger';
 import { Z_INDEX } from '../styles/zIndex';
 import { getTradeRepository } from '../services/calendarService';
 import {
   getReminderNotesForDay,
   getReminderNotesForDate,
-} from '../services/notesService';
+} from 'features/notes/services/notesService';
 import { useTradeSyncContextOptional } from '../contexts/TradeSyncContext';
 import { normalizeTradeDates } from '../utils/tradeUtils';
 import { DEFAULT_FILTER_SETTINGS as DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS } from '../hooks/useEconomicCalendarFilters';

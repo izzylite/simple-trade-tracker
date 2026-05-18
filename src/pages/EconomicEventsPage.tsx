@@ -66,8 +66,8 @@ import EconomicEventDetailDialog from '../components/economicCalendar/EconomicEv
 import EconomicEventDetailPanel from '../components/economicCalendar/EconomicEventDetailPanel';
 import TradeGalleryDialog from '../components/TradeGalleryDialog';
 import ImageZoomDialog from '../components/ImageZoomDialog';
-import NotesContent from '../components/sidePanel/content/NotesContent';
-import NotesDrawer from '../components/notes/NotesDrawer';
+import NotesContent from 'features/notes/components/sidePanel/NotesContent';
+import NotesDrawer from 'features/notes/components/NotesDrawer';
 import { useEventPageTradeOps } from '../hooks/useEventPageTradeOps';
 import AllPinnedEventsContent from '../components/economicCalendar/AllPinnedEventsContent';
 import EconomicEventShimmer from '../components/economicCalendar/EconomicEventShimmer';

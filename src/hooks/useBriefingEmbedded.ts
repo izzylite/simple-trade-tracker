@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { getTradeRepository } from '../services/calendarService';
 import { economicCalendarService } from '../services/economicCalendarService';
-import { getNote } from '../services/notesService';
+import { getNote } from 'features/notes/services/notesService';
 import type { Trade } from '../types/trade';
 import type { EconomicEvent } from '../types/economicCalendar';
-import type { Note } from '../types/note';
+import type { Note } from 'features/notes/types/note';
 import { logger } from '../utils/logger';
 
 /**

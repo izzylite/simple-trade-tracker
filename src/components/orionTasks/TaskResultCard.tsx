@@ -30,12 +30,12 @@ import ToolUsageChip, { type ToolUsageEntry } from '../aiChat/ToolUsageChip';
 import type { Citation } from '../../types/aiChat';
 import type { Calendar, Trade } from '../../types/dualWrite';
 import type { EconomicEvent } from '../../types/economicCalendar';
-import type { Note } from '../../types/note';
+import type { Note } from 'features/notes/types/note';
 import type { TradeOperationsProps } from '../../types/tradeOperations';
 import { useBriefingEmbedded } from '../../hooks/useBriefingEmbedded';
 import TradeGalleryDialog from '../TradeGalleryDialog';
 import EconomicEventDetailDialog from '../economicCalendar/EconomicEventDetailDialog';
-import NoteEditorDialog from '../notes/NoteEditorDialog';
+import NoteEditorDialog from 'features/notes/components/NoteEditorDialog';
 
 interface TaskResultCardProps {
   result: OrionTaskResult;

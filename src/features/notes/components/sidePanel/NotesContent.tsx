@@ -33,22 +33,22 @@ import {
   LocalOffer as TagViewIcon,
 } from '@mui/icons-material';
 
-import RoundedTabs from '../../common/RoundedTabs';
-import NoteListItem from '../../notes/NoteListItem';
-import NotesTagView from '../../notes/NotesTagView';
-import { useNotesViewMode } from '../../../hooks/useNotesViewMode';
-import EconomicEventShimmer from '../../economicCalendar/EconomicEventShimmer';
-import NoteEditorDialog from '../../notes/NoteEditorDialog';
-import NoteViewerDialog from '../../notes/NoteViewerDialog';
-import { Note } from '../../../types/note';
-import { Calendar } from '../../../types/calendar';
-import * as notesService from '../../../services/notesService';
-import { logger } from '../../../utils/logger';
-import { useAuthState } from '../../../contexts/AuthStateContext';
-import { CalendarRepository } from '../../../services/repository/repositories/CalendarRepository';
-import { scrollbarStyles } from '../../../styles/scrollbarStyles';
-import { useNotes } from '../../../hooks/useNotes';
-import type { Currency, ImpactLevel } from '../../../types/economicCalendar';
+import RoundedTabs from 'components/common/RoundedTabs';
+import NoteListItem from '../NoteListItem';
+import NotesTagView from '../NotesTagView';
+import { useNotesViewMode } from '../../hooks/useNotesViewMode';
+import EconomicEventShimmer from 'components/economicCalendar/EconomicEventShimmer';
+import NoteEditorDialog from '../NoteEditorDialog';
+import NoteViewerDialog from '../NoteViewerDialog';
+import { Note } from '../../types/note';
+import { Calendar } from 'types/calendar';
+import * as notesService from '../../services/notesService';
+import { logger } from 'utils/logger';
+import { useAuthState } from 'contexts/AuthStateContext';
+import { CalendarRepository } from 'services/repository/repositories/CalendarRepository';
+import { scrollbarStyles } from 'styles/scrollbarStyles';
+import { useNotes } from '../../hooks/useNotes';
+import type { Currency, ImpactLevel } from 'types/economicCalendar';
 
 export interface NotesContentProps {
   /** Controls whether data fetching and hooks are active (replaces `open` from drawer) */

@@ -28,7 +28,7 @@ import DOMPurify from 'dompurify';
 import ImageZoomDialog, { ImageZoomProp } from '../ImageZoomDialog';
 import type { Trade } from '../../types/trade';
 import type { EconomicEvent } from '../../types/economicCalendar';
-import type { Note } from '../../types/note';
+import type { Note } from 'features/notes/types/note';
 import { getTagChipStyles } from '../../utils/tagColors';
 
 // Convert inline reference tags to placeholder <span> elements that survive

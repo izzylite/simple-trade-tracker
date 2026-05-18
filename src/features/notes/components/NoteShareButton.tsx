@@ -12,11 +12,11 @@ import ShareIcon from '@mui/icons-material/Share';
 import LinkIcon from '@mui/icons-material/Link';
 import LinkOffIcon from '@mui/icons-material/LinkOff';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import { Note } from '../../types/note';
+import { Note } from '../types/note';
 import {
   generateNoteShareLink,
   deactivateNoteShareLink,
-} from '../../services/sharingService';
+} from 'services/sharingService';
 
 interface NoteShareButtonProps {
   note: Note;

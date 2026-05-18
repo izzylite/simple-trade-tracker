@@ -20,7 +20,7 @@
 import React from 'react';
 import { Box } from '@mui/material';
 
-import { useNotesPanelState } from '../../contexts/NotesPanelStateContext';
+import { useNotesPanelState } from '../contexts/NotesPanelStateContext';
 
 import NoteListPanel from './NoteListPanel';
 import NoteEditorDialog from './NoteEditorDialog';

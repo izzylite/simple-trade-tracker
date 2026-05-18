@@ -12,7 +12,7 @@
  * ai-trading-agent edge function in mode='reminder'; the edge function
  * performs the atomic claim internally. Single chokepoint, least-privilege.
  */
-import { supabase } from '../config/supabase';
+import { supabase } from 'config/supabase';
 
 export type ReminderStatus =
   | 'pending'

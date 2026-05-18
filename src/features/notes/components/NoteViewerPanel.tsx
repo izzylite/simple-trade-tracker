@@ -36,11 +36,11 @@ import {
   ErrorOutline as NotFoundIcon,
 } from '@mui/icons-material';
 
-import { Note } from '../../types/note';
-import { scrollbarStyles } from '../../styles/scrollbarStyles';
-import Shimmer from '../Shimmer';
-import { getNote } from '../../services/notesService';
-import { logger } from '../../utils/logger';
+import { Note } from '../types/note';
+import { scrollbarStyles } from 'styles/scrollbarStyles';
+import Shimmer from 'components/Shimmer';
+import { getNote } from '../services/notesService';
+import { logger } from 'utils/logger';
 import NoteViewerContent from './NoteViewerContent';
 
 interface NoteViewerPanelProps {

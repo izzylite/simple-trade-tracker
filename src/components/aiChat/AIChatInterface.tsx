@@ -38,12 +38,12 @@ import { ChatMessage as ChatMessageType, AttachedImage } from '../../types/aiCha
 import { Trade } from '../../types/trade';
 import { Calendar } from '../../types/calendar';
 import { EconomicEvent } from '../../types/economicCalendar';
-import { Note } from '../../types/note';
+import { Note } from 'features/notes/types/note';
 import { scrollbarStyles } from '../../styles/scrollbarStyles';
 import { Z_INDEX } from '../../styles/zIndex';
 import { logger } from '../../utils/logger';
 import { compressImageToDataUrl } from '../../utils/fileValidation';
-import * as notesService from '../../services/notesService';
+import * as notesService from 'features/notes/services/notesService';
 import { expandMentionsForSend, stripReferencedBlocks } from '../../utils/chatMentions';
 
 // Image limit for AI agent requests (must match backend MAX_IMAGES_PER_REQUEST)

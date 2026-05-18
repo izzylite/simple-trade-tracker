@@ -19,14 +19,14 @@ import {
 import type { Theme } from '@mui/material';
 import { convertFromRaw } from 'draft-js';
 
-import { Note } from '../../types/note';
-import { Trade } from '../../types/dualWrite';
-import { scrollbarStyles } from '../../styles/scrollbarStyles';
-import type { TradeChipData } from '../common/RichTextEditor/utils/tradeEntityUtils';
-import { getSharedTrade } from '../../services/sharingService';
-import { logger } from '../../utils/logger';
-import TradeGalleryDialog from '../TradeGalleryDialog';
-import ImageZoomDialog, { ImageZoomProp } from '../ImageZoomDialog';
+import { Note } from '../types/note';
+import { Trade } from 'types/dualWrite';
+import { scrollbarStyles } from 'styles/scrollbarStyles';
+import type { TradeChipData } from 'components/common/RichTextEditor/utils/tradeEntityUtils';
+import { getSharedTrade } from 'services/sharingService';
+import { logger } from 'utils/logger';
+import TradeGalleryDialog from 'components/TradeGalleryDialog';
+import ImageZoomDialog, { ImageZoomProp } from 'components/ImageZoomDialog';
 
 interface NoteMetaPanelProps {
   note: Note | null;

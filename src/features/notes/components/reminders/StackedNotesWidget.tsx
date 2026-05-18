@@ -10,11 +10,11 @@ import { useReminderNotes } from './useReminderNotes';
 import NoteCard from './NoteCard';
 import PlaceholderNoteCard from './PlaceholderNoteCard';
 import NotesBottomSheet from './NotesBottomSheet';
-import { Z_INDEX } from '../../styles/zIndex';
+import { Z_INDEX } from 'styles/zIndex';
 import { Note } from '../../types/note';
-import { Calendar } from '../../types/calendar';
-import { useUserPinnedEvents } from '../../contexts/UserPinnedEventsContext';
-import { SIDE_NAV_WIDTH } from '../layout/SideNav';
+import { Calendar } from 'types/calendar';
+import { useUserPinnedEvents } from 'contexts/UserPinnedEventsContext';
+import { SIDE_NAV_WIDTH } from 'components/layout/SideNav';
 
 interface StackedNotesWidgetProps {
   calendarId: string;

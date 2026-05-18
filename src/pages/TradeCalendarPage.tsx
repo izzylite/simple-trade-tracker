@@ -91,18 +91,18 @@ import { CalendarRepository } from '../services/repository/repositories/Calendar
 import CalendarFormDialog, { CalendarFormData } from '../components/CalendarFormDialog';
 import ShareButton from '../components/sharing/ShareButton';
 import { exportTrades } from '../utils/tradeExportImport';
-import NoteEditorDialog from '../components/notes/NoteEditorDialog';
-import CalendarNotesPanel from '../components/notes/CalendarNotesPanel';
+import NoteEditorDialog from 'features/notes/components/NoteEditorDialog';
+import CalendarNotesPanel from 'features/notes/components/CalendarNotesPanel';
 import UnifiedDrawer from '../components/common/UnifiedDrawer';
 import {
   StackedNotesWidget,
   StickyReminderCards,
   useReminderNotes,
-} from '../components/reminderNotes';
-import NotesBottomSheet from '../components/reminderNotes/NotesBottomSheet';
-import * as notesService from '../services/notesService';
+} from 'features/notes/components/reminders';
+import NotesBottomSheet from 'features/notes/components/reminders/NotesBottomSheet';
+import * as notesService from 'features/notes/services/notesService';
 import * as calendarService from '../services/calendarService';
-import { Note, DayAbbreviation } from '../types/note';
+import { Note, DayAbbreviation } from 'features/notes/types/note';
 
 import { DynamicRiskSettings } from '../utils/dynamicRiskUtils';
 import { Z_INDEX } from '../styles/zIndex';
@@ -131,7 +131,7 @@ import { usePanelMutexSlot } from '../contexts/PanelMutexContext';
 import { SearchPanelStateProvider } from '../contexts/SearchPanelStateContext';
 import { OverviewPanelStateProvider } from '../contexts/OverviewPanelStateContext';
 import { EventsPanelStateProvider } from '../contexts/EventsPanelStateContext';
-import { NotesPanelStateProvider } from '../contexts/NotesPanelStateContext';
+import { NotesPanelStateProvider } from 'features/notes/contexts/NotesPanelStateContext';
 import { TagsPanelStateProvider } from '../contexts/TagsPanelStateContext';
 import SidePanel from '../components/sidePanel/SidePanel';
 import SearchContent from '../components/sidePanel/content/SearchContent';

@@ -20,7 +20,7 @@ import {
 import { alpha } from '@mui/material/styles';
 import CancelIcon from '@mui/icons-material/Cancel';
 import AlarmIcon from '@mui/icons-material/Alarm';
-import type { Reminder } from '../../services/remindersService';
+import type { Reminder } from 'features/notes/services/remindersService';
 
 interface ReminderListItemProps {
   reminder: Reminder;

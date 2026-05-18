@@ -4,12 +4,12 @@
  */
 
 import { CreateNoteInput, Note, UpdateNoteInput } from "../types/note";
-import { logger } from "../utils/logger";
+import { logger } from "utils/logger";
 import {
   NoteQueryOptions,
   NoteQueryResult,
   NoteRepository,
-} from "./repository/repositories/NoteRepository";
+} from "services/repository/repositories/NoteRepository";
 
 const noteRepository = new NoteRepository();
 

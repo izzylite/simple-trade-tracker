@@ -8,8 +8,8 @@ import {
   getTagSubtitle,
   getTagIcon,
 } from './NoteEditorDialogTags';
-import { Note } from '../../types/note';
-import { Calendar } from '../../types/calendar';
+import { Note } from '../types/note';
+import { Calendar } from 'types/calendar';
 
 const UNTAGGED = '__untagged';
 const UNTAGGED_LABEL = 'Untagged';

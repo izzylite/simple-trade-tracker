@@ -42,7 +42,7 @@ import OrionTasksContent from '../orionTasks/OrionTasksContent';
 import type { AITasksBundle, OrionTaskResult } from '../../types/orionTask';
 import { TASK_TYPE_LABELS } from '../../types/orionTask';
 import { useAuth } from '../../contexts/SupabaseAuthContext';
-import { createNote } from '../../services/notesService';
+import { createNote } from 'features/notes/services/notesService';
 
 const ORION_NOTE_NS = 'a7f3d5e2-1b4c-5890-9e12-f3c4d5b6a7e8';
 

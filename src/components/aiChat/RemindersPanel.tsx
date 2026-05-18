@@ -21,7 +21,7 @@ import {
   cancelReminder,
   cancelReminderBatch,
   type Reminder,
-} from '../../services/remindersService';
+} from 'features/notes/services/remindersService';
 import { useRealtimeSubscription } from '../../hooks/useRealtimeSubscription';
 import { logger } from '../../utils/logger';
 import ReminderListItem from './ReminderListItem';

@@ -8,8 +8,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Note } from '../types/note';
 import * as notesService from '../services/notesService';
-import { logger } from '../utils/logger';
-import { supabase } from '../config/supabase';
+import { logger } from 'utils/logger';
+import { supabase } from 'config/supabase';
 
 export interface UseNotesOptions {
   /**

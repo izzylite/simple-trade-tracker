@@ -75,7 +75,7 @@ describe('detectMentionTrigger', () => {
 });
 
 import { expandMentionsForSend, MessageSegment } from '../chatMentions';
-import { SLASH_COMMAND_TAG, STRATEGY_TAG } from '../../types/note';
+import { SLASH_COMMAND_TAG, STRATEGY_TAG } from 'features/notes/types/note';
 
 const notesMap = new Map<string, { title: string; content: string; tags: string[] }>([
   ['n1', { title: 'Daily Review', content: "Summarize yesterday's trades and flag rule violations.", tags: [SLASH_COMMAND_TAG] }],

@@ -17,13 +17,13 @@
  */
 import { useCallback, useEffect, useRef } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
-import { supabase, supabaseUrl } from '../config/supabase';
+import { supabase, supabaseUrl } from 'config/supabase';
 import {
   getReminders,
   type Reminder,
 } from '../services/remindersService';
-import { useRealtimeSubscription } from './useRealtimeSubscription';
-import { logger } from '../utils/logger';
+import { useRealtimeSubscription } from 'hooks/useRealtimeSubscription';
+import { logger } from 'utils/logger';
 
 // 24 days, safely under setTimeout's ~24.8-day signed-32-bit-ms cap.
 const MAX_LOCAL_HORIZON_MS = 24 * 24 * 60 * 60 * 1000;

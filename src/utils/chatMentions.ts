@@ -4,7 +4,7 @@
  */
 
 import { EditorState } from 'draft-js';
-import { SLASH_COMMAND_TAG } from '../types/note';
+import { SLASH_COMMAND_TAG } from 'features/notes/types/note';
 
 // =============================================================================
 // Referenced-block format — single source of truth.

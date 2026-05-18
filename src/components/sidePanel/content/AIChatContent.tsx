@@ -41,15 +41,15 @@ import { logger } from '../../../utils/logger';
 import { stripReferencedBlocks } from '../../../utils/chatMentions';
 import { useAuthState } from '../../../contexts/AuthStateContext';
 import { useAIChat, UseAIChatReturn } from '../../../hooks/useAIChat';
-import { useReminderScheduler } from '../../../hooks/useReminderScheduler';
+import { useReminderScheduler } from 'features/notes/hooks/useReminderScheduler';
 import EconomicEventDetailDialog
   from '../../economicCalendar/EconomicEventDetailDialog';
-import NoteEditorDialog from '../../notes/NoteEditorDialog';
+import NoteEditorDialog from 'features/notes/components/NoteEditorDialog';
 import ConfirmationDialog from '../../common/ConfirmationDialog';
 import RemindersPanel from '../../aiChat/RemindersPanel';
 import MemoryLogsPanel from '../../aiChat/MemoryLogsPanel';
-import { Note, SLASH_COMMAND_TAG, GUIDELINE_TAG } from '../../../types/note';
-import * as notesService from '../../../services/notesService';
+import { Note, SLASH_COMMAND_TAG, GUIDELINE_TAG } from 'features/notes/types/note';
+import * as notesService from 'features/notes/services/notesService';
 import { ConversationRepository }
   from '../../../services/repository/repositories/ConversationRepository';
 import type { SystemCommand } from '../../aiChat/AIChatMentionInput';

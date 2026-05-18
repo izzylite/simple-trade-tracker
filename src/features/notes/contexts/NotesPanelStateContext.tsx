@@ -24,12 +24,12 @@ import React, {
 } from 'react';
 
 import { Note } from '../types/note';
-import type { Currency, ImpactLevel } from '../types/economicCalendar';
-import { useAuthState } from './AuthStateContext';
+import type { Currency, ImpactLevel } from 'types/economicCalendar';
+import { useAuthState } from 'contexts/AuthStateContext';
 import { useNotes } from '../hooks/useNotes';
 import * as notesService from '../services/notesService';
-import { logger } from '../utils/logger';
-import type { NotesTab, NotesTagPill } from '../components/notes/NoteListPanel';
+import { logger } from 'utils/logger';
+import type { NotesTab, NotesTagPill } from '../components/NoteListPanel';
 
 export interface PinnedEventLite {
   event_id: string;

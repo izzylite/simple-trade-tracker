@@ -25,9 +25,9 @@ import {
   SmartToy as AIIcon,
 } from '@mui/icons-material';
 
-import { Note } from '../../types/note';
-import { scrollbarStyles } from '../../styles/scrollbarStyles';
-import { Z_INDEX } from '../../styles/zIndex';
+import { Note } from '../types/note';
+import { scrollbarStyles } from 'styles/scrollbarStyles';
+import { Z_INDEX } from 'styles/zIndex';
 import NoteViewerContent from './NoteViewerContent';
 
 interface NoteViewerDialogProps {

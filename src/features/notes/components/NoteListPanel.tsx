@@ -42,8 +42,8 @@ import {
   RISK_MANAGEMENT_TAG,
   SLASH_COMMAND_TAG,
   GENERAL_TAG,
-} from '../../types/note';
-import { scrollbarStyles } from '../../styles/scrollbarStyles';
+} from '../types/note';
+import { scrollbarStyles } from 'styles/scrollbarStyles';
 import { getTagDisplayLabel } from './NoteEditorDialogTags';
 
 /** Lifecycle tab — mutually exclusive, drives useNotes activeTab. */

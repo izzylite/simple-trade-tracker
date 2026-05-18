@@ -8,7 +8,7 @@ import { Z_INDEX } from '../../styles/zIndex';
 import { useDialogTokens } from '../../styles/dialogTokens';
 import type { MessageSegment } from '../../utils/chatMentions';
 import { detectMentionTrigger, extractSegments } from '../../utils/chatMentions';
-import { SLASH_COMMAND_TAG } from '../../types/note';
+import { SLASH_COMMAND_TAG } from 'features/notes/types/note';
 
 export interface AIChatMentionInputHandle {
   focus: () => void;

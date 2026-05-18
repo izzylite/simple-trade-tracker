@@ -22,7 +22,7 @@ import {
 import { alpha } from '@mui/material/styles';
 import CancelIcon from '@mui/icons-material/Cancel';
 import RepeatIcon from '@mui/icons-material/Repeat';
-import type { Reminder } from '../../services/remindersService';
+import type { Reminder } from 'features/notes/services/remindersService';
 
 interface ReminderBatchListItemProps {
   batchId: string;
