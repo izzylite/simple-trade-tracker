@@ -4,7 +4,7 @@
  * Extracts core AI chat logic for use across different UI components
  */
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import {
   ChatMessage as ChatMessageType,
@@ -20,6 +20,7 @@ import {
   ConversationPaginationOptions
 } from '../services/repository/repositories/ConversationRepository';
 import { logger } from '../utils/logger';
+import { estimateConversationTokens } from '../utils/tokenEstimation';
 import { supabase } from '../config/supabase';
 
 const CONVERSATIONS_PAGE_SIZE = 15;
@@ -75,7 +76,11 @@ export interface UseAIChatOptions {
   userId: string | undefined;
   calendar?: Calendar;
   trade?: Trade;
-  messageLimit?: number;
+  /**
+   * Total estimated tokens (text + images) the conversation may consume
+   * before the input is locked. Heuristic; see utils/tokenEstimation.ts.
+   */
+  tokenBudget?: number;
   autoSaveConversation?: boolean;
   /**
    * When true, conversations save to userId only (calendar_id = null)
@@ -98,7 +103,12 @@ export interface UseAIChatReturn {
   loadingMoreConversations: boolean;
   hasMoreConversations: boolean;
   totalConversationsCount: number;
-  isAtMessageLimit: boolean;
+  /** True once estimated tokens reach `tokenBudget` — input is locked. */
+  isAtContextLimit: boolean;
+  /** Estimated tokens used by the current conversation. */
+  tokenUsage: number;
+  /** Effective token budget (defaulted from `tokenBudget` option). */
+  tokenBudget: number;
   editingMessageId: string | null;
 
   // Actions
@@ -123,16 +133,28 @@ export interface UseAIChatReturn {
   getWelcomeMessage: () => ChatMessageType;
 }
 
-const MESSAGE_LIMIT_DEFAULT = 100;
+// Default conversational context budget. Gemini supports 1M tokens, but
+// agent attention measurably degrades well before that — 80K is the sweet
+// spot: generous enough that most chats never hit it, tight enough to
+// catch truly bloated turns (long pastes, multi-image threads) before
+// quality rots.
+const TOKEN_BUDGET_DEFAULT = 80_000;
 
 export function useAIChat({
   userId,
   calendar,
   trade,
-  messageLimit = MESSAGE_LIMIT_DEFAULT,
+  tokenBudget: tokenBudgetOption,
   autoSaveConversation = true,
   saveAsUserLevel = false,
 }: UseAIChatOptions): UseAIChatReturn {
+  // Coerce non-positive overrides (0, negative, NaN) to the default. Without
+  // this, `tokenBudget: 0` would make `tokenUsage >= tokenBudget` true from
+  // mount and lock the input before the user ever types.
+  const tokenBudget =
+    typeof tokenBudgetOption === 'number' && tokenBudgetOption > 0
+      ? tokenBudgetOption
+      : TOKEN_BUDGET_DEFAULT;
   // State
   const [messages, setMessages] = useState<ChatMessageType[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -144,8 +166,17 @@ export function useAIChat({
   const [loadingMoreConversations, setLoadingMoreConversations] = useState(false);
   const [hasMoreConversations, setHasMoreConversations] = useState(false);
   const [totalConversationsCount, setTotalConversationsCount] = useState(0);
-  const [isAtMessageLimit, setIsAtMessageLimit] = useState(false);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  // Recomputes on every messages identity change. The heuristic is cheap
+  // (~chars/4 + flat per-image cost) so doing it inline avoids the extra
+  // render pass a `useState + useEffect` pair would cost on every streaming
+  // chunk, and keeps `tokenUsage` in lockstep with `messages` (no window
+  // where one belongs to convo A and the other to convo B during a switch).
+  const tokenUsage = useMemo(
+    () => estimateConversationTokens(messages),
+    [messages],
+  );
+  const isAtContextLimit = tokenUsage >= tokenBudget;
 
   // Refs
   const conversationRepo = useRef(new ConversationRepository()).current;
@@ -157,11 +188,6 @@ export function useAIChat({
   const embedChannelIdRef = useRef(
     `ai-chat-embeds-pg-${Math.random().toString(36).slice(2, 8)}`
   );
-
-  // Check message limit whenever messages change
-  useEffect(() => {
-    setIsAtMessageLimit(messages.length >= messageLimit);
-  }, [messages.length, messageLimit]);
 
   // Live-patch embeddedNotes / embeddedTrades snapshots inside chat messages
   // when the underlying row changes. Without this, a chip rendered in turn N
@@ -425,7 +451,6 @@ export function useAIChat({
   const startNewChat = useCallback(async () => {
     setMessages([]);
     setCurrentConversationId(null);
-    setIsAtMessageLimit(false);
     setEditingMessageId(null);
     logger.log('Started new conversation (local reset)');
   }, []);
@@ -436,10 +461,9 @@ export function useAIChat({
   const selectConversation = useCallback((conversation: AIConversation) => {
     setMessages(conversation.messages as ChatMessageType[]);
     setCurrentConversationId(conversation.id);
-    setIsAtMessageLimit(conversation.message_count >= messageLimit);
     setEditingMessageId(null);
     logger.log('Loaded conversation:', conversation.id);
-  }, [messageLimit]);
+  }, []);
 
   /**
    * Delete a conversation
@@ -973,7 +997,9 @@ What would you like to know about your trading?`,
     loadingMoreConversations,
     hasMoreConversations,
     totalConversationsCount,
-    isAtMessageLimit,
+    isAtContextLimit,
+    tokenUsage,
+    tokenBudget,
     editingMessageId,
 
     // Actions

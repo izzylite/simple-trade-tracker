@@ -97,7 +97,12 @@ export interface AIChatInterfaceProps {
   isLoading: boolean;
   isTyping: boolean;
   toolExecutionStatus: string;
-  isAtMessageLimit: boolean;
+  /** True when the conversation has reached its estimated token budget. */
+  isAtContextLimit: boolean;
+  /** Estimated tokens consumed by the current conversation. */
+  tokenUsage: number;
+  /** Effective token budget for the current conversation. */
+  tokenBudget: number;
 
   // Actions from useAIChat hook
   sendMessage: (messageText: string, images?: AttachedImage[], segments?: ChatMessageType['segments']) => Promise<void>;
@@ -121,7 +126,6 @@ export interface AIChatInterfaceProps {
   isReadOnly?: boolean;
   showTemplates?: boolean;
   autoScroll?: boolean;
-  messageLimit?: number;
   questionTemplates?: QuestionTemplate[];
 
   // Locally-handled slash commands shown above note-based slash commands.
@@ -155,7 +159,9 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
   isLoading,
   isTyping,
   toolExecutionStatus,
-  isAtMessageLimit,
+  isAtContextLimit,
+  tokenUsage,
+  tokenBudget,
   sendMessage,
   cancelRequest,
   setInputForEdit,
@@ -171,7 +177,6 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
   isReadOnly = false,
   showTemplates: showTemplatesProp,
   autoScroll = true,
-  messageLimit = 100,
   questionTemplates = defaultQuestionTemplates,
   systemCommands,
   onSystemCommand,
@@ -481,19 +486,22 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
         }
 
         try {
-          // Convert to base64 data URL
-          const dataUrl = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-          });
+          // Same compression path as the file picker: scale to 1600px on the
+          // long edge + re-encode as JPEG. Without this, raw clipboard PNGs
+          // (~5-10MB each) ship at full resolution and can blow past Gemini's
+          // 20MB inline-payload limit when 4 are attached.
+          //
+          // Quality bumped from the default 0.85 → 0.92 because the dominant
+          // paste use case in a trading app is chart/UI screenshots, which
+          // contain small anti-aliased text and flat-color regions where
+          // 0.85 introduces visible JPEG ringing.
+          const dataUrl = await compressImageToDataUrl(file, 1600, 0.92);
 
           newImages.push({
             id: crypto.randomUUID(),
             url: dataUrl,
-            mimeType: file.type,
-            name: `pasted-image-${Date.now()}.${file.type.split('/')[1] || 'png'}`,
+            mimeType: 'image/jpeg',
+            name: `pasted-image-${Date.now()}.jpg`,
             size: file.size
           });
         } catch (error) {
@@ -610,6 +618,161 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
       flexDirection: 'column',
       overflow: 'hidden'
     }}>
+      {/* Context budget meter — sits flush at the very top of the chat
+          surface (just below the parent's tab row) so users see usage
+          accumulating without scanning to the input.
+          - Hidden until the conversation has any real user/assistant turn.
+          - <85%: edge-to-edge 2px line with a tiny % chip floated right.
+          - ≥85% (or at limit): expands into an inline banner with copy +
+            Start-New-Chat CTA when budget is exhausted. */}
+      {(() => {
+        const realTurns = messages.filter(
+          (m) => m.id !== 'welcome' && (m.role === 'user' || m.role === 'assistant'),
+        ).length;
+        if (realTurns === 0) return null;
+        const usagePct = tokenBudget > 0
+          ? Math.min(100, Math.round((tokenUsage / tokenBudget) * 100))
+          : 0;
+        const meterColor = isAtContextLimit
+          ? theme.palette.error.main
+          : usagePct >= 85
+            ? theme.palette.warning.main
+            : violet;
+        const showAlert = usagePct >= 85 || isAtContextLimit;
+
+        if (!showAlert) {
+          return (
+            <Box sx={{ position: 'relative', flexShrink: 0 }}>
+              <Box
+                role="progressbar"
+                aria-label="Conversation context budget"
+                aria-valuenow={usagePct}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                sx={{
+                  width: '100%',
+                  height: 2,
+                  backgroundColor: alpha(meterColor, 0.14),
+                  overflow: 'hidden',
+                }}
+              >
+                <Box
+                  sx={{
+                    width: `${Math.max(usagePct, 1)}%`,
+                    height: '100%',
+                    backgroundColor: alpha(meterColor, 0.75),
+                    transition: 'width 240ms ease',
+                  }}
+                />
+              </Box>
+              <Typography
+                component="span"
+                sx={{
+                  ...monoLabelSx,
+                  position: 'absolute',
+                  top: 4,
+                  right: 8,
+                  fontSize: '0.58rem',
+                  color: theme.palette.text.secondary,
+                  pointerEvents: 'none',
+                }}
+              >
+                {usagePct}%
+              </Typography>
+            </Box>
+          );
+        }
+
+        return (
+          <Box sx={{ p: 1.5, pb: 0, flexShrink: 0 }}>
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 1.5,
+                p: 1.5,
+                borderRadius: 1.5,
+                backgroundColor: alpha(meterColor, 0.08),
+                border: `1px solid ${alpha(meterColor, 0.35)}`,
+              }}
+            >
+              <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                  <Typography
+                    component="span"
+                    sx={{
+                      ...monoLabelSx,
+                      fontSize: '0.66rem',
+                      color: meterColor,
+                    }}
+                  >
+                    {isAtContextLimit ? 'Context Budget Reached' : 'Context Budget'}
+                  </Typography>
+                  <Typography
+                    component="span"
+                    sx={{
+                      ...monoLabelSx,
+                      fontSize: '0.66rem',
+                      color: meterColor,
+                    }}
+                  >
+                    {usagePct}%
+                  </Typography>
+                </Box>
+                <Box
+                  role="progressbar"
+                  aria-label="Conversation context budget"
+                  aria-valuenow={usagePct}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  sx={{
+                    width: '100%',
+                    height: 4,
+                    borderRadius: 2,
+                    backgroundColor: alpha(meterColor, 0.18),
+                    overflow: 'hidden',
+                  }}
+                >
+                  <Box
+                    sx={{
+                      width: `${usagePct}%`,
+                      height: '100%',
+                      backgroundColor: meterColor,
+                      transition: 'width 240ms ease',
+                    }}
+                  />
+                </Box>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    fontSize: '0.82rem',
+                    lineHeight: 1.45,
+                    color: theme.palette.text.secondary,
+                  }}
+                >
+                  {isAtContextLimit
+                    ? 'This conversation has used its context budget. Start a new chat to keep responses sharp.'
+                    : 'This conversation is getting long. Responses may start to drift — consider starting a new chat soon.'}
+                </Typography>
+              </Box>
+              {isAtContextLimit && (
+                <Button
+                  size="small"
+                  onClick={handleNewChat}
+                  startIcon={<NewChatIcon />}
+                  sx={{
+                    ...primaryButtonSx,
+                    flexShrink: 0,
+                  }}
+                >
+                  Start New Chat
+                </Button>
+              )}
+            </Box>
+          </Box>
+        );
+      })()}
+
       {/* Messages Area */}
       <Box sx={{ flex: 1, position: 'relative', minHeight: 0 }}>
       <Box
@@ -849,58 +1012,6 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
         )}
       </Box>
 
-      {/* Message Limit Warning */}
-      {isAtMessageLimit && (
-        <Box sx={{ p: 2, pb: 0 }}>
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: 1.5,
-              p: 1.5,
-              borderRadius: 1.5,
-              backgroundColor: alpha(theme.palette.warning.main, 0.08),
-              border: `1px solid ${alpha(theme.palette.warning.main, 0.35)}`,
-            }}
-          >
-            <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-              <Typography
-                component="span"
-                sx={{
-                  ...monoLabelSx,
-                  fontSize: '0.66rem',
-                  color: theme.palette.warning.main,
-                }}
-              >
-                Conversation Limit Reached
-              </Typography>
-              <Typography
-                variant="body2"
-                sx={{
-                  fontSize: '0.82rem',
-                  lineHeight: 1.45,
-                  color: theme.palette.text.secondary,
-                }}
-              >
-                This conversation has reached the maximum length of {messageLimit} messages.
-                Please start a new conversation to continue.
-              </Typography>
-            </Box>
-            <Button
-              size="small"
-              onClick={handleNewChat}
-              startIcon={<NewChatIcon />}
-              sx={{
-                ...primaryButtonSx,
-                flexShrink: 0,
-              }}
-            >
-              Start New Chat
-            </Button>
-          </Box>
-        </Box>
-      )}
-
       {/* Mention Warning (deleted referenced note) */}
       {mentionWarning && (
         <Box sx={{ p: 2, pb: 0 }}>
@@ -1071,7 +1182,7 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
             onChange={setInputMessage}
             onKeyDown={handleKeyPress}
             placeholder={calendar ? "Ask Orion… (use @ to mention)" : "Ask Orion about your trading..."}
-            disabled={isLoading || isAtMessageLimit}
+            disabled={isLoading || isAtContextLimit}
             allTags={allTagsMemo}
             allNotes={allNotesMemo}
             systemCommands={systemCommands}
@@ -1083,7 +1194,7 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
           <IconButton
             aria-label="Attach image"
             onClick={handleImageUploadClick}
-            disabled={isReadOnly || isLoading || isAtMessageLimit || attachedImages.length >= MAX_IMAGES}
+            disabled={isReadOnly || isLoading || isAtContextLimit || attachedImages.length >= MAX_IMAGES}
             size="small"
             sx={{
               width: 32,
@@ -1129,7 +1240,7 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
             <Button
               aria-label="Send message"
               onClick={handleSendMessage}
-              disabled={(!inputMessage.trim() && attachedImages.length === 0) || isAtMessageLimit}
+              disabled={(!inputMessage.trim() && attachedImages.length === 0) || isAtContextLimit}
               size="small"
               endIcon={<SendIcon sx={{ fontSize: 14, transform: 'rotate(-12deg)' }} />}
               sx={{

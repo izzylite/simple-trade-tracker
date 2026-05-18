@@ -184,7 +184,6 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
     userId: user?.uid,
     calendar,
     trade: focusedTrade,
-    messageLimit: 100,
     autoSaveConversation: true
   });
 
@@ -198,7 +197,9 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
     loadingMoreConversations,
     hasMoreConversations,
     totalConversationsCount,
-    isAtMessageLimit,
+    isAtContextLimit,
+    tokenUsage,
+    tokenBudget,
     sendMessage,
     cancelRequest,
     setInputForEdit,
@@ -549,7 +550,9 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
               isLoading={isLoading}
               isTyping={isTyping}
               toolExecutionStatus={toolExecutionStatus}
-              isAtMessageLimit={isAtMessageLimit}
+              isAtContextLimit={isAtContextLimit}
+              tokenUsage={tokenUsage}
+              tokenBudget={tokenBudget}
               sendMessage={sendMessage}
               cancelRequest={cancelRequest}
               setInputForEdit={setInputForEdit}
@@ -600,7 +603,6 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
                 }
               }}
               isReadOnly={isReadOnly}
-              messageLimit={100}
               systemCommands={systemCommands}
               onSystemCommand={handleSystemCommand}
             />

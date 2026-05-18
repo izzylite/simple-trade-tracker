@@ -120,7 +120,6 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   const internalChatState = useAIChat({
     userId: user?.uid,
     calendar,
-    messageLimit: 100,
     autoSaveConversation: true,
   });
   const effectiveChatState = sharedChatState ?? internalChatState;
@@ -176,8 +175,8 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
     return () => {
       cancelled = true;
     };
-    // selectConversation is stable across messageLimit changes; intentionally
-    // listing the primitive identity-driving fields only.
+    // selectConversation is stable; intentionally listing the primitive
+    // identity-driving fields only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, pendingDeepLink?.conversationId, pendingDeepLink?.messageId]);
 

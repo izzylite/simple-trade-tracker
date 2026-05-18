@@ -62,7 +62,9 @@ interface AIChatBundle {
   isLoading: boolean;
   isTyping: boolean;
   toolExecutionStatus: string;
-  isAtMessageLimit: boolean;
+  isAtContextLimit: boolean;
+  tokenUsage: number;
+  tokenBudget: number;
   sendMessage: (text: string, images?: AttachedImage[], segments?: ChatMessageType['segments']) => Promise<void>;
   cancelRequest: () => void;
   setInputForEdit: (messageId: string) => { content: string; images?: AttachedImage[]; segments?: ChatMessageType['segments'] } | null;
