@@ -129,7 +129,7 @@ import {
 } from '../contexts/SidePanelContext';
 import { usePanelMutexSlot } from '../contexts/PanelMutexContext';
 import { SearchPanelStateProvider } from '../contexts/SearchPanelStateContext';
-import { OverviewPanelStateProvider } from '../contexts/OverviewPanelStateContext';
+import { OverviewPanelStateProvider } from 'features/performance/contexts/OverviewPanelStateContext';
 import { EventsPanelStateProvider } from 'features/events/contexts/EventsPanelStateContext';
 import { NotesPanelStateProvider } from 'features/notes/contexts/NotesPanelStateContext';
 import { TagsPanelStateProvider } from '../contexts/TagsPanelStateContext';
@@ -137,8 +137,8 @@ import SidePanel from '../components/sidePanel/SidePanel';
 import SearchContent from '../components/sidePanel/content/SearchContent';
 import TagManagementContent from '../components/sidePanel/content/TagManagementContent';
 import DayTradesContent from '../components/sidePanel/content/DayTradesContent';
-import StatsContent from '../components/sidePanel/content/StatsContent';
-import StatsDrawer from '../components/StatsDrawer';
+import StatsContent from 'features/performance/components/StatsContent';
+import StatsDrawer from 'features/performance/components/StatsDrawer';
 
 // Lazy-load: ImportMappingDialog pulls xlsx + multi-step wizard. Only mount
 // when the user actually opens the import flow.

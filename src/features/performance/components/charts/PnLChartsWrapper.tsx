@@ -3,8 +3,8 @@ import { Box, Paper } from '@mui/material';
 import CumulativePnLChart from './CumulativePnLChart';
 import DailyPnLChart from './DailyPnLChart';
 import PnLHeatmap from './PnLHeatmap';
-import RoundedTabs, { TabPanel } from '../common/RoundedTabs';
-import { Trade } from '../../types/dualWrite';
+import RoundedTabs, { TabPanel } from 'components/common/RoundedTabs';
+import { Trade } from 'types/dualWrite';
 import { TimePeriod } from '../../utils/chartDataUtils';
 
 interface PnLChartsWrapperProps {

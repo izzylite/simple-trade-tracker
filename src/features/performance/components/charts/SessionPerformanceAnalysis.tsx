@@ -5,9 +5,9 @@ import {
 } from '@mui/material';
 import { Assessment as PerformanceIcon } from '@mui/icons-material';
 import { isSameMonth } from 'date-fns';
-import { Trade } from '../../types/dualWrite';
-import { formatValue } from '../../utils/formatters';
-import { SESSION_COLORS } from '../../utils/sessionTimeUtils';
+import { Trade } from 'types/dualWrite';
+import { formatValue } from 'utils/formatters';
+import { SESSION_COLORS } from 'utils/sessionTimeUtils';
 
 interface SessionPerformanceAnalysisProps {
   sessionStats: any[];

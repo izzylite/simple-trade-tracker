@@ -5,8 +5,8 @@
  * This is an O(n³) operation that can block the UI with large datasets.
  */
 
-import { createInlineWorker, WorkerManager } from './utils/workerManager';
-import type { Trade } from '../types/dualWrite';
+import { createInlineWorker, WorkerManager } from 'workers/utils/workerManager';
+import type { Trade } from 'types/dualWrite';
 
 export interface GenerateTagCombinationsRequest {
   trades: Trade[];

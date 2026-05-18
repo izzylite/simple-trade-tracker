@@ -13,9 +13,9 @@ import {
 import { Box, Paper, Typography, useTheme, Button, alpha, Tooltip as MuiTooltip, CircularProgress } from '@mui/material';
 import { InfoOutlined } from '@mui/icons-material';
 
-import { Trade } from '../../types/dualWrite';
-import { formatCurrency } from '../../utils/formatters';
-import TagFilterDialog from '../TagFilterDialog';
+import { Trade } from 'types/dualWrite';
+import { formatCurrency } from 'utils/formatters';
+import TagFilterDialog from 'components/TagFilterDialog';
 import { getTagDayOfWeekChartData } from '../../utils/chartDataUtils';
 
 interface TagDayOfWeekAnalysisProps { 

@@ -11,9 +11,9 @@ import {
 } from 'recharts';
 import { Box, Paper, Typography, useTheme } from '@mui/material';
 import { format } from 'date-fns';
-import { Trade } from '../../types/dualWrite';
-import { formatValue } from '../../utils/formatters';
-import { log } from '../../utils/logger';
+import { Trade } from 'types/dualWrite';
+import { formatValue } from 'utils/formatters';
+import { log } from 'utils/logger';
 
 interface CumulativePnLChartProps {
   chartData: any[];

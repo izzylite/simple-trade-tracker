@@ -7,9 +7,9 @@ import {
   eachDayOfInterval, getDay, format, isToday,
   startOfWeek, differenceInCalendarWeeks
 } from 'date-fns';
-import { Trade } from '../../types/dualWrite';
+import { Trade } from 'types/dualWrite';
 import { TimePeriod } from '../../utils/chartDataUtils';
-import { formatValue } from '../../utils/formatters';
+import { formatValue } from 'utils/formatters';
 
 interface PnLHeatmapProps {
   trades: Trade[];

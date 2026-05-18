@@ -8,9 +8,9 @@ import {
 import { useAuthState } from '../contexts/AuthStateContext';
 import { useCalendars } from '../hooks/useCalendars';
 import { Calendar } from '../types/calendar';
-import PerformanceCharts, { TimePeriod } from '../components/PerformanceCharts';
+import PerformanceCharts, { TimePeriod } from 'features/performance/components/PerformanceCharts';
 import { useSelectedCalendar } from '../contexts/SelectedCalendarContext';
-import PerformanceHeader from '../components/performance/PerformanceHeader';
+import PerformanceHeader from 'features/performance/components/PerformanceHeader';
 
 const SWITCH_SPINNER_MS = 350;
 const APP_HEADER_HEIGHT = 64;

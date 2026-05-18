@@ -31,8 +31,8 @@ import {
   InfoOutlined as InfoIcon,
   TrendingDown as DrawdownIcon,
 } from '@mui/icons-material';
-import { Trade } from '../types/dualWrite';
-import { DynamicRiskSettings } from '../utils/dynamicRiskUtils';
+import { Trade } from 'types/dualWrite';
+import { DynamicRiskSettings } from 'utils/dynamicRiskUtils';
 
 interface AccountStatsProps {
   balance: number;

@@ -1,10 +1,10 @@
 import React from 'react';
 import { Insights as StatsIcon } from '@mui/icons-material';
 
-import UnifiedDrawer from './common/UnifiedDrawer';
+import UnifiedDrawer from 'components/common/UnifiedDrawer';
 import StatsContent, {
   StatsContentProps,
-} from './sidePanel/content/StatsContent';
+} from './StatsContent';
 
 interface StatsDrawerProps extends StatsContentProps {
   open: boolean;

@@ -12,8 +12,8 @@ import {
 } from 'recharts';
 import { Box, Paper, Typography, useTheme } from '@mui/material';
 import { format } from 'date-fns'; 
- import { formatValue } from '../../utils/formatters';
-import { log } from '../../utils/logger';
+ import { formatValue } from 'utils/formatters';
+import { log } from 'utils/logger';
 
 interface DailyPnLChartProps {
   chartData: any[];

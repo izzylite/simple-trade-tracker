@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { Box, Popover, useTheme } from '@mui/material';
 import { format, addMonths, addQuarters, addYears, startOfQuarter, startOfYear, startOfMonth } from 'date-fns';
-import { TimePeriod } from '../PerformanceCharts';
+import { TimePeriod } from './PerformanceCharts';
 
 interface PeriodPickerProps {
   period: TimePeriod;

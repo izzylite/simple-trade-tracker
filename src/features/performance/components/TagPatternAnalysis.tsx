@@ -18,12 +18,12 @@ import {
   HelpOutline,
   Tune,
 } from '@mui/icons-material';
-import { Trade } from '../types/dualWrite';
+import { Trade } from 'types/dualWrite';
 import { TagPatternInsight } from '../types/score';
 import { tagPatternService } from '../services/tagPatternService';
-import { getTagChipStyles, formatTagForDisplay } from '../utils/tagColors';
-import { scrollbarStyles } from '../styles/scrollbarStyles';
-import TagSelectionDialog, { SelectableItem } from './TagSelectionDialog';
+import { getTagChipStyles, formatTagForDisplay } from 'utils/tagColors';
+import { scrollbarStyles } from 'styles/scrollbarStyles';
+import TagSelectionDialog, { SelectableItem } from 'components/TagSelectionDialog';
 
 interface TagPatternAnalysisProps {
   trades: Trade[];

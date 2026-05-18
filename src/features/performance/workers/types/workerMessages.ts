@@ -5,7 +5,7 @@
  * All data must be serializable (no functions, Date objects converted to strings).
  */
 
-import type { Trade } from '../../types/dualWrite';
+import type { Trade } from 'types/dualWrite';
 import type { TimePeriod, ChartDataPoint } from '../../utils/chartDataUtils';
 
 // ============================================================================

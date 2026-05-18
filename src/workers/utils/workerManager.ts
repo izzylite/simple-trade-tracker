@@ -7,7 +7,7 @@
  * - Request timeout support
  */
 
-import type { WorkerRequest, WorkerResponse } from '../types/workerMessages';
+import type { WorkerRequest, WorkerResponse } from 'features/performance/workers/types/workerMessages';
 import { logger } from '../../utils/logger';
 
 interface PendingRequest {

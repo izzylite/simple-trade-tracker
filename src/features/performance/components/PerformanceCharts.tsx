@@ -1,21 +1,21 @@
 import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { format } from 'date-fns';
 import { Box, Typography, useTheme, useMediaQuery, Paper, Alert, Button, CircularProgress } from '@mui/material';
-import { Trade, Calendar } from '../types/dualWrite';
-import ImageZoomDialog, { ImageZoomProp } from './ImageZoomDialog';
-import { DynamicRiskSettings } from '../utils/dynamicRiskUtils';
+import { Trade, Calendar } from 'types/dualWrite';
+import ImageZoomDialog, { ImageZoomProp } from 'components/ImageZoomDialog';
+import { DynamicRiskSettings } from 'utils/dynamicRiskUtils';
 import TagPatternAnalysis from './TagPatternAnalysis';
-import RoundedTabs from './common/RoundedTabs';
-import KpiStrip from './performance/KpiStrip';
-import WeekdayWinRate from './performance/WeekdayWinRate';
-import { logger } from '../utils/logger';
+import RoundedTabs from 'components/common/RoundedTabs';
+import KpiStrip from './KpiStrip';
+import WeekdayWinRate from './WeekdayWinRate';
+import { logger } from 'utils/logger';
 import { getFilteredTrades, getNormalizedDate } from '../utils/chartDataUtils';
 import {
   PerformanceCalculationResult
 } from '../services/performanceCalculationService';
-import { supabase } from '../config/supabase';
+import { supabase } from 'config/supabase';
 import { EconomicCalendarFilterSettings, DEFAULT_FILTER_SETTINGS as DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS } from 'features/events/hooks/useEconomicCalendarFilters';
-import { TradeOperationsProps } from '../types/tradeOperations';
+import { TradeOperationsProps } from 'types/tradeOperations';
 import PnLChartsWrapper from './charts/PnLChartsWrapper';
 import WinLossStats from './charts/WinLossStats';
 import TagPerformanceAnalysis from './charts/TagPerformanceAnalysis';
@@ -24,8 +24,8 @@ import SessionPerformanceAnalysis from './charts/SessionPerformanceAnalysis';
 import TradesListDialog from './charts/TradesListDialog';
 import RiskRewardChart from './charts/RiskRewardChart';
 import EconomicEventCorrelationAnalysis from 'features/events/components/charts/EconomicEventCorrelationAnalysis';
-import { useTradeSyncContextOptional } from '../contexts/TradeSyncContext';
-import { normalizeTradeDates } from '../utils/tradeUtils';
+import { useTradeSyncContextOptional } from 'contexts/TradeSyncContext';
+import { normalizeTradeDates } from 'utils/tradeUtils';
 
 // Type definition needed for module-level constants
 export type TimePeriod = 'month' | 'quarter' | 'ytd' | 'year' | 'all';
