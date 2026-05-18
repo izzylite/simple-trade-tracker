@@ -21,80 +21,13 @@ import {
   INSIGHT_TAG,
   AGENT_MEMORY_TAG,
 } from "../_shared/noteTags.ts";
+import { getCurrentTradingSession } from "./sessions.ts";
 
 // =============================================================================
 // TEMPORAL CONTEXT (DST-aware trading session detection)
 // =============================================================================
-
-type TradingSession = "Asia" | "London" | "NY AM" | "NY PM" | "After Hours";
-
-function isDaylightSavingTime(date: Date, region: "EU" | "US" = "EU"): boolean {
-  const year = date.getUTCFullYear();
-  const month = date.getUTCMonth();
-  const day = date.getUTCDate();
-
-  if (region === "EU") {
-    // EU/UK DST: Last Sunday in March to last Sunday in October
-    if (month < 2 || month > 9) return false;
-    if (month > 2 && month < 9) return true;
-
-    if (month === 2) {
-      const lastSunday = getLastSundayOfMonth(year, 2);
-      return day >= lastSunday;
-    }
-    if (month === 9) {
-      const lastSunday = getLastSundayOfMonth(year, 9);
-      return day < lastSunday;
-    }
-  } else {
-    // US DST: Second Sunday in March to first Sunday in November
-    if (month < 2 || month > 10) return false;
-    if (month > 2 && month < 10) return true;
-
-    if (month === 2) {
-      const secondSunday = getNthSundayOfMonth(year, 2, 2);
-      return day >= secondSunday;
-    }
-    if (month === 10) {
-      const firstSunday = getNthSundayOfMonth(year, 10, 1);
-      return day < firstSunday;
-    }
-  }
-  return false;
-}
-
-function getLastSundayOfMonth(year: number, month: number): number {
-  const lastDay = new Date(Date.UTC(year, month + 1, 0));
-  return lastDay.getUTCDate() - lastDay.getUTCDay();
-}
-
-function getNthSundayOfMonth(year: number, month: number, n: number): number {
-  const firstDay = new Date(Date.UTC(year, month, 1));
-  const daysToFirstSunday = (7 - firstDay.getUTCDay()) % 7;
-  return 1 + daysToFirstSunday + (n - 1) * 7;
-}
-
-function getCurrentTradingSession(now: Date = new Date()): TradingSession {
-  const hour = now.getUTCHours();
-  const isDST = isDaylightSavingTime(now, "EU");
-
-  // Session boundaries (UTC) - adjusted for DST
-  const londonStart = isDST ? 7 : 8;
-  const londonEnd = isDST ? 12 : 13;
-  const nyAmStart = isDST ? 12 : 13;
-  const nyAmEnd = isDST ? 17 : 18;
-  const nyPmStart = isDST ? 17 : 18;
-  const nyPmEnd = isDST ? 21 : 22;
-  const asiaStart = isDST ? 22 : 23;
-  const asiaEnd = isDST ? 7 : 8;
-
-  if (hour >= londonStart && hour < londonEnd) return "London";
-  if (hour >= nyAmStart && hour < nyAmEnd) return "NY AM";
-  if (hour >= nyPmStart && hour < nyPmEnd) return "NY PM";
-  if (hour >= asiaStart || hour < asiaEnd) return "Asia";
-
-  return "After Hours";
-}
+// Session boundary + DST math lives in `./sessions.ts` — shared with
+// tools.executeGetSessionLevels so prompt + tool agree on windows.
 
 export function buildTemporalContext(): string {
   const now = new Date();

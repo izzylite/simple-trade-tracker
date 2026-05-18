@@ -40,6 +40,20 @@ import {
   resolveInstrumentInput,
   VALID_BRIEFING_CURRENCIES,
 } from "../_shared/instruments.ts";
+import {
+  classifyForSessions,
+  getNextSessionWindow,
+  getSessionWindow,
+  isDaylightSavingTime,
+  nextInCycle,
+  pipSize,
+  pipUnit,
+  SCOPED_SESSIONS,
+  type ScopedSession,
+  type SessionWindow,
+  sweepThreshold,
+  symbolSupportsSessionLevels,
+} from "./sessions.ts";
 
 /**
  * Per-call context passed by edge-function entrypoints into the tool
@@ -137,12 +151,19 @@ export const scrapeUrlTool: GeminiFunctionDeclaration = {
  *                      forex/US-stocks/crypto. VWAP is intraday-only.
  * action="search"    — fuzzy name-to-ticker resolution via /symbol_search.
  *
+ * `action="history"` accepts `include_session_summary: true` to prepend an
+ * Asian/London/NY-AM/NY-PM H+L + sweep-state block (server-computed from a
+ * second 15-min fetch). Used for "did we sweep Asian high/low" liquidity
+ * questions. Forex / futures / indices / crypto only — single stocks
+ * silently skip the summary since session concepts don't apply to RTH-only
+ * tape.
+ *
  * Future actions reserved: "earnings" (earnings calendar).
  */
 export const getMarketDataTool: GeminiFunctionDeclaration = {
   name: "get_market_data",
   description:
-    `Universal market data. Pick ONE \`action\`: "quote" (current price + day stats), "history" (OHLC candles for past dates / today's shape), "indicator" (RSI/MACD/ATR/BBANDS/EMA/SMA/VWAP), "search" (resolve company name → ticker). See TIER 4 MARKET DATA REFERENCE in the system prompt for the symbol catalog, indicator defaults, asset-class coverage caveats, and chart rules. Tool dispatcher validates per-action required params server-side.`,
+    `Universal market data. Pick ONE \`action\`: "quote" (current price + day stats), "history" (OHLC candles for past dates / today's shape; opt-in include_session_summary for sweep-state on Asia/London/NY levels), "indicator" (RSI/MACD/ATR/BBANDS/EMA/SMA/VWAP), "search" (resolve company name → ticker). See TIER 4 MARKET DATA REFERENCE in the system prompt for the symbol catalog, indicator defaults, asset-class coverage caveats, and chart rules. Tool dispatcher validates per-action required params server-side.`,
   parameters: {
     type: "object",
     properties: {
@@ -192,6 +213,10 @@ export const getMarketDataTool: GeminiFunctionDeclaration = {
       chart_only: {
         type: "boolean",
         description: 'action="history". Skip OHLC dump, return chart only. Implies a chart. Use for "show me the chart" requests.',
+      },
+      include_session_summary: {
+        type: "boolean",
+        description: 'action="history". Prepend an Asian/London/NY-AM/NY-PM H+L + sweep-state block (server-computed). Set true for "did we sweep Asian high/low", "where did London top out", "Asia range", "is NY above London high", "liquidity grab" — the server returns each session\'s high/low and classifies whether subsequent price action SWEPT (pierced + closed back inside), BROKE (pierced + still beyond), or left it INTACT. Forex / indices / futures / crypto only; single-name stocks silently skip (RTH-only, no overnight tape). Default false.',
       },
     },
     required: ["action"],
@@ -1051,6 +1076,7 @@ export async function executeGetMarketHistory(args: {
   end_date?: string;
   chart_only?: boolean;
   include_chart?: boolean;
+  include_session_summary?: boolean;
 }): Promise<string> {
   const symbol = (args.symbol || "").trim();
   if (!symbol) return "Symbol is required.";
@@ -1172,10 +1198,514 @@ export async function executeGetMarketHistory(args: {
     return `${symbol} ${interval} — ${ordered.length} candles\nChart: ${chartUrl}`;
   }
 
+  // Opt-in session summary block — costs one extra 15-min fetch *per UTC
+  // day* in the history window. Silently skipped for single stocks. Capped
+  // so a 30-day query doesn't fan out into 30 API calls.
+  let sessionBlock = "";
+  if (args.include_session_summary) {
+    if (!symbolSupportsSessionLevels(symbol)) {
+      sessionBlock =
+        `(session summary skipped — "${symbol}" is RTH-only; ` +
+        `Asian/London sessions don't apply to single-name stocks)\n\n`;
+    } else {
+      sessionBlock = await buildMultiDaySessionBlock(symbol, {
+        start_date: args.start_date,
+        end_date: args.end_date,
+      });
+    }
+  }
+
   const header = `${symbol} ${interval} — ${ordered.length} candles:`;
   const lines = ordered.map((c) => `  ${formatCandleLine(c)}`).join("\n");
   const chartLine = chartUrl ? `\nChart: ${chartUrl}` : "";
-  return `${header}\n${lines}${truncatedNote}${chartLine}`;
+  return `${sessionBlock}${header}\n${lines}${truncatedNote}${chartLine}`;
+}
+
+// ============================================================================
+// get_market_data action="session_levels" — Asian / London / NY-AM / NY-PM
+// highs, lows, ranges + breach state (server-computed, deterministic).
+// ============================================================================
+
+/** Default interval for slicing session candles. 15-min strikes a sweet spot:
+ *  fine enough to locate the H/L candle, coarse enough that a full UTC day
+ *  fits in ~96 bars (well under MAX_CANDLES). */
+const SESSION_LEVELS_INTERVAL: CandleInterval = "15min";
+
+interface SessionLevels {
+  window: SessionWindow;
+  high: number;
+  low: number;
+  highAt: string;
+  lowAt: string;
+  /** Range in price units (high - low). */
+  rangePrice: number;
+  /** Range expressed in pips/points for display. */
+  rangeUnits: number;
+  /** Number of candles that fell inside this window. */
+  candleCount: number;
+}
+
+type BreachState = "intact" | "swept" | "broken";
+
+interface LevelBreach {
+  level: "high" | "low";
+  price: number;
+  state: BreachState;
+  /** Furthest price reached past the level within the breach window. */
+  extremePast: number | null;
+  /** Last close in the breach window — drives swept vs broken. */
+  lastClose: number | null;
+}
+
+/**
+ * Render numeric prices with a precision that matches the instrument.
+ * Forex non-JPY = 5dp, JPY = 3dp, DXY = 3dp, everything else = 2dp.
+ */
+function priceFormatter(symbol: string): (n: number) => string {
+  const s = symbol.trim().toUpperCase();
+  if (s.endsWith("=X")) {
+    const dp = /JPY/.test(s) ? 3 : 5;
+    return (n) => n.toFixed(dp);
+  }
+  if (s === "DX-Y.NYB") return (n) => n.toFixed(3);
+  return (n) => n.toFixed(2);
+}
+
+function formatUtcHm(dateStr: string): string {
+  // Twelve Data returns "YYYY-MM-DD HH:mm:ss". Yahoo's normalizer matches.
+  const t = dateStr.includes(" ") ? dateStr.split(" ")[1] : dateStr;
+  return t.slice(0, 5); // HH:mm
+}
+
+function candleTimeMs(c: Candle): number {
+  const iso = c.datetime.includes(" ")
+    ? c.datetime.replace(" ", "T") + "Z"
+    : c.datetime + "T00:00:00Z";
+  return Date.parse(iso);
+}
+
+function sliceCandlesInWindow(
+  candles: Candle[],
+  start: Date,
+  end: Date,
+): Candle[] {
+  const s = start.getTime();
+  const e = end.getTime();
+  return candles.filter((c) => {
+    const t = candleTimeMs(c);
+    return t >= s && t < e;
+  });
+}
+
+function computeLevels(
+  window: SessionWindow,
+  candles: Candle[],
+  symbol: string,
+): SessionLevels | null {
+  if (candles.length === 0) return null;
+  let high = candles[0].high;
+  let low = candles[0].low;
+  let highAt = candles[0].datetime;
+  let lowAt = candles[0].datetime;
+  for (const c of candles) {
+    if (c.high > high) {
+      high = c.high;
+      highAt = c.datetime;
+    }
+    if (c.low < low) {
+      low = c.low;
+      lowAt = c.datetime;
+    }
+  }
+  const rangePrice = high - low;
+  return {
+    window,
+    high,
+    low,
+    highAt,
+    lowAt,
+    rangePrice,
+    rangeUnits: rangePrice / pipSize(symbol),
+    candleCount: candles.length,
+  };
+}
+
+/**
+ * Classify breach state for one level against the candles that occurred
+ * AFTER the session closed.
+ *
+ *  intact  — price never breached the level by ≥ `threshold`.
+ *  swept   — price breached by ≥ `threshold` AND the last close is back
+ *            inside the level (above for low, below for high).
+ *  broken  — price breached and last close remains beyond the level.
+ */
+function classifyBreach(
+  level: "high" | "low",
+  price: number,
+  postCandles: Candle[],
+  threshold: number,
+): LevelBreach {
+  if (postCandles.length === 0) {
+    return { level, price, state: "intact", extremePast: null, lastClose: null };
+  }
+
+  let extreme: number | null = null;
+  for (const c of postCandles) {
+    if (level === "high") {
+      if (c.high > price + threshold) {
+        extreme = extreme === null ? c.high : Math.max(extreme, c.high);
+      }
+    } else {
+      if (c.low < price - threshold) {
+        extreme = extreme === null ? c.low : Math.min(extreme, c.low);
+      }
+    }
+  }
+
+  const lastClose = postCandles[postCandles.length - 1].close;
+
+  if (extreme === null) {
+    return { level, price, state: "intact", extremePast: null, lastClose };
+  }
+
+  const reclaimed = level === "high" ? lastClose <= price : lastClose >= price;
+  return {
+    level,
+    price,
+    state: reclaimed ? "swept" : "broken",
+    extremePast: extreme,
+    lastClose,
+  };
+}
+
+function formatLevelsLine(
+  levels: SessionLevels,
+  fmt: (n: number) => string,
+  unit: "p" | "pt",
+): string {
+  const { window, high, low, highAt, lowAt, rangeUnits, candleCount } = levels;
+  const startHm = window.start.toISOString().slice(11, 16);
+  const endHm = window.end.toISOString().slice(11, 16);
+  const progress = window.inProgress ? " (in progress)" : "";
+  const range = unit === "p"
+    ? `${rangeUnits.toFixed(1)}p`
+    : `${rangeUnits.toFixed(2)}pt`;
+  return (
+    `${window.session.padEnd(7)} [${startHm}→${endHm}${progress}] ` +
+    `H ${fmt(high)} @ ${formatUtcHm(highAt)}  ` +
+    `L ${fmt(low)} @ ${formatUtcHm(lowAt)}  ` +
+    `R ${range}  (${candleCount} bars)`
+  );
+}
+
+function formatBreachLine(
+  breach: LevelBreach,
+  fmt: (n: number) => string,
+  symbol: string,
+): string {
+  const arrow = breach.level === "high" ? "▲" : "▼";
+  const label = breach.level === "high" ? "H" : "L";
+  const unit = pipUnit(symbol);
+  const pip = pipSize(symbol);
+
+  if (breach.state === "intact") {
+    return `  ${arrow} ${label} ${fmt(breach.price)}: intact`;
+  }
+  const extreme = breach.extremePast!;
+  const dist = Math.abs(extreme - breach.price) / pip;
+  const distStr = unit === "p" ? `${dist.toFixed(1)}p` : `${dist.toFixed(2)}pt`;
+  if (breach.state === "swept") {
+    return (
+      `  ${arrow} ${label} ${fmt(breach.price)}: SWEPT — pierced to ${
+        fmt(extreme)
+      } (${distStr} past), closed back inside at ${fmt(breach.lastClose!)}`
+    );
+  }
+  return (
+    `  ${arrow} ${label} ${fmt(breach.price)}: BROKEN — through to ${
+      fmt(extreme)
+    } (${distStr} past), last close ${fmt(breach.lastClose!)}`
+  );
+}
+
+/**
+ * Breach scope for one completed session: the candles that fall inside the
+ * immediately-following session's window (clipped to `ref`). This replaces
+ * the prior "all candles since session.end" semantic, which produced 16+
+ * hour cumulative breach windows for sessions like yesterday's NY PM when
+ * queried mid-NY-AM the next day.
+ *
+ * Returns null when the next session hasn't started yet (e.g. NY PM just
+ * ended, Asia hasn't opened) AND we'd produce an empty scope — caller
+ * should skip the breach line for that session.
+ */
+interface BreachScope {
+  evaluatorSession: ScopedSession;
+  windowStart: Date;
+  windowEnd: Date;
+  evaluatorInProgress: boolean;
+}
+
+function computeBreachScope(
+  w: SessionWindow,
+  ref: Date,
+): BreachScope | null {
+  const nextWindow = getNextSessionWindow(w.session, w.end);
+  const refMs = ref.getTime();
+  if (nextWindow.start.getTime() >= refMs) {
+    // Next session hasn't started by ref — there's nothing to evaluate.
+    return null;
+  }
+  const windowEndMs = Math.min(nextWindow.end.getTime(), refMs);
+  return {
+    evaluatorSession: nextWindow.session,
+    windowStart: nextWindow.start,
+    windowEnd: new Date(windowEndMs),
+    evaluatorInProgress: windowEndMs < nextWindow.end.getTime(),
+  };
+}
+
+/** Cap on how many UTC days of session summary we'll fan out per history
+ *  call. Beyond ~5 the output becomes noise and the API spend isn't worth
+ *  it — long lookbacks should rely on the OHLC dump, not per-day sessions. */
+const MAX_SESSION_SUMMARY_DAYS = 5;
+
+/**
+ * Produce a session summary block aligned with the history window. One
+ * `executeGetSessionLevels` call per UTC day in [start_date, end_date],
+ * newest day first, capped at MAX_SESSION_SUMMARY_DAYS. Without a window
+ * the block covers just today.
+ *
+ * Ref-per-day: end-of-UTC-day for completed days (so all four sessions
+ * read as closed); `new Date()` for today (so the in-progress session
+ * shows partial H/L). Asia's midnight-wrap is handled by getSessionWindow
+ * inside the per-day call.
+ */
+async function buildMultiDaySessionBlock(
+  symbol: string,
+  args: { start_date?: string; end_date?: string },
+): Promise<string> {
+  const dayMs = 86_400_000;
+  const now = new Date();
+  const toUtcMidnight = (d: Date) =>
+    Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+
+  const parseDay = (s: string | undefined): Date | null => {
+    if (!s) return null;
+    const ms = Date.parse(s.includes(" ") ? s.replace(" ", "T") : s);
+    return Number.isNaN(ms) ? null : new Date(ms);
+  };
+
+  const endDay = parseDay(args.end_date) ?? now;
+  const startDay = parseDay(args.start_date) ?? endDay;
+  const startUtcMs = toUtcMidnight(startDay);
+  const endUtcMs = toUtcMidnight(endDay);
+  const todayUtcMs = toUtcMidnight(now);
+
+  const totalDays = Math.max(
+    1,
+    Math.floor((endUtcMs - startUtcMs) / dayMs) + 1,
+  );
+
+  // Iterate newest → oldest, cap to MAX_SESSION_SUMMARY_DAYS.
+  // Per-day ref must land in the *gap* between NY PM close and Asia open,
+  // so every session for that trading day reads as completed and Asia
+  // resolves to "Tue 22/23 — Wed 07/08" (preceding Wed's London) rather
+  // than the empty in-progress Asia that just started.
+  //
+  //   DST OFF (winter):  NY PM ends 22:00, Asia opens 23:00 → gap 22-23 UTC
+  //   DST ON  (summer):  NY PM ends 21:00, Asia opens 22:00 → gap 21-22 UTC
+  //
+  // No fixed UTC time covers both states — must branch on the queried
+  // day's DST flag. Pick mid-gap for safety against boundary inclusivity.
+  const refs: Date[] = [];
+  let cursor = endUtcMs;
+  while (cursor >= startUtcMs && refs.length < MAX_SESSION_SUMMARY_DAYS) {
+    if (cursor === todayUtcMs) {
+      refs.push(now);
+    } else if (cursor < todayUtcMs) {
+      const isDST = isDaylightSavingTime(new Date(cursor), "EU");
+      const hoursIntoDay = isDST ? 21.5 : 22.5;
+      refs.push(new Date(cursor + hoursIntoDay * 3_600_000));
+    }
+    // Skip future days — can't summarize sessions that haven't happened.
+    cursor -= dayMs;
+  }
+
+  if (refs.length === 0) return "";
+
+  const blocks = await Promise.all(
+    refs.map((ref) => executeGetSessionLevels({ symbol, ref })),
+  );
+
+  const truncationNote = totalDays > MAX_SESSION_SUMMARY_DAYS
+    ? `(showing session summary for last ${MAX_SESSION_SUMMARY_DAYS} of ` +
+      `${totalDays} UTC days in window)\n\n`
+    : "";
+
+  return `${truncationNote}${blocks.join("\n\n")}\n\n`;
+}
+
+export async function executeGetSessionLevels(args: {
+  symbol: string;
+  sessions?: string[];
+  ref?: Date; // injectable for tests
+}): Promise<string> {
+  const symbol = (args.symbol || "").trim();
+  if (!symbol) {
+    return `get_market_data action="session_levels" requires \`symbol\`.`;
+  }
+
+  // Reject single stocks — RTH-only tape makes Asian/London highs meaningless.
+  if (!symbolSupportsSessionLevels(symbol)) {
+    return (
+      `Session highs/lows don't apply to "${symbol}" — single-name stocks ` +
+      `only trade during US RTH (14:30–21:00 UTC), so there's no Asian or ` +
+      `London tape to slice. For overnight gap or pre-market range, call ` +
+      `action="history" with a custom start_date / end_date instead.`
+    );
+  }
+
+  const ref = args.ref ?? new Date();
+
+  // Validate requested sessions; default to all four. The dispatcher slices
+  // out any that yielded zero candles (e.g. weekend or market closed).
+  const requested = Array.isArray(args.sessions) && args.sessions.length > 0
+    ? args.sessions
+    : [...SCOPED_SESSIONS];
+  const sessions: ScopedSession[] = [];
+  for (const s of requested) {
+    if ((SCOPED_SESSIONS as readonly string[]).includes(s)) {
+      sessions.push(s as ScopedSession);
+    } else {
+      return (
+        `get_market_data action="session_levels": invalid session "${s}". ` +
+        `Valid: ${SCOPED_SESSIONS.join(", ")}.`
+      );
+    }
+  }
+
+  // Compute each session's UTC window relative to `ref`. We need candle
+  // data covering [earliest session start] → `ref` so we can also evaluate
+  // the breach state of each session against the activity that followed.
+  const windows = sessions.map((s) => getSessionWindow(s, ref));
+  const earliestStart = windows.reduce(
+    (acc, w) => (w.start.getTime() < acc.getTime() ? w.start : acc),
+    windows[0].start,
+  );
+
+  // Pad the fetch end forward to `ref` (so post-session breach windows are
+  // covered) and pull at 15min. Twelve Data accepts "YYYY-MM-DD HH:mm:ss".
+  const toApiDate = (d: Date) =>
+    d.toISOString().replace("T", " ").slice(0, 19);
+  const start_date = toApiDate(earliestStart);
+  const end_date = toApiDate(ref);
+
+  // CRITICAL: pass timezone="UTC" so candle datetimes are UTC-stamped.
+  // Without this Twelve Data defaults to the symbol's *exchange* timezone
+  // (e.g. ^GSPC → America/New_York), and our UTC-window slicer would
+  // assign every candle to the wrong session. Yahoo's fallback already
+  // emits UTC via `new Date(ts*1000).toISOString()`.
+  let candles: Candle[] | null = await fetchTimeSeries(symbol, {
+    interval: SESSION_LEVELS_INTERVAL,
+    startDate: start_date,
+    endDate: end_date,
+    timezone: "UTC",
+  });
+  let chronological = false;
+
+  if (candles === null) {
+    const period1 = Math.floor(earliestStart.getTime() / 1000);
+    const period2 = Math.floor(ref.getTime() / 1000);
+    candles = await fetchYahooTimeSeries(symbol, {
+      interval: SESSION_LEVELS_INTERVAL,
+      period1,
+      period2,
+    });
+    chronological = true;
+  }
+
+  if (candles === null) {
+    return (
+      `Could not fetch ${SESSION_LEVELS_INTERVAL} candles for "${symbol}" — ` +
+      `data source unavailable. Retry, or call action="quote" for current ` +
+      `price only.`
+    );
+  }
+  if (candles.length === 0) {
+    return (
+      `No ${SESSION_LEVELS_INTERVAL} data for ${symbol} from ${start_date} ` +
+      `to ${end_date} (UTC). Market likely closed (weekend / holiday). ` +
+      `Session levels need an open tape — try after the next session open.`
+    );
+  }
+
+  // Normalize chronological (oldest→newest) for windowed slicing.
+  const ordered = chronological ? candles : [...candles].reverse();
+
+  // Compute each window's levels. Drop windows that yielded zero candles
+  // (off-tape sessions like Asia on Saturday).
+  const levelsBySession = new Map<ScopedSession, SessionLevels>();
+  for (const w of windows) {
+    const slice = sliceCandlesInWindow(ordered, w.start, w.end);
+    const lvl = computeLevels(w, slice, symbol);
+    if (lvl) levelsBySession.set(w.session, lvl);
+  }
+
+  if (levelsBySession.size === 0) {
+    return (
+      `No candles fell inside the requested session windows for ${symbol} ` +
+      `(UTC ${start_date} → ${end_date}). Market likely closed.`
+    );
+  }
+
+  // For each completed session, classify how the next-in-cycle session
+  // treated its high/low. Scope is bounded by computeBreachScope below.
+  const fmt = priceFormatter(symbol);
+  const unit = pipUnit(symbol);
+  const threshold = sweepThreshold(symbol);
+
+  const levelLines: string[] = [];
+  for (const w of windows) {
+    const lvl = levelsBySession.get(w.session);
+    if (lvl) levelLines.push(formatLevelsLine(lvl, fmt, unit));
+  }
+
+  // Breach scope for each completed session = the immediately-following
+  // session's window (clipped to ref). Cap exists so yesterday's NY PM
+  // doesn't get evaluated against the entire 16h that followed; it gets
+  // evaluated against last night's Asia only.
+  const breachBlocks: string[] = [];
+  for (const w of windows) {
+    const lvl = levelsBySession.get(w.session);
+    if (!lvl || w.inProgress) continue;
+    const scope = computeBreachScope(w, ref);
+    if (!scope) continue;
+    const post = sliceCandlesInWindow(ordered, scope.windowStart, scope.windowEnd);
+    if (post.length === 0) continue;
+    const highBreach = classifyBreach("high", lvl.high, post, threshold);
+    const lowBreach = classifyBreach("low", lvl.low, post, threshold);
+    const evalStartHm = scope.windowStart.toISOString().slice(11, 16);
+    const evalEndHm = scope.windowEnd.toISOString().slice(11, 16);
+    const progress = scope.evaluatorInProgress ? " (in progress)" : "";
+    breachBlocks.push(
+      `vs ${w.session} levels (during ${scope.evaluatorSession} ` +
+        `[${evalStartHm}→${evalEndHm}${progress}], ${post.length} bars):\n` +
+        `${formatBreachLine(highBreach, fmt, symbol)}\n` +
+        `${formatBreachLine(lowBreach, fmt, symbol)}`,
+    );
+  }
+
+  const lastClose = ordered[ordered.length - 1].close;
+  const refIso = ref.toISOString().slice(0, 16) + "Z";
+  const dayLine = `Reference: ${refIso}  |  Last close: ${fmt(lastClose)}`;
+  const cls = classifyForSessions(symbol);
+  const classNote = cls === "single_stock" ? "" : ` (${cls})`;
+
+  return (
+    `${symbol}${classNote} — Session Levels\n${dayLine}\n` +
+    `${levelLines.join("\n")}\n\n${breachBlocks.join("\n\n")}`
+  ).trimEnd();
 }
 
 // ============================================================================
@@ -3285,6 +3815,7 @@ export async function executeCustomTool(
               typeof args.end_date === "string" ? args.end_date : undefined,
             chart_only: args.chart_only === true,
             include_chart: args.include_chart === true,
+            include_session_summary: args.include_session_summary === true,
           });
         }
         if (action === "indicator") {
