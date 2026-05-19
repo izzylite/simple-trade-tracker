@@ -8,17 +8,29 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  Cell
+  Cell,
 } from 'recharts';
-import { Box, Paper, Typography, useTheme, Button, alpha, Tooltip as MuiTooltip, CircularProgress } from '@mui/material';
-import { InfoOutlined } from '@mui/icons-material';
+import {
+  Box,
+  Paper,
+  Typography,
+  useTheme,
+  Button,
+  alpha,
+  Tooltip as MuiTooltip,
+  CircularProgress,
+} from '@mui/material';
+import { InfoOutlined, CalendarViewWeek } from '@mui/icons-material';
 
 import { Trade } from 'features/calendar/types/dualWrite';
 import { formatCurrency } from 'utils/formatters';
 import TagFilterDialog from 'features/calendar/components/TagFilterDialog';
 import { getTagDayOfWeekChartData } from 'features/performance/utils/chartDataUtils';
+import { EYEBROW_SX, getInsetSurface } from 'styles/designTokens';
+import CardShell from 'components/common/CardShell';
+import InfoStrip from 'components/common/InfoStrip';
 
-interface TagDayOfWeekAnalysisProps { 
+interface TagDayOfWeekAnalysisProps {
   trades: Trade[];
   selectedDate: Date;
   timePeriod: 'month' | 'quarter' | 'ytd' | 'year' | 'all';
@@ -30,9 +42,7 @@ interface TagDayOfWeekAnalysisProps {
   setMultipleTradesDialog: (dialogState: any) => void;
 }
 
-
-
-const TagDayOfWeekAnalysis: React.FC<TagDayOfWeekAnalysisProps> = ({ 
+const TagDayOfWeekAnalysis: React.FC<TagDayOfWeekAnalysisProps> = ({
   trades,
   selectedDate,
   timePeriod,
@@ -41,7 +51,7 @@ const TagDayOfWeekAnalysis: React.FC<TagDayOfWeekAnalysisProps> = ({
   secondaryTags,
   setPrimaryTags,
   setSecondaryTags,
-  setMultipleTradesDialog
+  setMultipleTradesDialog,
 }) => {
   const theme = useTheme();
   const [primaryTagsDialogOpen, setPrimaryTagsDialogOpen] = useState(false);
@@ -62,11 +72,12 @@ const TagDayOfWeekAnalysis: React.FC<TagDayOfWeekAnalysisProps> = ({
       setIsCalculating(true);
       try {
         // Filter trades client-side (needed for day-of-week grouping and click handlers)
-        const filteredTrades = trades.filter(trade => {
+        const filteredTrades = trades.filter((trade) => {
           // Check if trade has any primary tag
-          if (!trade.tags || !primaryTags.some(tag => trade.tags?.includes(tag))) return false;
+          if (!trade.tags || !primaryTags.some((tag) => trade.tags?.includes(tag))) return false;
           // Check if trade has all secondary tags
-          if (secondaryTags.length > 0 && !secondaryTags.every(tag => trade.tags?.includes(tag))) return false;
+          if (secondaryTags.length > 0 && !secondaryTags.every((tag) => trade.tags?.includes(tag)))
+            return false;
           return true;
         });
 
@@ -84,16 +95,38 @@ const TagDayOfWeekAnalysis: React.FC<TagDayOfWeekAnalysisProps> = ({
     calculateData();
   }, [trades, primaryTags, secondaryTags, selectedMetric, theme]);
 
+  // ── Tokens ──────────────────────────────────────────────────────────
+  const radius = theme.palette.custom.radius;
+  const hairline = theme.palette.divider;
+  const insetBg = getInsetSurface(theme);
+
   // Custom tooltip for the chart
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (
-        <Paper sx={{ p: 1.5, bgcolor: 'background.paper' }}>
-          <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+        <Paper
+          elevation={0}
+          sx={{
+            p: 1.25,
+            bgcolor: 'background.paper',
+            border: `1px solid ${hairline}`,
+            borderRadius: `${radius.md}px`,
+            boxShadow: 'none',
+          }}
+        >
+          <Typography
+            variant="body2"
+            sx={{
+              fontWeight: 600,
+              color: 'text.primary',
+              mb: 0.5,
+              letterSpacing: '-0.01em',
+            }}
+          >
             {data.fullDay}
           </Typography>
-          <Typography variant="body2">
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
             Total Trades: {data.total_trades}
           </Typography>
           <Typography variant="body2" sx={{ color: theme.palette.success.main }}>
@@ -102,10 +135,17 @@ const TagDayOfWeekAnalysis: React.FC<TagDayOfWeekAnalysisProps> = ({
           <Typography variant="body2" sx={{ color: theme.palette.error.main }}>
             Losses: {data.lossTrades}
           </Typography>
-          <Typography variant="body2">
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
             Win Rate: {data.win_rate.toFixed(1)}%
           </Typography>
-          <Typography variant="body2">
+          <Typography
+            variant="body2"
+            sx={{
+              color: data.pnl >= 0 ? theme.palette.success.main : theme.palette.error.main,
+              fontWeight: 600,
+              mt: 0.5,
+            }}
+          >
             P&L: {formatCurrency(data.pnl)}
           </Typography>
         </Paper>
@@ -114,152 +154,194 @@ const TagDayOfWeekAnalysis: React.FC<TagDayOfWeekAnalysisProps> = ({
     return null;
   };
 
-
+  // ── Header band right-slot controls ─────────────────────────────────
+  const headerRight = (
+    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+      <Button
+        variant={selectedMetric === 'winRate' ? 'contained' : 'outlined'}
+        size="small"
+        onClick={() => setSelectedMetric('winRate')}
+        sx={{
+          textTransform: 'none',
+          '&:focus-visible': { boxShadow: theme.palette.custom.focusRing },
+        }}
+      >
+        Win Rate
+      </Button>
+      <Button
+        variant={selectedMetric === 'pnl' ? 'contained' : 'outlined'}
+        size="small"
+        onClick={() => setSelectedMetric('pnl')}
+        sx={{
+          textTransform: 'none',
+          '&:focus-visible': { boxShadow: theme.palette.custom.focusRing },
+        }}
+      >
+        P&L
+      </Button>
+      <MuiTooltip
+        title="Select primary tags to filter trades that have ANY of these tags. These are your main strategies or setups to analyze."
+        arrow
+        placement="top"
+      >
+        <Button
+          variant="outlined"
+          size="small"
+          onClick={() => setPrimaryTagsDialogOpen(true)}
+          sx={{
+            textTransform: 'none',
+            borderColor: primaryTags.length > 0 ? 'primary.main' : undefined,
+            '&:focus-visible': { boxShadow: theme.palette.custom.focusRing },
+          }}
+        >
+          {primaryTags.length > 0 ? `Primary: ${primaryTags.length} tags` : 'Select Primary Tags'}
+        </Button>
+      </MuiTooltip>
+      <MuiTooltip
+        title="Select secondary tags to further filter trades that have ALL of these tags. Use this to analyze specific conditions within your primary strategies."
+        arrow
+        placement="top"
+      >
+        <Button
+          variant="outlined"
+          size="small"
+          onClick={() => setSecondaryTagsDialogOpen(true)}
+          color={secondaryTags.length > 0 ? 'secondary' : 'primary'}
+          sx={{
+            textTransform: 'none',
+            borderColor: secondaryTags.length > 0 ? 'secondary.main' : undefined,
+            '&:focus-visible': { boxShadow: theme.palette.custom.focusRing },
+          }}
+        >
+          {secondaryTags.length > 0 ? `Secondary: ${secondaryTags.length} tags` : 'Select Secondary Tags'}
+        </Button>
+      </MuiTooltip>
+      <TagFilterDialog
+        open={primaryTagsDialogOpen}
+        onClose={() => setPrimaryTagsDialogOpen(false)}
+        title="Select Primary Tags"
+        allTags={allTags}
+        selectedTags={primaryTags}
+        onTagsChange={(tags) => setPrimaryTags(tags)}
+        showApplyButton={true}
+        showClearButton={true}
+      />
+      <TagFilterDialog
+        open={secondaryTagsDialogOpen}
+        onClose={() => setSecondaryTagsDialogOpen(false)}
+        title="Select Secondary Tags"
+        allTags={allTags}
+        selectedTags={secondaryTags}
+        onTagsChange={(tags) => setSecondaryTags(tags)}
+        showApplyButton={true}
+        showClearButton={true}
+      />
+    </Box>
+  );
 
   return (
-    <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography variant="h6">Tag Performance by Day of Week</Typography>
-          <MuiTooltip
-            title="Analyze how selected tags perform on different days of the week. This helps identify which strategies work better on specific days."
-            arrow
-            placement="top"
-          >
-            <InfoOutlined sx={{ fontSize: 16, color: 'text.secondary', opacity: 0.7, cursor: 'help' }} />
-          </MuiTooltip>
-        </Box>
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button
-            variant={selectedMetric === 'winRate' ? 'contained' : 'outlined'}
-            size="small"
-            onClick={() => setSelectedMetric('winRate')}
-            sx={{ textTransform: 'none' }}
-          >
-            Win Rate
-          </Button>
-          <Button
-            variant={selectedMetric === 'pnl' ? 'contained' : 'outlined'}
-            size="small"
-            onClick={() => setSelectedMetric('pnl')}
-            sx={{ textTransform: 'none' }}
-          >
-            P&L
-          </Button>
-          <MuiTooltip
-            title="Select primary tags to filter trades that have ANY of these tags. These are your main strategies or setups to analyze."
-            arrow
-            placement="top"
-          >
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={() => setPrimaryTagsDialogOpen(true)}
-              sx={{ textTransform: 'none' }}
+    <CardShell
+      radius="lg"
+      head={{
+        icon: <CalendarViewWeek sx={{ fontSize: 16 }} />,
+        title: (
+          <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>
+            Tag Performance by Day of Week
+            <MuiTooltip
+              title="Analyze how selected tags perform on different days of the week. This helps identify which strategies work better on specific days."
+              arrow
+              placement="top"
             >
-              {primaryTags.length > 0 ? `Primary: ${primaryTags.length} tags` : 'Select Primary Tags'}
-            </Button>
-          </MuiTooltip>
-          <MuiTooltip
-            title="Select secondary tags to further filter trades that have ALL of these tags. Use this to analyze specific conditions within your primary strategies."
-            arrow
-            placement="top"
-          >
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={() => setSecondaryTagsDialogOpen(true)}
-              color={secondaryTags.length > 0 ? "secondary" : "primary"}
-              sx={{
-                textTransform: 'none',
-                borderColor: secondaryTags.length > 0 ? 'secondary.main' : undefined
-              }}
-            >
-              {secondaryTags.length > 0 ? `Secondary: ${secondaryTags.length} tags` : 'Select Secondary Tags'}
-            </Button>
-          </MuiTooltip>
-          <TagFilterDialog
-            open={primaryTagsDialogOpen}
-            onClose={() => setPrimaryTagsDialogOpen(false)}
-            title="Select Primary Tags"
-            allTags={allTags}
-            selectedTags={primaryTags}
-            onTagsChange={(tags) => setPrimaryTags(tags)}
-            showApplyButton={true}
-            showClearButton={true}
-          />
-          <TagFilterDialog
-            open={secondaryTagsDialogOpen}
-            onClose={() => setSecondaryTagsDialogOpen(false)}
-            title="Select Secondary Tags"
-            allTags={allTags}
-            selectedTags={secondaryTags}
-            onTagsChange={(tags) => setSecondaryTags(tags)}
-            showApplyButton={true}
-            showClearButton={true}
-          />
-        </Box>
-      </Box> 
+              <InfoOutlined sx={{ fontSize: 14, color: 'text.secondary', opacity: 0.7, cursor: 'help' }} />
+            </MuiTooltip>
+          </Box>
+        ),
+        right: headerRight,
+      }}
+    >
       {primaryTags.length === 0 ? (
-        <Box sx={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          height: 200,
-          bgcolor: alpha(theme.palette.background.paper, 0.4),
-          borderRadius: 2,
-          p: 3
-        }}>
-          <Typography variant="h6" color="text.secondary" sx={{ mb: 1 }}>
-            No Tags Selected
-          </Typography>
-          <Typography variant="body2" color="text.secondary" align="center">
-            Please select primary tags to view day of week performance analysis.
-          </Typography>
+        <Box sx={{ p: 2 }}>
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              textAlign: 'center',
+              gap: 0.75,
+              p: 3,
+              borderRadius: '10px',
+              bgcolor: insetBg,
+              border: `1px solid ${hairline}`,
+            }}
+          >
+            <Typography sx={EYEBROW_SX}>No tags selected</Typography>
+            <Typography variant="body2" sx={{ color: 'text.secondary', maxWidth: 360 }}>
+              Select primary tags to view day-of-week performance analysis.
+            </Typography>
+          </Box>
         </Box>
       ) : isCalculating ? (
-        <Box sx={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          height: 300,
-          bgcolor: alpha(theme.palette.background.paper, 0.4),
-          borderRadius: 2,
-          p: 3
-        }}>
-          <CircularProgress size={40} sx={{ mb: 2 }} />
-          <Typography variant="body2" color="text.secondary">
-            Calculating day of week performance...
-          </Typography>
+        <Box sx={{ p: 2 }}>
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 1.25,
+              py: 6,
+              borderRadius: '10px',
+              bgcolor: insetBg,
+              border: `1px solid ${hairline}`,
+            }}
+          >
+            <CircularProgress size={28} />
+            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+              Calculating day of week performance…
+            </Typography>
+          </Box>
         </Box>
       ) : (
-        <>
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.6 }}>
-              This chart shows how your selected trading strategies (tags) perform on different days of the week.
-              {selectedMetric === 'winRate'
-                ? ' Higher bars indicate better win rates on those days. '
-                : ' Higher bars indicate better profitability on those days. '}
-              Click on any bar to see the specific trades for that day.
-            </Typography>
-            {chartData.some(data => data.total_trades > 0) ? (
-              <Typography variant="body2" color="primary" sx={{ mt: 1, fontWeight: 500 }}>
+        <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {/* Info strip — hairline + violet tint, not a loud MUI Alert */}
+          <InfoStrip tone="violet">
+            <Box sx={{ minWidth: 0 }}>
+              <Typography variant="body2" sx={{ color: 'text.secondary', lineHeight: 1.5 }}>
+                This chart shows how your selected trading strategies (tags) perform on different
+                days of the week.
                 {selectedMetric === 'winRate'
-                  ? `Best day for selected strategies: ${chartData.reduce((best, day) => day.total_trades > 0 && day.win_rate > best.win_rate ? day : best, { win_rate: 0, fullDay: 'None' }).fullDay}`
-                  : `Most profitable day: ${chartData.reduce((best, day) => day.total_trades > 0 && day.pnl > best.pnl ? day : best, { pnl: -Infinity, fullDay: 'None' }).fullDay}`
-                }
+                  ? ' Higher bars indicate better win rates on those days. '
+                  : ' Higher bars indicate better profitability on those days. '}
+                Click on any bar to see the specific trades for that day.
               </Typography>
-            ) : null}
-          </Box>
+              {chartData.some((data) => data.total_trades > 0) ? (
+                <Typography
+                  variant="body2"
+                  sx={{ mt: 0.75, fontWeight: 600, color: 'primary.main' }}
+                >
+                  {selectedMetric === 'winRate'
+                    ? `Best day for selected strategies: ${chartData.reduce(
+                        (best, day) =>
+                          day.total_trades > 0 && day.win_rate > best.win_rate ? day : best,
+                        { win_rate: 0, fullDay: 'None' },
+                      ).fullDay}`
+                    : `Most profitable day: ${chartData.reduce(
+                        (best, day) => (day.total_trades > 0 && day.pnl > best.pnl ? day : best),
+                        { pnl: -Infinity, fullDay: 'None' },
+                      ).fullDay}`}
+                </Typography>
+              ) : null}
+            </Box>
+          </InfoStrip>
+
           <ResponsiveContainer width="100%" height={300}>
             <BarChart
               data={chartData}
               margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
               maxBarSize={50}
             >
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={hairline} />
               <XAxis
                 dataKey="day"
                 axisLine={false}
@@ -271,11 +353,16 @@ const TagDayOfWeekAnalysis: React.FC<TagDayOfWeekAnalysisProps> = ({
                 tickLine={false}
                 tick={{ fill: theme.palette.text.secondary, fontSize: 12 }}
                 domain={selectedMetric === 'winRate' ? [0, 100] : ['auto', 'auto']}
-                tickFormatter={selectedMetric === 'winRate'
-                  ? (value) => `${value}%`
-                  : (value) => formatCurrency(value).replace('$', '')}
+                tickFormatter={
+                  selectedMetric === 'winRate'
+                    ? (value) => `${value}%`
+                    : (value) => formatCurrency(value).replace('$', '')
+                }
               />
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip
+                content={<CustomTooltip />}
+                cursor={{ fill: alpha(theme.palette.primary.main, 0.06) }}
+              />
               <Legend />
               <Bar
                 dataKey="value"
@@ -289,9 +376,9 @@ const TagDayOfWeekAnalysis: React.FC<TagDayOfWeekAnalysisProps> = ({
                       setMultipleTradesDialog({
                         open: true,
                         trades: dayTrades,
-                        showChartInfo:false,
+                        showChartInfo: false,
                         date: `${selectedMetric === 'winRate' ? 'Win Rate' : 'P&L'} for ${data.payload.fullDay}`,
-                        expandedTradeId: dayTrades.length === 1 ? dayTrades[0].id : null
+                        expandedTradeId: dayTrades.length === 1 ? dayTrades[0].id : null,
                       });
                     }
                   }
@@ -304,11 +391,10 @@ const TagDayOfWeekAnalysis: React.FC<TagDayOfWeekAnalysisProps> = ({
               </Bar>
             </BarChart>
           </ResponsiveContainer>
-        </>
-      )} 
-    </Box>
+        </Box>
+      )}
+    </CardShell>
   );
 };
- 
 
 export default TagDayOfWeekAnalysis;

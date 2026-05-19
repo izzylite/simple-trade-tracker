@@ -14,23 +14,6 @@ import {
   Theme,
 } from '@mui/material';
 import {
-  pink,
-  purple,
-  deepPurple,
-  indigo,
-  lightBlue,
-  cyan,
-  teal,
-  lightGreen,
-  lime,
-  yellow,
-  amber,
-  deepOrange,
-  brown,
-  grey,
-  blueGrey,
-} from '@mui/material/colors';
-import {
   Close as CloseIcon,
   ChevronLeft as ChevronLeftIcon,
   ChevronRight as ChevronRightIcon,
@@ -40,6 +23,7 @@ import {
 import { Note } from 'features/notes/types/note';
 import { Z_INDEX } from 'styles/zIndex';
 import { scrollbarStyles } from 'styles/scrollbarStyles';
+import { EYEBROW_SX } from 'styles/designTokens';
 import RichTextEditor from 'components/common/RichTextEditor';
 import NoteEditorDialog from 'features/notes/components/NoteEditorDialog';
 import { getSharedTrade } from 'features/calendar/services/sharingService';
@@ -66,28 +50,65 @@ interface NotesBottomSheetProps {
   }>;
 }
 
-// Color mapping
-const getColorMap = (theme: Theme): Record<string, string> => ({
-  'red': theme.palette.error.main,
-  'pink': pink[500],
-  'purple': purple[500],
-  'deepPurple': deepPurple[500],
-  'indigo': indigo[500],
-  'blue': theme.palette.info.main,
-  'lightBlue': lightBlue[500],
-  'cyan': cyan[500],
-  'teal': teal[500],
-  'green': theme.palette.success.main,
-  'lightGreen': lightGreen[500],
-  'lime': lime[500],
-  'yellow': yellow[600],
-  'amber': amber[500],
-  'orange': theme.palette.warning.main,
-  'deepOrange': deepOrange[500],
-  'brown': brown[500],
-  'grey': grey[500],
-  'blueGrey': blueGrey[500],
-});
+// ── Tone resolver ─────────────────────────────────────────────────────────
+// Map the 18-color picker palette down to 4 semantic tones, then resolve to
+// theme tokens. Keeps the per-color banner identity (red=Friday, etc.) but
+// routes the actual colors through the theme so dark/light mode stay aligned.
+type ReminderTone = 'violet' | 'success' | 'error' | 'warning' | 'neutral';
+
+const noteColorToTone = (color?: string): ReminderTone => {
+  switch (color) {
+    case 'red':
+    case 'pink':
+      return 'error';
+    case 'orange':
+    case 'deepOrange':
+    case 'amber':
+    case 'yellow':
+      return 'warning';
+    case 'green':
+    case 'lightGreen':
+    case 'lime':
+    case 'teal':
+      return 'success';
+    case 'grey':
+    case 'blueGrey':
+    case 'brown':
+    case 'blue':
+    case 'lightBlue':
+    case 'cyan':
+    case 'indigo':
+      return 'neutral';
+    case 'purple':
+    case 'deepPurple':
+    default:
+      return 'violet';
+  }
+};
+
+const getReminderTone = (theme: Theme, tone: ReminderTone) => {
+  const accent =
+    tone === 'success'
+      ? theme.palette.success.main
+      : tone === 'error'
+        ? theme.palette.error.main
+        : tone === 'warning'
+          ? theme.palette.warning.main
+          : tone === 'neutral'
+            ? theme.palette.text.secondary
+            : theme.palette.primary.main;
+  return {
+    accent,
+    bg:
+      tone === 'violet'
+        ? theme.palette.custom.tintViolet.soft
+        : alpha(accent, 0.1),
+    border:
+      tone === 'violet'
+        ? alpha(theme.palette.primary.main, 0.15)
+        : alpha(accent, 0.2),
+  };
+};
 
 const NotesBottomSheet: React.FC<NotesBottomSheetProps> = ({
   open,
@@ -102,8 +123,8 @@ const NotesBottomSheet: React.FC<NotesBottomSheetProps> = ({
   pinnedEvents,
 }) => {
   const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
-  const colorMap = getColorMap(theme);
+  const radius = theme.palette.custom.radius;
+  const easing = theme.palette.custom.easing.smooth;
 
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [editorOpen, setEditorOpen] = useState(false);
@@ -137,7 +158,7 @@ const NotesBottomSheet: React.FC<NotesBottomSheetProps> = ({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         onClose();
-      } 
+      }
       // else if (e.key === 'ArrowLeft') {
       //   handlePrevious();
       // } else if (e.key === 'ArrowRight') {
@@ -202,9 +223,19 @@ const NotesBottomSheet: React.FC<NotesBottomSheetProps> = ({
   const currentNote = notes[currentIndex];
   const hasMultipleNotes = notes.length > 1;
 
-  const baseColor = currentNote?.color
-    ? colorMap[currentNote.color] || theme.palette.info.main
-    : theme.palette.info.main;
+  const tone = getReminderTone(theme, noteColorToTone(currentNote?.color));
+
+  // Shared icon-button sx for header actions (close, edit, nav)
+  const headerBtnSx = {
+    width: 30,
+    height: 30,
+    borderRadius: `${radius.md}px`,
+    color: 'text.secondary',
+    '&:hover': {
+      color: 'text.primary',
+      bgcolor: theme.palette.action.hover,
+    },
+  } as const;
 
   return (
     <>
@@ -222,7 +253,7 @@ const NotesBottomSheet: React.FC<NotesBottomSheetProps> = ({
           zIndex: Z_INDEX.AI_DRAWER_BACKDROP,
           opacity: open ? 1 : 0,
           pointerEvents: open ? 'auto' : 'none',
-          transition: 'opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          transition: `opacity 240ms ${easing}`,
           cursor: 'pointer',
         }}
       />
@@ -239,17 +270,13 @@ const NotesBottomSheet: React.FC<NotesBottomSheetProps> = ({
           maxHeight: '85vh',
           width: '100%',
           maxWidth: { xs: '100%', sm: '420px' },
-          borderTopLeftRadius: 20,
-          borderTopRightRadius: 20,
-          background: isDark
-            ? 'linear-gradient(135deg, rgba(18, 18, 18, 1) 0%, rgba(30, 30, 30, 1) 100%)'
-            : 'linear-gradient(135deg, rgba(255, 255, 255, 1) 0%, rgba(248, 250, 252, 1) 100%)',
-          boxShadow: isDark
-            ? '0 -8px 32px rgba(0, 0, 0, 0.6)'
-            : '0 -8px 32px rgba(0, 0, 0, 0.15)',
-          border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+          borderTopLeftRadius: `${radius.xl}px`,
+          borderTopRightRadius: `${radius.xl}px`,
+          bgcolor: 'background.paper',
+          boxShadow: theme.shadows[8],
+          border: `1px solid ${theme.palette.divider}`,
           borderBottom: 'none',
-          transition: 'height 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          transition: `height 240ms ${easing}, transform 240ms ${easing}`,
           transform: open ? 'translateY(0)' : 'translateY(100%)',
           overflow: 'hidden',
           pointerEvents: open ? 'auto' : 'none',
@@ -263,40 +290,41 @@ const NotesBottomSheet: React.FC<NotesBottomSheetProps> = ({
             overflow: 'hidden',
           }}
         >
-          {/* Header */}
+          {/* Header — tone-tinted band with eyebrow title + action buttons */}
           <Box
             sx={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              p: 2,
-              pb: 1.5,
-              borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-              background: alpha(baseColor, isDark ? 0.1 : 0.15), 
+              gap: 1,
+              px: 2,
+              py: 1.5,
+              borderBottom: `1px solid ${theme.palette.divider}`,
+              bgcolor: tone.bg,
             }}
           >
             {/* Left side - Icon and Title */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <EventNoteIcon sx={{ fontSize: '1.25rem', color: baseColor }} />
-              <Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, minWidth: 0 }}>
+              <EventNoteIcon sx={{ fontSize: 18, color: tone.accent, flexShrink: 0 }} />
+              <Box sx={{ minWidth: 0 }}>
                 <Typography
-                  variant="subtitle2"
                   sx={{
-                    fontSize: '0.875rem',
-                    color: baseColor,
-                    fontWeight: 600,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px',
+                    ...EYEBROW_SX,
+                    color: tone.accent,
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
                   }}
                 >
                   {fullDayName} Reminder
                 </Typography>
                 {hasMultipleNotes && (
                   <Typography
-                    variant="caption"
                     sx={{
-                      color: 'text.secondary',
-                      fontSize: '0.75rem',
+                      mt: 0.25,
+                      fontSize: '0.7rem',
+                      color: 'text.tertiary',
+                      fontFeatureSettings: "'tnum' on, 'lnum' on",
                     }}
                   >
                     {currentIndex + 1} of {notes.length}
@@ -307,46 +335,43 @@ const NotesBottomSheet: React.FC<NotesBottomSheetProps> = ({
 
             {/* Right side - Actions */}
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              {/* Navigation buttons */}
               {hasMultipleNotes && (
                 <>
                   <IconButton
                     size="small"
                     onClick={handlePrevious}
-                    sx={{ color: baseColor }}
+                    sx={headerBtnSx}
                     title="Previous (←)"
                   >
-                    <ChevronLeftIcon />
+                    <ChevronLeftIcon sx={{ fontSize: 18 }} />
                   </IconButton>
                   <IconButton
                     size="small"
                     onClick={handleNext}
-                    sx={{ color: baseColor }}
+                    sx={headerBtnSx}
                     title="Next (→)"
                   >
-                    <ChevronRightIcon />
+                    <ChevronRightIcon sx={{ fontSize: 18 }} />
                   </IconButton>
                 </>
               )}
 
-              {/* Edit button */}
               <IconButton
                 size="small"
                 onClick={handleEditNote}
-                sx={{ color: 'text.secondary' }}
+                sx={headerBtnSx}
                 title="Edit note"
               >
-                <EditIcon fontSize="small" />
+                <EditIcon sx={{ fontSize: 16 }} />
               </IconButton>
 
-              {/* Close button */}
               <IconButton
                 size="small"
                 onClick={onClose}
-                sx={{ color: 'text.secondary' }}
+                sx={headerBtnSx}
                 title="Close (Esc)"
               >
-                <CloseIcon fontSize="small" />
+                <CloseIcon sx={{ fontSize: 16 }} />
               </IconButton>
             </Box>
           </Box>
@@ -378,12 +403,13 @@ const NotesBottomSheet: React.FC<NotesBottomSheetProps> = ({
 
                 {/* Text Content */}
                 <Box sx={{ p: 2 }}>
-                  {/* Note Title */}
+                  {/* Note Title — canonical title type role */}
                   {currentNote.title && currentNote.title.trim() !== '' && (
                     <Typography
-                      variant="h6"
                       sx={{
+                        fontSize: '1.125rem',
                         fontWeight: 600,
+                        letterSpacing: '-0.015em',
                         color: 'text.primary',
                         mb: 2,
                       }}

@@ -18,13 +18,14 @@ import {
   Snackbar,
   Alert,
   Fade,
-  LinearProgress,
   Badge,
   Menu,
   MenuItem,
   ListItemIcon,
   ListItemText,
 } from '@mui/material';
+import { EYEBROW_SX, TNUM, MONO_FONT } from 'styles/designTokens';
+import CompareBar from 'components/common/CompareBar';
 import {
   ChevronLeft,
   ChevronRight,
@@ -211,28 +212,21 @@ const WeeklyPnL: React.FC<WeeklyPnLProps> = React.memo(({
         <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'info.light' }}>
           Weekly Target
         </Typography>
-        <Typography variant="caption" sx={{ fontWeight: 700, color: 'white' }}>
+        <Typography variant="caption" sx={{ fontFamily: MONO_FONT, fontFeatureSettings: TNUM, fontWeight: 700, color: 'white' }}>
           {weeklyTarget}% (${weeklyTargetAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })})
         </Typography>
       </Box>
 
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
         <Box sx={{ flex: 1 }}>
-          <LinearProgress
-            variant="determinate"
+          <CompareBar
             value={cappedProgress}
-            sx={{
-              height: 6,
-              borderRadius: 3,
-              bgcolor: alpha(theme.palette.common.white, 0.1),
-              '& .MuiLinearProgress-bar': {
-                borderRadius: 3,
-                bgcolor: isTargetMet ? 'success.light' : 'info.main'
-              }
-            }}
+            pct
+            color={isTargetMet ? theme.palette.success.light : theme.palette.info.main}
+            height={6}
           />
         </Box>
-        <Typography variant="caption" sx={{ fontWeight: 700, color: isTargetMet ? 'success.light' : 'info.light' }}>
+        <Typography variant="caption" sx={{ fontFamily: MONO_FONT, fontWeight: 700, color: isTargetMet ? 'success.light' : 'info.light', fontFeatureSettings: TNUM }}>
           {targetProgress}%
         </Typography>
       </Box>
@@ -241,7 +235,7 @@ const WeeklyPnL: React.FC<WeeklyPnLProps> = React.memo(({
         <Typography variant="caption" sx={{ color: 'text.secondary' }}>
           Remaining:
         </Typography>
-        <Typography variant="caption" sx={{ fontWeight: 600, color: 'white' }}>
+        <Typography variant="caption" sx={{ fontFamily: MONO_FONT, fontFeatureSettings: TNUM, fontWeight: 600, color: 'white' }}>
           ${remainingAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </Typography>
       </Box>
@@ -290,6 +284,8 @@ const WeeklyPnL: React.FC<WeeklyPnLProps> = React.memo(({
         <Typography
           variant="h6"
           sx={{
+            fontFamily: MONO_FONT,
+            fontFeatureSettings: TNUM,
             fontWeight: 700,
             color: netAmount > 0 ? 'success.main' : netAmount < 0 ? 'error.main' : 'text.primary',
             fontSize: { xs: '0.9rem', md: '1rem' },
@@ -303,6 +299,8 @@ const WeeklyPnL: React.FC<WeeklyPnLProps> = React.memo(({
           <Typography
             variant="body2"
             sx={{
+              fontFamily: MONO_FONT,
+              fontFeatureSettings: TNUM,
               color: netAmount > 0 ? 'success.main' : netAmount < 0 ? 'error.main' : 'text.secondary',
               fontSize: '0.8rem',
               fontWeight: 600,
@@ -324,6 +322,8 @@ const WeeklyPnL: React.FC<WeeklyPnLProps> = React.memo(({
         <Typography
           variant="caption"
           sx={{
+            fontFamily: MONO_FONT,
+            fontFeatureSettings: TNUM,
             fontSize: '0.75rem',
             textAlign: 'center',
             color: 'text.secondary',
@@ -364,45 +364,41 @@ const TagFilter = React.memo<TagFilterProps>(({ allTags, selectedTags, onTagsCha
     onTagsChange([]);
   };
 
+  // Active when the search/tags panel is open OR tags are currently filtering trades.
+  const isPillActive = isActive || selectedTags.length > 0;
+  const radiusMd = `${theme.palette.custom.radius.md}px`;
+
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.5, sm: 1 }, flex: { xs: 1, sm: 'none' } }}>
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
       <Tooltip title="Filter by tags" arrow>
         <Button
-          variant={selectedTags.length > 0 ? "contained" : "outlined"}
+          variant="outlined"
           size="small"
-          startIcon={<FilterAlt sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />}
+          startIcon={<FilterAlt sx={{ fontSize: 16 }} />}
           onClick={onOpenDrawer}
           sx={{
-            flex: 1,
-            minWidth: { xs: 'auto', sm: '120px' },
-            borderRadius: 2,
-            fontWeight: 600,
             textTransform: 'none',
-            fontSize: { xs: '0.8125rem', sm: '0.875rem' },
-            py: { xs: 0.75, sm: 1 },
-            px: { xs: 1.5, sm: 2 },
-            ...(selectedTags.length > 0 ? {
-              bgcolor: alpha(theme.palette.info.main, 0.9),
-              color: 'white',
-              boxShadow: `0 4px 12px ${alpha(theme.palette.info.main, 0.3)}`,
-              '&:hover': {
-                bgcolor: theme.palette.info.main,
-                boxShadow: `0 6px 16px ${alpha(theme.palette.info.main, 0.4)}`
-              }
-            } : {
-              borderColor: isActive ? 'info.main' : alpha(theme.palette.text.secondary, 0.3),
-              color: isActive ? 'info.main' : 'text.secondary',
-              bgcolor: isActive ? alpha(theme.palette.info.main, 0.1) : 'transparent',
-              '&:hover': {
-                borderColor: 'info.main',
-                bgcolor: alpha(theme.palette.info.main, 0.1),
-                color: 'info.main'
-              }
-            }),
-            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+            fontWeight: 600,
+            fontSize: '0.8125rem',
+            borderRadius: radiusMd,
+            py: 0.625,
+            px: 1.5,
+            minWidth: 0,
+            borderColor: isPillActive ? theme.palette.primary.main : theme.palette.divider,
+            color: isPillActive ? 'primary.main' : 'text.secondary',
+            bgcolor: isPillActive ? alpha(theme.palette.primary.main, 0.08) : 'transparent',
+            boxShadow: 'none',
+            '&:hover': {
+              borderColor: isPillActive ? 'primary.dark' : 'text.primary',
+              bgcolor: isPillActive
+                ? alpha(theme.palette.primary.main, 0.12)
+                : theme.palette.action.hover,
+            },
           }}
         >
-          {selectedTags.length > 0 ? `${formatCount(selectedTags.length)} tag${selectedTags.length > 1 ? 's' : ''}` : 'Filter'}
+          {selectedTags.length > 0
+            ? `${formatCount(selectedTags.length)} tag${selectedTags.length > 1 ? 's' : ''}`
+            : 'Filter'}
         </Button>
       </Tooltip>
 
@@ -412,17 +408,19 @@ const TagFilter = React.memo<TagFilterProps>(({ allTags, selectedTags, onTagsCha
             size="small"
             onClick={handleClearTags}
             sx={{
-              bgcolor: alpha(theme.palette.error.main, 0.1),
+              width: 32,
+              height: 32,
+              borderRadius: radiusMd,
               color: 'error.main',
-              borderRadius: 2,
-              p: { xs: 0.5, sm: 0.75 },
+              border: `1px solid ${theme.palette.divider}`,
+              bgcolor: 'background.paper',
               '&:hover': {
-                bgcolor: alpha(theme.palette.error.main, 0.2)
+                borderColor: alpha(theme.palette.error.main, 0.4),
+                bgcolor: alpha(theme.palette.error.main, 0.08),
               },
-              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
             }}
           >
-            <Clear sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />
+            <Clear sx={{ fontSize: 16 }} />
           </IconButton>
         </Tooltip>
       )}
@@ -1740,275 +1738,166 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
           position: 'relative'
         }}>
 
-          {/* Calendar Navigation Header */}
-          <Box sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            mb: { xs: 1.5, sm: 2, md: 3 },
-            flexDirection: { xs: 'column', lg: 'row' },
-            gap: { xs: 1.5, sm: 2, lg: 1 }
-          }}>
-            {/* Month Navigation with Enhanced Styling */}
-            <Box
-              data-testid="month-nav-section"
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: { xs: 1, sm: 1.5, md: 2 },
-                order: { xs: 1, lg: 0 }
-              }}
-            >
-              <IconButton
-                onClick={handlePrevMonth}
-                size="small"
+          {/* Calendar Navigation Header — PerformanceHeader-style hero:
+              eyebrow + display title (clickable month picker) flanked by
+              prev/next chevrons, with the action pill cluster on the right.
+              See `features/performance/components/PerformanceHeader.tsx`. */}
+          {(() => {
+            const isNotesActive = isLgUp
+              ? isPanelOpen && currentView.id === 'notes'
+              : isNotesDrawerOpen;
+            const isEventsActive = isLgUp
+              ? isPanelOpen && currentView.id === 'economic-calendar'
+              : isEconomicCalendarOpen;
+            const isTagsActive = isLgUp
+              ? isPanelOpen && currentView.id === 'tags'
+              : isTagManagementDrawerOpen;
+
+            const pillSx = (active: boolean) => ({
+              textTransform: 'none' as const,
+              fontWeight: 600,
+              fontSize: '0.8125rem',
+              borderRadius: `${theme.palette.custom.radius.md}px`,
+              py: 0.625,
+              px: 1.5,
+              minWidth: 0,
+              borderColor: active
+                ? theme.palette.primary.main
+                : theme.palette.divider,
+              color: active ? 'primary.main' : 'text.secondary',
+              bgcolor: active
+                ? alpha(theme.palette.primary.main, 0.08)
+                : 'transparent',
+              boxShadow: 'none',
+              '&:hover': {
+                borderColor: active ? 'primary.dark' : 'text.primary',
+                bgcolor: active
+                  ? alpha(theme.palette.primary.main, 0.12)
+                  : theme.palette.action.hover,
+              },
+            });
+
+            const chevronBtnSx = {
+              width: 32,
+              height: 32,
+              borderRadius: `${theme.palette.custom.radius.md}px`,
+              color: 'text.secondary',
+              border: `1px solid ${theme.palette.divider}`,
+              bgcolor: 'background.paper',
+              '&:hover': {
+                color: 'primary.main',
+                borderColor: alpha(theme.palette.primary.main, 0.4),
+                bgcolor: alpha(theme.palette.primary.main, 0.06),
+              },
+            };
+
+            return (
+              <Box
+                data-testid="month-nav-section"
                 sx={{
-                  bgcolor: alpha(theme.palette.primary.main, 0.1),
-                  color: 'primary.main',
-                  p: { xs: 0.75, sm: 1 },
-                  '&:hover': {
-                    bgcolor: alpha(theme.palette.primary.main, 0.2),
-                    transform: 'scale(1.05)'
-                  },
-                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+                  display: 'flex',
+                  alignItems: 'flex-end',
+                  justifyContent: 'space-between',
+                  gap: 2,
+                  flexWrap: 'wrap',
+                  mb: { xs: 1.5, sm: 2, md: 3 },
                 }}
               >
-                <ChevronLeft sx={{ fontSize: { xs: '1.25rem', sm: '1.5rem' } }} />
-              </IconButton>
+               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, mt: '6px' }}>
+                    <IconButton onClick={handlePrevMonth} size="small" sx={chevronBtnSx} aria-label="Previous month">
+                      <ChevronLeft sx={{ fontSize: 18 }} />
+                    </IconButton>
+                    <Typography
+                      component="h1"
+                      onClick={handleMonthClick}
+                      sx={{
+                        cursor: 'pointer',
+                        fontWeight: 700,
+                        fontSize: { xs: '1.5rem', sm: '1.65rem', md: '1.85rem' },
+                        letterSpacing: '-0.025em',
+                        color: 'text.primary',
+                        mb: 0,
+                        lineHeight: 1.15,
+                        fontFeatureSettings: TNUM,
+                        transition: 'color 160ms ease',
+                        '&:hover': { color: 'primary.main' },
+                      }}
+                    >
+                      {format(currentDate, 'MMMM yyyy')}
+                    </Typography>
+                    <IconButton onClick={handleNextMonth} size="small" sx={chevronBtnSx} aria-label="Next month">
+                      <ChevronRight sx={{ fontSize: 18 }} />
+                    </IconButton>
+                  </Box>
 
-              <Typography
-                variant="h4"
-                sx={{
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  minWidth: { xs: '180px', sm: '220px', md: '250px' },
-                  textAlign: 'center',
-                  fontSize: { xs: '1.25rem', sm: '1.5rem', md: '1.8rem', lg: '2rem' },
-                  letterSpacing: '-0.5px',
-                  color: 'text.primary',
-                  background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
-                  backgroundClip: 'text',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  '&:hover': {
-                    transform: 'scale(1.02)',
-                    filter: 'brightness(1.1)'
-                  }
-                }}
-                onClick={handleMonthClick}
-              >
-                {format(currentDate, 'MMMM yyyy')}
-              </Typography>
-
-              <IconButton
-                onClick={handleNextMonth}
-                size="small"
-                sx={{
-                  bgcolor: alpha(theme.palette.primary.main, 0.1),
-                  color: 'primary.main',
-                  p: { xs: 0.75, sm: 1 },
-                  '&:hover': {
-                    bgcolor: alpha(theme.palette.primary.main, 0.2),
-                    transform: 'scale(1.05)'
-                  },
-                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
-                }}
-              >
-                <ChevronRight sx={{ fontSize: { xs: '1.25rem', sm: '1.5rem' } }} />
-              </IconButton>
-            </Box>
-            {/* Enhanced Action Buttons */}
-            <Box sx={{
-              display: 'flex',
-              flexDirection: { xs: 'column', sm: 'row' },
-              gap: { xs: 1, sm: 1.5, md: 2 },
-              flexWrap: 'wrap',
-              justifyContent: 'center',
-              order: { xs: 0, lg: 1 },
-              width: { xs: '100%', lg: 'auto' }
-            }}>
-              {/* Primary Actions Group */}
-              <Box sx={{
-                display: 'flex',
-                gap: { xs: 0.75, sm: 1 },
-                flexWrap: 'wrap',
-                justifyContent: 'center',
-                width: { xs: '100%', sm: 'auto' }
-              }}>
-                {/* Only show Today button when not viewing current month */}
-                {!isSameMonth(currentDate, new Date()) && (
-                  <Button
-                    startIcon={<Today sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />}
-                    onClick={handleTodayClick}
-                    variant="contained"
-                    size="small"
-                    sx={{
-                      flex: { xs: 1, sm: 'none' },
-                      minWidth: { xs: 'auto', sm: '100px' },
-                      borderRadius: 2,
-                      fontWeight: 600,
-                      textTransform: 'none',
-                      fontSize: { xs: '0.8125rem', sm: '0.875rem' },
-                      py: { xs: 0.75, sm: 1 },
-                      px: { xs: 1.5, sm: 2 },
-                      boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`,
-                      '&:hover': {
-                        transform: 'translateY(-1px)',
-                        boxShadow: `0 6px 16px ${alpha(theme.palette.primary.main, 0.4)}`
-                      },
-                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
-                    }}
-                  >
-                    Today
-                  </Button>
-                )}
-
-                {/* Notes Button */}
-                <Tooltip title="Notes for this calendar" arrow>
-                  <Button
-                    startIcon={<NotesIcon sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />}
-                    onClick={() => togglePanel('notes', setIsNotesDrawerOpen)}
-                    variant="outlined"
-                    size="small"
-                    sx={{
-                      flex: { xs: 1, sm: 'none' },
-                      minWidth: { xs: 'auto', sm: '100px' },
-                      borderRadius: 2,
-                      fontWeight: 600,
-                      textTransform: 'none',
-                      fontSize: { xs: '0.8125rem', sm: '0.875rem' },
-                      py: { xs: 0.75, sm: 1 },
-                      px: { xs: 1.5, sm: 2 },
-                      borderColor: (isLgUp
-                        ? isPanelOpen && currentView.id === 'notes'
-                        : isNotesDrawerOpen
-                      ) ? 'info.main' : alpha(theme.palette.text.secondary, 0.3),
-                      color: (isLgUp
-                        ? isPanelOpen && currentView.id === 'notes'
-                        : isNotesDrawerOpen
-                      ) ? 'info.main' : 'text.secondary',
-                      bgcolor: (isLgUp
-                        ? isPanelOpen && currentView.id === 'notes'
-                        : isNotesDrawerOpen
-                      ) ? alpha(theme.palette.info.main, 0.1) : 'transparent',
-                      '&:hover': {
-                        borderColor: 'info.main',
-                        bgcolor: alpha(theme.palette.info.main, 0.1),
-                        color: 'info.main',
-                        transform: 'translateY(-1px)'
-                      },
-                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
-                    }}
-                  >
-                    Notes
-                  </Button>
-                </Tooltip>
-
-                {/* Events Button */}
-                <Tooltip title="Economic Calendar" arrow>
-                  <Button
-                    startIcon={<EventIcon sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />}
-                    onClick={handleToggleEconomicCalendar}
-                    variant="outlined"
-                    size="small"
-                    sx={{
-                      flex: { xs: 1, sm: 'none' },
-                      minWidth: { xs: 'auto', sm: '100px' },
-                      borderRadius: 2,
-                      fontWeight: 600,
-                      textTransform: 'none',
-                      fontSize: { xs: '0.8125rem', sm: '0.875rem' },
-                      py: { xs: 0.75, sm: 1 },
-                      px: { xs: 1.5, sm: 2 },
-                      borderColor: (isLgUp
-                        ? isPanelOpen && currentView.id === 'economic-calendar'
-                        : isEconomicCalendarOpen
-                      ) ? 'info.main' : alpha(theme.palette.text.secondary, 0.3),
-                      color: (isLgUp
-                        ? isPanelOpen && currentView.id === 'economic-calendar'
-                        : isEconomicCalendarOpen
-                      ) ? 'info.main' : 'text.secondary',
-                      bgcolor: (isLgUp
-                        ? isPanelOpen && currentView.id === 'economic-calendar'
-                        : isEconomicCalendarOpen
-                      ) ? alpha(theme.palette.info.main, 0.1) : 'transparent',
-                      '&:hover': {
-                        borderColor: 'info.main',
-                        bgcolor: alpha(theme.palette.info.main, 0.1),
-                        color: 'info.main',
-                        transform: 'translateY(-1px)'
-                      },
-                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
-                    }}
-                  >
-                    Events
-                  </Button>
-                </Tooltip>
-
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
+                  {!isSameMonth(currentDate, new Date()) && (
+                    <Button
+                      variant="contained"
+                      size="small"
+                      startIcon={<Today sx={{ fontSize: 16 }} />}
+                      onClick={handleTodayClick}
+                      sx={{
+                        textTransform: 'none',
+                        fontWeight: 600,
+                        fontSize: '0.8125rem',
+                        borderRadius: `${theme.palette.custom.radius.md}px`,
+                        py: 0.625,
+                        px: 1.5,
+                        minWidth: 0,
+                        boxShadow: 'none',
+                      }}
+                    >
+                      Today
+                    </Button>
+                  )}
+                  <Tooltip title="Notes for this calendar" arrow>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={<NotesIcon sx={{ fontSize: 16 }} />}
+                      onClick={() => togglePanel('notes', setIsNotesDrawerOpen)}
+                      sx={pillSx(isNotesActive)}
+                    >
+                      Notes
+                    </Button>
+                  </Tooltip>
+                  <Tooltip title="Economic Calendar" arrow>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={<EventIcon sx={{ fontSize: 16 }} />}
+                      onClick={handleToggleEconomicCalendar}
+                      sx={pillSx(isEventsActive)}
+                    >
+                      Events
+                    </Button>
+                  </Tooltip>
+                  <TagFilter
+                    allTags={allTags}
+                    selectedTags={selectedTags}
+                    onTagsChange={handleTagsChange}
+                    onOpenDrawer={() => togglePanel('search', setIsSearchDrawerOpen)}
+                    isActive={isLgUp
+                      ? isPanelOpen && currentView.id === 'search'
+                      : isSearchDrawerOpen
+                    }
+                  />
+                  <Tooltip title={isReadOnly ? "View tags and definitions" : "Manage tags and required tag groups"} arrow>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={<TagIcon sx={{ fontSize: 16 }} />}
+                      onClick={() => togglePanel('tags', setIsTagManagementDrawerOpen)}
+                      sx={pillSx(isTagsActive)}
+                    >
+                      Tags
+                    </Button>
+                  </Tooltip>
+                </Box>
               </Box>
-
-              {/* Secondary Actions Group */}
-              <Box sx={{
-                display: 'flex',
-                gap: { xs: 0.75, sm: 1 },
-                flexWrap: 'wrap',
-                justifyContent: 'center',
-                width: { xs: '100%', sm: 'auto' }
-              }}>
-                <TagFilter
-                  allTags={allTags}
-                  selectedTags={selectedTags}
-                  onTagsChange={handleTagsChange}
-                  onOpenDrawer={() => togglePanel('search', setIsSearchDrawerOpen)}
-                  isActive={isLgUp
-                    ? isPanelOpen && currentView.id === 'search'
-                    : isSearchDrawerOpen
-                  }
-                />
-
-                <Tooltip title={isReadOnly ? "View tags and definitions" : "Manage tags and required tag groups"} arrow>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    startIcon={<TagIcon sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />}
-                    onClick={() => togglePanel('tags', setIsTagManagementDrawerOpen)}
-                    sx={{
-                      flex: { xs: 1, sm: 'none' },
-                      minWidth: { xs: 'auto', sm: '120px' },
-                      borderRadius: 2,
-                      fontWeight: 600,
-                      textTransform: 'none',
-                      fontSize: { xs: '0.8125rem', sm: '0.875rem' },
-                      py: { xs: 0.75, sm: 1 },
-                      px: { xs: 1.5, sm: 2 },
-                      borderColor: (isLgUp
-                        ? isPanelOpen && currentView.id === 'tags'
-                        : isTagManagementDrawerOpen
-                      ) ? 'info.main' : alpha(theme.palette.text.secondary, 0.3),
-                      color: (isLgUp
-                        ? isPanelOpen && currentView.id === 'tags'
-                        : isTagManagementDrawerOpen
-                      ) ? 'info.main' : 'text.secondary',
-                      bgcolor: (isLgUp
-                        ? isPanelOpen && currentView.id === 'tags'
-                        : isTagManagementDrawerOpen
-                      ) ? alpha(theme.palette.info.main, 0.1) : 'transparent',
-                      '&:hover': {
-                        borderColor: 'info.main',
-                        bgcolor: alpha(theme.palette.info.main, 0.1),
-                        color: 'info.main',
-                        transform: 'translateY(-1px)'
-                      },
-                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
-                    }}
-                  >
-                    Tags
-                  </Button>
-                </Tooltip>
-              </Box>
-            </Box>
-          </Box>
+            );
+          })()}
 
 
 

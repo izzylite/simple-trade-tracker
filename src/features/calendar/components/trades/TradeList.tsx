@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { formatCount } from 'utils/formatters';
+import { MONO_FONT, TNUM } from 'styles/designTokens';
 import {
   Box,
   Typography,
@@ -493,6 +494,8 @@ const TradeList: React.FC<TradeListProps> = ({
                       )}
                       <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
                         <Typography variant="body1" sx={{
+                          fontFamily: MONO_FONT,
+                          fontFeatureSettings: TNUM,
                           fontSize: { xs: '0.95rem', sm: '1rem', md: '1.05rem' },
                           fontWeight: 600,
                           color: trade.trade_type === 'win'
@@ -553,6 +556,8 @@ const TradeList: React.FC<TradeListProps> = ({
                                 }}
                               />
                               <Typography variant="caption" sx={{
+                                fontFamily: MONO_FONT,
+                                fontFeatureSettings: TNUM,
                                 fontSize: '0.7rem',
                                 color: 'text.secondary',
                                 fontWeight: 500,

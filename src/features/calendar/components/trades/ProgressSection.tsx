@@ -2,21 +2,25 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Typography,
-  LinearProgress,
-  Paper
+  useTheme,
 } from '@mui/material';
 import {
   CalendarMonthOutlined,
   CheckCircle as CheckIcon,
   Timelapse,
-  TipsAndUpdates
+  TipsAndUpdates,
+  TrendingUp,
 } from '@mui/icons-material';
-import { alpha } from '@mui/material/styles';
 import { format, startOfDay, startOfWeek, endOfWeek } from 'date-fns';
 import { Trade, Calendar } from '../../types/dualWrite';
 import { TradeRepository } from 'services/repositories/TradeRepository';
 import { calculateCumulativePnLToDateAsync } from '../../utils/dynamicRiskUtils';
 import { logger } from 'utils/logger';
+import { EYEBROW_SX, TNUM, MONO_FONT } from 'styles/designTokens';
+import CardShell from 'components/common/CardShell';
+import CompareBar from 'components/common/CompareBar';
+import InfoStrip from 'components/common/InfoStrip';
+import { formatCurrency } from 'utils/formatters';
 
 interface ProgressSectionProps {
   calendarId: string;
@@ -121,6 +125,7 @@ const ProgressSection: React.FC<ProgressSectionProps> = ({
   calendar,
   weekTrades: weekTradesProp
 }) => {
+  const theme = useTheme();
   // State - only used when weekTradesProp is not provided
   const [weekTradesState, setWeekTrades] = useState<Trade[]>([]);
   const [cumulativePnLBeforeWeek, setCumulativePnLBeforeWeek] = useState<number>(0);
@@ -221,195 +226,220 @@ const ProgressSection: React.FC<ProgressSectionProps> = ({
     return null;
   }
 
-  return (
-    <Paper
-      elevation={0}
-      sx={{
-        p: 1.5,
-        mb: 2,
-        backgroundColor: 'rgba(255, 255, 255, 0.05)',
-        borderRadius: 1
-      }}
-    >
-      <Typography variant="subtitle1" sx={{ mb: 1.5, fontWeight: 600 }}>
-        Progress
-      </Typography>
+  const pnlColor =
+    totalPnL > 0
+      ? theme.palette.success.main
+      : totalPnL < 0
+        ? theme.palette.error.main
+        : theme.palette.text.primary;
 
+  return (
+    <CardShell
+      radius="lg"
+      sx={{ mb: 2 }}
+      head={{
+        icon: <TrendingUp sx={{ fontSize: 16 }} />,
+        title: 'Weekly progress',
+      }}
+      innerSx={{ p: 1.75, display: 'flex', flexDirection: 'column', gap: 2 }}
+    >
       {/* Traded Days Progress */}
-      <Box sx={{ mb: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.5 }}>
-          {tradedDaysReached ? (
-            <CheckIcon sx={{ color: 'success.main', fontSize: 16 }} />
-          ) : (
-            <CalendarMonthOutlined sx={{ fontSize: 16 }} />
-          )}
-          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-            Traded days
+      <Box>
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 1,
+            mb: 0.75,
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0 }}>
+            {tradedDaysReached ? (
+              <CheckIcon sx={{ color: 'success.main', fontSize: 14 }} />
+            ) : (
+              <CalendarMonthOutlined sx={{ fontSize: 14, color: 'text.secondary' }} />
+            )}
+            <Typography sx={EYEBROW_SX}>Traded days</Typography>
+          </Box>
+          <Typography
+            sx={{
+              fontSize: '0.8rem',
+              fontWeight: 700,
+              color: 'text.primary',
+              fontFeatureSettings: TNUM,
+              letterSpacing: '-0.01em',
+            }}
+          >
+            {displayedTradedDays} / {tradedDaysTarget}
           </Typography>
         </Box>
-        <LinearProgress
-          variant="determinate"
+        <CompareBar
           value={tradedDaysProgress}
-          sx={{
-            height: 6,
-            borderRadius: 1,
-            backgroundColor: 'rgba(255, 255, 255, 0.1)',
-            '& .MuiLinearProgress-bar': {
-              backgroundColor: 'primary.main',
-              borderRadius: 1
-            }
-          }}
+          pct
+          color={
+            tradedDaysReached
+              ? theme.palette.success.main
+              : theme.palette.primary.main
+          }
         />
-        <Typography variant="body2" sx={{ mt: 0.5, fontWeight: 600 }}>
-          {displayedTradedDays} / {tradedDaysTarget}
-        </Typography>
       </Box>
 
       {/* Profit Target Progress */}
       <Box>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.5 }}>
-          {profitTargetReached ? (
-            <CheckIcon sx={{ color: 'success.main', fontSize: 16 }} />
-          ) : (
-             <Timelapse sx={{ fontSize: 16 }} />
-          )}
-          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-            Reach your profit target of ${profitTarget.toLocaleString()}
-          </Typography>
-        </Box>
-        <LinearProgress
-          variant="determinate"
-          value={profitProgress}
+        <Box
           sx={{
-            height: 6,
-            borderRadius: 1,
-            backgroundColor: 'rgba(255, 255, 255, 0.1)',
-            '& .MuiLinearProgress-bar': {
-              backgroundColor: 'primary.main',
-              borderRadius: 1
-            }
-          }}
-        />
-        <Typography
-          variant="body2"
-          sx={{
-            mt: 0.5,
-            fontWeight: 600,
-            color: totalPnL >= 0 ? 'success.main' : 'error.main'
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 1,
+            mb: 0.75,
+            flexWrap: 'wrap',
           }}
         >
-          ${displayedPnL.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / ${profitTarget.toLocaleString()}
-        </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0 }}>
+            {profitTargetReached ? (
+              <CheckIcon sx={{ color: 'success.main', fontSize: 14 }} />
+            ) : (
+              <Timelapse sx={{ fontSize: 14, color: 'text.secondary' }} />
+            )}
+            <Typography sx={EYEBROW_SX}>
+              Profit target{' '}
+              <Box component="span" sx={{ fontFamily: MONO_FONT, fontFeatureSettings: TNUM }}>
+                {formatCurrency(profitTarget)}
+              </Box>
+            </Typography>
+          </Box>
+          <Typography
+            sx={{
+              fontFamily: MONO_FONT,
+              fontSize: '0.8rem',
+              fontWeight: 700,
+              color: pnlColor,
+              fontFeatureSettings: TNUM,
+              letterSpacing: '-0.01em',
+            }}
+          >
+            {formatCurrency(displayedPnL)} / {formatCurrency(profitTarget)}
+          </Typography>
+        </Box>
+        <CompareBar
+          value={profitProgress}
+          pct
+          color={
+            profitTargetReached
+              ? theme.palette.success.main
+              : theme.palette.primary.main
+          }
+        />
       </Box>
 
       {/* Motivational Tip Section */}
       {motivationalTip && (
-        <Box
-          sx={{
-            mt: 2,
-            p: 1.5,
-            borderRadius: 1,
-            backgroundColor: (theme) => alpha(theme.palette.warning.main, 0.15),
-            border: '1px solid',
-            borderColor: (theme) => alpha(theme.palette.warning.main, 0.3)
-          }}
+        <InfoStrip
+          tone="warning"
+          icon={<TipsAndUpdates sx={{ fontSize: 16 }} />}
         >
-          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
-            <TipsAndUpdates
-              sx={{
-                color: 'warning.main',
-                fontSize: 18,
-                mt: 0.25
-              }}
-            />
-            <Box sx={{ flex: 1 }}>
-              {/* Trade indicators when available */}
-              {motivationalTip.trades ? (
-                <>
-                  {/* Main message: "You need at least X trades" */}
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      fontWeight: 600,
-                      color: 'text.primary',
-                      mb: 0.75,
-                      display: 'block'
-                    }}
-                  >
-                    {motivationalTip.message}
-                  </Typography>
-                  {/* Trade breakdown with badges */}
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5, flexWrap: 'wrap' }}>
-                    {/* 2R trade indicators */}
-                    {Array.from({ length: motivationalTip.trades.r2 }).map((_, i) => (
-                      <Box
-                        key={`r2-${i}`}
-                        sx={{
-                          px: 0.75,
-                          py: 0.25,
-                          borderRadius: 1,
-                          backgroundColor: 'success.main',
-                          color: 'success.contrastText',
-                          fontSize: '0.6rem',
-                          fontWeight: 600
-                        }}
-                      >
-                        2R
-                      </Box>
-                    ))}
-                    {/* 1R trade indicators */}
-                    {Array.from({ length: motivationalTip.trades.r1 }).map((_, i) => (
-                      <Box
-                        key={`r1-${i}`}
-                        sx={{
-                          px: 0.75,
-                          py: 0.25,
-                          borderRadius: 1,
-                          backgroundColor: 'primary.main',
-                          color: 'primary.contrastText',
-                          fontSize: '0.6rem',
-                          fontWeight: 600
-                        }}
-                      >
-                        1R
-                      </Box>
-                    ))}
-                    <Typography
-                      variant="caption"
-                      sx={{ color: 'text.secondary', fontWeight: 400, fontSize: '0.7rem' }}
-                    >
-                      to reach your target
-                    </Typography>
-                  </Box>
-                </>
-              ) : (
+          <Box>
+            {motivationalTip.trades ? (
+              <>
                 <Typography
-                  variant="caption"
                   sx={{
+                    fontSize: '0.78rem',
                     fontWeight: 600,
                     color: 'text.primary',
-                    mb: 0.5,
-                    display: 'block'
+                    mb: 0.75,
+                    display: 'block',
+                    letterSpacing: '-0.01em',
                   }}
                 >
                   {motivationalTip.message}
                 </Typography>
-              )}
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 0.5,
+                    mb: 0.5,
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  {Array.from({ length: motivationalTip.trades.r2 }).map((_, i) => (
+                    <Box
+                      key={`r2-${i}`}
+                      sx={{
+                        px: 0.75,
+                        py: 0.25,
+                        borderRadius: `${theme.palette.custom.radius.md}px`,
+                        backgroundColor: 'success.main',
+                        color: 'success.contrastText',
+                        fontSize: '0.62rem',
+                        fontWeight: 700,
+                        letterSpacing: '0.02em',
+                        fontFeatureSettings: TNUM,
+                      }}
+                    >
+                      2R
+                    </Box>
+                  ))}
+                  {Array.from({ length: motivationalTip.trades.r1 }).map((_, i) => (
+                    <Box
+                      key={`r1-${i}`}
+                      sx={{
+                        px: 0.75,
+                        py: 0.25,
+                        borderRadius: `${theme.palette.custom.radius.md}px`,
+                        backgroundColor: 'primary.main',
+                        color: 'primary.contrastText',
+                        fontSize: '0.62rem',
+                        fontWeight: 700,
+                        letterSpacing: '0.02em',
+                        fontFeatureSettings: TNUM,
+                      }}
+                    >
+                      1R
+                    </Box>
+                  ))}
+                  <Typography
+                    sx={{
+                      color: 'text.secondary',
+                      fontWeight: 500,
+                      fontSize: '0.7rem',
+                      ml: 0.25,
+                    }}
+                  >
+                    to reach your target
+                  </Typography>
+                </Box>
+              </>
+            ) : (
               <Typography
-                variant="caption"
                 sx={{
-                  color: 'warning.light',
+                  fontSize: '0.78rem',
+                  fontWeight: 600,
+                  color: 'text.primary',
+                  mb: 0.5,
                   display: 'block',
-                  mt: 0.5
+                  letterSpacing: '-0.01em',
                 }}
               >
-                {motivationalTip.subMessage}
+                {motivationalTip.message}
               </Typography>
-            </Box>
+            )}
+            <Typography
+              sx={{
+                fontSize: '0.72rem',
+                color: 'text.secondary',
+                display: 'block',
+                lineHeight: 1.45,
+              }}
+            >
+              {motivationalTip.subMessage}
+            </Typography>
           </Box>
-        </Box>
+        </InfoStrip>
       )}
-    </Paper>
+    </CardShell>
   );
 };
 

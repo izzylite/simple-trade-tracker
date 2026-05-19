@@ -95,7 +95,7 @@ const NoteViewPanel: React.FC<NoteViewPanelProps> = ({
             borderRadius: '999px',
             borderColor: alpha(theme.palette.primary.main, 0.4),
             color: 'primary.main',
-            '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.08) },
+            '&:hover': { bgcolor: theme.palette.custom.tintViolet.soft },
           }}
         >
           New note
@@ -125,7 +125,10 @@ const NoteViewPanel: React.FC<NoteViewPanelProps> = ({
           top: 0,
           zIndex: 5,
           borderBottom: `1px solid ${theme.palette.divider}`,
-          bgcolor: isDark ? 'rgba(8,8,8,0.88)' : 'rgba(232,237,244,0.88)',
+          bgcolor: alpha(
+            isDark ? theme.palette.background.default : theme.palette.background.paper,
+            0.88,
+          ),
           backdropFilter: 'blur(20px) saturate(160%)',
           px: 4,
           py: 1,
@@ -150,9 +153,9 @@ const NoteViewPanel: React.FC<NoteViewPanelProps> = ({
               sx={{
                 color: note.is_pinned ? 'primary.main' : 'text.secondary',
                 border: `1px solid ${theme.palette.divider}`,
-                borderRadius: 1,
+                borderRadius: `${theme.palette.custom.radius.md}px`,
                 p: 0.75,
-                '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.08) },
+                '&:hover': { bgcolor: theme.palette.custom.tintViolet.soft },
               }}
             >
               {note.is_pinned
@@ -168,7 +171,7 @@ const NoteViewPanel: React.FC<NoteViewPanelProps> = ({
               sx={{
                 color: 'text.secondary',
                 border: `1px solid ${theme.palette.divider}`,
-                borderRadius: 1,
+                borderRadius: `${theme.palette.custom.radius.md}px`,
                 p: 0.75,
                 '&:hover': { bgcolor: alpha(theme.palette.warning.main, 0.08), color: 'warning.main' },
               }}
@@ -185,13 +188,13 @@ const NoteViewPanel: React.FC<NoteViewPanelProps> = ({
             startIcon={<EditIcon sx={{ fontSize: '0.9rem !important' }} />}
             onClick={onEdit}
             sx={{
-              borderRadius: 1,
+              borderRadius: `${theme.palette.custom.radius.md}px`,
               fontSize: '0.8rem',
               fontWeight: 600,
               px: 1.5,
               py: 0.75,
               bgcolor: 'primary.main',
-              '&:hover': { bgcolor: '#6d28d9' },
+              '&:hover': { bgcolor: 'primary.dark' },
               boxShadow: 'none',
               ml: 0.5,
             }}
@@ -228,7 +231,7 @@ const NoteViewPanel: React.FC<NoteViewPanelProps> = ({
         >
           {/* Tag chips */}
           {note.tags && note.tags.length > 0 && (
-            <Stack direction="row" spacing={0.75} flexWrap="wrap" sx={{ mb: 2 }}>
+            <Stack direction="row" spacing={0.75} flexWrap="wrap" sx={{ mb: 2, rowGap: 0.75 }}>
               {note.tags.map(tag => (
                 <Chip
                   key={tag}
@@ -239,9 +242,9 @@ const NoteViewPanel: React.FC<NoteViewPanelProps> = ({
                     fontSize: '0.7rem',
                     fontWeight: 600,
                     borderRadius: '999px',
-                    bgcolor: alpha(theme.palette.primary.main, 0.12),
-                    color: theme.palette.primary.light,
-                    border: `1px solid ${alpha(theme.palette.primary.main, 0.28)}`,
+                    bgcolor: theme.palette.custom.tintViolet.soft,
+                    color: 'primary.main',
+                    border: `1px solid ${alpha(theme.palette.primary.main, 0.15)}`,
                     '& .MuiChip-label': { px: 1 },
                   }}
                 />
@@ -270,9 +273,7 @@ const NoteViewPanel: React.FC<NoteViewPanelProps> = ({
               sx={{
                 fontSize: '1rem',
                 lineHeight: 1.78,
-                color: isDark
-                  ? 'rgba(255,255,255,0.72)'
-                  : theme.palette.text.secondary,
+                color: 'text.secondary',
                 '& h2': {
                   color: 'text.primary',
                   fontWeight: 700,
@@ -296,9 +297,9 @@ const NoteViewPanel: React.FC<NoteViewPanelProps> = ({
                   borderLeft: `2px solid ${theme.palette.primary.main}`,
                   ml: 0,
                   pl: 2,
-                  color: isDark ? 'rgba(255,255,255,0.55)' : theme.palette.text.secondary,
-                  bgcolor: alpha(theme.palette.primary.main, 0.06),
-                  borderRadius: '0 8px 8px 0',
+                  color: 'text.tertiary',
+                  bgcolor: theme.palette.custom.tintViolet.soft,
+                  borderRadius: `0 ${theme.palette.custom.radius.md}px ${theme.palette.custom.radius.md}px 0`,
                   py: 0.5,
                 },
               }}

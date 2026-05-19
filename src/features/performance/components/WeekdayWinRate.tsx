@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react';
 import { Box, Tooltip, useTheme } from '@mui/material';
 import { Trade } from 'features/calendar/types/dualWrite';
-import PerfCard from 'features/performance/components/PerfCard';
+import CardShell from 'components/common/CardShell';
+import { TNUM } from 'styles/designTokens';
 
 interface WeekdayWinRateProps {
   trades: Trade[];
@@ -53,7 +54,7 @@ const WeekdayWinRate: React.FC<WeekdayWinRateProps> = ({ trades }) => {
 
   return (
     <Box sx={{ mb: 2.5 }}>
-      <PerfCard
+      <CardShell
         head={{
           icon: <span aria-hidden>▦</span>,
           title: 'By weekday',
@@ -133,7 +134,7 @@ const WeekdayWinRate: React.FC<WeekdayWinRateProps> = ({ trades }) => {
                     fontSize: '0.7rem',
                     color: isBest ? theme.palette.primary.main : theme.palette.text.secondary,
                     fontWeight: 700,
-                    fontFeatureSettings: "'tnum' on, 'lnum' on",
+                    fontFeatureSettings: TNUM,
                   }}
                 >
                   {s.total > 0 ? `${s.winRate.toFixed(0)}%` : '—'}
@@ -142,7 +143,7 @@ const WeekdayWinRate: React.FC<WeekdayWinRateProps> = ({ trades }) => {
             );
           })}
         </Box>
-      </PerfCard>
+      </CardShell>
     </Box>
   );
 };

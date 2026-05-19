@@ -18,6 +18,8 @@ import { EconomicCalendarFilterSettings, DEFAULT_FILTER_SETTINGS as DEFAULT_ECON
 import { TradeOperationsProps } from 'features/calendar/types/tradeOperations';
 import PnLChartsWrapper from 'features/performance/components/charts/PnLChartsWrapper';
 import WinLossStats from 'features/performance/components/charts/WinLossStats';
+import WinLossDistribution from 'features/performance/components/charts/WinLossDistribution';
+import DailySummaryTable from 'features/performance/components/charts/DailySummaryTable';
 import TagPerformanceAnalysis from 'features/performance/components/charts/TagPerformanceAnalysis';
 import TagDayOfWeekAnalysis from 'features/performance/components/charts/TagDayOfWeekAnalysis';
 import SessionPerformanceAnalysis from 'features/performance/components/charts/SessionPerformanceAnalysis';
@@ -466,6 +468,32 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
   // Get all unique tags from async calculations
   const allTags = performanceData?.allTags || [];
 
+  // Win/loss pie data and daily summary table data
+  const winLossData = performanceData?.winLossData || [];
+  const dailySummaryData = performanceData?.dailySummaryData || [];
+
+  // Open the trades dialog filtered by win/loss/breakeven when a pie segment is clicked
+  const handleWinLossPieClick = useCallback((category: string) => {
+    const matchers: Record<string, (t: Trade) => boolean> = {
+      Wins: (t) => t.amount > 0,
+      Losses: (t) => t.amount < 0,
+      Breakeven: (t) => t.amount === 0,
+    };
+    const predicate = matchers[category];
+    if (!predicate) return;
+
+    const matchingTrades = filteredTrades.filter(predicate);
+    if (matchingTrades.length === 0) return;
+
+    setTradesDialog({
+      open: true,
+      trades: matchingTrades,
+      showChartInfo: true,
+      title: `${category} (${matchingTrades.length})`,
+      expandedTradeId: matchingTrades.length === 1 ? matchingTrades[0].id : null,
+    });
+  }, [filteredTrades]);
+
   // Calculate target value for monthly target
   const targetValue = useMemo(() => {
     if (monthlyTarget === undefined || accountBalance <= 0) return null;
@@ -636,6 +664,37 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
                 onTradeClick={handleTradeExpand}
                 compact={basicOnly}
               />
+
+              {/* Win/Loss Distribution + Daily Summary — side by side on desktop, stacked on mobile.
+                  In basicOnly (narrow side-panel) only the pie is shown. */}
+              {(winLossData.length > 0 || (!basicOnly && dailySummaryData.length > 0)) && (
+                <Box
+                  sx={{
+                    display: 'grid',
+                    gridTemplateColumns: {
+                      xs: '1fr',
+                      md: basicOnly ? '1fr' : '1fr 1fr',
+                    },
+                    gap: 2,
+                    mb: 3,
+                    alignItems: 'stretch',
+                  }}
+                >
+                  {winLossData.length > 0 && (
+                    <WinLossDistribution
+                      winLossData={winLossData}
+                      onPieClick={handleWinLossPieClick}
+                    />
+                  )}
+                  {!basicOnly && dailySummaryData.length > 0 && (
+                    <DailySummaryTable
+                      dailySummaryData={dailySummaryData}
+                      trades={trades}
+                      setMultipleTradesDialog={setTradesDialog}
+                    />
+                  )}
+                </Box>
+              )}
 
               {/* P&L Charts with Tabs (Heatmap, Cumulative, Daily) */}
               <PnLChartsWrapper

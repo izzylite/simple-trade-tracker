@@ -2,62 +2,16 @@ import React, { useMemo } from 'react';
 import { Box, useTheme } from '@mui/material';
 import { formatCurrency, formatPercentage } from 'utils/formatters';
 import { PerformanceCalculationResult } from 'features/performance/services/performanceCalculationService';
+import StatTile from 'components/common/StatTile';
+import PnlValue from 'components/common/PnlValue';
 
 interface KpiStripProps {
   performanceData: PerformanceCalculationResult | null;
 }
 
-interface KpiCardProps {
-  label: string;
-  value: string;
-  tone?: 'win' | 'loss' | 'neutral';
-}
-
-const KpiCard: React.FC<KpiCardProps> = ({ label, value, tone = 'neutral' }) => {
-  const theme = useTheme();
-  const color =
-    tone === 'win'
-      ? theme.palette.success.main
-      : tone === 'loss'
-      ? theme.palette.error.main
-      : theme.palette.text.primary;
-  return (
-    <Box
-      sx={{
-        bgcolor: theme.palette.background.paper,
-        border: `1px solid ${theme.palette.divider}`,
-        borderRadius: '14px',
-        padding: 2,
-      }}
-    >
-      <Box
-        sx={{
-          fontSize: '0.72rem',
-          color: theme.palette.text.tertiary,
-          fontWeight: 600,
-          letterSpacing: '0.08em',
-          textTransform: 'uppercase',
-        }}
-      >
-        {label}
-      </Box>
-      <Box
-        sx={{
-          fontSize: '1.65rem',
-          fontWeight: 800,
-          letterSpacing: '-0.025em',
-          mt: '6px',
-          color,
-          fontFeatureSettings: "'tnum' on, 'lnum' on",
-        }}
-      >
-        {value}
-      </Box>
-    </Box>
-  );
-};
-
 const KpiStrip: React.FC<KpiStripProps> = ({ performanceData }) => {
+  const theme = useTheme();
+
   const kpis = useMemo(() => {
     const w = performanceData?.winLossStats;
     const winnersTotal = w?.winners?.total ?? 0;
@@ -78,28 +32,57 @@ const KpiStrip: React.FC<KpiStripProps> = ({ performanceData }) => {
     return { netPnl, winRate, profitFactor, avgR };
   }, [performanceData]);
 
-  const netTone: 'win' | 'loss' | 'neutral' =
-    kpis.netPnl > 0 ? 'win' : kpis.netPnl < 0 ? 'loss' : 'neutral';
-  const netValue = `${kpis.netPnl > 0 ? '+' : ''}${formatCurrency(kpis.netPnl)}`;
   const winRateValue = formatPercentage(kpis.winRate, 1);
+
   const profitFactorValue = !isFinite(kpis.profitFactor)
     ? '∞'
     : kpis.profitFactor.toFixed(2);
-  const avgRValue = `${kpis.avgR >= 0 ? '+' : ''}${kpis.avgR.toFixed(2)}R`;
+  const profitFactorColor = !isFinite(kpis.profitFactor)
+    ? theme.palette.success.main
+    : kpis.profitFactor > 1
+    ? theme.palette.success.main
+    : kpis.profitFactor < 1 && kpis.profitFactor > 0
+    ? theme.palette.error.main
+    : theme.palette.text.primary;
 
   return (
     <Box
       sx={{
         display: 'grid',
-        gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
+        gridTemplateColumns: {
+          xs: 'repeat(2, 1fr)',
+          md: 'repeat(auto-fit, minmax(180px, 1fr))',
+        },
         gap: 1.5,
         mb: 2.5,
       }}
     >
-      <KpiCard label="Net P&L" value={netValue} tone={netTone} />
-      <KpiCard label="Win rate" value={winRateValue} />
-      <KpiCard label="Profit factor" value={profitFactorValue} />
-      <KpiCard label="Avg R" value={avgRValue} />
+      <StatTile
+        label="Net P&L"
+        value={
+          <PnlValue
+            amount={kpis.netPnl}
+            format={formatCurrency}
+            size="lg"
+          />
+        }
+      />
+      <StatTile label="Win rate" value={winRateValue} />
+      <StatTile
+        label="Profit factor"
+        value={profitFactorValue}
+        valueColor={profitFactorColor}
+      />
+      <StatTile
+        label="Avg R"
+        value={
+          <PnlValue
+            amount={kpis.avgR}
+            format={(n) => `${n.toFixed(2)}R`}
+            size="lg"
+          />
+        }
+      />
     </Box>
   );
 };

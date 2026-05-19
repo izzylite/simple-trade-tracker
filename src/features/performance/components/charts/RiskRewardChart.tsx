@@ -2,10 +2,12 @@ import React from 'react';
 import {
   AreaChart,
   Area,
-  ResponsiveContainer
+  ResponsiveContainer,
 } from 'recharts';
-import { Box, Paper, Typography, useTheme, Tooltip } from '@mui/material';
-import { InfoOutlined } from '@mui/icons-material';
+import { Box, useTheme, Tooltip } from '@mui/material';
+import { InfoOutlined, ShowChart } from '@mui/icons-material';
+import CardShell from 'components/common/CardShell';
+import StatTile from 'components/common/StatTile';
 
 interface RiskRewardChartProps {
   riskRewardStats: {
@@ -25,73 +27,75 @@ const RiskRewardChart: React.FC<RiskRewardChartProps> = ({ riskRewardStats }) =>
     return null;
   }
 
-  return (
-    <Paper
-      sx={{
-        p: 2,
-        mb: 2,
-        borderRadius: 2
-      }}
-    >
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-        <Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
-            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-              Average RR
-            </Typography>
-            <Tooltip
-              title="Average Risk to reward ratio (RR) per trade. An RR of 2 means that for every 1$ you risk you will make 2$."
-              arrow
-              placement="top"
-            >
-              <InfoOutlined sx={{ fontSize: 16, color: 'text.secondary', opacity: 0.7, cursor: 'help' }} />
-            </Tooltip>
-          </Box>
-          <Typography variant="h4" sx={{ fontWeight: 500, color: 'text.primary' }}>
-            {riskRewardStats.average.toFixed(2)}
-          </Typography>
-        </Box>
-        <Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
-            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-              Max RR
-            </Typography>
-            <Tooltip
-              title="Maximum Risk to reward Ratio between all your trades. You can use the small graph at the bottom of this card to see the RR of every one of your trades."
-              arrow
-              placement="top"
-            >
-              <InfoOutlined sx={{ fontSize: 16, color: 'text.secondary', opacity: 0.7, cursor: 'help' }} />
-            </Tooltip>
-          </Box>
-          <Typography variant="h4" sx={{ fontWeight: 500, color: 'text.primary' }}>
-            {riskRewardStats.max.toFixed(2)}
-          </Typography>
-        </Box>
-      </Box>
+  const renderTooltipIcon = (tooltip: string) => (
+    <Tooltip title={tooltip} arrow placement="top">
+      <InfoOutlined
+        sx={{
+          fontSize: 13,
+          color: 'text.tertiary',
+          cursor: 'help',
+        }}
+      />
+    </Tooltip>
+  );
 
-      {/* RR Trend Line Graph */}
-      <Box sx={{ height: 60, mt: 2 }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={riskRewardStats.data} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
-            <defs>
-              <linearGradient id="rrGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor={theme.palette.primary.main} stopOpacity={0.3} />
-                <stop offset="95%" stopColor={theme.palette.primary.main} stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <Area
-              type="monotone"
-              dataKey="rr"
-              stroke={theme.palette.primary.main}
-              strokeWidth={2}
-              fill="url(#rrGradient)"
-              dot={false}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
+  return (
+    <CardShell
+      head={{
+        icon: <ShowChart sx={{ fontSize: 16 }} />,
+        title: 'Risk / Reward',
+        eyebrow: 'Per-trade RR distribution',
+      }}
+      sx={{ mb: 2 }}
+    >
+      {/* Body */}
+      <Box sx={{ p: 2 }}>
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(2, 1fr)',
+            gap: 1.25,
+          }}
+        >
+          <StatTile
+            label="Average RR"
+            value={riskRewardStats.average.toFixed(2)}
+            icon={renderTooltipIcon(
+              'Average Risk to reward ratio (RR) per trade. An RR of 2 means that for every 1$ you risk you will make 2$.'
+            )}
+          />
+          <StatTile
+            label="Max RR"
+            value={riskRewardStats.max.toFixed(2)}
+            icon={renderTooltipIcon(
+              'Maximum Risk to reward Ratio between all your trades. You can use the small graph at the bottom of this card to see the RR of every one of your trades.'
+            )}
+          />
+        </Box>
+
+        {/* RR Trend Line Graph */}
+        <Box sx={{ height: 60, mt: 2 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={riskRewardStats.data} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="rrGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={theme.palette.primary.main} stopOpacity={0.3} />
+                  <stop offset="95%" stopColor={theme.palette.primary.main} stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <Area
+                type="monotone"
+                dataKey="rr"
+                stroke={theme.palette.primary.main}
+                strokeWidth={2}
+                fill="url(#rrGradient)"
+                dot={false}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </Box>
       </Box>
-    </Paper>
+    </CardShell>
   );
 };
 

@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  Paper,
   Typography,
   useTheme,
   Table,
@@ -14,11 +13,14 @@ import {
   TablePagination
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
-import { InfoOutlined, TrendingUp, TrendingDown, TrendingFlat } from '@mui/icons-material';
+import { InfoOutlined, CalendarMonth } from '@mui/icons-material';
 import { format, isValid } from 'date-fns';
 import { Trade } from 'features/calendar/types/dualWrite';
 import { formatValue, formatCount } from 'utils/formatters';
 import { scrollbarStyles } from 'styles/scrollbarStyles';
+import { EYEBROW_SX, TNUM, getInsetSurface } from 'styles/designTokens';
+import CardShell from 'components/common/CardShell';
+import PnlValue from 'components/common/PnlValue';
 
 interface DailySummaryTableProps {
   dailySummaryData: any[];
@@ -32,6 +34,8 @@ const DailySummaryTable: React.FC<DailySummaryTableProps> = ({
   setMultipleTradesDialog
 }) => {
   const theme = useTheme();
+  const radius = theme.palette.custom.radius;
+  const insetBg = getInsetSurface(theme);
 
   // Pagination state
   const [page, setPage] = React.useState(0);
@@ -66,114 +70,104 @@ const DailySummaryTable: React.FC<DailySummaryTableProps> = ({
     setPage(0);
   }, [dailySummaryData.length]);
 
-  return (
-    <Paper sx={{ p: 3, borderRadius: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography variant="h6">Daily Summary</Typography>
-          <Tooltip
-            title="Daily trading summary showing trades, session, and P&L for each day"
-            arrow
-            placement="top"
-          >
-            <InfoOutlined sx={{ fontSize: 16, color: 'text.secondary', opacity: 0.7, cursor: 'help' }} />
-          </Tooltip>
-        </Box>
-        {dailySummaryData && dailySummaryData.length > 0 && (
-          <Box sx={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1,
-            bgcolor: alpha(
-              totalPnL > 0
-                ? theme.palette.success.main
-                : totalPnL < 0
-                ? theme.palette.error.main
-                : theme.palette.grey[500],
-              0.1
-            ),
-            px: 1.5,
-            py: 0.5,
-            borderRadius: 2,
-            border: `1px solid ${alpha(
-              totalPnL > 0
-                ? theme.palette.success.main
-                : totalPnL < 0
-                ? theme.palette.error.main
-                : theme.palette.grey[500],
-              0.2
-            )}`,
-          }}>
-          {totalPnL > 0 ? (
-            <TrendingUp sx={{ color: theme.palette.success.main }} />
-          ) : totalPnL < 0 ? (
-            <TrendingDown sx={{ color: theme.palette.error.main }} />
-          ) : (
-            <TrendingFlat sx={{ color: theme.palette.grey[500] }} />
-          )}
-          <Typography
-            variant="subtitle1"
-            sx={{
-              fontWeight: 600,
-              color: totalPnL > 0
-                ? theme.palette.success.main
-                : totalPnL < 0
-                ? theme.palette.error.main
-                : 'text.secondary'
-            }}
-          >
-            Total P&L: {formatValue(totalPnL)}
-          </Typography>
-        </Box>
-        )}
+  const totalChip =
+    dailySummaryData && dailySummaryData.length > 0 ? (
+      <Box
+        sx={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 0.75,
+          bgcolor: insetBg,
+          border: `1px solid ${theme.palette.divider}`,
+          px: 1.25,
+          py: 0.625,
+          borderRadius: `${radius.md}px`,
+          flexShrink: 0,
+        }}
+      >
+        <Typography sx={{ ...EYEBROW_SX, color: 'text.tertiary' }}>
+          Total
+        </Typography>
+        <PnlValue amount={totalPnL} format={formatValue} size="sm" bold />
       </Box>
-      <TableContainer sx={{
-        flex: 1,
-        overflow: 'auto',
-        ...scrollbarStyles(theme)
-      }}>
+    ) : undefined;
+
+  return (
+    <CardShell
+      sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}
+      head={{
+        icon: <CalendarMonth sx={{ fontSize: 16 }} />,
+        title: (
+          <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>
+            <Box component="span">Daily Summary</Box>
+            <Tooltip
+              title="Daily trading summary showing trades, session, and P&L for each day"
+              arrow
+              placement="top"
+            >
+              <InfoOutlined
+                sx={{ fontSize: 14, color: 'text.tertiary', cursor: 'help' }}
+              />
+            </Tooltip>
+          </Box>
+        ),
+        right: totalChip,
+      }}
+    >
+      {/* Table body */}
+      <TableContainer
+        sx={{
+          flex: 1,
+          overflow: 'auto',
+          ...scrollbarStyles(theme),
+        }}
+      >
         <Table stickyHeader size="small">
           <TableHead>
             <TableRow>
               <TableCell
                 sx={{
+                  ...EYEBROW_SX,
                   fontWeight: 600,
                   backgroundColor: theme.palette.background.paper,
-                  borderBottom: `2px solid ${theme.palette.divider}`,
-                  color: 'text.secondary'
+                  borderBottom: `1px solid ${theme.palette.divider}`,
+                  py: 1.25,
                 }}
               >
-                DATE
+                Date
               </TableCell>
               <TableCell
                 align="right"
                 sx={{
+                  ...EYEBROW_SX,
                   fontWeight: 600,
                   backgroundColor: theme.palette.background.paper,
-                  borderBottom: `2px solid ${theme.palette.divider}`,
-                  color: 'text.secondary'
+                  borderBottom: `1px solid ${theme.palette.divider}`,
+                  py: 1.25,
                 }}
               >
-                TRADES
+                Trades
               </TableCell>
               <TableCell
                 align="center"
                 sx={{
+                  ...EYEBROW_SX,
                   fontWeight: 600,
                   backgroundColor: theme.palette.background.paper,
-                  borderBottom: `2px solid ${theme.palette.divider}`,
-                  color: 'text.secondary'
+                  borderBottom: `1px solid ${theme.palette.divider}`,
+                  py: 1.25,
                 }}
               >
-                SESSION
+                Session
               </TableCell>
               <TableCell
                 align="right"
                 sx={{
+                  ...EYEBROW_SX,
                   fontWeight: 600,
                   backgroundColor: theme.palette.background.paper,
-                  borderBottom: `2px solid ${theme.palette.divider}`,
-                  color: 'text.secondary'
+                  borderBottom: `1px solid ${theme.palette.divider}`,
+                  py: 1.25,
                 }}
               >
                 P/L
@@ -181,7 +175,7 @@ const DailySummaryTable: React.FC<DailySummaryTableProps> = ({
             </TableRow>
           </TableHead>
           <TableBody>
-            {paginatedData.map((row, index) => {
+            {paginatedData.map((row) => {
               // Ensure trade_date is a valid Date object
               const tradeDate = new Date(row.trade_date);
 
@@ -208,71 +202,68 @@ const DailySummaryTable: React.FC<DailySummaryTableProps> = ({
                     }
                   }}
                   sx={{
+                    '& td, & th': {
+                      borderBottom: `1px solid ${theme.palette.divider}`,
+                    },
                     '&:last-child td, &:last-child th': { border: 0 },
                     '&:hover': {
                       backgroundColor: alpha(theme.palette.primary.main, 0.04),
-                      cursor: 'pointer'
+                      cursor: 'pointer',
                     },
-                    bgcolor: row.pnl > 0
-                      ? alpha(theme.palette.success.main, 0.05)
-                      : row.pnl < 0
-                      ? alpha(theme.palette.error.main, 0.05)
-                      : 'transparent'
                   }}
                 >
                   <TableCell
                     sx={{
                       fontWeight: 500,
-                      color: 'text.primary'
+                      color: 'text.primary',
+                      fontFeatureSettings: TNUM,
                     }}
                   >
                     {format(tradeDate, 'dd/MM/yyyy')}
                   </TableCell>
-                <TableCell
-                  align="right"
-                  sx={{
-                    fontWeight: 500,
-                    color: 'text.primary'
-                  }}
-                >
-                  {formatCount(row.trades)}
-                </TableCell>
-                <TableCell align="center">
-                  {row.session ? (
-                    <Typography
-                      sx={{
-                        color: 'text.primary',
-                        fontWeight: 500
-                      }}
-                    >
-                      {row.session}
-                    </Typography>
-                  ) : (
-                    <Typography
-                      sx={{
-                        color: 'text.secondary',
-                        fontStyle: 'italic'
-                      }}
-                    >
-                      —
-                    </Typography>
-                  )}
-                </TableCell>
-                <TableCell
-                  align="right"
-                  sx={{
-                    color: row.pnl > 0
-                      ? theme.palette.success.main
-                      : row.pnl < 0
-                      ? theme.palette.error.main
-                      : 'text.secondary',
-                    fontWeight: 600,
-                    fontSize: '0.875rem'
-                  }}
-                >
-                  {formatValue(row.pnl)}
-                </TableCell>
-              </TableRow>
+                  <TableCell
+                    align="right"
+                    sx={{
+                      fontWeight: 500,
+                      color: 'text.primary',
+                      fontFeatureSettings: TNUM,
+                    }}
+                  >
+                    {formatCount(row.trades)}
+                  </TableCell>
+                  <TableCell align="center">
+                    {row.session ? (
+                      <Typography
+                        sx={{
+                          color: 'text.primary',
+                          fontWeight: 500,
+                          fontSize: '0.85rem',
+                        }}
+                      >
+                        {row.session}
+                      </Typography>
+                    ) : (
+                      <Typography
+                        sx={{
+                          color: 'text.tertiary',
+                          fontStyle: 'italic',
+                          fontSize: '0.85rem',
+                        }}
+                      >
+                        —
+                      </Typography>
+                    )}
+                  </TableCell>
+                  <TableCell align="right" sx={{ py: 1 }}>
+                    <PnlValue
+                      amount={row.pnl}
+                      format={formatValue}
+                      size="sm"
+                      arrow={false}
+                      bold
+                    />
+                  </TableCell>
+                </TableRow>
               );
             })}
           </TableBody>
@@ -289,11 +280,15 @@ const DailySummaryTable: React.FC<DailySummaryTableProps> = ({
         sx={{
           borderTop: `1px solid ${theme.palette.divider}`,
           '.MuiTablePagination-toolbar': {
-            minHeight: 52
-          }
+            minHeight: 52,
+          },
+          '.MuiTablePagination-selectLabel, .MuiTablePagination-displayedRows': {
+            fontFeatureSettings: TNUM,
+            color: 'text.secondary',
+          },
         }}
       />
-    </Paper>
+    </CardShell>
   );
 };
 

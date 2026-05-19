@@ -4,19 +4,15 @@ import {
   IconButton,
   Typography,
   useTheme,
-  alpha,
-  Chip,
   Fade,
   Tooltip
 } from '@mui/material';
 import {
   ChevronLeft,
   ChevronRight,
-  CalendarMonth,
-  Today,
-  KeyboardArrowDown
 } from '@mui/icons-material';
 import { format, isToday } from 'date-fns';
+import { TNUM } from 'styles/designTokens';
 
 interface FloatingMonthNavigationProps {
   currentDate: Date;
@@ -108,6 +104,8 @@ const FloatingMonthNavigation: React.FC<FloatingMonthNavigationProps> = ({
 
   const finalVisible = isVisible && !hideByTopScroll;
 
+  // Floating element genuinely floats over the page — retain elevation via
+  // theme.shadows[3] (no hardcoded alpha shadows).
   return (
     <Fade in={finalVisible} timeout={300} mountOnEnter unmountOnExit>
       <Box
@@ -125,21 +123,17 @@ const FloatingMonthNavigation: React.FC<FloatingMonthNavigationProps> = ({
         {/* Main Navigation Pill */}
         <Box
           sx={{
-            backgroundColor: theme.palette.background.paper,
-            borderRadius: '24px',
-            boxShadow: `0 8px 32px ${alpha(theme.palette.common.black, 0.12)}`,
-            border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+            bgcolor: 'background.paper',
+            borderRadius: `${theme.palette.custom.radius.xxl}px`,
+            boxShadow: theme.shadows[3],
+            border: `1px solid ${theme.palette.divider}`,
             p: 0.5,
             display: 'flex',
             alignItems: 'center',
             gap: 0.5,
-            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            transition: `transform 240ms ${theme.palette.custom.easing.smooth}, opacity 240ms ${theme.palette.custom.easing.smooth}`,
             transform: finalVisible ? 'translateY(0)' : 'translateY(-10px)',
             opacity: finalVisible ? 1 : 0,
-            '&:hover': {
-              boxShadow: `0 12px 40px ${alpha(theme.palette.common.black, 0.15)}`,
-              transform: 'translateY(-2px)'
-            }
           }}
         >
           {/* Previous Month Button */}
@@ -150,12 +144,12 @@ const FloatingMonthNavigation: React.FC<FloatingMonthNavigationProps> = ({
               sx={{
                 width: 36,
                 height: 36,
+                borderRadius: `${theme.palette.custom.radius.md}px`,
                 color: 'text.secondary',
-                transition: 'all 0.2s ease',
+                transition: `background-color 150ms ${theme.palette.custom.easing.smooth}, color 150ms ${theme.palette.custom.easing.smooth}`,
                 '&:hover': {
                   color: 'primary.main',
-                  bgcolor: alpha(theme.palette.primary.main, 0.1),
-                  transform: 'scale(1.05)'
+                  bgcolor: theme.palette.custom.tintViolet.soft,
                 }
               }}
             >
@@ -170,13 +164,12 @@ const FloatingMonthNavigation: React.FC<FloatingMonthNavigationProps> = ({
               cursor: 'pointer',
               px: 2,
               py: 1,
-              borderRadius: '16px',
+              borderRadius: `${theme.palette.custom.radius.lg}px`,
               textAlign: 'center',
-              transition: 'all 0.2s ease',
+              transition: `background-color 150ms ${theme.palette.custom.easing.smooth}`,
               position: 'relative',
               '&:hover': {
-                bgcolor: alpha(theme.palette.primary.main, 0.08),
-                transform: 'scale(1.02)'
+                bgcolor: theme.palette.custom.tintViolet.soft,
               }
             }}
           >
@@ -186,28 +179,28 @@ const FloatingMonthNavigation: React.FC<FloatingMonthNavigationProps> = ({
                 fontWeight: 700,
                 fontSize: '0.9rem',
                 color: 'text.primary',
-                letterSpacing: '0.5px',
-                lineHeight: 1.2
+                letterSpacing: '-0.01em',
+                lineHeight: 1.2,
+                fontFeatureSettings: TNUM,
               }}
             >
               {format(currentDate, 'MMM')}
-
-
             </Typography>
             <Typography
               variant="caption"
               sx={{
-                fontSize: '0.75rem',
-                color: 'text.secondary',
-                fontWeight: 500,
+                fontSize: '0.6875rem',
+                color: 'text.tertiary',
+                fontWeight: 600,
+                letterSpacing: '0.05em',
+                textTransform: 'uppercase',
                 display: 'block',
-                lineHeight: 1
+                lineHeight: 1,
+                fontFeatureSettings: TNUM,
               }}
             >
               {format(currentDate, 'yyyy')}
             </Typography>
-
-
           </Box>
 
           {/* Next Month Button */}
@@ -218,12 +211,12 @@ const FloatingMonthNavigation: React.FC<FloatingMonthNavigationProps> = ({
               sx={{
                 width: 36,
                 height: 36,
+                borderRadius: `${theme.palette.custom.radius.md}px`,
                 color: 'text.secondary',
-                transition: 'all 0.2s ease',
+                transition: `background-color 150ms ${theme.palette.custom.easing.smooth}, color 150ms ${theme.palette.custom.easing.smooth}`,
                 '&:hover': {
                   color: 'primary.main',
-                  bgcolor: alpha(theme.palette.primary.main, 0.1),
-                  transform: 'scale(1.05)'
+                  bgcolor: theme.palette.custom.tintViolet.soft,
                 }
               }}
             >

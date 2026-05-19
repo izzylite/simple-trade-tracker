@@ -58,8 +58,8 @@ declare module '@mui/material/styles' {
        *
        * | key  | px  | role                          |
        * |------|-----|-------------------------------|
-       * | xs   | 4   | tooltip nub, tiny accents     |
-       * | sm   | 6   | chips                         |
+       * | xs   | 2   | tooltip nub, tiny accents     |
+       * | sm   | 4   | chips                         |
        * | md   | 8   | buttons, inputs               |
        * | lg   | 12  | cards, dialogs, menus         |
        * | xl   | 16  | side-nav tile                 |

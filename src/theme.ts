@@ -103,7 +103,7 @@ export function createAppTheme(mode: 'light' | 'dark') {
         focusRing: `0 0 0 3px ${alpha(palette.violet.main, 0.15)}`,
         focusRingStrong: `0 0 0 3px ${alpha(palette.violet.main, 0.25)}`,
         // DESIGN.md radius scale — named so component sx reads as intent.
-        radius: { xs: 4, sm: 6, md: 8, lg: 12, xl: 16, xxl: 24, pill: 999 },
+        radius: { xs: 2, sm: 4, md: 8, lg: 12, xl: 16, xxl: 24, pill: 999 },
         // Side-nav's ease-out-quart — the canonical confidence curve.
         easing: { smooth: 'cubic-bezier(0.22, 1, 0.36, 1)' },
       },

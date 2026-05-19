@@ -1,7 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import {
   Box,
-  Paper,
   Typography,
   Stack,
   Chip,
@@ -9,21 +8,25 @@ import {
   IconButton,
   Skeleton,
 } from '@mui/material';
-import { alpha, useTheme } from '@mui/material/styles';
+import { useTheme } from '@mui/material/styles';
 import {
   TrendingUp,
   TrendingDown,
   Warning,
-  Info,
   HelpOutline,
   Tune,
+  Insights,
 } from '@mui/icons-material';
 import { Trade } from 'features/calendar/types/dualWrite';
 import { TagPatternInsight } from 'features/performance/types/score';
 import { tagPatternService } from 'features/performance/services/tagPatternService';
 import { getTagChipStyles, formatTagForDisplay } from 'utils/tagColors';
-import { scrollbarStyles } from 'styles/scrollbarStyles';
 import TagSelectionDialog, { SelectableItem } from 'features/calendar/components/TagSelectionDialog';
+import { EYEBROW_SX, TNUM, getInsetTileSx } from 'styles/designTokens';
+import CardShell from 'components/common/CardShell';
+import InfoStrip from 'components/common/InfoStrip';
+import CompareBar from 'components/common/CompareBar';
+import EyebrowRow from 'components/common/EyebrowRow';
 
 interface TagPatternAnalysisProps {
   trades: Trade[];
@@ -53,6 +56,7 @@ const TagPatternAnalysis: React.FC<TagPatternAnalysisProps> = ({
   onExcludedTagsChange,
 }) => {
   const theme = useTheme();
+
   const [analysis, setAnalysis] = useState<Awaited<
     ReturnType<typeof tagPatternService.analyzeTagPatterns>
   > | null>(null);
@@ -102,9 +106,15 @@ const TagPatternAnalysis: React.FC<TagPatternAnalysisProps> = ({
       : type === 'declining_pattern'
       ? theme.palette.error.main
       : theme.palette.warning.main;
+  const infoStripTone = (type: TagPatternInsight['type']): 'success' | 'error' | 'warning' =>
+    type === 'high_performance'
+      ? 'success'
+      : type === 'declining_pattern'
+        ? 'error'
+        : 'warning';
   const insightIcon = (type: TagPatternInsight['type']) => {
     const Icon = type === 'high_performance' ? TrendingUp : type === 'declining_pattern' ? TrendingDown : Warning;
-    return <Icon sx={{ fontSize: 18, color: tone(type) }} />;
+    return <Icon sx={{ fontSize: 16 }} />;
   };
 
   const tagChips = (tags: string[]) => (
@@ -115,66 +125,33 @@ const TagPatternAnalysis: React.FC<TagPatternAnalysisProps> = ({
     </Stack>
   );
 
-  const cardSx = {
-    p: { xs: 2, sm: 3 },
-    mb: 3,
-    borderRadius: 3,
-    boxShadow: 'none',
-    bgcolor: theme.palette.mode === 'dark' ? alpha(theme.palette.common.white, 0.02) : theme.palette.background.paper,
-    border: `1px solid ${theme.palette.mode === 'dark' ? alpha(theme.palette.common.white, 0.08) : theme.palette.divider}`,
-  } as const;
-
-  const sectionLabelSx = { color: theme.palette.text.disabled, letterSpacing: 1 } as const;
-  const emptyBoxSx = {
-    py: 4,
-    textAlign: 'center' as const,
-    color: theme.palette.text.secondary,
-    border: `1px dashed ${alpha(theme.palette.divider, 0.6)}`,
-    borderRadius: 2,
-  };
-
-  const Header = (
-    <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2.5}>
-      <Stack direction="row" alignItems="center" spacing={1}>
-        <Box
-          sx={{
-            width: 28,
-            height: 28,
-            borderRadius: 1.5,
-            display: 'grid',
-            placeItems: 'center',
-            bgcolor: alpha(theme.palette.primary.main, 0.15),
-            color: theme.palette.primary.main,
-            fontSize: 16,
-          }}
-        >
-          🏷️
-        </Box>
-        <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-          Tag patterns
-        </Typography>
+  // ── Header band ─────────────────────────────────────────────────────
+  const headProps = {
+    icon: <Insights sx={{ fontSize: 16 }} />,
+    title: 'Pattern Insights',
+    eyebrow: 'Tag combinations & trends',
+    right: (
+      <>
         <Tooltip title="Combinations of tags that consistently win or lose, and patterns that are slipping recently">
-          <IconButton size="small" sx={{ color: theme.palette.text.disabled }}>
+          <IconButton size="small" sx={{ color: 'text.disabled' }}>
             <HelpOutline sx={{ fontSize: 16 }} />
           </IconButton>
         </Tooltip>
-      </Stack>
-      <Stack direction="row" alignItems="center" spacing={1}>
         {excluded.length > 0 && (
-          <Typography variant="caption" sx={{ color: theme.palette.text.disabled }}>
+          <Typography variant="caption" sx={{ color: 'text.disabled' }}>
             {excluded.length} excluded
           </Typography>
         )}
         {onExcludedTagsChange && (
           <Tooltip title="Exclude tags from this analysis">
-            <IconButton size="small" onClick={() => setExcludeOpen(true)} sx={{ color: theme.palette.text.secondary }}>
+            <IconButton size="small" onClick={() => setExcludeOpen(true)} sx={{ color: 'text.secondary' }}>
               <Tune sx={{ fontSize: 18 }} />
             </IconButton>
           </Tooltip>
         )}
-      </Stack>
-    </Stack>
-  );
+      </>
+    ),
+  };
 
   const excludeDialog = onExcludedTagsChange && (
     <ExcludeTagsDialog
@@ -192,14 +169,15 @@ const TagPatternAnalysis: React.FC<TagPatternAnalysisProps> = ({
   if (isLoading && !analysis) {
     return (
       <>
-        <Paper sx={cardSx}>
-          {Header}
-          <Stack spacing={1.5}>
-            {[0, 1, 2].map((i) => (
-              <Skeleton key={i} variant="rounded" height={44} sx={{ borderRadius: 2 }} />
-            ))}
-          </Stack>
-        </Paper>
+        <CardShell sx={{ mb: 3 }} head={headProps}>
+          <Box sx={{ p: 2.5 }}>
+            <Stack spacing={1.25}>
+              {[0, 1, 2].map((i) => (
+                <Skeleton key={i} variant="rounded" height={56} sx={{ borderRadius: '10px' }} />
+              ))}
+            </Stack>
+          </Box>
+        </CardShell>
         {excludeDialog}
       </>
     );
@@ -208,13 +186,13 @@ const TagPatternAnalysis: React.FC<TagPatternAnalysisProps> = ({
   if (!analysis || trades.length < MIN_TRADES) {
     return (
       <>
-        <Paper sx={cardSx}>
-          {Header}
-          <Box sx={emptyBoxSx}>
-            <Info sx={{ fontSize: 20, mb: 0.5, opacity: 0.6 }} />
-            <Typography variant="body2">Add at least {MIN_TRADES} trades to surface tag patterns.</Typography>
+        <CardShell sx={{ mb: 3 }} head={headProps}>
+          <Box sx={{ p: 2.5 }}>
+            <InfoStrip tone="violet">
+              Add at least {MIN_TRADES} trades to surface tag patterns.
+            </InfoStrip>
           </Box>
-        </Paper>
+        </CardShell>
         {excludeDialog}
       </>
     );
@@ -227,156 +205,179 @@ const TagPatternAnalysis: React.FC<TagPatternAnalysisProps> = ({
 
   return (
     <>
-      <Paper sx={cardSx}>
-        {Header}
+      <CardShell sx={{ mb: 3 }} head={headProps}>
+        <Box sx={{ p: 2.5, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+          {nothing && (
+            <InfoStrip tone="violet">
+              No clear tag patterns yet — keep logging trades with tags.
+            </InfoStrip>
+          )}
 
-      {nothing && (
-        <Box sx={emptyBoxSx}>
-          <Typography variant="body2">No clear tag patterns yet — keep logging trades with tags.</Typography>
-        </Box>
-      )}
-
-      {/* Insights */}
-      {insights.length > 0 && (
-        <Box mb={topCombos.length || declining.length ? 3 : 0}>
-          <Typography variant="overline" sx={sectionLabelSx}>
-            Key insights
-          </Typography>
-          <Stack spacing={1} mt={0.5}>
-            {insights.map((ins, i) => (
-              <Box
-                key={i}
-                sx={{
-                  p: 1.5,
-                  borderRadius: 2,
-                  bgcolor: alpha(tone(ins.type), 0.08),
-                  border: `1px solid ${alpha(tone(ins.type), 0.18)}`,
-                }}
-              >
-                <Stack direction="row" spacing={1} alignItems="flex-start">
-                  <Box sx={{ mt: '1px' }}>{insightIcon(ins.type)}</Box>
-                  <Box sx={{ minWidth: 0, flex: 1 }}>
-                    <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap" useFlexGap>
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        {ins.title}
+          {/* ── Insights — tone-tinted info strips ────────────────────── */}
+          {insights.length > 0 && (
+            <Box>
+              <Typography sx={EYEBROW_SX}>Key insights</Typography>
+              <Stack spacing={1} mt={1}>
+                {insights.map((ins, i) => (
+                  <InfoStrip
+                    key={i}
+                    tone={infoStripTone(ins.type)}
+                    icon={insightIcon(ins.type)}
+                  >
+                    <Box sx={{ minWidth: 0, flex: 1 }}>
+                      <Stack
+                        direction="row"
+                        alignItems="center"
+                        spacing={1}
+                        flexWrap="wrap"
+                        useFlexGap
+                      >
+                        <Typography
+                          variant="body2"
+                          sx={{ fontWeight: 600, color: 'text.primary' }}
+                        >
+                          {ins.title}
+                        </Typography>
+                        {tagChips(ins.tagCombination)}
+                      </Stack>
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          color: 'text.secondary',
+                          display: 'block',
+                          mt: 0.5,
+                          lineHeight: 1.5,
+                        }}
+                      >
+                        {ins.recommendation}
                       </Typography>
-                      {tagChips(ins.tagCombination)}
-                    </Stack>
-                    <Typography variant="caption" sx={{ color: theme.palette.text.secondary, display: 'block', mt: 0.25 }}>
-                      {ins.recommendation}
-                    </Typography>
-                  </Box>
-                </Stack>
-              </Box>
-            ))}
-          </Stack>
-        </Box>
-      )}
+                    </Box>
+                  </InfoStrip>
+                ))}
+              </Stack>
+            </Box>
+          )}
 
-      {/* Top combinations — proportion-bar list */}
-      {topCombos.length > 0 && (
-        <Box mb={declining.length ? 3 : 0}>
-          <Stack direction="row" alignItems="baseline" justifyContent="space-between">
-            <Typography variant="overline" sx={sectionLabelSx}>
-              Top combinations
-            </Typography>
-            <Typography variant="caption" sx={{ color: theme.palette.text.disabled }}>
-              by win rate
-            </Typography>
-          </Stack>
-          <Stack spacing={1} mt={0.5}>
-            {topCombos.map((c, i) => {
-              const col = winRateColor(c.win_rate);
-              return (
-                <Box
-                  key={i}
-                  sx={{
-                    display: 'grid',
-                    gridTemplateColumns: { xs: '1fr auto', sm: 'minmax(0,1fr) 120px auto' },
-                    alignItems: 'center',
-                    columnGap: 1.5,
-                    rowGap: 0.5,
-                    p: 1,
-                    borderRadius: 2,
-                    bgcolor: alpha(theme.palette.common.white, theme.palette.mode === 'dark' ? 0.02 : 0),
-                  }}
-                >
-                  <Box sx={{ minWidth: 0 }}>
-                    {tagChips(c.tags)}
-                    <Typography variant="caption" sx={{ color: theme.palette.text.disabled }}>
-                      {c.total_trades} trades · avg {fmtSigned(c.avgPnL)}
-                      {c.trend !== 'stable' && (
-                        <Box
-                          component="span"
+          {/* ── Top combinations — inset tiles with proportion bar ────── */}
+          {topCombos.length > 0 && (
+            <Box>
+              <EyebrowRow label="Top combinations" rightLabel="By win rate" />
+              <Stack spacing={1} mt={1}>
+                {topCombos.map((c, i) => {
+                  const col = winRateColor(c.win_rate);
+                  return (
+                    <Box
+                      key={i}
+                      sx={{
+                        ...getInsetTileSx(theme),
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 0.75,
+                        minWidth: 0,
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 1.25,
+                          flexWrap: 'wrap',
+                        }}
+                      >
+                        <Box sx={{ minWidth: 0, flex: 1 }}>{tagChips(c.tags)}</Box>
+                        <Typography
                           sx={{
-                            ml: 1,
-                            color: c.trend === 'improving' ? theme.palette.success.main : theme.palette.error.main,
-                            fontWeight: 600,
+                            fontSize: '0.95rem',
+                            fontWeight: 700,
+                            color: col,
+                            fontFeatureSettings: TNUM,
+                            letterSpacing: '-0.01em',
+                            whiteSpace: 'nowrap',
                           }}
                         >
-                          {c.trend === 'improving' ? '▲ improving' : '▼ declining'}
-                        </Box>
-                      )}
-                    </Typography>
-                  </Box>
-                  {/* bar */}
-                  <Box
-                    sx={{
-                      height: 8,
-                      borderRadius: 4,
-                      bgcolor: alpha(theme.palette.common.white, theme.palette.mode === 'dark' ? 0.06 : 0.1),
-                      overflow: 'hidden',
-                      order: { xs: 3, sm: 0 },
-                      gridColumn: { xs: '1 / -1', sm: 'auto' },
-                    }}
+                          {fmtPct(c.win_rate)}
+                        </Typography>
+                      </Box>
+
+                      {/* proportion bar */}
+                      <CompareBar value={Math.max(2, c.win_rate)} pct color={col} />
+
+                      <Typography
+                        sx={{
+                          fontSize: '0.72rem',
+                          color: 'text.tertiary',
+                          fontFeatureSettings: TNUM,
+                        }}
+                      >
+                        {c.total_trades} trades · avg {fmtSigned(c.avgPnL)}
+                        {c.trend !== 'stable' && (
+                          <Box
+                            component="span"
+                            sx={{
+                              ml: 1,
+                              color:
+                                c.trend === 'improving'
+                                  ? theme.palette.success.main
+                                  : theme.palette.error.main,
+                              fontWeight: 600,
+                            }}
+                          >
+                            {c.trend === 'improving' ? '▲ improving' : '▼ declining'}
+                          </Box>
+                        )}
+                      </Typography>
+                    </Box>
+                  );
+                })}
+              </Stack>
+            </Box>
+          )}
+
+          {/* ── Declining — tone-tinted info strips ───────────────────── */}
+          {declining.length > 0 && (
+            <Box>
+              <Typography sx={{ ...EYEBROW_SX, color: theme.palette.error.main }}>
+                Slipping
+              </Typography>
+              <Stack spacing={1} mt={1}>
+                {declining.map((c, i) => (
+                  <InfoStrip
+                    key={i}
+                    tone="error"
+                    icon={<TrendingDown sx={{ fontSize: 16 }} />}
+                    sx={{ alignItems: 'center', flexWrap: 'wrap' }}
                   >
-                    <Box sx={{ width: `${Math.max(2, Math.min(100, c.win_rate))}%`, height: '100%', bgcolor: col, borderRadius: 4 }} />
-                  </Box>
-                  <Typography variant="body2" sx={{ fontWeight: 700, color: col, textAlign: 'right', justifySelf: 'end' }}>
-                    {fmtPct(c.win_rate)}
-                  </Typography>
-                </Box>
-              );
-            })}
-          </Stack>
+                    <Box sx={{ minWidth: 0, flex: 1 }}>{tagChips(c.tags)}</Box>
+                    <Typography
+                      sx={{
+                        fontSize: '0.72rem',
+                        color: 'text.secondary',
+                        whiteSpace: 'nowrap',
+                        fontFeatureSettings: TNUM,
+                      }}
+                    >
+                      {fmtPct(c.historicalWinRate)} → {fmtPct(c.recentWinRate)}
+                    </Typography>
+                    <Typography
+                      sx={{
+                        fontSize: '0.9rem',
+                        fontWeight: 700,
+                        color: theme.palette.error.main,
+                        whiteSpace: 'nowrap',
+                        fontFeatureSettings: TNUM,
+                        letterSpacing: '-0.01em',
+                      }}
+                    >
+                      ▼{(c.historicalWinRate - c.recentWinRate).toFixed(1)}%
+                    </Typography>
+                  </InfoStrip>
+                ))}
+              </Stack>
+            </Box>
+          )}
         </Box>
-      )}
-
-      {/* Declining */}
-      {declining.length > 0 && (
-        <Box>
-          <Typography variant="overline" sx={{ color: theme.palette.error.main, letterSpacing: 1, opacity: 0.85 }}>
-            Slipping
-          </Typography>
-          <Stack spacing={1} mt={0.5}>
-            {declining.map((c, i) => (
-              <Box
-                key={i}
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 1.5,
-                  p: 1.25,
-                  borderRadius: 2,
-                  bgcolor: alpha(theme.palette.error.main, 0.06),
-                  border: `1px solid ${alpha(theme.palette.error.main, 0.18)}`,
-                }}
-              >
-                <TrendingDown sx={{ fontSize: 18, color: theme.palette.error.main }} />
-                <Box sx={{ minWidth: 0, flex: 1 }}>{tagChips(c.tags)}</Box>
-                <Typography variant="caption" sx={{ color: theme.palette.text.secondary, whiteSpace: 'nowrap' }}>
-                  {fmtPct(c.historicalWinRate)} → {fmtPct(c.recentWinRate)}
-                </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 700, color: theme.palette.error.main, whiteSpace: 'nowrap' }}>
-                  ▼{(c.historicalWinRate - c.recentWinRate).toFixed(1)}%
-                </Typography>
-              </Box>
-            ))}
-          </Stack>
-        </Box>
-      )}
-
-      </Paper>
+      </CardShell>
       {excludeDialog}
     </>
   );

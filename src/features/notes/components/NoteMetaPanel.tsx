@@ -27,6 +27,9 @@ import { getSharedTrade } from 'features/calendar/services/sharingService';
 import { logger } from 'utils/logger';
 import TradeGalleryDialog from 'features/calendar/components/TradeGalleryDialog';
 import ImageZoomDialog, { ImageZoomProp } from 'features/calendar/components/ImageZoomDialog';
+import { EYEBROW_SX, TNUM, getInsetTileSx } from 'styles/designTokens';
+import EyebrowRow from 'components/common/EyebrowRow';
+import StatTile from 'components/common/StatTile';
 
 interface NoteMetaPanelProps {
   note: Note | null;
@@ -187,22 +190,22 @@ const ReminderCardStack: React.FC<ReminderCardStackProps> = ({ notes, onSelect }
     <Box
       onClick={() => onSelect(front)}
       sx={{
-        borderRadius: 1.5,
+        borderRadius: `${theme.palette.custom.radius.lg}px`,
         bgcolor: alpha(frontColor, 0.15),
         height: 200,
         border: `1px solid ${alpha(frontColor, 0.3)}`,
         cursor: 'pointer',
         boxShadow: theme.palette.mode === 'dark'
-          ? `0 1px 2px ${alpha('#000', 0.4)}, 0 8px 20px ${alpha('#000', 0.45)}, 0 16px 40px ${alpha(frontColor, 0.18)}`
+          ? `0 1px 2px ${alpha(theme.palette.common.black, 0.4)}, 0 8px 20px ${alpha(theme.palette.common.black, 0.45)}, 0 16px 40px ${alpha(frontColor, 0.18)}`
           : `0 1px 2px ${alpha(frontColor, 0.18)}, 0 8px 20px ${alpha(frontColor, 0.22)}, 0 16px 40px ${alpha(frontColor, 0.14)}`,
         opacity: dismissingId === front.id ? 0 : 1,
         transform: dismissingId === front.id ? 'translateY(-12px)' : 'translateY(0)',
         transition: `
-          opacity ${DISMISS_DURATION_MS}ms cubic-bezier(0.22, 1, 0.36, 1),
-          transform ${DISMISS_DURATION_MS}ms cubic-bezier(0.22, 1, 0.36, 1),
-          background-color 200ms cubic-bezier(0.22, 1, 0.36, 1),
-          border-color 200ms cubic-bezier(0.22, 1, 0.36, 1),
-          box-shadow 200ms cubic-bezier(0.22, 1, 0.36, 1)
+          opacity ${DISMISS_DURATION_MS}ms ${theme.palette.custom.easing.smooth},
+          transform ${DISMISS_DURATION_MS}ms ${theme.palette.custom.easing.smooth},
+          background-color 200ms ${theme.palette.custom.easing.smooth},
+          border-color 200ms ${theme.palette.custom.easing.smooth},
+          box-shadow 200ms ${theme.palette.custom.easing.smooth}
         `,
         pointerEvents: dismissingId === front.id ? 'none' : 'auto',
         px: 2,
@@ -306,23 +309,6 @@ const NoteMetaPanel: React.FC<NoteMetaPanelProps> = ({ note, notes, onSelectNote
     [notes]
   );
 
-  const sectionLabelSx = {
-    fontSize: '0.65rem',
-    fontWeight: 600,
-    letterSpacing: '0.16em',
-    textTransform: 'uppercase' as const,
-    color: 'text.disabled',
-    mb: 1.25,
-  };
-
-  const statCardSx = {
-    bgcolor: alpha(theme.palette.common.white, theme.palette.mode === 'dark' ? 0.03 : 0.6),
-    border: `1px solid ${theme.palette.divider}`,
-    borderRadius: '10px',
-    px: 1.5,
-    py: 1.25,
-  };
-
   const handleSelect = useCallback(
     (n: Note) => onSelectNote?.(n),
     [onSelectNote]
@@ -345,33 +331,19 @@ const NoteMetaPanel: React.FC<NoteMetaPanelProps> = ({ note, notes, onSelectNote
 
          {/* Reminders — persists across note selection */}
         {hasReminders && (
-          <Box>
-            <Typography sx={sectionLabelSx}>Reminders</Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+            <EyebrowRow label="Reminders" />
             <ReminderCardStack notes={reminderNotes} onSelect={handleSelect} />
           </Box>
         )}
 
         {/* Stats */}
         {showStats && (
-          <Box>
-            <Typography sx={sectionLabelSx}>Stats</Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+            <EyebrowRow label="Stats" />
             <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
-              <Box sx={statCardSx}>
-                <Typography sx={{ fontSize: '0.62rem', color: 'text.disabled', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-                  Words
-                </Typography>
-                <Typography sx={{ fontWeight: 700, fontFeatureSettings: "'tnum' on", fontSize: '1rem', mt: 0.25, letterSpacing: '-0.015em' }}>
-                  {wordCount.toLocaleString()}
-                </Typography>
-              </Box>
-              <Box sx={statCardSx}>
-                <Typography sx={{ fontSize: '0.62rem', color: 'text.disabled', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-                  Read
-                </Typography>
-                <Typography sx={{ fontWeight: 700, fontFeatureSettings: "'tnum' on", fontSize: '1rem', mt: 0.25, letterSpacing: '-0.015em' }}>
-                  {readMins}m
-                </Typography>
-              </Box>
+              <StatTile label="Words" value={wordCount.toLocaleString()} size="sm" />
+              <StatTile label="Read" value={`${readMins}m`} size="sm" />
             </Box>
           </Box>
         )}
@@ -396,8 +368,8 @@ const NoteMetaPanel: React.FC<NoteMetaPanelProps> = ({ note, notes, onSelectNote
             note so the user can jump back to a referenced trade without
             scrolling the body. Hidden when the note has none. */}
         {note && linkedTrades.length > 0 && (
-          <Box>
-            <Typography sx={sectionLabelSx}>Linked Trades</Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+            <EyebrowRow label="Linked Trades" />
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
               {linkedTrades.map((t) => {
                 const isWin = t.pnl >= 0;
@@ -431,16 +403,15 @@ const NoteMetaPanel: React.FC<NoteMetaPanelProps> = ({ note, notes, onSelectNote
                     key={t.tradeId}
                     onClick={() => { void handleOpenLinkedTrade(t.shareId); }}
                     sx={{
+                      ...getInsetTileSx(theme),
                       display: 'flex',
                       alignItems: 'center',
                       gap: 1,
+                      p: 0,
                       px: 1.25,
                       py: 0.85,
                       cursor: 'pointer',
-                      borderRadius: '8px',
-                      border: `1px solid ${theme.palette.divider}`,
-                      bgcolor: alpha(theme.palette.common.white, theme.palette.mode === 'dark' ? 0.02 : 0.5),
-                      transition: 'all 150ms cubic-bezier(0.22, 1, 0.36, 1)',
+                      transition: `background-color 150ms ${theme.palette.custom.easing.smooth}, border-color 150ms ${theme.palette.custom.easing.smooth}`,
                       '&:hover': {
                         bgcolor: alpha(color, 0.08),
                         borderColor: alpha(color, 0.35),
@@ -451,7 +422,7 @@ const NoteMetaPanel: React.FC<NoteMetaPanelProps> = ({ note, notes, onSelectNote
                       sx={{
                         width: 22,
                         height: 22,
-                        borderRadius: '6px',
+                        borderRadius: `${theme.palette.custom.radius.sm}px`,
                         bgcolor: alpha(color, 0.14),
                         color,
                         display: 'flex',
@@ -478,11 +449,10 @@ const NoteMetaPanel: React.FC<NoteMetaPanelProps> = ({ note, notes, onSelectNote
                       </Typography>
                       <Typography
                         sx={{
-                          fontSize: '0.7rem',
+                          ...EYEBROW_SX,
+                          color: 'text.tertiary',
                           fontWeight: 500,
-                          color: 'text.disabled',
                           letterSpacing: '0.04em',
-                          textTransform: 'uppercase',
                           lineHeight: 1.3,
                         }}
                       >
@@ -494,7 +464,7 @@ const NoteMetaPanel: React.FC<NoteMetaPanelProps> = ({ note, notes, onSelectNote
                         fontSize: '0.82rem',
                         fontWeight: 700,
                         color,
-                        fontFeatureSettings: "'tnum' on, 'lnum' on",
+                        fontFeatureSettings: TNUM,
                         letterSpacing: '-0.01em',
                         flexShrink: 0,
                       }}
@@ -510,8 +480,8 @@ const NoteMetaPanel: React.FC<NoteMetaPanelProps> = ({ note, notes, onSelectNote
 
         {/* Outline */}
         {note && headings.length > 0 && (
-          <Box>
-            <Typography sx={sectionLabelSx}>Outline</Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+            <EyebrowRow label="Outline" />
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
               {headings.map((h, i) => (
                 <Box
@@ -530,11 +500,11 @@ const NoteMetaPanel: React.FC<NoteMetaPanelProps> = ({ note, notes, onSelectNote
                     fontSize: h.level === 3 ? '0.78rem' : '0.83rem',
                     fontWeight: h.level === 3 ? 500 : 600,
                     cursor: 'pointer',
-                    borderRadius: '6px',
-                    transition: 'all 150ms',
+                    borderRadius: `${theme.palette.custom.radius.sm}px`,
+                    transition: `color 150ms ${theme.palette.custom.easing.smooth}, background-color 150ms ${theme.palette.custom.easing.smooth}`,
                     '&:hover': {
                       color: 'text.primary',
-                      bgcolor: alpha(theme.palette.common.white, theme.palette.mode === 'dark' ? 0.03 : 0),
+                      bgcolor: theme.palette.custom.tintViolet.soft,
                     },
                     '&::before': {
                       content: '""',
@@ -566,8 +536,8 @@ const NoteMetaPanel: React.FC<NoteMetaPanelProps> = ({ note, notes, onSelectNote
 
         {/* Details */}
         {note && (
-          <Box>
-            <Typography sx={sectionLabelSx}>Details</Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+            <EyebrowRow label="Details" />
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
               <DetailRow
                 label="Created"
@@ -637,7 +607,7 @@ const DetailRow: React.FC<{ label: string; value: string; valueColor?: string }>
   valueColor,
 }) => (
   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 1 }}>
-    <Typography sx={{ fontSize: '0.75rem', color: 'text.disabled', fontWeight: 500 }}>
+    <Typography sx={{ ...EYEBROW_SX, color: 'text.tertiary' }}>
       {label}
     </Typography>
     <Typography
@@ -646,6 +616,7 @@ const DetailRow: React.FC<{ label: string; value: string; valueColor?: string }>
         fontWeight: 600,
         color: valueColor ?? 'text.secondary',
         textAlign: 'right',
+        fontFeatureSettings: TNUM,
       }}
     >
       {value}

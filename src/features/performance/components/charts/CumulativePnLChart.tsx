@@ -10,10 +10,12 @@ import {
   ReferenceLine
 } from 'recharts';
 import { Box, Paper, Typography, useTheme } from '@mui/material';
+import { TrendingUp } from '@mui/icons-material';
 import { format } from 'date-fns';
-import { Trade } from 'features/calendar/types/dualWrite';
 import { formatValue } from 'utils/formatters';
 import { log } from 'utils/logger';
+import CardShell from 'components/common/CardShell';
+import { TNUM } from 'styles/designTokens';
 
 interface CumulativePnLChartProps {
   chartData: any[];
@@ -25,13 +27,21 @@ interface CumulativePnLChartProps {
 
 // Custom Y-axis tick component
 const CustomYAxisTick = (props: any) => {
-  const { x, y, payload } = props;
+  const { x, y, payload, tickFill } = props;
   const value = payload.value;
   const formattedValue = formatValue(value);
 
   return (
     <g transform={`translate(${x},${y})`}>
-      <text x={0} y={0} dy={5} textAnchor="end" fill="rgba(255,255,255,0.38)" fontSize={12}>
+      <text
+        x={0}
+        y={0}
+        dy={5}
+        textAnchor="end"
+        fill={tickFill}
+        fontSize={12}
+        style={{ fontFeatureSettings: TNUM }}
+      >
         {formattedValue}
       </text>
     </g>
@@ -39,31 +49,67 @@ const CustomYAxisTick = (props: any) => {
 };
 
 // Custom tooltip component
-const CustomTooltip = ({ active, payload, label, type }: any) => {
+const CustomTooltip = ({ active, payload, label }: any) => {
   const theme = useTheme();
-  
+  const radius = theme.palette.custom.radius;
+
   if (active && payload && payload.length) {
     const data = payload[0].payload;
-    
+
     return (
-      <Paper sx={{ p: 1.5, boxShadow: theme.shadows[3] }}>
-        <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 0.5 }}>
+      <Paper
+        elevation={0}
+        sx={{
+          p: 1.5,
+          bgcolor: 'background.paper',
+          border: `1px solid ${theme.palette.divider}`,
+          borderRadius: `${radius.md}px`,
+          boxShadow: 'none',
+        }}
+      >
+        <Typography
+          variant="body2"
+          sx={{
+            fontWeight: 600,
+            mb: 0.5,
+            color: 'text.primary',
+            letterSpacing: '-0.01em',
+          }}
+        >
           {label}
         </Typography>
         <Typography
           variant="body2"
           sx={{
-            color: data.dailyChange > 0 ? '#22c55e' : data.dailyChange < 0 ? '#ef4444' : 'text.secondary',
-            fontWeight: 'bold'
+            color:
+              data.dailyChange > 0
+                ? 'success.main'
+                : data.dailyChange < 0
+                  ? 'error.main'
+                  : 'text.secondary',
+            fontWeight: 700,
+            fontFeatureSettings: TNUM,
+            letterSpacing: '-0.01em',
           }}
         >
           {formatValue(data.dailyChange)}
         </Typography>
-        <Typography variant="body2" color="text.secondary">
+        <Typography
+          variant="body2"
+          sx={{ color: 'text.tertiary', fontSize: '0.75rem', fontFeatureSettings: TNUM }}
+        >
           Cumulative P&L: {formatValue(data.cumulativePnL)}
         </Typography>
         {data.trades && data.trades.length > 0 && (
-          <Typography variant="body2" sx={{ color: theme.palette.primary.main, fontSize: '0.75rem', mt: 0.5 }}>
+          <Typography
+            variant="body2"
+            sx={{
+              color: 'primary.main',
+              fontSize: '0.7rem',
+              mt: 0.5,
+              fontWeight: 500,
+            }}
+          >
             Click to view {data.trades.length} trade{data.trades.length > 1 ? 's' : ''}
           </Typography>
         )}
@@ -81,135 +127,186 @@ const CumulativePnLChart: React.FC<CumulativePnLChartProps> = ({
   timePeriod
 }) => {
   const theme = useTheme();
-  
+  const radius = theme.palette.custom.radius;
+
   // Define colors
   const COLORS = {
-    win: '#22c55e',
-    loss: '#ef4444',
-    zero: '#94a3b8',
-    breakEven: '#64748b'
+    win: theme.palette.success.main,
+    loss: theme.palette.error.main,
+    zero: theme.palette.text.tertiary,
+    breakEven: theme.palette.text.secondary,
   };
 
-  return (
-    <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography sx={{ fontWeight: 700, fontSize: '1rem', letterSpacing: '-0.01em' }}>Cumulative P&L</Typography>
-        {monthly_target && targetValue !== null && (
-          <Box
-            sx={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              bgcolor: 'rgba(124,58,237,0.16)',
-              border: '1px solid rgba(124,58,237,0.32)',
-              color: '#ede9fe',
-              px: 1.25,
-              py: 0.5,
-              borderRadius: '8px',
-              fontSize: '0.78rem',
-              fontWeight: 600,
-              letterSpacing: '0.01em',
-              fontFeatureSettings: "'tnum' on, 'lnum' on",
-            }}
-          >
-            Target: {monthly_target}% (${targetValue?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
-          </Box>
-        )}
+  const periodLabel =
+    timePeriod === 'month'
+      ? 'Current month'
+      : timePeriod === 'quarter'
+        ? 'Current quarter'
+        : timePeriod === 'ytd'
+          ? 'Year to date'
+          : timePeriod === 'year'
+            ? 'Year'
+            : 'All time';
+
+  const targetChip = monthly_target && targetValue !== null ? (
+    <Box
+      sx={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 0.5,
+        bgcolor: theme.palette.custom.tintViolet.strong,
+        border: `1px solid ${theme.palette.divider}`,
+        color: 'primary.main',
+        px: 1.25,
+        py: 0.5,
+        borderRadius: `${radius.md}px`,
+        fontSize: '0.75rem',
+        fontWeight: 600,
+        letterSpacing: '0.01em',
+        fontFeatureSettings: TNUM,
+        flexShrink: 0,
+      }}
+    >
+      <Box
+        component="span"
+        sx={{
+          fontSize: '0.625rem',
+          fontWeight: 700,
+          letterSpacing: '0.06em',
+          textTransform: 'uppercase',
+          color: 'text.secondary',
+          mr: 0.25,
+        }}
+      >
+        Target
       </Box>
-      <ResponsiveContainer width="100%" height={300}>
-        <AreaChart data={chartData}>
-          <defs>
-            <linearGradient id="colorPnLWin" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor={COLORS.win} stopOpacity={0.2} />
-              <stop offset="95%" stopColor={COLORS.win} stopOpacity={0} />
-            </linearGradient>
-            <linearGradient id="colorPnLLoss" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor={COLORS.loss} stopOpacity={0.2} />
-              <stop offset="95%" stopColor={COLORS.loss} stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.06)" />
-          <XAxis
-            dataKey="date"
-            axisLine={false}
-            tickLine={false}
-            interval="preserveStartEnd"
-            minTickGap={timePeriod === 'month' ? 32 : 56}
-            tick={{
-              fill: theme.palette.text.secondary,
-              fontSize: 10
-            }}
-          />
-          <YAxis
-            axisLine={false}
-            tickLine={false}
-            tick={<CustomYAxisTick />}
-          />
-          <Tooltip content={(props) => <CustomTooltip {...props} type="cumulative" />} />
-          {targetValue !== null && (
-            <>
-              <ReferenceLine
-                y={targetValue}
-                stroke={theme.palette.primary.main}
-                strokeDasharray="4 4"
-                strokeWidth={2}
-              />
-              {/* Add a semi-transparent area above the target line */}
-              <Area
-                type="monotone"
-                dataKey="cumulativePnL"
-                stroke="none"
-                fill={theme.palette.primary.main}
-                fillOpacity={0.05}
-                baseValue={targetValue}
-              />
-            </>
-          )}
-          <ReferenceLine y={0} stroke={COLORS.zero} strokeDasharray="3 3" />
-          <Area
-            type="monotone"
-            dataKey="cumulativePnL"
-            stroke={COLORS.win}
-            fill="url(#colorPnLWin)"
-            strokeWidth={2}
-            name="Cumulative P&L"
-            style={{ cursor: 'pointer' }}
-            activeDot={(props) => {
-              const { cx, cy, index } = props;
-              return (
-                <circle
-                  cx={cx}
-                  cy={cy}
-                  r={6}
-                  stroke={theme.palette.background.paper}
-                  strokeWidth={2}
-                  fill={theme.palette.primary.main}
-                  style={{ cursor: 'pointer' }}
-                  onClick={() => {
-                    log('Dot clicked, Index:', index);
-                    const dataPoint = chartData[index];
-                    if (dataPoint && dataPoint.trades && dataPoint.trades.length > 0) {
-                      const formattedDate = format(dataPoint.fullDate, 'MMMM d, yyyy');
-                      setMultipleTradesDialog({
-                        open: true,
-                        trades: dataPoint.trades,
-                        title: formattedDate,
-                        expandedTradeId: dataPoint.trades.length === 1 ? dataPoint.trades[0].id : null
-                      });
-                    }
-                  }}
-                />
-              );
-            }}
-            dot={{
-              r: 3,
-              fill: COLORS.win,
-              stroke: theme.palette.background.paper,
-              strokeWidth: 1
-            }}
-          />
-        </AreaChart>
-      </ResponsiveContainer>
+      <Box component="span" sx={{ color: 'primary.main' }}>
+        {monthly_target}%
+      </Box>
+      <Box component="span" sx={{ color: 'text.tertiary' }}>
+        · ${targetValue?.toLocaleString(undefined, {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })}
+      </Box>
     </Box>
+  ) : undefined;
+
+  return (
+    <CardShell
+      radius="lg"
+      head={{
+        icon: <TrendingUp sx={{ fontSize: 16 }} />,
+        title: 'Cumulative P&L',
+        eyebrow: periodLabel,
+        right: targetChip,
+      }}
+    >
+      {/* Chart body */}
+      <Box sx={{ p: 2 }}>
+        <ResponsiveContainer width="100%" height={300}>
+          <AreaChart data={chartData}>
+            <defs>
+              <linearGradient id="colorPnLWin" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor={COLORS.win} stopOpacity={0.2} />
+                <stop offset="95%" stopColor={COLORS.win} stopOpacity={0} />
+              </linearGradient>
+              <linearGradient id="colorPnLLoss" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor={COLORS.loss} stopOpacity={0.2} />
+                <stop offset="95%" stopColor={COLORS.loss} stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid
+              strokeDasharray="3 3"
+              vertical={false}
+              stroke={theme.palette.divider}
+            />
+            <XAxis
+              dataKey="date"
+              axisLine={false}
+              tickLine={false}
+              interval="preserveStartEnd"
+              minTickGap={timePeriod === 'month' ? 32 : 56}
+              tick={{
+                fill: theme.palette.text.secondary,
+                fontSize: 10,
+              }}
+            />
+            <YAxis
+              axisLine={false}
+              tickLine={false}
+              tick={<CustomYAxisTick tickFill={theme.palette.text.secondary} />}
+            />
+            <Tooltip
+              cursor={{ stroke: theme.palette.divider, strokeWidth: 1 }}
+              content={(props) => <CustomTooltip {...props} />}
+            />
+            {targetValue !== null && (
+              <>
+                <ReferenceLine
+                  y={targetValue}
+                  stroke={theme.palette.primary.main}
+                  strokeDasharray="4 4"
+                  strokeWidth={2}
+                />
+                {/* Add a semi-transparent area above the target line */}
+                <Area
+                  type="monotone"
+                  dataKey="cumulativePnL"
+                  stroke="none"
+                  fill={theme.palette.primary.main}
+                  fillOpacity={0.05}
+                  baseValue={targetValue}
+                />
+              </>
+            )}
+            <ReferenceLine y={0} stroke={theme.palette.text.tertiary} strokeDasharray="3 3" />
+            <Area
+              type="monotone"
+              dataKey="cumulativePnL"
+              stroke={COLORS.win}
+              fill="url(#colorPnLWin)"
+              strokeWidth={2}
+              name="Cumulative P&L"
+              style={{ cursor: 'pointer' }}
+              activeDot={(props) => {
+                const { cx, cy, index } = props;
+                return (
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    r={6}
+                    stroke={theme.palette.background.paper}
+                    strokeWidth={2}
+                    fill={theme.palette.primary.main}
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => {
+                      log('Dot clicked, Index:', index);
+                      const dataPoint = chartData[index];
+                      if (dataPoint && dataPoint.trades && dataPoint.trades.length > 0) {
+                        const formattedDate = format(dataPoint.fullDate, 'MMMM d, yyyy');
+                        setMultipleTradesDialog({
+                          open: true,
+                          trades: dataPoint.trades,
+                          title: formattedDate,
+                          expandedTradeId: dataPoint.trades.length === 1 ? dataPoint.trades[0].id : null
+                        });
+                      }
+                    }}
+                  />
+                );
+              }}
+              dot={{
+                r: 3,
+                fill: COLORS.win,
+                stroke: theme.palette.background.paper,
+                strokeWidth: 1
+              }}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      </Box>
+    </CardShell>
   );
 };
 

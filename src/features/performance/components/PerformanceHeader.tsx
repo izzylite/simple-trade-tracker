@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import PerfPill, { PerfPillOption } from 'features/performance/components/PerfPill';
 import { TimePeriod } from 'features/performance/components/PerformanceCharts';
 import PeriodPicker from 'features/performance/components/PeriodPicker';
+import { EYEBROW_SX } from 'styles/designTokens';
 
 const PILL_OPTIONS: ReadonlyArray<PerfPillOption<TimePeriod>> = [
   { label: 'Month', value: 'month' },
@@ -64,27 +65,18 @@ const PerformanceHeader: React.FC<PerformanceHeaderProps> = ({
         mb: 3,
       }}
     >
-      <Box>
-        <Typography
-          sx={{
-            fontSize: '0.7rem',
-            fontWeight: 600,
-            letterSpacing: '0.18em',
-            textTransform: 'uppercase',
-            color: theme.palette.primary.main,
-          }}
-        >
-          Performance
-        </Typography>
+      <Box sx={{ minWidth: 0 }}>
+        <Typography sx={EYEBROW_SX}>Performance</Typography>
         <Typography
           component="h1"
           sx={{
-            fontWeight: 800,
+            fontWeight: 700,
             fontSize: '1.85rem',
             letterSpacing: '-0.025em',
             color: theme.palette.text.primary,
             mt: '6px',
             mb: 0,
+            lineHeight: 1.15,
           }}
         >
           {title}
@@ -93,8 +85,9 @@ const PerformanceHeader: React.FC<PerformanceHeaderProps> = ({
           <Typography
             sx={{
               color: theme.palette.text.secondary,
-              fontSize: '0.92rem',
-              mt: '4px',
+              fontSize: '0.875rem',
+              mt: '6px',
+              lineHeight: 1.4,
             }}
           >
             {subParts.join(' · ')}

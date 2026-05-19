@@ -27,6 +27,7 @@ import { EconomicEvent } from 'features/events/types/economicCalendar';
 import { Note, DayAbbreviation } from 'features/notes/types/note';
 import TradeDetailExpanded from './TradeDetailExpanded';
 import { scrollbarStyles } from 'styles/scrollbarStyles';
+import { EYEBROW_SX, TNUM, getInsetTileSx } from 'styles/designTokens';
 import { TradeOperationsProps } from '../types/tradeOperations';
 import { useAIChat } from 'features/orion/hooks/useAIChat';
 import { QuestionTemplate } from 'features/orion/components/aiChat/AIChatInterface';
@@ -691,6 +692,33 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
   const isInitialLoading =
     externalLoading || (isFetchMode && isLoadingTrades && effectiveTrades.length === 0);
 
+  // Shared header action button — neutral state with subtle violet hover,
+  // toggle states use tintViolet.strong + primary.main for an active pill.
+  const actionBtnSx = useMemo(
+    () => ({
+      color: 'text.secondary',
+      borderRadius: `${theme.palette.custom.radius.md}px`,
+      '&:hover': {
+        backgroundColor: theme.palette.custom.tintViolet.strong,
+        color: 'primary.main',
+      },
+    }),
+    [theme],
+  );
+
+  const activeActionBtnSx = useMemo(
+    () => ({
+      color: 'primary.main',
+      borderRadius: `${theme.palette.custom.radius.md}px`,
+      bgcolor: theme.palette.custom.tintViolet.strong,
+      '&:hover': {
+        backgroundColor: theme.palette.custom.tintViolet.strong,
+        color: 'primary.main',
+      },
+    }),
+    [theme],
+  );
+
   // Only return null if not in fetch mode and no trade
   if (!currentTrade && !isInitialLoading) {
     return null;
@@ -716,6 +744,8 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
           display: 'flex',
           flexDirection: 'column',
           backgroundColor: theme.palette.background.default,
+          borderRadius: `${theme.palette.custom.radius.xl}px`,
+          border: `1px solid ${theme.palette.divider}`,
           overflow: 'hidden',
           position: 'relative'
         }
@@ -726,14 +756,15 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        p: 2,
+        px: 2.25,
+        py: 1.5,
         borderBottom: `1px solid ${theme.palette.divider}`,
         backgroundColor: theme.palette.background.paper
       }}>
 
-        <Box sx={{ display: 'flex', flex: 1 }}>
+        <Box sx={{ display: 'flex', flex: 1, minWidth: 0 }}>
           {/* Navigation and Title */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, minWidth: 0 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
             {/* Previous Button */}
             <Tooltip
               title={isInitialLoading ? "Loading..." : isAtStart && isFetchMode ? "At first trade" : "Previous trade (←)"}
@@ -744,10 +775,8 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
                   onClick={navigatePrevious}
                   disabled={isInitialLoading || effectiveTrades.length <= 1 || (isAtStart && isFetchMode)}
                   sx={{
+                    ...actionBtnSx,
                     color: isInitialLoading || effectiveTrades.length <= 1 || (isAtStart && isFetchMode) ? 'text.disabled' : 'text.primary',
-                    '&:hover': {
-                      backgroundColor: alpha(theme.palette.primary.main, 0.1)
-                    }
                   }}
                 >
                   <ArrowBackIcon />
@@ -756,9 +785,13 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
             </Tooltip>
 
             {/* Title and Counter */}
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, minWidth: 0 }}>
-              <Typography variant="h6" sx={{
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25, minWidth: 0 }}>
+              <Typography sx={{
                 fontWeight: 600,
+                fontSize: '1rem',
+                letterSpacing: '-0.015em',
+                color: 'text.primary',
+                lineHeight: 1.3,
                 wordBreak: 'break-word',
                 overflowWrap: 'break-word'
               }}>
@@ -766,7 +799,7 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                 {isInitialLoading ? (
-                  <Shimmer height={24} width={80} borderRadius={12} variant="wave" intensity="medium" />
+                  <Shimmer height={22} width={80} borderRadius={theme.palette.custom.radius.md} variant="wave" intensity="medium" />
                 ) : (
                   <Chip
                     size="small"
@@ -775,18 +808,25 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
                       : `${safeCurrentIndex + 1} of ${effectiveTrades.length}`
                     }
                     sx={{
-                      backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                      backgroundColor: theme.palette.custom.tintViolet.strong,
                       color: 'primary.main',
-                      fontWeight: 600
+                      fontWeight: 600,
+                      fontFeatureSettings: TNUM,
+                      borderRadius: `${theme.palette.custom.radius.md}px`,
+                      height: 22,
+                      '& .MuiChip-label': { px: 1 }
                     }}
                   />
                 )}
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <CalendarIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+                  <CalendarIcon sx={{ fontSize: 14, color: 'text.tertiary' }} />
                   {isInitialLoading ? (
                     <Shimmer height={14} width={100} borderRadius={4} variant="wave" intensity="low" />
                   ) : (
-                    <Typography variant="caption" color="text.secondary" sx={{
+                    <Typography sx={{
+                      ...EYEBROW_SX,
+                      color: 'text.tertiary',
+                      fontFeatureSettings: TNUM,
                       wordBreak: 'break-word',
                       overflowWrap: 'break-word'
                     }}>
@@ -807,10 +847,8 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
                   onClick={navigateNext}
                   disabled={effectiveTrades.length <= 1 || isLoadingNext || (isAtEnd && !hasMoreTrades && isFetchMode)}
                   sx={{
+                    ...actionBtnSx,
                     color: effectiveTrades.length <= 1 || (isAtEnd && !hasMoreTrades && isFetchMode) ? 'text.disabled' : 'text.primary',
-                    '&:hover': {
-                      backgroundColor: alpha(theme.palette.primary.main, 0.1)
-                    }
                   }}
                 >
                   {isLoadingNext ? (
@@ -825,7 +863,7 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
         </Box>
 
         {/* Tabs, Immersive, and History Controls */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 2 }}>
           {/* Immersive Mode Button */}
           {!isInitialLoading && currentTrade?.images &&
             currentTrade.images.length > 0 && (
@@ -841,15 +879,7 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
                   setImmersiveImageIndex(0);
                   setImmersiveMode(true);
                 }}
-                sx={{
-                  color: 'text.secondary',
-                  '&:hover': {
-                    backgroundColor: alpha(
-                      theme.palette.primary.main, 0.1
-                    ),
-                    color: 'primary.main'
-                  }
-                }}
+                sx={actionBtnSx}
               >
                 <SlideshowIcon sx={{ fontSize: 20 }} />
               </IconButton>
@@ -870,11 +900,7 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
                   onClick={handleOpenGamePlan}
                   disabled={loadingGamePlan}
                   sx={{
-                    color: 'text.secondary',
-                    '&:hover': {
-                      backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                      color: 'primary.main',
-                    },
+                    ...actionBtnSx,
                     '&:disabled': { color: 'text.disabled' },
                   }}
                 >
@@ -898,16 +924,7 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
               <IconButton
                 size="small"
                 onClick={handleToggleEvents}
-                sx={{
-                  color: eventsOpen ? 'primary.main' : 'text.secondary',
-                  bgcolor: eventsOpen
-                    ? alpha(theme.palette.primary.main, 0.12)
-                    : 'transparent',
-                  '&:hover': {
-                    backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                    color: 'primary.main',
-                  },
-                }}
+                sx={eventsOpen ? activeActionBtnSx : actionBtnSx}
               >
                 <EconomicIcon sx={{ fontSize: 20 }} />
               </IconButton>
@@ -923,16 +940,7 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
             <IconButton
               size="small"
               onClick={handleToggleOrion}
-              sx={{
-                color: orionOpen ? 'primary.main' : 'text.secondary',
-                bgcolor: orionOpen
-                  ? alpha(theme.palette.primary.main, 0.12)
-                  : 'transparent',
-                '&:hover': {
-                  backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                  color: 'primary.main',
-                },
-              }}
+              sx={orionOpen ? activeActionBtnSx : actionBtnSx}
             >
               <AssistantIcon sx={{ fontSize: 20 }} />
             </IconButton>
@@ -943,7 +951,9 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
         <IconButton
           onClick={onClose}
           sx={{
+            ml: 0.5,
             color: 'text.secondary',
+            borderRadius: `${theme.palette.custom.radius.md}px`,
             '&:hover': {
               backgroundColor: alpha(theme.palette.error.main, 0.1),
               color: 'error.main'
@@ -991,81 +1001,61 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
               {/* Trade name row: Icon + Name + Action buttons */}
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                  <Shimmer height={28} width={28} borderRadius={4} variant="wave" intensity="medium" />
-                  <Shimmer height={28} width={120} borderRadius={4} variant="wave" intensity="medium" />
+                  <Shimmer height={28} width={28} borderRadius={theme.palette.custom.radius.xs} variant="wave" intensity="medium" />
+                  <Shimmer height={28} width={120} borderRadius={theme.palette.custom.radius.xs} variant="wave" intensity="medium" />
                 </Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Shimmer height={32} width={32} borderRadius="50%" variant="wave" intensity="low" />
-                  <Shimmer height={32} width={32} borderRadius="50%" variant="wave" intensity="low" />
-                  <Shimmer height={32} width={32} borderRadius="50%" variant="wave" intensity="low" />
+                  <Shimmer height={32} width={32} borderRadius={theme.palette.custom.radius.xs} variant="wave" intensity="low" />
+                  <Shimmer height={32} width={32} borderRadius={theme.palette.custom.radius.xs} variant="wave" intensity="low" />
+                  <Shimmer height={32} width={32} borderRadius={theme.palette.custom.radius.xs} variant="wave" intensity="low" />
                 </Box>
               </Box>
 
               {/* Properties Section Header */}
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Shimmer height={16} width={16} borderRadius={4} variant="wave" intensity="low" />
-                <Shimmer height={16} width={80} borderRadius={4} variant="wave" intensity="low" />
+                <Shimmer height={14} width={14} borderRadius={4} variant="wave" intensity="low" />
+                <Shimmer height={11} width={80} borderRadius={4} variant="wave" intensity="low" />
               </Box>
 
-              {/* Properties 2x2 Grid */}
+              {/* Properties 2x2 Grid — canonical inset tile pattern */}
               <Box sx={{
                 display: 'grid',
                 gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
-                gap: 2
+                gap: 1.25
               }}>
-                {/* PnL Card */}
-                <Box sx={{
-                  p: 2,
-                  borderRadius: 2,
-                  bgcolor: theme.palette.background.paper,
-                  border: `1px solid ${alpha(theme.palette.divider, 0.1)}`
-                }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
+                {/* PnL Tile */}
+                <Box sx={getInsetTileSx(theme)}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.75 }}>
                     <Shimmer height={14} width={14} borderRadius={4} variant="wave" intensity="low" />
-                    <Shimmer height={14} width={30} borderRadius={4} variant="wave" intensity="low" />
+                    <Shimmer height={11} width={30} borderRadius={4} variant="wave" intensity="low" />
                   </Box>
-                  <Shimmer height={28} width={80} borderRadius={4} variant="wave" intensity="medium" />
+                  <Shimmer height={24} width={80} borderRadius={4} variant="wave" intensity="medium" />
                 </Box>
 
-                {/* Date Card */}
-                <Box sx={{
-                  p: 2,
-                  borderRadius: 2,
-                  bgcolor: theme.palette.background.paper,
-                  border: `1px solid ${alpha(theme.palette.divider, 0.1)}`
-                }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
+                {/* Date Tile */}
+                <Box sx={getInsetTileSx(theme)}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.75 }}>
                     <Shimmer height={14} width={14} borderRadius={4} variant="wave" intensity="low" />
-                    <Shimmer height={14} width={35} borderRadius={4} variant="wave" intensity="low" />
+                    <Shimmer height={11} width={35} borderRadius={4} variant="wave" intensity="low" />
                   </Box>
                   <Shimmer height={20} width={130} borderRadius={4} variant="wave" intensity="medium" />
                 </Box>
 
-                {/* Risk to Reward Card */}
-                <Box sx={{
-                  p: 2,
-                  borderRadius: 2,
-                  bgcolor: theme.palette.background.paper,
-                  border: `1px solid ${alpha(theme.palette.divider, 0.1)}`
-                }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
+                {/* Risk to Reward Tile */}
+                <Box sx={getInsetTileSx(theme)}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.75 }}>
                     <Shimmer height={14} width={14} borderRadius={4} variant="wave" intensity="low" />
-                    <Shimmer height={14} width={90} borderRadius={4} variant="wave" intensity="low" />
+                    <Shimmer height={11} width={90} borderRadius={4} variant="wave" intensity="low" />
                   </Box>
                   <Shimmer height={24} width={40} borderRadius={4} variant="wave" intensity="medium" sx={{ mb: 0.5 }} />
-                  <Shimmer height={14} width={120} borderRadius={4} variant="wave" intensity="low" />
+                  <Shimmer height={11} width={120} borderRadius={4} variant="wave" intensity="low" />
                 </Box>
 
-                {/* Session Card */}
-                <Box sx={{
-                  p: 2,
-                  borderRadius: 2,
-                  bgcolor: theme.palette.background.paper,
-                  border: `1px solid ${alpha(theme.palette.divider, 0.1)}`
-                }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
+                {/* Session Tile */}
+                <Box sx={getInsetTileSx(theme)}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.75 }}>
                     <Shimmer height={14} width={14} borderRadius={4} variant="wave" intensity="low" />
-                    <Shimmer height={14} width={55} borderRadius={4} variant="wave" intensity="low" />
+                    <Shimmer height={11} width={55} borderRadius={4} variant="wave" intensity="low" />
                   </Box>
                   <Shimmer height={20} width={60} borderRadius={4} variant="wave" intensity="medium" />
                 </Box>
@@ -1074,13 +1064,13 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
               {/* Images Section */}
               <Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                  <Shimmer height={16} width={16} borderRadius={4} variant="wave" intensity="low" />
-                  <Shimmer height={16} width={55} borderRadius={4} variant="wave" intensity="low" />
+                  <Shimmer height={14} width={14} borderRadius={4} variant="wave" intensity="low" />
+                  <Shimmer height={11} width={55} borderRadius={4} variant="wave" intensity="low" />
                 </Box>
-                <Box sx={{ display: 'flex', gap: 2 }}>
-                  <Shimmer height={100} width="100%" borderRadius={2} variant="wave" intensity="medium" sx={{ flex: 1 }} />
-                  <Shimmer height={100} width="100%" borderRadius={2} variant="wave" intensity="medium" sx={{ flex: 1 }} />
-                  <Shimmer height={100} width="100%" borderRadius={2} variant="wave" intensity="medium" sx={{ flex: 1 }} />
+                <Box sx={{ display: 'flex', gap: 1.25 }}>
+                  <Shimmer height={100} width="100%" borderRadius={theme.palette.custom.radius.xs} variant="wave" intensity="medium" sx={{ flex: 1 }} />
+                  <Shimmer height={100} width="100%" borderRadius={theme.palette.custom.radius.xs} variant="wave" intensity="medium" sx={{ flex: 1 }} />
+                  <Shimmer height={100} width="100%" borderRadius={theme.palette.custom.radius.xs} variant="wave" intensity="medium" sx={{ flex: 1 }} />
                 </Box>
               </Box>
 
@@ -1088,14 +1078,14 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
               <Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Shimmer height={16} width={16} borderRadius={4} variant="wave" intensity="low" />
-                    <Shimmer height={16} width={40} borderRadius={4} variant="wave" intensity="low" />
+                    <Shimmer height={14} width={14} borderRadius={4} variant="wave" intensity="low" />
+                    <Shimmer height={11} width={40} borderRadius={4} variant="wave" intensity="low" />
                   </Box>
                   <Shimmer height={20} width={20} borderRadius={4} variant="wave" intensity="low" />
                 </Box>
                 <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                   {[140, 180, 100, 160, 80, 100, 80, 120].map((width, i) => (
-                    <Shimmer key={i} height={28} width={width} borderRadius={14} variant="wave" intensity="medium" />
+                    <Shimmer key={i} height={28} width={width} borderRadius={theme.palette.custom.radius.pill} variant="wave" intensity="medium" />
                   ))}
                 </Box>
               </Box>
@@ -1258,7 +1248,9 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
                   backgroundColor: alpha('#fff', 0.15),
                   color: '#fff',
                   fontWeight: 600,
-                  fontSize: '0.8rem'
+                  fontSize: '0.8rem',
+                  fontFeatureSettings: TNUM,
+                  borderRadius: `${theme.palette.custom.radius.md}px`
                 }}
               />
               <Chip
@@ -1271,7 +1263,9 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
                   backgroundColor: alpha('#fff', 0.15),
                   color: '#fff',
                   fontWeight: 600,
-                  fontSize: '0.8rem'
+                  fontSize: '0.8rem',
+                  fontFeatureSettings: TNUM,
+                  borderRadius: `${theme.palette.custom.radius.md}px`
                 }}
               />
               <Button
@@ -1285,8 +1279,11 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
                   textTransform: 'none',
                   fontWeight: 600,
                   fontSize: '0.8rem',
+                  borderRadius: `${theme.palette.custom.radius.md}px`,
+                  boxShadow: 'none',
                   '&:hover': {
-                    backgroundColor: alpha('#fff', 0.25)
+                    backgroundColor: alpha('#fff', 0.25),
+                    boxShadow: 'none'
                   }
                 }}
               >
@@ -1321,6 +1318,7 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
                 zIndex: 3,
                 color: '#fff',
                 backgroundColor: alpha('#fff', 0.1),
+                borderRadius: `${theme.palette.custom.radius.md}px`,
                 '&:hover': {
                   backgroundColor: alpha('#fff', 0.2)
                 },
@@ -1342,7 +1340,7 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
                 maxWidth: '90%',
                 maxHeight: '85vh',
                 objectFit: 'contain',
-                borderRadius: 1,
+                borderRadius: `${theme.palette.custom.radius.md}px`,
                 transition: 'opacity 0.2s ease'
               }}
             />
@@ -1366,6 +1364,7 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
                 zIndex: 3,
                 color: '#fff',
                 backgroundColor: alpha('#fff', 0.1),
+                borderRadius: `${theme.palette.custom.radius.md}px`,
                 '&:hover': {
                   backgroundColor: alpha('#fff', 0.2)
                 },
@@ -1405,13 +1404,13 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
                     width: 56,
                     height: 40,
                     objectFit: 'cover',
-                    borderRadius: 0.5,
+                    borderRadius: `${theme.palette.custom.radius.xs}px`,
                     cursor: 'pointer',
                     border: idx === immersiveImageIndex
                       ? '2px solid #fff'
                       : '2px solid transparent',
                     opacity: idx === immersiveImageIndex ? 1 : 0.5,
-                    transition: 'all 0.2s ease',
+                    transition: `all 0.2s ${theme.palette.custom.easing.smooth}`,
                     '&:hover': { opacity: 0.8 }
                   }}
                 />

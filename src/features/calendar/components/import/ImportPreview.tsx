@@ -14,18 +14,22 @@ import {
   Tooltip,
   alpha,
   Button,
-  Collapse
+  Collapse,
+  useTheme
 } from '@mui/material';
 import {
   CheckCircle,
   Warning,
   Error as ErrorIcon,
   ExpandMore,
-  ExpandLess
+  ExpandLess,
+  TableChartOutlined
 } from '@mui/icons-material';
 import { ImportPreviewRow, TradeField } from '../../types/import';
 import { TRADE_FIELD_METADATA } from '../../utils/importValidation';
 import { format } from 'date-fns';
+import { EYEBROW_SX, TNUM } from 'styles/designTokens';
+import CardShell from 'components/common/CardShell';
 
 interface ImportPreviewProps {
   previewRows: ImportPreviewRow[];
@@ -38,6 +42,7 @@ export const ImportPreview: React.FC<ImportPreviewProps> = ({
   mappedFields,
   maxRows = 10
 }) => {
+  const theme = useTheme();
   const [showAll, setShowAll] = useState(false);
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
 
@@ -90,30 +95,26 @@ export const ImportPreview: React.FC<ImportPreviewProps> = ({
 
   const getRowColor = (row: ImportPreviewRow) => {
     if (row.errors.length > 0) {
-      return alpha('#f44336', 0.05);
+      return alpha(theme.palette.error.main, 0.05);
     }
     if (row.warnings.length > 0) {
-      return alpha('#ff9800', 0.05);
+      return alpha(theme.palette.warning.main, 0.05);
     }
     return 'transparent';
   };
 
   return (
-    <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h6">
-          Data Preview
-        </Typography>
-        <Typography variant="caption" color="text.secondary">
-          Showing {formatCount(displayRows.length)} of {formatCount(previewRows.length)} rows
-        </Typography>
-      </Box>
-
+    <CardShell
+      radius="lg"
+      head={{
+        icon: <TableChartOutlined sx={{ fontSize: 16 }} />,
+        title: 'Data preview',
+        eyebrow: `Showing ${formatCount(displayRows.length)} of ${formatCount(previewRows.length)} rows`,
+      }}
+      innerSx={{ p: 0 }}
+    >
       <TableContainer
         sx={{
-          border: '1px solid',
-          borderColor: 'divider',
-          borderRadius: 1,
           maxHeight: 500,
           overflow: 'auto',
           // Custom scrollbar styling to match app
@@ -122,14 +123,14 @@ export const ImportPreview: React.FC<ImportPreviewProps> = ({
             height: '8px'
           },
           '&::-webkit-scrollbar-track': {
-            bgcolor: alpha('#000', 0.05),
-            borderRadius: 1
+            bgcolor: alpha(theme.palette.text.primary, 0.05),
+            borderRadius: `${theme.palette.custom.radius.sm}px`
           },
           '&::-webkit-scrollbar-thumb': {
-            bgcolor: alpha('#000', 0.2),
-            borderRadius: 1,
+            bgcolor: alpha(theme.palette.text.primary, 0.2),
+            borderRadius: `${theme.palette.custom.radius.sm}px`,
             '&:hover': {
-              bgcolor: alpha('#000', 0.3)
+              bgcolor: alpha(theme.palette.text.primary, 0.3)
             }
           }
         }}
@@ -138,17 +139,17 @@ export const ImportPreview: React.FC<ImportPreviewProps> = ({
           <TableHead>
             <TableRow>
               <TableCell sx={{ width: 40, bgcolor: 'background.paper' }}>
-                Status
+                <Typography sx={EYEBROW_SX}>Status</Typography>
               </TableCell>
               <TableCell sx={{ width: 60, bgcolor: 'background.paper' }}>
-                Row
+                <Typography sx={EYEBROW_SX}>Row</Typography>
               </TableCell>
               {mappedFields.map(field => (
                 <TableCell key={field} sx={{ bgcolor: 'background.paper', minWidth: 120 }}>
-                  <Typography variant="caption" fontWeight={600}>
+                  <Typography sx={EYEBROW_SX}>
                     {TRADE_FIELD_METADATA[field].displayName}
                   </Typography>
-                 
+
                 </TableCell>
               ))}
               <TableCell sx={{ width: 40, bgcolor: 'background.paper' }} />
@@ -165,7 +166,7 @@ export const ImportPreview: React.FC<ImportPreviewProps> = ({
                     sx={{
                       bgcolor: getRowColor(row),
                       '&:hover': {
-                        bgcolor: alpha('#000', 0.02)
+                        bgcolor: alpha(theme.palette.text.primary, 0.02)
                       }
                     }}
                   >
@@ -183,7 +184,7 @@ export const ImportPreview: React.FC<ImportPreviewProps> = ({
                       </Tooltip>
                     </TableCell>
                     <TableCell>
-                      <Typography variant="caption" color="text.secondary">
+                      <Typography variant="caption" sx={{ color: 'text.tertiary', fontFeatureSettings: TNUM }}>
                         {row.rowIndex + 1}
                       </Typography>
                     </TableCell>
@@ -197,9 +198,9 @@ export const ImportPreview: React.FC<ImportPreviewProps> = ({
                           key={field}
                           sx={{
                             bgcolor: hasError
-                              ? alpha('#f44336', 0.08)
+                              ? alpha(theme.palette.error.main, 0.08)
                               : hasWarning
-                              ? alpha('#ff9800', 0.08)
+                              ? alpha(theme.palette.warning.main, 0.08)
                               : 'transparent',
                             maxWidth: 200,
                             overflow: 'hidden',
@@ -213,6 +214,7 @@ export const ImportPreview: React.FC<ImportPreviewProps> = ({
                               sx={{
                                 color: hasError ? 'error.main' : hasWarning ? 'warning.main' : 'text.primary',
                                 fontWeight: hasError || hasWarning ? 600 : 400,
+                                fontFeatureSettings: TNUM,
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis',
                                 whiteSpace: 'nowrap',
@@ -244,15 +246,19 @@ export const ImportPreview: React.FC<ImportPreviewProps> = ({
                           <Box
                             sx={{
                               p: 2,
-                              bgcolor: alpha(row.errors.length > 0 ? '#f44336' : '#ff9800', 0.05),
-                              borderBottom: '1px solid',
-                              borderColor: 'divider'
+                              bgcolor: alpha(
+                                row.errors.length > 0
+                                  ? theme.palette.error.main
+                                  : theme.palette.warning.main,
+                                0.05
+                              ),
+                              borderBottom: `1px solid ${theme.palette.divider}`
                             }}
                           >
                             {row.errors.length > 0 && (
                               <Box sx={{ mb: row.warnings.length > 0 ? 2 : 0 }}>
-                                <Typography variant="caption" fontWeight={600} color="error.main" sx={{ display: 'block', mb: 1 }}>
-                                  Errors:
+                                <Typography sx={{ ...EYEBROW_SX, color: 'error.main', display: 'block', mb: 1 }}>
+                                  Errors
                                 </Typography>
                                 {row.errors.map((error, errorIndex) => (
                                   <Box
@@ -264,9 +270,8 @@ export const ImportPreview: React.FC<ImportPreviewProps> = ({
                                       mb: 0.5,
                                       p: 0.75,
                                       bgcolor: 'background.paper',
-                                      borderRadius: 0.5,
-                                      border: '1px solid',
-                                      borderColor: alpha('#f44336', 0.3)
+                                      borderRadius: `${theme.palette.custom.radius.sm}px`,
+                                      border: `1px solid ${alpha(theme.palette.error.main, 0.3)}`,
                                     }}
                                   >
                                     <ErrorIcon sx={{ fontSize: 16, color: 'error.main', mt: 0.25 }} />
@@ -275,7 +280,7 @@ export const ImportPreview: React.FC<ImportPreviewProps> = ({
                                         {error.column}: {error.message}
                                       </Typography>
                                       {error.suggestedFix && (
-                                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }}>
+                                        <Typography variant="caption" color="text.tertiary" sx={{ display: 'block', mt: 0.25 }}>
                                           💡 {error.suggestedFix}
                                         </Typography>
                                       )}
@@ -287,8 +292,8 @@ export const ImportPreview: React.FC<ImportPreviewProps> = ({
 
                             {row.warnings.length > 0 && (
                               <Box>
-                                <Typography variant="caption" fontWeight={600} color="warning.main" sx={{ display: 'block', mb: 1 }}>
-                                  Warnings:
+                                <Typography sx={{ ...EYEBROW_SX, color: 'warning.main', display: 'block', mb: 1 }}>
+                                  Warnings
                                 </Typography>
                                 {row.warnings.map((warning, warningIndex) => (
                                   <Box
@@ -300,9 +305,8 @@ export const ImportPreview: React.FC<ImportPreviewProps> = ({
                                       mb: 0.5,
                                       p: 0.75,
                                       bgcolor: 'background.paper',
-                                      borderRadius: 0.5,
-                                      border: '1px solid',
-                                      borderColor: alpha('#ff9800', 0.3)
+                                      borderRadius: `${theme.palette.custom.radius.sm}px`,
+                                      border: `1px solid ${alpha(theme.palette.warning.main, 0.3)}`,
                                     }}
                                   >
                                     <Warning sx={{ fontSize: 16, color: 'warning.main', mt: 0.25 }} />
@@ -326,7 +330,14 @@ export const ImportPreview: React.FC<ImportPreviewProps> = ({
       </TableContainer>
 
       {hasMore && !showAll && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'center',
+            py: 1.5,
+            borderTop: `1px solid ${theme.palette.divider}`,
+          }}
+        >
           <Button
             variant="outlined"
             size="small"
@@ -338,7 +349,14 @@ export const ImportPreview: React.FC<ImportPreviewProps> = ({
       )}
 
       {showAll && hasMore && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'center',
+            py: 1.5,
+            borderTop: `1px solid ${theme.palette.divider}`,
+          }}
+        >
           <Button
             variant="outlined"
             size="small"
@@ -348,6 +366,6 @@ export const ImportPreview: React.FC<ImportPreviewProps> = ({
           </Button>
         </Box>
       )}
-    </Box>
+    </CardShell>
   );
 };

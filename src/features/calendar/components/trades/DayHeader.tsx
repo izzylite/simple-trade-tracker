@@ -7,8 +7,9 @@ import {
   useTheme,
 } from '@mui/material';
 import { ChevronLeft, ChevronRight } from '@mui/icons-material';
-import { alpha } from '@mui/material/styles';
-import { useDialogTokens, MONO_FONT } from 'styles/dialogTokens';
+import { EYEBROW_SX, TNUM, MONO_FONT, getInsetTileSx } from 'styles/designTokens';
+import PnlValue from 'components/common/PnlValue';
+import { formatCurrency } from 'utils/formatters';
 
 interface DayHeaderProps {
   formInputVisible: boolean;
@@ -33,28 +34,6 @@ const DayHeader: React.FC<DayHeaderProps> = ({
   compact = false,
 }) => {
   const theme = useTheme();
-  const { isDark, violet, monoLabelSx } = useDialogTokens();
-
-  const isPositive = total_pnl >= 0;
-  const pnlColor = isPositive ? theme.palette.success.main : theme.palette.error.main;
-  const pnlBg = alpha(pnlColor, isDark ? 0.12 : 0.08);
-  const pnlBorder = alpha(pnlColor, isDark ? 0.3 : 0.22);
-
-  const balanceBg = alpha(violet, isDark ? 0.12 : 0.08);
-  const balanceBorder = alpha(violet, isDark ? 0.3 : 0.22);
-
-  const tileSectionLabelSx = {
-    ...monoLabelSx,
-    fontSize: '0.6rem',
-    letterSpacing: '0.14em',
-  };
-
-  const numberSx = {
-    fontFamily: MONO_FONT,
-    fontWeight: 700,
-    letterSpacing: '-0.01em',
-    fontSize: compact ? '1rem' : '1.25rem',
-  };
 
   return (
     <Box sx={{ mb: compact ? 2 : 3 }}>
@@ -67,7 +46,11 @@ const DayHeader: React.FC<DayHeaderProps> = ({
         }}
       >
         {!formInputVisible && (
-          <IconButton onClick={onPrevDay} size="small" sx={{ color: theme.palette.text.secondary }}>
+          <IconButton
+            onClick={onPrevDay}
+            size="small"
+            sx={{ color: 'text.secondary' }}
+          >
             <ChevronLeft fontSize={compact ? 'small' : 'medium'} />
           </IconButton>
         )}
@@ -75,14 +58,22 @@ const DayHeader: React.FC<DayHeaderProps> = ({
         {title && (
           <Typography
             variant={compact ? 'subtitle2' : 'h6'}
-            sx={{ fontWeight: 700, letterSpacing: '-0.01em' }}
+            sx={{
+              fontWeight: 600,
+              letterSpacing: '-0.015em',
+              color: 'text.primary',
+            }}
           >
             {title}
           </Typography>
         )}
 
         {!formInputVisible && (
-          <IconButton onClick={onNextDay} size="small" sx={{ color: theme.palette.text.secondary }}>
+          <IconButton
+            onClick={onNextDay}
+            size="small"
+            sx={{ color: 'text.secondary' }}
+          >
             <ChevronRight fontSize={compact ? 'small' : 'medium'} />
           </IconButton>
         )}
@@ -92,17 +83,16 @@ const DayHeader: React.FC<DayHeaderProps> = ({
         {/* Day P&L tile */}
         <Box
           sx={{
+            ...getInsetTileSx(theme),
             flex: 1,
             p: compact ? 1.25 : 1.5,
-            borderRadius: 1.5,
-            backgroundColor: pnlBg,
-            border: `1px solid ${pnlBorder}`,
             display: 'flex',
             flexDirection: 'column',
             gap: 0.5,
+            minWidth: 0,
           }}
         >
-          <Typography sx={tileSectionLabelSx}>Day P&amp;L</Typography>
+          <Typography sx={EYEBROW_SX}>Day P&amp;L</Typography>
           {loading ? (
             <Skeleton
               variant="text"
@@ -110,27 +100,27 @@ const DayHeader: React.FC<DayHeaderProps> = ({
               sx={{ fontSize: compact ? '1rem' : '1.25rem' }}
             />
           ) : (
-            <Typography sx={{ ...numberSx, color: pnlColor }}>
-              {isPositive ? '+' : ''}
-              {total_pnl.toLocaleString()}
-            </Typography>
+            <PnlValue
+              amount={total_pnl}
+              format={formatCurrency}
+              size={compact ? 'md' : 'lg'}
+            />
           )}
         </Box>
 
         {/* Balance tile */}
         <Box
           sx={{
+            ...getInsetTileSx(theme),
             flex: 1,
             p: compact ? 1.25 : 1.5,
-            borderRadius: 1.5,
-            backgroundColor: balanceBg,
-            border: `1px solid ${balanceBorder}`,
             display: 'flex',
             flexDirection: 'column',
             gap: 0.5,
+            minWidth: 0,
           }}
         >
-          <Typography sx={tileSectionLabelSx}>Balance of the day</Typography>
+          <Typography sx={EYEBROW_SX}>Balance of the day</Typography>
           {loading ? (
             <Skeleton
               variant="text"
@@ -138,8 +128,18 @@ const DayHeader: React.FC<DayHeaderProps> = ({
               sx={{ fontSize: compact ? '1rem' : '1.25rem' }}
             />
           ) : (
-            <Typography sx={{ ...numberSx, color: theme.palette.text.primary }}>
-              ${account_balance.toLocaleString()}
+            <Typography
+              sx={{
+                fontFamily: MONO_FONT,
+                fontWeight: 700,
+                letterSpacing: '-0.015em',
+                fontSize: compact ? '1rem' : '1.5rem',
+                color: 'text.primary',
+                fontFeatureSettings: TNUM,
+                lineHeight: 1.15,
+              }}
+            >
+              {formatCurrency(account_balance)}
             </Typography>
           )}
         </Box>

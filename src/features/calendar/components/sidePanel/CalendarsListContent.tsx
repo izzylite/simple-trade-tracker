@@ -38,17 +38,24 @@ import { useAuthState } from 'contexts/AuthStateContext';
 import RoundedTabs, { TabPanel } from 'components/common/RoundedTabs';
 import CalendarsPanelShimmer from './CalendarsPanelShimmer';
 import ConfirmationDialog from 'components/common/ConfirmationDialog';
+import PnlValue from 'components/common/PnlValue';
+import InfoStrip from 'components/common/InfoStrip';
+import {
+  EYEBROW_SX,
+  TNUM,
+  getInsetSurface,
+  getCardShellSx,
+} from 'styles/designTokens';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-const MONO_FONT = "'JetBrains Mono', ui-monospace, monospace";
-const monoSx = {
-  fontFamily: MONO_FONT,
-  fontVariantNumeric: 'tabular-nums' as const,
+/** Shared tabular-numeric sx used for every stacked number in this panel. */
+const tnumSx = {
+  fontFeatureSettings: TNUM,
   fontWeight: 600,
-};
+} as const;
 
 const safeFormatDate = (
   date: Date | string | undefined | null,
@@ -123,19 +130,33 @@ const buildEquityCurve = (calendar: Calendar): number[] | null => {
   return points.length > 1 ? points : null;
 };
 
-/** Stable per-calendar hero gradient when no hero image is set. */
-const heroGradient = (id: string): string => {
-  const palettes = [
-    'linear-gradient(135deg, #f4a261 0%, #e76f51 50%, #2a2438 100%)',
-    'linear-gradient(135deg, #1e3a8a 0%, #312e81 50%, #1e293b 100%)',
-    'linear-gradient(135deg, #064e3b 0%, #022c22 50%, #052e2b 100%)',
-    'linear-gradient(135deg, #831843 0%, #4c1d95 50%, #1e1b4b 100%)',
-    'linear-gradient(135deg, #1e40af 0%, #0c4a6e 50%, #082f49 100%)',
-    'linear-gradient(135deg, #7c3aed 0%, #5b21b6 50%, #312e81 100%)',
-  ];
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) | 0;
-  return palettes[Math.abs(hash) % palettes.length];
+/**
+ * Stable per-calendar hero gradient when no hero image is set.
+ *
+ * Built from the violet brand at varying alphas + the neutral slate steps so
+ * every calendar gets a unique-but-on-brand swatch instead of the previous
+ * mix of warm/cold hardcoded hexes. Uses the canonical primary.main +
+ * tintViolet.{soft,strong} so it follows theme dark/light mode automatically.
+ */
+const useHeroGradient = (): ((id: string) => string) => {
+  const theme = useTheme();
+  return (id: string): string => {
+    const violet = theme.palette.primary.main;
+    const violetSoft = theme.palette.custom.tintViolet.soft;
+    const violetStrong = theme.palette.custom.tintViolet.strong;
+    const surface = theme.palette.background.paper;
+    const palettes = [
+      `linear-gradient(135deg, ${violet} 0%, ${violetStrong} 50%, ${surface} 100%)`,
+      `linear-gradient(135deg, ${violetStrong} 0%, ${violet} 50%, ${violetSoft} 100%)`,
+      `linear-gradient(135deg, ${violet} 0%, ${violetSoft} 60%, ${surface} 100%)`,
+      `linear-gradient(135deg, ${violetSoft} 0%, ${violet} 50%, ${violetStrong} 100%)`,
+      `linear-gradient(135deg, ${violetStrong} 0%, ${violetSoft} 50%, ${surface} 100%)`,
+      `linear-gradient(135deg, ${violet} 0%, ${violetStrong} 35%, ${violetSoft} 100%)`,
+    ];
+    let hash = 0;
+    for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) | 0;
+    return palettes[Math.abs(hash) % palettes.length];
+  };
 };
 
 const heroLabel = (name: string): string => {
@@ -270,8 +291,11 @@ interface HeroSwatchProps {
 const HeroSwatch: React.FC<HeroSwatchProps> = ({
   calendar,
   size = 26,
-  radius = 6,
+  radius,
 }) => {
+  const theme = useTheme();
+  const heroGradient = useHeroGradient();
+  const radiusPx = radius ?? theme.palette.custom.radius.sm;
   const background = calendar.hero_image_url
     ? `center / cover no-repeat url(${calendar.hero_image_url})`
     : heroGradient(calendar.id);
@@ -281,12 +305,12 @@ const HeroSwatch: React.FC<HeroSwatchProps> = ({
       sx={{
         width: size,
         height: size,
-        borderRadius: `${radius}px`,
+        borderRadius: `${radiusPx}px`,
         background,
         display: 'grid',
         placeItems: 'center',
         color: 'rgba(255,255,255,0.9)',
-        fontFamily: MONO_FONT,
+        fontFeatureSettings: TNUM,
         fontWeight: 700,
         fontSize: size > 40 ? 14 : 11,
         letterSpacing: '0.02em',
@@ -343,26 +367,24 @@ const FocusedCalendarCard: React.FC<FocusedCalendarCardProps> = ({
       : theme.palette.error.main;
 
   const curve = useMemo(() => buildEquityCurve(calendar), [calendar]);
-  const surface = alpha(theme.palette.common.white, 0.03);
-  const divider = alpha(theme.palette.common.white, 0.08);
   const isLight = theme.palette.mode === 'light';
+  const insetSurface = getInsetSurface(theme);
+  const divider = theme.palette.divider;
 
   return (
     <Box
       onClick={onClick}
       sx={{
+        ...getCardShellSx(theme, 'lg'),
+        bgcolor: isLight
+          ? alpha(theme.palette.background.paper, 0.7)
+          : insetSurface,
+        borderColor: isActive
+          ? alpha(theme.palette.primary.main, 0.45)
+          : divider,
         p: 1.75,
-        borderRadius: '12px',
         cursor: 'pointer',
         position: 'relative',
-        bgcolor: isLight ? alpha(theme.palette.background.paper, 0.7) : surface,
-        border: `1px solid ${
-          isActive
-            ? alpha(theme.palette.primary.main, 0.45)
-            : isLight
-              ? theme.palette.divider
-              : divider
-        }`,
         boxShadow: isActive
           ? `0 0 0 1px ${alpha(theme.palette.primary.main, 0.25)} inset, 0 8px 20px ${alpha(theme.palette.primary.main, 0.08)}`
           : 'none',
@@ -376,7 +398,7 @@ const FocusedCalendarCard: React.FC<FocusedCalendarCardProps> = ({
         spacing={1.25}
         sx={{ mb: 1.5 }}
       >
-        <HeroSwatch calendar={calendar} size={28} radius={7} />
+        <HeroSwatch calendar={calendar} size={28} />
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography
             sx={{
@@ -397,7 +419,7 @@ const FocusedCalendarCard: React.FC<FocusedCalendarCardProps> = ({
               mt: '2px',
             }}
           >
-            <Box component="span" sx={monoSx}>
+            <Box component="span" sx={tnumSx}>
               {trades}
             </Box>{' '}
             trades · {empty ? 'no activity' : 'active'}
@@ -484,21 +506,30 @@ const FocusedCalendarCard: React.FC<FocusedCalendarCardProps> = ({
         spacing={1}
         sx={{ mb: 1.25 }}
       >
+        {empty ? (
+          <Typography
+            sx={{
+              ...tnumSx,
+              fontSize: '1.5rem',
+              color: pnlColor,
+              lineHeight: 1,
+              letterSpacing: '-0.015em',
+            }}
+          >
+            $0
+          </Typography>
+        ) : (
+          <PnlValue
+            amount={pnl}
+            format={fmtCurrencyExact}
+            arrow={false}
+            size="lg"
+            sx={{ lineHeight: 1, letterSpacing: '-0.015em' }}
+          />
+        )}
         <Typography
           sx={{
-            ...monoSx,
-            fontSize: '1.5rem',
-            color: pnlColor,
-            lineHeight: 1,
-            letterSpacing: '-0.015em',
-          }}
-        >
-          {positive && !empty ? '+' : ''}
-          {fmtCurrencyExact(pnl)}
-        </Typography>
-        <Typography
-          sx={{
-            ...monoSx,
+            ...tnumSx,
             fontSize: '0.75rem',
             color: pnlColor,
           }}
@@ -538,7 +569,7 @@ const FocusedCalendarCard: React.FC<FocusedCalendarCardProps> = ({
         sx={{
           mt: 1.25,
           pt: 1.25,
-          borderTop: `1px solid ${divider}`,
+          borderTop: `1px solid ${theme.palette.divider}`,
         }}
       >
         <InlineStat
@@ -575,11 +606,9 @@ const InlineStat: React.FC<InlineStatProps> = ({ label, value, tooltip }) => {
     <Box sx={{ flex: 1, minWidth: 0 }}>
       <Typography
         sx={{
+          ...EYEBROW_SX,
           fontSize: '0.625rem',
-          color: 'text.secondary',
-          textTransform: 'uppercase',
           letterSpacing: '0.06em',
-          fontWeight: 600,
           mb: '2px',
           lineHeight: 1,
         }}
@@ -588,7 +617,7 @@ const InlineStat: React.FC<InlineStatProps> = ({ label, value, tooltip }) => {
       </Typography>
       <Typography
         sx={{
-          ...monoSx,
+          ...tnumSx,
           fontSize: '0.75rem',
           lineHeight: 1,
           whiteSpace: 'nowrap',
@@ -652,7 +681,6 @@ const WatchRow: React.FC<WatchRowProps> = ({
       : theme.palette.error.main;
 
   const curve = useMemo(() => buildEquityCurve(calendar), [calendar]);
-  const divider = alpha(theme.palette.common.white, 0.08);
 
   return (
     <Box
@@ -668,14 +696,12 @@ const WatchRow: React.FC<WatchRowProps> = ({
         bgcolor: isActive
           ? alpha(theme.palette.primary.main, 0.07)
           : 'transparent',
-        borderBottom: isLast
-          ? 0
-          : `1px solid ${theme.palette.mode === 'dark' ? divider : theme.palette.divider}`,
+        borderBottom: isLast ? 0 : `1px solid ${theme.palette.divider}`,
         transition: 'background .12s',
         '&:hover': {
           bgcolor: isActive
             ? alpha(theme.palette.primary.main, 0.1)
-            : alpha(theme.palette.common.white, theme.palette.mode === 'dark' ? 0.03 : 0),
+            : getInsetSurface(theme),
           '& .row-actions': { opacity: 1 },
         },
       }}
@@ -692,7 +718,7 @@ const WatchRow: React.FC<WatchRowProps> = ({
           }}
         />
       )}
-      <HeroSwatch calendar={calendar} size={28} radius={6} />
+      <HeroSwatch calendar={calendar} size={28} />
       <Box sx={{ flex: 1, minWidth: 0 }}>
         <Typography
           sx={{
@@ -713,14 +739,14 @@ const WatchRow: React.FC<WatchRowProps> = ({
             mt: '2px',
           }}
         >
-          <Box component="span" sx={monoSx}>
+          <Box component="span" sx={tnumSx}>
             {trades}
           </Box>{' '}
           trades
           {!empty && (
             <>
               {' · '}
-              <Box component="span" sx={monoSx}>
+              <Box component="span" sx={tnumSx}>
                 {winRate.toFixed(0)}%
               </Box>
             </>
@@ -746,7 +772,7 @@ const WatchRow: React.FC<WatchRowProps> = ({
           minWidth: 78,
           px: 0.875,
           py: 0.5,
-          borderRadius: '6px',
+          borderRadius: `${theme.palette.custom.radius.sm}px`,
           bgcolor: empty
             ? 'transparent'
             : positive
@@ -754,20 +780,29 @@ const WatchRow: React.FC<WatchRowProps> = ({
               : alpha(theme.palette.error.main, 0.1),
         }}
       >
+        {empty ? (
+          <Typography
+            sx={{
+              ...tnumSx,
+              fontSize: '0.75rem',
+              color: pnlColor,
+              lineHeight: 1,
+            }}
+          >
+            $0
+          </Typography>
+        ) : (
+          <PnlValue
+            amount={pnl}
+            format={fmtCurrencyCompact}
+            arrow={false}
+            size="sm"
+            sx={{ fontSize: '0.75rem', lineHeight: 1 }}
+          />
+        )}
         <Typography
           sx={{
-            ...monoSx,
-            fontSize: '0.75rem',
-            color: pnlColor,
-            lineHeight: 1,
-          }}
-        >
-          {positive && !empty ? '+' : ''}
-          {fmtCurrencyCompact(pnl)}
-        </Typography>
-        <Typography
-          sx={{
-            ...monoSx,
+            ...tnumSx,
             fontSize: '0.59375rem',
             color: pnlColor,
             mt: '2px',
@@ -869,10 +904,8 @@ const TrashCalendarPanelItem: React.FC<TrashItemProps> = ({
   const [restoreOpen, setRestoreOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const pnl = calendar.total_pnl || 0;
-  const positive = pnl >= 0;
   const trades = calendar.total_trades || 0;
   const daysLeft = getDaysUntilDeletion(calendar.auto_delete_at);
-  const divider = alpha(theme.palette.common.white, 0.08);
 
   const handleRestoreClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -908,14 +941,14 @@ const TrashCalendarPanelItem: React.FC<TrashItemProps> = ({
     <Box
       sx={{
         p: 1.5,
-        borderRadius: '10px',
-        bgcolor: alpha(theme.palette.common.white, theme.palette.mode === 'dark' ? 0.03 : 0),
-        border: `1px solid ${theme.palette.mode === 'dark' ? divider : theme.palette.divider}`,
+        borderRadius: `${theme.palette.custom.radius.md}px`,
+        bgcolor: getInsetSurface(theme),
+        border: `1px solid ${theme.palette.divider}`,
         opacity: 0.92,
       }}
     >
       <Stack direction="row" alignItems="center" spacing={1.25} sx={{ mb: 1.25 }}>
-        <HeroSwatch calendar={calendar} size={28} radius={6} />
+        <HeroSwatch calendar={calendar} size={28} />
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography
             sx={{
@@ -929,24 +962,33 @@ const TrashCalendarPanelItem: React.FC<TrashItemProps> = ({
             {calendar.name}
           </Typography>
           <Typography sx={{ fontSize: '0.6875rem', color: 'text.secondary' }}>
-            <Box component="span" sx={monoSx}>
+            <Box component="span" sx={tnumSx}>
               {trades}
             </Box>{' '}
             trades · deleted {safeFormatDate(calendar.deleted_at, 'MMM d')}
           </Typography>
         </Box>
         <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
-          <Typography
-            sx={{
-              ...monoSx,
-              fontSize: '0.75rem',
-              color: positive ? 'success.main' : 'error.main',
-              lineHeight: 1,
-            }}
-          >
-            {positive ? '+' : ''}
-            {fmtCurrencyCompact(pnl)}
-          </Typography>
+          {pnl === 0 ? (
+            <Typography
+              sx={{
+                ...tnumSx,
+                fontSize: '0.75rem',
+                color: 'text.secondary',
+                lineHeight: 1,
+              }}
+            >
+              $0
+            </Typography>
+          ) : (
+            <PnlValue
+              amount={pnl}
+              format={fmtCurrencyCompact}
+              arrow={false}
+              size="sm"
+              sx={{ fontSize: '0.75rem', lineHeight: 1 }}
+            />
+          )}
           <Stack
             direction="row"
             spacing={0.25}
@@ -1124,10 +1166,8 @@ const CalendarsListContent: React.FC<CalendarsListContentProps> = ({
     () => calendarList.reduce((sum, c) => sum + (c.total_pnl || 0), 0),
     [calendarList]
   );
-  const combinedPositive = combinedPnl >= 0;
 
-  const divider = alpha(theme.palette.common.white, 0.08);
-  const surface = alpha(theme.palette.common.white, 0.03);
+  const insetSurface = getInsetSurface(theme);
   const isDark = theme.palette.mode === 'dark';
 
   const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
@@ -1159,25 +1199,29 @@ const CalendarsListContent: React.FC<CalendarsListContentProps> = ({
                 fontSize: '0.6875rem',
                 color: 'text.secondary',
                 fontWeight: 500,
+                display: 'inline-flex',
+                alignItems: 'baseline',
+                gap: 0.5,
+                flexWrap: 'wrap',
               }}
+              component="div"
             >
-              <Box component="span" sx={monoSx}>
+              <Box component="span" sx={tnumSx}>
                 {calendarList.length}
-              </Box>{' '}
-              {calendarList.length === 1 ? 'calendar' : 'calendars'}
+              </Box>
+              <Box component="span">
+                {calendarList.length === 1 ? 'calendar' : 'calendars'}
+              </Box>
               {calendarList.length > 0 && (
                 <>
-                  {' · combined '}
-                  <Box
-                    component="span"
-                    sx={{
-                      ...monoSx,
-                      color: combinedPositive ? 'success.main' : 'error.main',
-                    }}
-                  >
-                    {combinedPositive ? '+' : ''}
-                    {fmtCurrencyCompact(combinedPnl)}
-                  </Box>
+                  <Box component="span">· combined</Box>
+                  <PnlValue
+                    amount={combinedPnl}
+                    format={fmtCurrencyCompact}
+                    arrow={false}
+                    size="sm"
+                    sx={{ fontSize: '0.6875rem' }}
+                  />
                 </>
               )}
             </Typography>
@@ -1266,15 +1310,7 @@ const CalendarsListContent: React.FC<CalendarsListContentProps> = ({
                   justifyContent="space-between"
                   sx={{ px: 0.5, mt: 0.5 }}
                 >
-                  <Typography
-                    sx={{
-                      fontSize: '0.6875rem',
-                      color: 'text.secondary',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.08em',
-                      fontWeight: 600,
-                    }}
-                  >
+                  <Typography sx={{ ...EYEBROW_SX, letterSpacing: '0.08em' }}>
                     All calendars
                   </Typography>
                   <Button
@@ -1288,8 +1324,8 @@ const CalendarsListContent: React.FC<CalendarsListContentProps> = ({
                       fontSize: '0.6875rem',
                       fontWeight: 600,
                       color: 'text.secondary',
-                      border: `1px solid ${isDark ? divider : theme.palette.divider}`,
-                      borderRadius: '6px',
+                      border: `1px solid ${theme.palette.divider}`,
+                      borderRadius: `${theme.palette.custom.radius.sm}px`,
                       textTransform: 'none',
                       '&:hover': {
                         bgcolor: alpha(theme.palette.primary.main, 0.06),
@@ -1324,9 +1360,11 @@ const CalendarsListContent: React.FC<CalendarsListContentProps> = ({
                 {/* Watchlist */}
                 <Box
                   sx={{
-                    bgcolor: isDark ? surface : alpha(theme.palette.background.paper, 0.7),
-                    border: `1px solid ${isDark ? divider : theme.palette.divider}`,
-                    borderRadius: '10px',
+                    bgcolor: isDark
+                      ? insetSurface
+                      : alpha(theme.palette.background.paper, 0.7),
+                    border: `1px solid ${theme.palette.divider}`,
+                    borderRadius: `${theme.palette.custom.radius.md}px`,
                     overflow: 'hidden',
                   }}
                 >
@@ -1375,19 +1413,11 @@ const CalendarsListContent: React.FC<CalendarsListContentProps> = ({
               </Box>
             ) : (
               <Stack spacing={1}>
-                <Box
-                  sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1,
-                    p: 1.25,
-                    borderRadius: '8px',
-                    bgcolor: alpha(theme.palette.warning.main, 0.08),
-                    border: `1px solid ${alpha(theme.palette.warning.main, 0.2)}`,
-                    mb: 0.5,
-                  }}
+                <InfoStrip
+                  tone="warning"
+                  icon={<ScheduleIcon sx={{ fontSize: 16 }} />}
+                  sx={{ mb: 0.5 }}
                 >
-                  <ScheduleIcon sx={{ color: 'warning.main', fontSize: 16 }} />
                   <Typography
                     variant="caption"
                     fontWeight={600}
@@ -1395,7 +1425,7 @@ const CalendarsListContent: React.FC<CalendarsListContentProps> = ({
                   >
                     Auto-deleted after 30 days
                   </Typography>
-                </Box>
+                </InfoStrip>
                 {trashList.map((cal) => (
                   <TrashCalendarPanelItem
                     key={cal.id}
@@ -1418,7 +1448,7 @@ const CalendarsListContent: React.FC<CalendarsListContentProps> = ({
           sx={{
             px: 2,
             py: 1.5,
-            borderTop: `1px solid ${isDark ? divider : theme.palette.divider}`,
+            borderTop: `1px solid ${theme.palette.divider}`,
             display: 'flex',
             gap: 0.75,
           }}
@@ -1429,8 +1459,8 @@ const CalendarsListContent: React.FC<CalendarsListContentProps> = ({
             sx={{
               flex: 1,
               height: 36,
-              border: `1px dashed ${isDark ? alpha(theme.palette.common.white, 0.15) : theme.palette.divider}`,
-              borderRadius: '9px',
+              border: `1px dashed ${theme.palette.divider}`,
+              borderRadius: `${theme.palette.custom.radius.md}px`,
               color: 'text.secondary',
               fontSize: '0.8125rem',
               fontWeight: 600,
@@ -1450,9 +1480,11 @@ const CalendarsListContent: React.FC<CalendarsListContentProps> = ({
             sx={{
               width: 36,
               height: 36,
-              borderRadius: '9px',
-              bgcolor: isDark ? surface : alpha(theme.palette.background.paper, 0.7),
-              border: `1px solid ${isDark ? divider : theme.palette.divider}`,
+              borderRadius: `${theme.palette.custom.radius.md}px`,
+              bgcolor: isDark
+                ? insetSurface
+                : alpha(theme.palette.background.paper, 0.7),
+              border: `1px solid ${theme.palette.divider}`,
               color: 'text.secondary',
               '&:hover': {
                 color: 'primary.main',

@@ -1,8 +1,12 @@
 import React from 'react';
-import { Box, Paper, Typography, Tooltip, useTheme, Stack, alpha } from '@mui/material';
-import { InfoOutlined } from '@mui/icons-material';
+import { Box, Typography, Tooltip, useTheme, alpha } from '@mui/material';
+import { InfoOutlined, EmojiEvents, TrendingDown, TrendingUp } from '@mui/icons-material';
 import { formatCurrency, formatCount } from 'utils/formatters';
 import { Trade } from 'features/calendar/types/dualWrite';
+import { EYEBROW_SX, TNUM, getInsetSurface } from 'styles/designTokens';
+import CardShell from 'components/common/CardShell';
+import EyebrowRow from 'components/common/EyebrowRow';
+import PnlValue from 'components/common/PnlValue';
 
 interface WinLossStatsProps {
   winLossStats: {
@@ -35,174 +39,280 @@ interface WinLossStatsProps {
   compact?: boolean;
 }
 
-const WinLossStats: React.FC<WinLossStatsProps> = ({ winLossStats, trades, onTradeClick, compact = false }) => {
+interface StatRowSpec {
+  label: string;
+  tooltip: string;
+  value: React.ReactNode;
+  /** Optional click handler — used for best/worst trade rows */
+  onClick?: () => void;
+}
+
+const StatRow: React.FC<{ row: StatRowSpec; accent: string }> = ({ row, accent }) => {
+  const theme = useTheme();
+  const interactive = !!row.onClick;
+  return (
+    <Box
+      role={interactive ? 'button' : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      onClick={
+        interactive
+          ? (e) => {
+              e.stopPropagation();
+              row.onClick!();
+            }
+          : undefined
+      }
+      onKeyDown={
+        interactive
+          ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                row.onClick!();
+              }
+            }
+          : undefined
+      }
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 1,
+        px: 1.25,
+        py: 1,
+        borderRadius: '10px',
+        bgcolor: getInsetSurface(theme),
+        border: `1px solid ${theme.palette.divider}`,
+        cursor: interactive ? 'pointer' : 'default',
+        transition: interactive ? 'background-color 150ms ease' : 'none',
+        '&:hover': interactive ? { bgcolor: alpha(accent, 0.08) } : {},
+        '&:focus-visible': interactive
+          ? { outline: 'none', boxShadow: `0 0 0 3px ${alpha(accent, 0.25)}` }
+          : {},
+      }}
+    >
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0 }}>
+        <Typography
+          variant="body2"
+          sx={{
+            color: 'text.secondary',
+            fontSize: '0.8125rem',
+            fontWeight: 500,
+            minWidth: 0,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {row.label}
+        </Typography>
+        <Tooltip title={row.tooltip} arrow>
+          <InfoOutlined
+            sx={{ fontSize: 13, color: 'text.tertiary', opacity: 0.7, cursor: 'help' }}
+          />
+        </Tooltip>
+      </Box>
+      <Typography
+        sx={{
+          fontSize: '0.875rem',
+          fontWeight: 700,
+          color: 'text.primary',
+          fontFeatureSettings: TNUM,
+          letterSpacing: '-0.015em',
+          flexShrink: 0,
+        }}
+      >
+        {row.value}
+      </Typography>
+    </Box>
+  );
+};
+
+const WinLossStats: React.FC<WinLossStatsProps> = ({
+  winLossStats,
+  trades,
+  onTradeClick,
+  compact = false,
+}) => {
   const theme = useTheme();
 
   // Find the best win (trade with highest amount)
   const bestWin = React.useMemo(() => {
-    const winTrades = trades.filter(trade => trade.trade_type === 'win');
+    const winTrades = trades.filter((trade) => trade.trade_type === 'win');
     if (winTrades.length === 0) return null;
-    return winTrades.reduce((best, current) =>
-      current.amount > best.amount ? current : best, winTrades[0]);
+    return winTrades.reduce(
+      (best, current) => (current.amount > best.amount ? current : best),
+      winTrades[0],
+    );
   }, [trades]);
 
   // Find the worst loss (trade with lowest/most negative amount)
   const worstLoss = React.useMemo(() => {
-    const lossTrades = trades.filter(trade => trade.trade_type === 'loss');
+    const lossTrades = trades.filter((trade) => trade.trade_type === 'loss');
     if (lossTrades.length === 0) return null;
-    return lossTrades.reduce((worst, current) =>
-      current.amount < worst.amount ? current : worst, lossTrades[0]);
+    return lossTrades.reduce(
+      (worst, current) => (current.amount < worst.amount ? current : worst),
+      lossTrades[0],
+    );
   }, [trades]);
 
-  return (
-    <Box>
-      {/* Winners and Losers Section */}
-      {(winLossStats.winners.total > 0 || winLossStats.losers.total > 0) && (
-        <Box sx={{ display: 'flex', flexDirection: compact ? 'column' : 'row', gap: 2, mb: 3 }}>
-          {/* Winners Card */}
-          <Paper sx={{ 
-            flex: 1, 
-            p: 2, 
-            border: `4px solid ${alpha(theme.palette.success.main, 0.1)}`,
-            borderRadius: 2
-          }}>
-            <Typography variant="subtitle1" sx={{ color: theme.palette.success.main, mb: 2 }}>
-              Winners
-            </Typography>
-            <Stack spacing={1.5}>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    Total winners
-                  </Typography>
-                  <Tooltip title="Total number of winning trades in the selected period" arrow>
-                    <InfoOutlined sx={{ fontSize: 14, color: 'text.secondary', opacity: 0.7, cursor: 'help' }} />
-                  </Tooltip>
-                </Box>
-                <Typography variant="body2">{formatCount(winLossStats.winners.total)}</Typography>
-              </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    Best win
-                  </Typography>
-                  <Tooltip title="Your largest winning trade as a percentage of your account" arrow>
-                    <InfoOutlined sx={{ fontSize: 14, color: 'text.secondary', opacity: 0.7, cursor: 'help' }} />
-                  </Tooltip>
-                </Box>
-                <Typography variant="body2">
-                  {bestWin ? formatCurrency(bestWin.amount) : '0'}
-                </Typography>
-              </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    Average win
-                  </Typography>
-                  <Tooltip title="The average size of your winning trades as a percentage of your account" arrow>
-                    <InfoOutlined sx={{ fontSize: 14, color: 'text.secondary', opacity: 0.7, cursor: 'help' }} />
-                  </Tooltip>
-                </Box>
-                <Typography variant="body2">{formatCurrency(winLossStats.winners.avgAmount)}</Typography>
-              </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    Max consecutive wins
-                  </Typography>
-                  <Tooltip title="Your longest streak of consecutive winning trades" arrow>
-                    <InfoOutlined sx={{ fontSize: 14, color: 'text.secondary', opacity: 0.7, cursor: 'help' }} />
-                  </Tooltip>
-                </Box>
-                <Typography variant="body2">{formatCount(winLossStats.winners.maxConsecutive)}</Typography>
-              </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    Avg consecutive wins
-                  </Typography>
-                  <Tooltip title="The average number of wins you achieve in a row before a loss" arrow>
-                    <InfoOutlined sx={{ fontSize: 14, color: 'text.secondary', opacity: 0.7, cursor: 'help' }} />
-                  </Tooltip>
-                </Box>
-                <Typography variant="body2">{winLossStats.winners.avgConsecutive.toFixed(1)}</Typography>
-              </Box>
-            </Stack>
-          </Paper>
+  if (winLossStats.winners.total <= 0 && winLossStats.losers.total <= 0) {
+    return null;
+  }
 
-          {/* Losers Card */}
-          <Paper sx={{ 
-            flex: 1, 
-            p: 2, 
-            border: `4px solid ${alpha(theme.palette.error.main, 0.1)}`,
-            borderRadius: 2
-          }}>
-            <Typography variant="subtitle1" sx={{ color: theme.palette.error.main, mb: 2 }}>
-              Losers
-            </Typography>
-            <Stack spacing={1.5}>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    Total losers
-                  </Typography>
-                  <Tooltip title="Total number of losing trades in the selected period" arrow>
-                    <InfoOutlined sx={{ fontSize: 14, color: 'text.secondary', opacity: 0.7, cursor: 'help' }} />
-                  </Tooltip>
-                </Box>
-                <Typography variant="body2">{formatCount(winLossStats.losers.total)}</Typography>
+  const winnersRows: StatRowSpec[] = [
+    {
+      label: 'Total winners',
+      tooltip: 'Total number of winning trades in the selected period',
+      value: formatCount(winLossStats.winners.total),
+    },
+    {
+      label: 'Best win',
+      tooltip: 'Your largest winning trade as a percentage of your account',
+      value: bestWin ? (
+        <PnlValue
+          amount={bestWin.amount}
+          format={formatCurrency}
+          size="sm"
+          bold
+        />
+      ) : (
+        '0'
+      ),
+      onClick: bestWin && onTradeClick ? () => onTradeClick(bestWin.id) : undefined,
+    },
+    {
+      label: 'Average win',
+      tooltip:
+        'The average size of your winning trades as a percentage of your account',
+      value: (
+        <PnlValue
+          amount={winLossStats.winners.avgAmount}
+          format={formatCurrency}
+          size="sm"
+          bold
+        />
+      ),
+    },
+    {
+      label: 'Max consecutive wins',
+      tooltip: 'Your longest streak of consecutive winning trades',
+      value: formatCount(winLossStats.winners.maxConsecutive),
+    },
+    {
+      label: 'Avg consecutive wins',
+      tooltip: 'The average number of wins you achieve in a row before a loss',
+      value: winLossStats.winners.avgConsecutive.toFixed(1),
+    },
+  ];
+
+  const losersRows: StatRowSpec[] = [
+    {
+      label: 'Total losers',
+      tooltip: 'Total number of losing trades in the selected period',
+      value: formatCount(winLossStats.losers.total),
+    },
+    {
+      label: 'Worst loss',
+      tooltip: 'Your largest losing trade as a percentage of your account',
+      value: worstLoss ? (
+        <PnlValue
+          amount={worstLoss.amount}
+          format={formatCurrency}
+          size="sm"
+          bold
+        />
+      ) : (
+        '0'
+      ),
+      onClick: worstLoss && onTradeClick ? () => onTradeClick(worstLoss.id) : undefined,
+    },
+    {
+      label: 'Average loss',
+      tooltip: 'The average size of your losing trades as a percentage of your account',
+      value: (
+        <PnlValue
+          amount={winLossStats.losers.avgAmount}
+          format={formatCurrency}
+          size="sm"
+          bold
+        />
+      ),
+    },
+    {
+      label: 'Max consecutive losses',
+      tooltip: 'Your longest streak of consecutive losing trades',
+      value: formatCount(winLossStats.losers.maxConsecutive),
+    },
+    {
+      label: 'Avg consecutive losses',
+      tooltip: 'The average number of losses you have in a row before a win',
+      value: winLossStats.losers.avgConsecutive.toFixed(1),
+    },
+  ];
+
+  return (
+    <CardShell
+      sx={{ mb: 3 }}
+      head={{
+        icon: <EmojiEvents sx={{ fontSize: 16 }} />,
+        title: 'Winners & Losers',
+        eyebrow: `${formatCount(winLossStats.winners.total)} wins · ${formatCount(
+          winLossStats.losers.total,
+        )} losses`,
+      }}
+    >
+      {/* ── Body: two-column grid (or stacked when compact) ────────── */}
+      <Box
+        sx={{
+          p: 2.25,
+          display: 'grid',
+          gridTemplateColumns: compact ? '1fr' : { xs: '1fr', sm: '1fr 1fr' },
+          gap: 2.25,
+        }}
+      >
+        {/* Winners */}
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <EyebrowRow
+            accent={theme.palette.success.main}
+            label="Winners"
+            rightLabel={
+              <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+                <TrendingUp
+                  sx={{ fontSize: 14, color: theme.palette.success.main, opacity: 0.8 }}
+                />
+                <Box component="span">Profitable</Box>
               </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    Worst loss
-                  </Typography>
-                  <Tooltip title="Your largest losing trade as a percentage of your account" arrow>
-                    <InfoOutlined sx={{ fontSize: 14, color: 'text.secondary', opacity: 0.7, cursor: 'help' }} />
-                  </Tooltip>
-                </Box>
-                <Typography variant="body2">
-                  {worstLoss ? formatCurrency(Math.abs(worstLoss.amount)) : '0'}
-                </Typography>
-              </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    Average loss
-                  </Typography>
-                  <Tooltip title="The average size of your losing trades as a percentage of your account" arrow>
-                    <InfoOutlined sx={{ fontSize: 14, color: 'text.secondary', opacity: 0.7, cursor: 'help' }} />
-                  </Tooltip>
-                </Box>
-                <Typography variant="body2">{formatCurrency(Math.abs(winLossStats.losers.avgAmount))}</Typography>
-              </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    Max consecutive losses
-                  </Typography>
-                  <Tooltip title="Your longest streak of consecutive losing trades" arrow>
-                    <InfoOutlined sx={{ fontSize: 14, color: 'text.secondary', opacity: 0.7, cursor: 'help' }} />
-                  </Tooltip>
-                </Box>
-                <Typography variant="body2">{formatCount(winLossStats.losers.maxConsecutive)}</Typography>
-              </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    Avg consecutive losses
-                  </Typography>
-                  <Tooltip title="The average number of losses you have in a row before a win" arrow>
-                    <InfoOutlined sx={{ fontSize: 14, color: 'text.secondary', opacity: 0.7, cursor: 'help' }} />
-                  </Tooltip>
-                </Box>
-                <Typography variant="body2">{winLossStats.losers.avgConsecutive.toFixed(1)}</Typography>
-              </Box>
-            </Stack>
-          </Paper>
+            }
+          />
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+            {winnersRows.map((row, i) => (
+              <StatRow key={i} row={row} accent={theme.palette.success.main} />
+            ))}
+          </Box>
         </Box>
-      )}
-    </Box>
+
+        {/* Losers */}
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <EyebrowRow
+            accent={theme.palette.error.main}
+            label="Losers"
+            rightLabel={
+              <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+                <TrendingDown
+                  sx={{ fontSize: 14, color: theme.palette.error.main, opacity: 0.8 }}
+                />
+                <Box component="span">Drawdown</Box>
+              </Box>
+            }
+          />
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+            {losersRows.map((row, i) => (
+              <StatRow key={i} row={row} accent={theme.palette.error.main} />
+            ))}
+          </Box>
+        </Box>
+      </Box>
+    </CardShell>
   );
 };
 

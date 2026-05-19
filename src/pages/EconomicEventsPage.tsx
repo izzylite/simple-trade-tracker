@@ -72,6 +72,10 @@ import { useEventPageTradeOps } from 'features/events/hooks/useEventPageTradeOps
 import AllPinnedEventsContent from 'features/events/components/AllPinnedEventsContent';
 import EconomicEventShimmer from 'features/events/components/EconomicEventShimmer';
 import { Z_INDEX } from 'styles/zIndex';
+import { EYEBROW_SX, TNUM } from 'styles/designTokens';
+import CardShell from 'components/common/CardShell';
+import StatTile from 'components/common/StatTile';
+import CompareBar from 'components/common/CompareBar';
 
 const APP_HEADER_HEIGHT = 64;
 // App.tsx sets pb: 0 for /events (isViewportLockedPage) so the page can
@@ -514,42 +518,42 @@ const EconomicEventsPageInner: React.FC = () => {
           flexDirection: 'column',
         }}
       >
-      {/* Page head */}
-      <Stack
-        direction={{ xs: 'column', sm: 'row' }}
-        alignItems={{ xs: 'flex-start', sm: 'flex-end' }}
-        justifyContent="space-between"
-        spacing={2}
-        sx={{ mb: 3 }}
+      {/* Page head — PerformanceHeader pattern: eyebrow + display title + subtitle + right actions */}
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'flex-end',
+          justifyContent: 'space-between',
+          gap: 2,
+          flexWrap: 'wrap',
+          mb: 3,
+        }}
       >
-        <Box>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography sx={EYEBROW_SX}>Macro calendar</Typography>
           <Typography
+            component="h1"
             sx={{
-              fontSize: '0.6875rem',
-              fontWeight: 600,
-              letterSpacing: '0.18em',
-              textTransform: 'uppercase',
-              color: 'primary.main',
-              lineHeight: 1.1,
-              mb: 0.75,
-            }}
-          >
-            Economic
-          </Typography>
-          <Typography
-            sx={{
+              fontWeight: 700,
               fontSize: { xs: '1.5rem', sm: '1.85rem' },
-              fontWeight: 800,
               letterSpacing: '-0.025em',
+              color: 'text.primary',
+              mt: '6px',
+              mb: 0,
               lineHeight: 1.15,
             }}
           >
-            Macro &amp; events
+            Economic events
           </Typography>
           <Typography
-            sx={{ fontSize: '0.875rem', color: 'text.secondary', mt: 0.5 }}
+            sx={{
+              color: 'text.secondary',
+              fontSize: '0.875rem',
+              mt: '6px',
+              lineHeight: 1.4,
+            }}
           >
-            All economic data feeding your calendar · {weekRangeLabel}
+            {weekRangeLabel}
             {visibleEvents.length > 0
               ? ` · ${visibleEvents.length} event${
                   visibleEvents.length === 1 ? '' : 's'
@@ -600,7 +604,7 @@ const EconomicEventsPageInner: React.FC = () => {
             </span>
           </Tooltip>
         </Stack>
-      </Stack>
+      </Box>
 
       {/* Currency chips + upcoming toggle (user-persisted) */}
       <Stack
@@ -1271,13 +1275,23 @@ const EventList: React.FC<{
     return upcoming[0]?.id ?? null;
   }, [events, currentTime]);
 
+  const headEyebrow = loading
+    ? 'Loading…'
+    : events.length === 0
+      ? 'No events'
+      : `${events.length} event${events.length === 1 ? '' : 's'}${
+          highCount > 0 ? ` · ${highCount} high` : ''
+        }`;
+
   return (
-    <Box
+    <CardShell
+      head={{
+        icon: <EventsIcon sx={{ fontSize: 16 }} />,
+        title: label,
+        eyebrow: headEyebrow,
+      }}
+      radius="xl"
       sx={{
-        bgcolor: 'background.paper',
-        border: `1px solid ${theme.palette.divider}`,
-        borderRadius: 2,
-        overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
         // Fill grid cell. Parent caps height to viewport so rows scroll
@@ -1286,52 +1300,6 @@ const EventList: React.FC<{
         minHeight: { xs: 360, md: 0 },
       }}
     >
-      <Stack
-        direction="row"
-        alignItems="center"
-        spacing={1.25}
-        sx={{
-          px: 2.25,
-          py: 1.75,
-          borderBottom: `1px solid ${theme.palette.divider}`,
-          flexShrink: 0,
-        }}
-      >
-        <Box
-          sx={{
-            width: 26,
-            height: 26,
-            borderRadius: 1,
-            bgcolor: alpha(theme.palette.primary.main, 0.16),
-            color: 'primary.main',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <EventsIcon sx={{ fontSize: 16 }} />
-        </Box>
-        <Typography sx={{ fontWeight: 600, fontSize: '0.95rem' }}>
-          {label}
-        </Typography>
-        <Box sx={{ flex: 1 }} />
-        <Typography
-          sx={{
-            fontSize: '0.75rem',
-            color: 'text.secondary',
-            fontFeatureSettings: "'tnum' on",
-          }}
-        >
-          {loading
-            ? 'Loading…'
-            : events.length === 0
-              ? 'No events'
-              : `${events.length} event${events.length === 1 ? '' : 's'}${
-                  highCount > 0 ? ` · ${highCount} high` : ''
-                }`}
-        </Typography>
-      </Stack>
-
       <Box
         sx={{
           overflowY: 'auto',
@@ -1400,7 +1368,7 @@ const EventList: React.FC<{
           );
         })}
       </Box>
-    </Box>
+    </CardShell>
   );
 };
 
@@ -1423,79 +1391,30 @@ const ImpactDistributionCard: React.FC<{
     { key: 'Low', label: 'Low', color: theme.palette.success.main },
   ];
   return (
-    <Box
-      sx={{
-        bgcolor: 'background.paper',
-        border: `1px solid ${theme.palette.divider}`,
-        borderRadius: 2,
-        p: 2.25,
+    <CardShell
+      radius="xl"
+      head={{
+        icon: <EventsIcon sx={{ fontSize: 16 }} />,
+        title: 'Impact distribution',
+        eyebrow: 'This week',
       }}
+      innerSx={{ p: 1.75, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1 }}
     >
-      <Typography
-        sx={{
-          fontWeight: 700,
-          fontSize: '0.85rem',
-          letterSpacing: '-0.005em',
-          mb: 1.5,
-        }}
-      >
-        Impact distribution · this week
-      </Typography>
-      <Stack spacing={1.25}>
-        {rows.map((row) => {
-          const count = counts[row.key];
-          const pct = Math.max(4, Math.round((count / max) * 100));
-          return (
-            <Box
-              key={row.key}
-              sx={{
-                display: 'grid',
-                gridTemplateColumns: '60px 1fr 30px',
-                gap: 1.25,
-                alignItems: 'center',
-              }}
-            >
-              <Typography
-                sx={{
-                  fontSize: '0.78rem',
-                  fontWeight: 600,
-                  color: 'text.secondary',
-                }}
-              >
-                {row.label}
-              </Typography>
-              <Box
-                sx={{
-                  height: 6,
-                  borderRadius: 0.75,
-                  bgcolor: alpha(theme.palette.text.primary, 0.05),
-                  overflow: 'hidden',
-                }}
-              >
-                <Box
-                  sx={{
-                    height: '100%',
-                    width: `${pct}%`,
-                    bgcolor: row.color,
-                    transition: 'width 200ms',
-                  }}
-                />
-              </Box>
-              <Typography
-                sx={{
-                  fontSize: '0.82rem',
-                  fontWeight: 600,
-                  textAlign: 'right',
-                  fontFeatureSettings: "'tnum' on",
-                }}
-              >
-                {count}
-              </Typography>
-            </Box>
-          );
-        })}
-      </Stack>
-    </Box>
+      {rows.map((row) => {
+        const count = counts[row.key];
+        const pct = Math.max(4, Math.round((count / max) * 100));
+        return (
+          <StatTile
+            key={row.key}
+            size="sm"
+            label={row.label}
+            value={count}
+            valueColor={row.color}
+            footer={<CompareBar value={pct} pct color={row.color} />}
+          />
+        );
+      })}
+    </CardShell>
   );
 };
 
@@ -1546,66 +1465,35 @@ const PinnedEventsCard: React.FC<{
   const visibleRows = rows.slice(0, PINNED_VISIBLE_LIMIT);
   const overflow = Math.max(0, pins.length - PINNED_VISIBLE_LIMIT);
 
-  return (
-    <Box
+  const headRight = (
+    <Typography
       sx={{
-        bgcolor: 'background.paper',
-        border: `1px solid ${theme.palette.divider}`,
-        borderRadius: 2,
+        fontSize: '0.72rem',
+        color: 'text.secondary',
+        fontFeatureSettings: TNUM,
+        fontWeight: 600,
+      }}
+    >
+      {pins.length}
+    </Typography>
+  );
+
+  return (
+    <CardShell
+      radius="xl"
+      head={{
+        icon: <PinIcon sx={{ fontSize: 14 }} />,
+        title: 'Pinned events',
+        eyebrow: pins.length === 0 ? 'None yet' : `${pins.length} tracked`,
+        right: headRight,
+      }}
+      sx={{
         display: 'flex',
         flexDirection: 'column',
         flex: { xs: 'none', lg: 1 },
         minHeight: 0,
-        overflow: 'hidden',
       }}
     >
-      <Stack
-        direction="row"
-        alignItems="center"
-        spacing={1.25}
-        sx={{
-          px: 2.25,
-          py: 1.625,
-          borderBottom: `1px solid ${theme.palette.divider}`,
-          flexShrink: 0,
-        }}
-      >
-        <Box
-          sx={{
-            width: 22,
-            height: 22,
-            borderRadius: 0.875,
-            bgcolor: alpha(theme.palette.primary.main, 0.16),
-            color: 'primary.main',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <PinIcon sx={{ fontSize: 13 }} />
-        </Box>
-        <Typography
-          sx={{
-            fontWeight: 700,
-            fontSize: '0.85rem',
-            letterSpacing: '-0.005em',
-          }}
-        >
-          Pinned events
-        </Typography>
-        <Box sx={{ flex: 1 }} />
-        <Typography
-          sx={{
-            fontSize: '0.72rem',
-            color: 'text.secondary',
-            fontFeatureSettings: "'tnum' on",
-            fontWeight: 600,
-          }}
-        >
-          {pins.length}
-        </Typography>
-      </Stack>
-
       {pins.length === 0 ? (
         <Typography
           sx={{
@@ -1679,7 +1567,7 @@ const PinnedEventsCard: React.FC<{
           )}
         </>
       )}
-    </Box>
+    </CardShell>
   );
 };
 

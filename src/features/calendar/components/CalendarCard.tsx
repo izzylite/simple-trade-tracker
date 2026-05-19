@@ -1,20 +1,15 @@
 import React, { useCallback, useMemo } from 'react';
 import {
-  Card,
-  CardContent,
-  CardActions,
   Box,
   Typography,
   IconButton,
   alpha,
   useTheme,
-  Button,
   Menu,
   MenuItem,
   ListItemIcon,
   ListItemText,
   Stack,
-  Divider,
   Tooltip,
   Theme
 } from '@mui/material';
@@ -32,6 +27,8 @@ import { format, isValid } from 'date-fns';
 import { Calendar } from '../types/calendar';
 import { CalendarStats } from '../services/calendarService';
 import ShareButton from './sharing/ShareButton';
+import { EYEBROW_SX, TNUM, getCardShellSx, getInsetTileSx } from 'styles/designTokens';
+import PnlValue from 'components/common/PnlValue';
 
 /**
  * Safely format a date value, returning a fallback string for invalid dates
@@ -83,7 +80,7 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
     action();
   }, [handleMenuClose]);
 
-  
+
   const stats: CalendarStats = useMemo(() => {
     return {  // Extract stats from calendar object (stats are auto-calculated by Supabase)
       total_pnl: calendar.total_pnl || 0,
@@ -123,98 +120,79 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
     const growth = stats.growth_percentage;
     if (isNaN(growth)) return null;
 
+    const isWin = stats.total_pnl > 0;
+    const isLoss = stats.total_pnl < 0;
+    const accent = isWin
+      ? theme.palette.success.main
+      : isLoss
+        ? theme.palette.error.main
+        : theme.palette.text.secondary;
+
     return (
       <Box
         sx={{
+          ...getInsetTileSx(theme),
           display: 'flex',
           alignItems: 'center',
           mt: 1,
           gap: 1.5,
-          p: 1.5,
-          borderRadius: 2,
-          bgcolor: stats.total_pnl > 0
-            ? alpha(theme.palette.success.main, 0.1)
-            : stats.total_pnl < 0
-              ? alpha(theme.palette.error.main, 0.1)
-              : alpha(theme.palette.grey[500], 0.1),
-          border: `1px solid ${stats.total_pnl > 0
-            ? alpha(theme.palette.success.main, 0.2)
-            : stats.total_pnl < 0
-              ? alpha(theme.palette.error.main, 0.2)
-              : alpha(theme.palette.grey[500], 0.2)}`,
         }}
       >
         <Box
           sx={{
-            width: 40,
-            height: 40,
-            borderRadius: '50%',
+            width: 36,
+            height: 36,
+            borderRadius: `${theme.palette.custom.radius.md}px`,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            bgcolor: stats.total_pnl > 0
-              ? alpha(theme.palette.success.main, 0.1)
-              : stats.total_pnl < 0
-                ? alpha(theme.palette.error.main, 0.1)
-                : alpha(theme.palette.grey[500], 0.1)
+            bgcolor: alpha(accent, 0.12),
+            color: accent,
+            flexShrink: 0,
           }}
         >
-          <TrendingUp sx={{
-            fontSize: '1.2rem',
-            color: stats.total_pnl > 0
-              ? theme.palette.success.main
-              : stats.total_pnl < 0
-                ? theme.palette.error.main
-                : theme.palette.grey[500]
-          }} />
+          <TrendingUp sx={{ fontSize: '1.1rem' }} />
         </Box>
-        <Box>
-          <Typography variant="h6" sx={{
-            color: stats.total_pnl > 0
-              ? 'success.main'
-              : stats.total_pnl < 0
-                ? 'error.main'
-                : 'text.secondary',
-            fontWeight: 600
-          }}>
-            {formatCurrency(stats.total_pnl)}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Growth: {stats.growth_percentage.toFixed(2)}%
+        <Box sx={{ minWidth: 0 }}>
+          <PnlValue
+            amount={stats.total_pnl}
+            format={formatCurrency}
+            size="lg"
+            arrow={false}
+          />
+          <Typography
+            sx={{
+              ...EYEBROW_SX,
+              mt: 0.25,
+              color: 'text.tertiary',
+              fontFeatureSettings: TNUM,
+            }}
+          >
+            Growth · {stats.growth_percentage.toFixed(2)}%
           </Typography>
         </Box>
       </Box>
     );
   }
   return (
-    <Card
+    <Box
+      onClick={() => onCalendarClick(calendar.id)}
       sx={{
+        ...getCardShellSx(theme, 'lg'),
         cursor: 'pointer',
-        transition: 'all 0.2s ease',
         position: 'relative',
-        overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
         height: 'auto',
-        borderRadius: '12px',
-        backgroundColor: 'background.paper',
-        boxShadow: theme.palette.mode === 'dark'
-          ? '0 2px 8px rgba(0,0,0,0.3)'
-          : '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)',
-        ...(theme.palette.mode === 'light' && {
-          border: '1px solid #cbd5e1',
-        }),
+        transition: `border-color 180ms ${theme.palette.custom.easing.smooth}, transform 180ms ${theme.palette.custom.easing.smooth}`,
         '&:hover': {
+          borderColor: alpha(theme.palette.primary.main, 0.4),
           transform: 'translateY(-2px)',
-          boxShadow: theme.palette.mode === 'dark'
-            ? '0 4px 16px rgba(0,0,0,0.4)'
-            : '0 4px 12px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.04)',
           '& .hero-image': {
             transform: 'scale(1.05)'
           }
         }
       }}
-      onClick={() => onCalendarClick(calendar.id)}
     >
       {/* Hero Image Section - Always rendered for consistent layout */}
       <Box
@@ -222,7 +200,8 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
           position: 'relative',
           overflow: 'hidden',
           height: { xs: 160, sm: 200 },
-          flexShrink: 0
+          flexShrink: 0,
+          borderBottom: `1px solid ${theme.palette.divider}`,
         }}
       >
         <Box
@@ -245,7 +224,7 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
                 ${alpha(theme.palette.secondary.main, 0.1)} 50%,
                 ${alpha(theme.palette.primary.main, 0.05)} 100%)`,
             }),
-            transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+            transition: `transform 400ms ${theme.palette.custom.easing.smooth}`,
             '&::before': {
               content: '""',
               position: 'absolute',
@@ -272,14 +251,13 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
               transform: 'translate(-50%, -50%)',
               zIndex: 2,
               textAlign: 'center',
-              color: alpha(theme.palette.text.secondary, 0.6)
+              color: 'text.tertiary'
             }}
           >
             <CalendarIcon sx={{ fontSize: '3rem', mb: 1, opacity: 0.4 }} />
             <Typography
               variant="body2"
               sx={{
-                
                 fontWeight: 500,
                 opacity: 0.7,
                 fontSize: '0.9rem'
@@ -289,12 +267,12 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
             </Typography>
           </Box>
         )}
- 
+
       </Box>
 
       {/* Content Section */}
-      <CardContent sx={{
-        p: 3,
+      <Box sx={{
+        p: 2.25,
         display: 'flex',
         flexDirection: 'column',
         flexGrow: 1,
@@ -308,15 +286,15 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
               variant="h5"
               component="div"
               sx={{
-                fontWeight: 700,
+                fontWeight: 600,
                 color: 'text.primary',
                 display: 'flex',
                 alignItems: 'center',
                 gap: 1.5,
                 mb: 0.5,
-                fontSize: '1.4rem',
-                letterSpacing: '-0.02em',
-                lineHeight: 1.2,
+                fontSize: '1.25rem',
+                letterSpacing: '-0.015em',
+                lineHeight: 1.3,
                 minWidth: 0
               }}
             >
@@ -339,11 +317,12 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
                   justifyContent: 'center',
                   width: 28,
                   height: 28,
-                  borderRadius: '50%',
-                  bgcolor: alpha(theme.palette.success.main, 0.1),
-                  border: `1px solid ${alpha(theme.palette.success.main, 0.2)}`
+                  borderRadius: `${theme.palette.custom.radius.md}px`,
+                  bgcolor: alpha(theme.palette.success.main, 0.12),
+                  color: 'success.main',
+                  flexShrink: 0,
                 }}>
-                  <TrendingUp sx={{ fontSize: '1rem', color: 'success.main' }} />
+                  <TrendingUp sx={{ fontSize: '1rem' }} />
                 </Box>
               )}
               {stats.total_pnl < 0 && (
@@ -353,11 +332,12 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
                   justifyContent: 'center',
                   width: 28,
                   height: 28,
-                  borderRadius: '50%',
-                  bgcolor: alpha(theme.palette.error.main, 0.1),
-                  border: `1px solid ${alpha(theme.palette.error.main, 0.2)}`
+                  borderRadius: `${theme.palette.custom.radius.md}px`,
+                  bgcolor: alpha(theme.palette.error.main, 0.12),
+                  color: 'error.main',
+                  flexShrink: 0,
                 }}>
-                  <TrendingDown sx={{ fontSize: '1rem', color: 'error.main' }} />
+                  <TrendingDown sx={{ fontSize: '1rem' }} />
                 </Box>
               )}
             </Typography>
@@ -371,47 +351,51 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
 
         {/* Metadata section */}
         <Stack direction="row" spacing={3} sx={{ mb: 1.5 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
             <Box sx={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               width: 20,
               height: 20,
-              borderRadius: '50%',
-              bgcolor: alpha(theme.palette.primary.main, 0.1)
+              borderRadius: `${theme.palette.custom.radius.sm}px`,
+              bgcolor: theme.palette.custom.tintViolet.soft,
+              color: 'primary.main',
             }}>
-              <CalendarIcon sx={{ fontSize: '0.8rem', color: 'primary.main' }} />
+              <CalendarIcon sx={{ fontSize: '0.8rem' }} />
             </Box>
-            <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8rem', fontWeight: 500 }}>
+            <Typography sx={{ ...EYEBROW_SX, color: 'text.tertiary', fontFeatureSettings: TNUM }}>
               Created {safeFormatDate(calendar.created_at, 'MMM d, yyyy')}
             </Typography>
           </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
             <Box sx={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               width: 20,
               height: 20,
-              borderRadius: '50%',
-              bgcolor: alpha(theme.palette.secondary.main, 0.1)
+              borderRadius: `${theme.palette.custom.radius.sm}px`,
+              bgcolor: alpha(theme.palette.secondary.main, 0.12),
+              color: 'secondary.main',
             }}>
-              <EditIcon sx={{ fontSize: '0.8rem', color: 'secondary.main' }} />
+              <EditIcon sx={{ fontSize: '0.8rem' }} />
             </Box>
-            <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8rem', fontWeight: 500 }}>
+            <Typography sx={{ ...EYEBROW_SX, color: 'text.tertiary', fontFeatureSettings: TNUM }}>
               Updated {safeFormatDate(calendar.updated_at, 'MMM d, yyyy')}
             </Typography>
           </Box>
         </Stack>
-      </CardContent>
+      </Box>
 
       {/* Card Actions */}
-      <CardActions sx={{
+      <Box sx={{
+        display: 'flex',
         justifyContent: 'flex-end',
         alignItems: 'center',
-        p: 2,
-        borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}`
+        px: 2.25,
+        py: 1.25,
+        borderTop: `1px solid ${theme.palette.divider}`
       }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           {/* Share Calendar Button */}
@@ -428,8 +412,9 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
             onClick={handleMenuClick}
             sx={{
               color: 'text.secondary',
+              borderRadius: `${theme.palette.custom.radius.sm}px`,
               '&:hover': {
-                bgcolor: alpha(theme.palette.primary.main, 0.1),
+                bgcolor: theme.palette.custom.tintViolet.soft,
                 color: 'primary.main'
               }
             }}
@@ -479,8 +464,8 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
             </MenuItem>
           </Menu>
         </Box>
-      </CardActions>
-    </Card>
+      </Box>
+    </Box>
   );
 };
 

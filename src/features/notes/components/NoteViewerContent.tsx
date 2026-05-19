@@ -22,6 +22,7 @@ import { getSharedTrade } from 'features/calendar/services/sharingService';
 import { logger } from 'utils/logger';
 import TradeGalleryDialog from 'features/calendar/components/TradeGalleryDialog';
 import ImageZoomDialog, { ImageZoomProp } from 'features/calendar/components/ImageZoomDialog';
+import { EYEBROW_SX } from 'styles/designTokens';
 
 interface NoteViewerContentProps {
   note: Note;
@@ -82,18 +83,21 @@ const NoteViewerContent: React.FC<NoteViewerContentProps> = ({ note }) => {
         }}
       >
         {note.tags && note.tags.length > 0 && (
-          <Stack direction="row" spacing={0.5} flexWrap="wrap" sx={{ mb: 2 }}>
+          <Stack direction="row" spacing={0.5} flexWrap="wrap" sx={{ mb: 2, rowGap: 0.5 }}>
             {note.tags.map((tag) => (
               <Chip
                 key={tag}
                 label={getTagDisplayLabel(tag)}
                 size="small"
                 sx={{
-                  bgcolor: alpha(theme.palette.secondary.main, 0.1),
-                  color: 'secondary.main',
-                  fontWeight: 500,
-                  fontSize: '0.75rem',
                   height: 24,
+                  fontSize: '0.75rem',
+                  fontWeight: 500,
+                  borderRadius: `${theme.palette.custom.radius.md}px`,
+                  bgcolor: theme.palette.custom.tintViolet.soft,
+                  color: 'primary.main',
+                  border: `1px solid ${alpha(theme.palette.primary.main, 0.15)}`,
+                  '& .MuiChip-label': { px: 1 },
                 }}
               />
             ))}
@@ -114,11 +118,14 @@ const NoteViewerContent: React.FC<NoteViewerContentProps> = ({ note }) => {
 
         {formattedDate && (
           <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{ mb: 3, display: 'block' }}
+            sx={{
+              ...EYEBROW_SX,
+              color: 'text.tertiary',
+              mb: 3,
+              display: 'block',
+            }}
           >
-            {note.updated_at ? 'Updated' : 'Created'} {formattedDate}
+            {note.updated_at ? 'Updated' : 'Created'} · {formattedDate}
           </Typography>
         )}
 

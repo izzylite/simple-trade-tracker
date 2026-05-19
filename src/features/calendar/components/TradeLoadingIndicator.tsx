@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { LinearProgress, Box, Typography, Fade, useTheme, alpha } from '@mui/material';
-import { CloudDownload, FileUpload, FileDownload } from '@mui/icons-material';
+import { Box, Fade, useTheme } from '@mui/material';
+import CompareBar from 'components/common/CompareBar';
 
 interface TradeLoadingIndicatorProps {
   isLoading: boolean;
@@ -12,6 +12,8 @@ const TradeLoadingIndicator: React.FC<TradeLoadingIndicatorProps> = ({ isLoading
   const theme = useTheme();
   const [loadingText, setLoadingText] = useState<string>('Loading trades...');
   const [dots, setDots] = useState(0);
+  // Indeterminate-style sweep: animate a 0→100 percent on a 1.2s loop.
+  const [sweep, setSweep] = useState(0);
 
   // Animate the loading text with dots
   useEffect(() => {
@@ -21,6 +23,15 @@ const TradeLoadingIndicator: React.FC<TradeLoadingIndicatorProps> = ({ isLoading
       setDots(prev => (prev + 1) % 4);
     }, 500);
 
+    return () => clearInterval(interval);
+  }, [isLoading]);
+
+  // Drive the sweep value (replaces the MUI indeterminate LinearProgress).
+  useEffect(() => {
+    if (!isLoading) return;
+    const interval = setInterval(() => {
+      setSweep(prev => (prev + 8) % 100);
+    }, 60);
     return () => clearInterval(interval);
   }, [isLoading]);
 
@@ -54,7 +65,7 @@ const TradeLoadingIndicator: React.FC<TradeLoadingIndicatorProps> = ({ isLoading
   }, [dots, calendarName, action]);
 
   if (!isLoading) return null;
- 
+
 
   return (
     <Fade in={isLoading} timeout={300}>
@@ -65,31 +76,21 @@ const TradeLoadingIndicator: React.FC<TradeLoadingIndicatorProps> = ({ isLoading
           left: 0,
           right: 0,
           zIndex: 1100,
-          bgcolor: theme.palette.background.paper,
-          boxShadow: 3, // Add a shadow for depth
+          bgcolor: 'background.paper',
+          boxShadow: theme.shadows[3],
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-          '@keyframes pulse': {
-            '0%': { opacity: 0.6, transform: 'scale(0.95)' },
-            '50%': { opacity: 1, transform: 'scale(1.05)' },
-            '100%': { opacity: 0.6, transform: 'scale(0.95)' },
-          },
+          borderBottom: `1px solid ${theme.palette.divider}`,
         }}
-      > 
-
+      >
         <Box sx={{ flexGrow: 1, maxWidth: '100%' }}>
-          
-
-          <LinearProgress
-            sx={{
-              height: 4, 
-              backgroundColor: alpha(theme.palette.primary.main, 0.15),
-              '& .MuiLinearProgress-bar': {
-                borderRadius: 3,
-              }
-            }}
+          <CompareBar
+            value={sweep}
+            pct
+            color={theme.palette.primary.main}
+            height={4}
+            sx={{ borderRadius: 0 }}
           />
         </Box>
       </Box>

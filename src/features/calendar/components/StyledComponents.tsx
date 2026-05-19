@@ -1,5 +1,6 @@
 import { styled, alpha } from '@mui/material/styles';
 import { Paper, Box, Typography, Button, IconButton, Chip, DialogTitle, DialogContent, DialogActions } from '@mui/material';
+import { MONO_FONT, TNUM } from 'styles/designTokens';
 
 export type DayStatus = 'win' | 'loss' | 'neutral' | 'breakeven';
 
@@ -10,59 +11,76 @@ export const StyledCalendarDay = styled(Box, {
   $isCurrentMonth: boolean;
   $isCurrentDay: boolean,
   $dayStatus: DayStatus;
-}>(({ theme, $isCurrentMonth, $isCurrentDay, $dayStatus }) => ({
-  padding: theme.spacing(1),
-  height: '100%',
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  cursor: 'pointer',
-  borderRadius: '8px',
-  transition: 'all 0.1s ease-in-out',
-  opacity: $isCurrentMonth ? 1 : 0.4,
-  minHeight: '100px',
-  [theme.breakpoints.down('md')]: { minHeight: '84px' },
-  [theme.breakpoints.down('sm')]: { minHeight: '60px', padding: theme.spacing(0.75) },
-  backgroundColor:
-    $dayStatus === 'win'
-      ? (theme.palette.mode === 'dark' ? 'rgba(34, 197, 94, 0.12)' : 'rgba(22, 163, 74, 0.15)')
-      : $dayStatus === 'loss'
-        ? (theme.palette.mode === 'dark' ? 'rgba(239, 68, 68, 0.10)' : 'rgba(220, 38, 38, 0.15)')
-        : $dayStatus === 'breakeven'
-          ? 'rgba(100, 116, 139, 0.08)'
-          : theme.palette.background.paper,
-  border: theme.palette.mode === 'light' ? '1px solid #cbd5e1' : 'none',
-  boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
-  position: 'relative',
-  overflow: 'hidden',
-  '&:hover': {
+}>(({ theme, $isCurrentMonth, $isCurrentDay, $dayStatus }) => {
+  const isDark = theme.palette.mode === 'dark';
+  const winBg = isDark
+    ? alpha(theme.palette.success.main, 0.12)
+    : alpha(theme.palette.success.main, 0.15);
+  const winHoverBg = isDark
+    ? alpha(theme.palette.success.main, 0.18)
+    : alpha(theme.palette.success.main, 0.22);
+  const lossBg = isDark
+    ? alpha(theme.palette.error.main, 0.1)
+    : alpha(theme.palette.error.main, 0.15);
+  const lossHoverBg = isDark
+    ? alpha(theme.palette.error.main, 0.16)
+    : alpha(theme.palette.error.main, 0.22);
+  const breakevenBg = alpha(theme.palette.text.secondary, 0.08);
+  const breakevenHoverBg = alpha(theme.palette.text.secondary, 0.13);
+
+  return {
+    padding: theme.spacing(1),
+    height: '100%',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    cursor: 'pointer',
+    borderRadius: `${theme.palette.custom.radius.md}px`,
+    transition: 'all 0.1s ease-in-out',
+    opacity: $isCurrentMonth ? 1 : 0.4,
+    minHeight: '100px',
+    [theme.breakpoints.down('md')]: { minHeight: '84px' },
+    [theme.breakpoints.down('sm')]: { minHeight: '60px', padding: theme.spacing(0.75) },
     backgroundColor:
       $dayStatus === 'win'
-        ? (theme.palette.mode === 'dark' ? 'rgba(34, 197, 94, 0.18)' : 'rgba(22, 163, 74, 0.22)')
+        ? winBg
         : $dayStatus === 'loss'
-          ? (theme.palette.mode === 'dark' ? 'rgba(239, 68, 68, 0.16)' : 'rgba(220, 38, 38, 0.22)')
+          ? lossBg
           : $dayStatus === 'breakeven'
-            ? 'rgba(100, 116, 139, 0.13)'
-            : alpha(theme.palette.background.paper, 0.85),
-  },
-  ...(!$isCurrentMonth && {
-    opacity: 0.4,
+            ? breakevenBg
+            : theme.palette.background.paper,
+    border: isDark ? 'none' : `1px solid ${theme.palette.divider}`,
+    boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
+    position: 'relative',
+    overflow: 'hidden',
     '&:hover': {
-      opacity: 0.6,
+      backgroundColor:
+        $dayStatus === 'win'
+          ? winHoverBg
+          : $dayStatus === 'loss'
+            ? lossHoverBg
+            : $dayStatus === 'breakeven'
+              ? breakevenHoverBg
+              : alpha(theme.palette.background.paper, 0.85),
     },
-  }),
-  ...($isCurrentDay && {
-    border: '3px solid rgba(124, 58, 237, 0.4)',
-    boxShadow: '0 2px 8px rgba(124, 58, 237, 0.25)',
-  })
-
-}));
+    ...(!$isCurrentMonth && {
+      opacity: 0.4,
+      '&:hover': {
+        opacity: 0.6,
+      },
+    }),
+    ...($isCurrentDay && {
+      border: `3px solid ${alpha(theme.palette.primary.main, 0.4)}`,
+      boxShadow: `0 2px 8px ${alpha(theme.palette.primary.main, 0.25)}`,
+    })
+  };
+});
 
 export const CalendarCell = styled(Box)(({ theme }) => ({
-  borderRadius: '8px',
+  borderRadius: `${theme.palette.custom.radius.md}px`,
   overflow: 'hidden',
   backgroundColor: 'transparent',
-  border: theme.palette.mode === 'light' ? '1px solid #cbd5e1' : 'none',
+  border: theme.palette.mode === 'light' ? `1px solid ${theme.palette.divider}` : 'none',
 }));
 
 export const WeekdayHeader = styled(Box)(({ theme }) => ({
@@ -74,13 +92,15 @@ export const WeekdayHeader = styled(Box)(({ theme }) => ({
   textTransform: 'uppercase' as const,
   letterSpacing: '0.05em',
   backgroundColor: 'transparent',
-  borderRadius: '8px',
+  borderRadius: `${theme.palette.custom.radius.md}px`,
 }));
 
 // Day number styled component
 export const DayNumber = styled(Typography, {
   shouldForwardProp: (prop) => prop !== '$isCurrentMonth'
 })<{ $isCurrentMonth: boolean }>(({ theme, $isCurrentMonth }) => ({
+  fontFamily: MONO_FONT,
+  fontFeatureSettings: TNUM,
   fontSize: '0.875rem',
   fontWeight: 500,
   color: $isCurrentMonth ? theme.palette.text.primary : theme.palette.text.secondary,
@@ -91,6 +111,8 @@ export const DayNumber = styled(Typography, {
 export const TradeAmount = styled(Typography, {
   shouldForwardProp: (prop) => prop !== '$dayStatus'
 })<{ $dayStatus: 'win' | 'loss' | 'neutral' | 'breakeven' }>(({ theme, $dayStatus }) => ({
+  fontFamily: MONO_FONT,
+  fontFeatureSettings: TNUM,
   fontSize: '0.875rem',
   fontWeight: 600,
   color: $dayStatus === 'win'
@@ -102,6 +124,8 @@ export const TradeAmount = styled(Typography, {
 
 // Trade count styled component
 export const TradeCount = styled(Typography)(({ theme }) => ({
+  fontFamily: MONO_FONT,
+  fontFeatureSettings: TNUM,
   fontSize: '0.75rem',
   color: theme.palette.text.secondary,
   fontWeight: 500,
@@ -127,7 +151,7 @@ export const ActionButton = styled(IconButton)(({ theme }) => ({
 // Status chip styled component
 export const StatusChip = styled(Chip)(({ theme }) => ({
   fontWeight: 600,
-  borderRadius: 16,
+  borderRadius: theme.palette.custom.radius.pill,
   '&.win': {
     backgroundColor: alpha(theme.palette.success.main, 0.1),
     color: theme.palette.success.main,
@@ -143,18 +167,14 @@ export const StatusChip = styled(Chip)(({ theme }) => ({
 // Card container styled component
 export const CardContainer = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(3),
-  borderRadius: '12px',
-  boxShadow: theme.palette.mode === 'dark'
-    ? '0 2px 8px rgba(0,0,0,0.3)'
-    : '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)',
-  border: theme.palette.mode === 'light' ? '1px solid #cbd5e1' : 'none',
+  borderRadius: `${theme.palette.custom.radius.lg}px`,
+  boxShadow: 'none',
+  border: `1px solid ${theme.palette.divider}`,
   backgroundColor: theme.palette.background.paper,
-  transition: 'all 0.2s ease-in-out',
+  transition: `border-color 180ms ${theme.palette.custom.easing.smooth}, transform 180ms ${theme.palette.custom.easing.smooth}`,
   '&:hover': {
+    borderColor: alpha(theme.palette.primary.main, 0.4),
     transform: 'translateY(-2px)',
-    boxShadow: theme.palette.mode === 'dark'
-      ? '0 4px 16px rgba(0,0,0,0.4)'
-      : '0 4px 12px rgba(0,0,0,0.12)',
   },
 }));
 
@@ -164,9 +184,9 @@ export const StatsContainer = styled(Box)(({ theme }) => ({
   flexDirection: 'column',
   gap: theme.spacing(2),
   padding: theme.spacing(2),
-  borderRadius: '12px',
+  borderRadius: `${theme.palette.custom.radius.lg}px`,
   backgroundColor: theme.palette.background.paper,
-  border: theme.palette.mode === 'light' ? '1px solid #cbd5e1' : 'none',
+  border: `1px solid ${theme.palette.divider}`,
 }));
 
 // Stat item styled component
@@ -175,12 +195,11 @@ export const StatItem = styled(Box)(({ theme }) => ({
   justifyContent: 'space-between',
   alignItems: 'center',
   padding: theme.spacing(1),
-  borderRadius: '8px',
-  backgroundColor: theme.palette.background.paper,
-  boxShadow: theme.palette.mode === 'dark'
-    ? '0 1px 2px rgba(0,0,0,0.2)'
-    : '0 1px 2px rgba(0,0,0,0.06)',
-  border: theme.palette.mode === 'light' ? '1px solid #cbd5e1' : 'none',
+  borderRadius: `${theme.palette.custom.radius.md}px`,
+  backgroundColor: theme.palette.mode === 'dark'
+    ? 'rgba(255,255,255,0.03)'
+    : alpha(theme.palette.text.primary, 0.03),
+  border: `1px solid ${theme.palette.divider}`,
 }));
 
 // Stat label styled component
@@ -266,26 +285,36 @@ export const TradeListItem = styled(Box, {
     ? '0 2px 4px rgba(0,0,0,0.55), 0 12px 28px rgba(0,0,0,0.45), 0 4px 8px rgba(0,0,0,0.28)'
     : '0 2px 4px rgba(15,23,42,0.08), 0 10px 24px rgba(15,23,42,0.14), 0 4px 8px rgba(15,23,42,0.06)';
 
+  const winBg = isDark
+    ? alpha(theme.palette.success.main, 0.1)
+    : alpha(theme.palette.success.main, 0.08);
+  const lossBg = isDark
+    ? alpha(theme.palette.error.main, 0.1)
+    : alpha(theme.palette.error.main, 0.08);
+  const breakevenBg = isDark
+    ? alpha(theme.palette.text.secondary, 0.1)
+    : alpha(theme.palette.text.secondary, 0.08);
+
   return {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: theme.spacing(1.5),
-    borderRadius: 12,
+    borderRadius: theme.palette.custom.radius.lg,
     backgroundColor: $type === 'win'
-      ? (isDark ? 'rgba(34, 197, 94, 0.10)' : 'rgba(34, 197, 94, 0.08)')
+      ? winBg
       : $type === 'loss'
-        ? (isDark ? 'rgba(239, 68, 68, 0.10)' : 'rgba(239, 68, 68, 0.08)')
+        ? lossBg
         : $type === 'breakeven'
-          ? (isDark ? 'rgba(100, 116, 139, 0.10)' : 'rgba(100, 116, 139, 0.08)')
+          ? breakevenBg
           : theme.palette.background.paper,
     border: '1px solid',
     borderColor: $type === 'win'
-      ? 'rgba(34, 197, 94, 0.22)'
+      ? alpha(theme.palette.success.main, 0.22)
       : $type === 'loss'
-        ? 'rgba(239, 68, 68, 0.22)'
+        ? alpha(theme.palette.error.main, 0.22)
         : $type === 'breakeven'
-          ? 'rgba(100, 116, 139, 0.22)'
+          ? alpha(theme.palette.text.secondary, 0.22)
           : theme.palette.divider,
     boxShadow: restingShadow,
     transition: 'box-shadow 180ms ease-out, transform 180ms ease-out, border-color 180ms ease-out',
@@ -346,17 +375,13 @@ export const AccountBalanceCard = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(2),
   marginBottom: theme.spacing(2),
   backgroundColor: theme.palette.background.paper,
-  borderRadius: '12px',
-  boxShadow: theme.palette.mode === 'dark'
-    ? '0 2px 8px rgba(0,0,0,0.3)'
-    : '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)',
-  border: theme.palette.mode === 'light' ? '1px solid #cbd5e1' : 'none',
-  transition: 'all 0.2s ease-in-out',
+  borderRadius: `${theme.palette.custom.radius.lg}px`,
+  boxShadow: 'none',
+  border: `1px solid ${theme.palette.divider}`,
+  transition: `border-color 180ms ${theme.palette.custom.easing.smooth}, transform 180ms ${theme.palette.custom.easing.smooth}`,
   '&:hover': {
+    borderColor: alpha(theme.palette.primary.main, 0.4),
     transform: 'translateY(-2px)',
-    boxShadow: theme.palette.mode === 'dark'
-      ? '0 4px 16px rgba(0,0,0,0.4)'
-      : '0 4px 12px rgba(0,0,0,0.12)',
   },
 }));
 
@@ -368,6 +393,9 @@ export const AccountBalanceTitle = styled(Typography)(({ theme }) => ({
 
 // Account balance amount styled component
 export const AccountBalanceAmount = styled(Typography)(({ theme }) => ({
+  fontFamily: MONO_FONT,
+  fontFeatureSettings: TNUM,
+  letterSpacing: '-0.015em',
   fontSize: '2rem',
   fontWeight: 700,
   color: theme.palette.text.primary,
@@ -380,6 +408,8 @@ export const AccountBalanceAmount = styled(Typography)(({ theme }) => ({
 
 // Account balance change styled component
 export const AccountBalanceChange = styled(Typography)(({ theme }) => ({
+  fontFamily: MONO_FONT,
+  fontFeatureSettings: TNUM,
   fontSize: '1rem',
   fontWeight: 500,
   textAlign: 'center',
@@ -392,11 +422,9 @@ export const AccountBalanceChange = styled(Typography)(({ theme }) => ({
 export const MonthlyStatsCard = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(3),
   backgroundColor: theme.palette.background.paper,
-  borderRadius: '12px',
-  boxShadow: theme.palette.mode === 'dark'
-    ? '0 2px 8px rgba(0,0,0,0.3)'
-    : '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)',
-  border: theme.palette.mode === 'light' ? '1px solid #cbd5e1' : 'none',
+  borderRadius: `${theme.palette.custom.radius.lg}px`,
+  boxShadow: 'none',
+  border: `1px solid ${theme.palette.divider}`,
 }));
 
 // Monthly stats title styled component
@@ -415,22 +443,15 @@ export const MonthlyStatsGrid = styled(Box)(({ theme }) => ({
 // Monthly stat item styled component
 export const MonthlyStatItem = styled(Box)(({ theme }) => ({
   padding: theme.spacing(1.5),
-  backgroundColor: theme.palette.background.paper,
-  borderRadius: '8px',
-  boxShadow: theme.palette.mode === 'dark'
-    ? '0 1px 2px rgba(0,0,0,0.2)'
-    : '0 1px 2px rgba(0,0,0,0.06)',
-  border: theme.palette.mode === 'light' ? '1px solid #cbd5e1' : 'none',
+  backgroundColor: theme.palette.mode === 'dark'
+    ? 'rgba(255,255,255,0.03)'
+    : alpha(theme.palette.text.primary, 0.03),
+  borderRadius: `${theme.palette.custom.radius.md}px`,
+  boxShadow: 'none',
+  border: `1px solid ${theme.palette.divider}`,
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
-  transition: 'all 0.2s ease-in-out',
-  '&:hover': {
-    transform: 'translateY(-2px)',
-    boxShadow: theme.palette.mode === 'dark'
-      ? '0 2px 8px rgba(0,0,0,0.3)'
-      : '0 2px 6px rgba(0,0,0,0.12)',
-  },
   [theme.breakpoints.down('sm')]: {
     padding: theme.spacing(1),
   },
@@ -450,6 +471,9 @@ export const MonthlyStatLabel = styled(Typography)(({ theme }) => ({
 
 // Monthly stat value styled component
 export const MonthlyStatValue = styled(Typography)(({ theme }) => ({
+  fontFamily: MONO_FONT,
+  fontFeatureSettings: TNUM,
+  letterSpacing: '-0.01em',
   fontSize: '1.25rem',
   fontWeight: 600,
   color: theme.palette.text.primary,

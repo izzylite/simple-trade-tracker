@@ -4,11 +4,13 @@ import {
   Pie,
   Cell,
   ResponsiveContainer,
-  Legend,
-  Tooltip
+  Tooltip,
 } from 'recharts';
-import { Box, Paper, Typography, useTheme } from '@mui/material';
-import { alpha } from '@mui/material/styles';
+import { Box, Typography, useTheme, alpha } from '@mui/material';
+import { PieChart as PieChartIcon, TouchApp } from '@mui/icons-material';
+import { TNUM, getInsetSurface } from 'styles/designTokens';
+import CardShell from 'components/common/CardShell';
+import InfoStrip from 'components/common/InfoStrip';
 
 interface WinLossDistributionProps {
   winLossData: any[];
@@ -17,7 +19,7 @@ interface WinLossDistributionProps {
 
 const WinLossDistribution: React.FC<WinLossDistributionProps> = ({
   winLossData,
-  onPieClick
+  onPieClick,
 }) => {
   const theme = useTheme();
 
@@ -63,10 +65,10 @@ const WinLossDistribution: React.FC<WinLossDistributionProps> = ({
 
   // Define colors with enhanced visual appeal
   const COLORS = {
-    win: '#22c55e',
-    loss: '#ef4444',
-    zero: '#94a3b8',
-    breakEven: '#64748b'
+    win: theme.palette.success.main,
+    loss: theme.palette.error.main,
+    zero: theme.palette.text.secondary,
+    breakEven: theme.palette.text.tertiary || theme.palette.text.secondary,
   };
 
   // Define chart styling
@@ -75,42 +77,44 @@ const WinLossDistribution: React.FC<WinLossDistributionProps> = ({
     innerRadius: 60,
     paddingAngle: 3,
     cornerRadius: 4,
-    activeFillOpacity: 0.9,
-    hoverShadowColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)',
-    labelFontSize: '0.85rem',
-    labelFontWeight: 500
   };
 
+  const radius = theme.palette.custom.radius;
+  const hairline = theme.palette.divider;
+  const insetBg = getInsetSurface(theme);
 
+  const totalTrades = winLossData.reduce((sum, item) => sum + item.value, 0);
+
+  const colorFor = (name: string): string =>
+    name === 'Wins'
+      ? COLORS.win
+      : name === 'Losses'
+        ? COLORS.loss
+        : name === 'Breakeven'
+          ? COLORS.breakEven
+          : COLORS.zero;
 
   return (
-    <Paper
-      elevation={theme.palette.mode === 'dark' ? 2 : 1}
-      sx={{
-        p: 3,
-        borderRadius: 2,
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        bgcolor: theme.palette.background.paper,
-      }}>
-      <Box sx={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        mb: 3,
-        pb: 1.5,
-      }}>
-        <Typography variant="h6" sx={{
+    <CardShell
+      sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}
+      head={{
+        icon: <PieChartIcon sx={{ fontSize: 16 }} />,
+        title: 'Win / Loss Distribution',
+        eyebrow: `${totalTrades} trade${totalTrades !== 1 ? 's' : ''} total`,
+      }}
+    >
+      {/* ── Body ───────────────────────────────────────────────────── */}
+      <Box
+        sx={{
+          p: 2.5,
           display: 'flex',
-          alignItems: 'center',
-          gap: 1
-        }}>
-          Win/Loss Distribution
-        </Typography>
-      </Box>
-      <Box sx={{ flex: 1, minHeight: 300 }} className="win-loss-chart-container">
-        <ResponsiveContainer width="100%" height="100%">
+          flexDirection: 'column',
+          gap: 2,
+          flex: 1,
+        }}
+      >
+        <Box sx={{ flex: 1, minHeight: 280 }} className="win-loss-chart-container">
+          <ResponsiveContainer width="100%" height="100%">
             <PieChart
               style={{ outline: 'none' }}
               tabIndex={-1}
@@ -120,35 +124,83 @@ const WinLossDistribution: React.FC<WinLossDistributionProps> = ({
                 content={({ active, payload }) => {
                   if (active && payload && payload.length) {
                     const data = payload[0].payload;
+                    const accent = colorFor(data.name);
+                    const pct =
+                      totalTrades > 0
+                        ? ((data.value / totalTrades) * 100).toFixed(1)
+                        : '0.0';
                     return (
-                      <Paper sx={{ p: 1.5, boxShadow: theme.shadows[3] }}>
-                        <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 0.5 }}>
-                          {data.name}
-                        </Typography>
-                        <Typography
-                          variant="body2"
+                      <Box
+                        sx={{
+                          bgcolor: 'background.paper',
+                          border: `1px solid ${hairline}`,
+                          borderRadius: `${radius.md}px`,
+                          p: 1.25,
+                          minWidth: 140,
+                        }}
+                      >
+                        <Box
                           sx={{
-                            color: data.name === 'Wins'
-                              ? COLORS.win
-                              : data.name === 'Losses'
-                                ? COLORS.loss
-                                : data.name === 'Breakeven'
-                                  ? COLORS.breakEven
-                                  : COLORS.zero,
-                            fontWeight: 'bold'
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 0.75,
+                            mb: 0.5,
+                          }}
+                        >
+                          <Box
+                            sx={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: '2px',
+                              bgcolor: accent,
+                            }}
+                          />
+                          <Typography
+                            sx={{
+                              fontSize: '0.8125rem',
+                              fontWeight: 700,
+                              color: 'text.primary',
+                              letterSpacing: '-0.01em',
+                            }}
+                          >
+                            {data.name}
+                          </Typography>
+                        </Box>
+                        <Typography
+                          sx={{
+                            fontSize: '0.875rem',
+                            fontWeight: 700,
+                            color: accent,
+                            fontFeatureSettings: TNUM,
+                            letterSpacing: '-0.015em',
                           }}
                         >
                           {data.value} trade{data.value !== 1 ? 's' : ''}
                         </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          {(data.value / winLossData.reduce((sum, item) => sum + item.value, 0) * 100).toFixed(1)}% of total
+                        <Typography
+                          sx={{
+                            fontSize: '0.75rem',
+                            color: 'text.secondary',
+                            fontFeatureSettings: TNUM,
+                            mt: 0.25,
+                          }}
+                        >
+                          {pct}% of total
                         </Typography>
                         {onPieClick && (
-                          <Typography variant="body2" sx={{ color: theme.palette.primary.main, fontSize: '0.75rem', mt: 0.5 }}>
+                          <Typography
+                            sx={{
+                              fontSize: '0.6875rem',
+                              color: 'primary.main',
+                              fontWeight: 600,
+                              mt: 0.5,
+                              letterSpacing: '0.02em',
+                            }}
+                          >
                             Click to view trades
                           </Typography>
                         )}
-                      </Paper>
+                      </Box>
                     );
                   }
                   return null;
@@ -177,19 +229,11 @@ const WinLossDistribution: React.FC<WinLossDistributionProps> = ({
                   }
                 }}
                 cursor={'pointer'}
-                style={{
-                  outline: 'none',
-                  filter: 'drop-shadow(0px 2px 5px rgba(0,0,0,0.1))'
-                }}
+                style={{ outline: 'none' }}
                 tabIndex={-1}
               >
                 {winLossData.map((entry, index) => {
-                  // For win/loss distribution, use the predefined colors
-                  const fillColor = entry.name === 'Wins' ? COLORS.win :
-                                    entry.name === 'Losses' ? COLORS.loss :
-                                    entry.name === 'Breakeven' ? COLORS.breakEven :
-                                    COLORS.zero;
-
+                  const fillColor = colorFor(entry.name);
                   return (
                     <Cell
                       key={`cell-${index}`}
@@ -198,57 +242,153 @@ const WinLossDistribution: React.FC<WinLossDistributionProps> = ({
                       stroke={theme.palette.background.paper}
                       style={{
                         outline: 'none',
-                        transition: 'opacity 0.3s'
+                        transition: 'opacity 0.3s',
                       }}
                     />
                   );
                 })}
               </Pie>
-              <Legend
-                verticalAlign="bottom"
-                align="center"
-                layout="horizontal"
-                iconSize={12}
-                iconType="circle"
-                wrapperStyle={{
-                  paddingTop: 15,
-                  fontSize: '0.85rem',
-                  fontWeight: 500
-                }}
-              />
             </PieChart>
           </ResponsiveContainer>
-      </Box>
-      <Box sx={{
-        display: 'flex',
-        justifyContent: 'center',
-        mt: 2,
-        pt: 1.5,
-        flexDirection: 'column',
-        alignItems: 'center',
-        marginTop: 'auto'
-      }}>
-        <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
-          Showing win/loss distribution for all trades
-        </Typography>
+        </Box>
+
+        {/* ── Custom legend as inset rows ─────────────────────────── */}
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: {
+              xs: '1fr',
+              sm: `repeat(${Math.min(winLossData.length || 1, 3)}, 1fr)`,
+            },
+            gap: 1,
+          }}
+        >
+          {winLossData.map((entry, index) => {
+            const accent = colorFor(entry.name);
+            const pct =
+              totalTrades > 0
+                ? ((entry.value / totalTrades) * 100).toFixed(1)
+                : '0.0';
+            const interactive = !!onPieClick;
+            return (
+              <Box
+                key={`legend-${index}`}
+                role={interactive ? 'button' : undefined}
+                tabIndex={interactive ? 0 : undefined}
+                onClick={
+                  interactive
+                    ? (e) => {
+                        e.stopPropagation();
+                        onPieClick!(entry.name);
+                      }
+                    : undefined
+                }
+                onKeyDown={
+                  interactive
+                    ? (e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          onPieClick!(entry.name);
+                        }
+                      }
+                    : undefined
+                }
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 0.875,
+                  px: 1.25,
+                  py: 1,
+                  borderRadius: '10px',
+                  bgcolor: insetBg,
+                  border: `1px solid ${hairline}`,
+                  cursor: interactive ? 'pointer' : 'default',
+                  transition: interactive ? 'background-color 150ms ease' : 'none',
+                  '&:hover': interactive ? { bgcolor: alpha(accent, 0.08) } : {},
+                  '&:focus-visible': interactive
+                    ? { outline: 'none', boxShadow: `0 0 0 3px ${alpha(accent, 0.25)}` }
+                    : {},
+                  minWidth: 0,
+                }}
+              >
+                <Box
+                  sx={{
+                    width: 10,
+                    height: 10,
+                    borderRadius: '3px',
+                    bgcolor: accent,
+                    flexShrink: 0,
+                  }}
+                />
+                <Typography
+                  sx={{
+                    fontSize: '0.8125rem',
+                    fontWeight: 600,
+                    color: 'text.primary',
+                    flex: 1,
+                    minWidth: 0,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {entry.name}
+                </Typography>
+                <Typography
+                  sx={{
+                    fontSize: '0.8125rem',
+                    fontWeight: 700,
+                    color: 'text.primary',
+                    fontFeatureSettings: TNUM,
+                    letterSpacing: '-0.015em',
+                  }}
+                >
+                  {entry.value}
+                </Typography>
+                <Typography
+                  sx={{
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    color: 'text.tertiary',
+                    fontFeatureSettings: TNUM,
+                    minWidth: 44,
+                    textAlign: 'right',
+                  }}
+                >
+                  {pct}%
+                </Typography>
+              </Box>
+            );
+          })}
+        </Box>
+
+        {/* ── Footer / hint ──────────────────────────────────────── */}
         {onPieClick && (
-          <Box sx={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 0.5,
-            mt: 0.5,
-            bgcolor: alpha(theme.palette.primary.main, 0.08),
-            px: 1.5,
-            py: 0.5,
-            borderRadius: 1
-          }}>
-            <Typography variant="caption" color="primary" sx={{ fontWeight: 500 }}>
-              Click on a segment to view trades
+          <InfoStrip
+            tone="violet"
+            icon={<TouchApp sx={{ fontSize: 14 }} />}
+            sx={{
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 0.625,
+              px: 1.25,
+              py: 0.875,
+            }}
+          >
+            <Typography
+              sx={{
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                color: 'primary.main',
+                letterSpacing: '0.01em',
+              }}
+            >
+              Click a segment or row to view trades
             </Typography>
-          </Box>
+          </InfoStrip>
         )}
       </Box>
-    </Paper>
+    </CardShell>
   );
 };
 

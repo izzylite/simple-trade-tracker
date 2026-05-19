@@ -14,7 +14,6 @@ import {
   Box,
   Typography,
   IconButton,
-  Paper,
   alpha,
   Tooltip,
   useTheme,
@@ -30,6 +29,10 @@ import {
 import { Trade, Calendar } from 'features/calendar/types/dualWrite';
 import { formatCurrency } from 'utils/formatters';
 import { calculateTargetProgress } from 'features/calendar/utils/statsUtils';
+import { EYEBROW_SX, TNUM, getInsetSurface } from 'styles/designTokens';
+import CardShell from 'components/common/CardShell';
+import StatTile from 'components/common/StatTile';
+import CompareBar from 'components/common/CompareBar';
 
 interface MonthlyStatsProps {
   trades: Trade[];
@@ -63,17 +66,6 @@ interface MonthlyStatsProps {
   calendar?: Calendar;
 }
 
-const TNUM = "'tnum' on, 'lnum' on";
-
-const EYEBROW_SX = {
-  fontSize: '0.62rem',
-  fontWeight: 700,
-  letterSpacing: '0.08em',
-  textTransform: 'uppercase' as const,
-  color: 'text.secondary',
-  lineHeight: 1.2,
-};
-
 const MonthlyStats: React.FC<MonthlyStatsProps> = ({
   trades,
   accountBalance,
@@ -90,9 +82,7 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
   const isDark = theme.palette.mode === 'dark';
 
   const hairline = isDark ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
-  const surfaceInset = isDark
-    ? 'rgba(255,255,255,0.03)'
-    : alpha(theme.palette.text.primary, 0.03);
+  const surfaceInset = getInsetSurface(theme);
 
   const handleOpenPerformancePage = () => {
     if (calendarId) setCalendarId(calendarId);
@@ -207,50 +197,34 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
     },
   };
 
-  return (
-    <Paper
-      elevation={0}
-      sx={{
-        p: 1.75,
-        borderRadius: '12px',
-        bgcolor: 'background.paper',
-        border: `1px solid ${hairline}`,
-        boxShadow: isDark
-          ? '0 2px 8px rgba(0,0,0,0.3)'
-          : '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 1.25,
-      }}
-    >
-      {/* ── Header ──────────────────────────────────────────────────── */}
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 1,
-        }}
-      >
-        <Typography sx={EYEBROW_SX}>Monthly performance</Typography>
-        <Box sx={{ display: 'flex', gap: 0.5 }}>
-          {calendarId && (
-            <Tooltip title="Open performance page" arrow>
-              <IconButton size="small" onClick={handleOpenPerformancePage} sx={actionBtnSx}>
-                <Analytics sx={{ fontSize: 14 }} />
-              </IconButton>
-            </Tooltip>
-          )}
-          {monthTrades.length > 0 && onOpenGalleryMode && (
-            <Tooltip title="View this month's trades in gallery mode" arrow>
-              <IconButton size="small" onClick={handleMonthlyGalleryMode} sx={actionBtnSx}>
-                <GalleryIcon sx={{ fontSize: 14 }} />
-              </IconButton>
-            </Tooltip>
-          )}
-        </Box>
-      </Box>
+  const headerRight = (
+    <Box sx={{ display: 'flex', gap: 0.5 }}>
+      {calendarId && (
+        <Tooltip title="Open performance page" arrow>
+          <IconButton size="small" onClick={handleOpenPerformancePage} sx={actionBtnSx}>
+            <Analytics sx={{ fontSize: 14 }} />
+          </IconButton>
+        </Tooltip>
+      )}
+      {monthTrades.length > 0 && onOpenGalleryMode && (
+        <Tooltip title="View this month's trades in gallery mode" arrow>
+          <IconButton size="small" onClick={handleMonthlyGalleryMode} sx={actionBtnSx}>
+            <GalleryIcon sx={{ fontSize: 14 }} />
+          </IconButton>
+        </Tooltip>
+      )}
+    </Box>
+  );
 
+  return (
+    <CardShell
+      radius="lg"
+      head={{
+        title: 'Monthly performance',
+        right: headerRight,
+      }}
+      innerSx={{ p: 1.75 }}
+    >
       {/* ── 2×3 grid of stat tiles ──────────────────────────────────── */}
       <Box
         sx={{
@@ -261,6 +235,7 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
       >
         {/* Monthly P&L */}
         <StatTile
+          size="sm"
           icon={<TrendingUp sx={{ fontSize: 14, color: pnlColor }} />}
           label="Monthly P&L"
           value={
@@ -332,24 +307,11 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
                     {targetProgressValue.toFixed(0)}%
                   </Typography>
                 </Box>
-                <Box
-                  sx={{
-                    width: '100%',
-                    height: 4,
-                    bgcolor: alpha(theme.palette.divider, 0.5),
-                    borderRadius: 2,
-                    overflow: 'hidden',
-                  }}
-                >
-                  <Box
-                    sx={{
-                      width: `${Math.max(Math.min(targetProgressValue, 100), 0)}%`,
-                      height: '100%',
-                      bgcolor: isTargetMet ? 'success.main' : 'primary.main',
-                      transition: 'width 0.3s ease',
-                    }}
-                  />
-                </Box>
+                <CompareBar
+                  value={targetProgressValue}
+                  pct
+                  color={isTargetMet ? theme.palette.success.main : theme.palette.primary.main}
+                />
               </Box>
             ) : undefined
           }
@@ -357,6 +319,7 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
 
         {/* Win Rate */}
         <StatTile
+          size="sm"
           icon={
             <EmojiEvents
               sx={{
@@ -399,6 +362,7 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
 
         {/* Trades */}
         <StatTile
+          size="sm"
           icon={<CalendarMonth sx={{ fontSize: 14, color: 'text.secondary' }} />}
           label="Trades"
           value={`${monthTrades.length}`}
@@ -407,6 +371,7 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
 
         {/* Started With */}
         <StatTile
+          size="sm"
           label="Started with"
           value={
             isPnlLoading ? (
@@ -419,6 +384,7 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
 
         {/* Best Day */}
         <StatTile
+          size="sm"
           label="Best day"
           value={bestDay > 0 ? formatCurrency(bestDay) : '—'}
           valueColor={bestDay > 0 ? theme.palette.success.main : undefined}
@@ -427,6 +393,7 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
 
         {/* Profit Factor */}
         <StatTile
+          size="sm"
           label="Profit factor"
           value={profitFactor}
           valueColor={
@@ -436,85 +403,7 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
           }
         />
       </Box>
-    </Paper>
-  );
-};
-
-// ─── StatTile ──────────────────────────────────────────────────────────────
-// Single tile in the monthly performance grid. All tiles share the same
-// height behavior so the grid stays aligned regardless of which optional
-// slots are populated.
-
-interface StatTileProps {
-  icon?: React.ReactNode;
-  label: string;
-  value: React.ReactNode;
-  valueColor?: string;
-  subtitle?: string;
-  footer?: React.ReactNode;
-}
-
-const StatTile: React.FC<StatTileProps> = ({
-  icon,
-  label,
-  value,
-  valueColor,
-  subtitle,
-  footer,
-}) => {
-  const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
-  const surfaceInset = isDark
-    ? 'rgba(255,255,255,0.03)'
-    : alpha(theme.palette.text.primary, 0.03);
-  return (
-    <Box
-      sx={{
-        p: 1.125,
-        borderRadius: '10px',
-        bgcolor: surfaceInset,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 0.375,
-        minWidth: 0,
-      }}
-    >
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0 }}>
-        {icon}
-        <Typography sx={EYEBROW_SX}>{label}</Typography>
-      </Box>
-      <Typography
-        sx={{
-          fontSize: '1rem',
-          fontWeight: 700,
-          color: valueColor ?? 'text.primary',
-          fontFeatureSettings: TNUM,
-          letterSpacing: '-0.01em',
-          lineHeight: 1.25,
-          display: 'flex',
-          alignItems: 'baseline',
-          flexWrap: 'wrap',
-          rowGap: 0.25,
-          minWidth: 0,
-          wordBreak: 'break-word',
-        }}
-      >
-        {value}
-      </Typography>
-      {subtitle && (
-        <Typography
-          sx={{
-            fontSize: '0.68rem',
-            color: 'text.disabled',
-            fontWeight: 500,
-            fontFeatureSettings: TNUM,
-          }}
-        >
-          {subtitle}
-        </Typography>
-      )}
-      {footer && <Box sx={{ mt: 0.5 }}>{footer}</Box>}
-    </Box>
+    </CardShell>
   );
 };
 

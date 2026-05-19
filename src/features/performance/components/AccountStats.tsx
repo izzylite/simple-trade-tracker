@@ -33,6 +33,7 @@ import {
 } from '@mui/icons-material';
 import { Trade } from 'features/calendar/types/dualWrite';
 import { DynamicRiskSettings } from 'features/calendar/utils/dynamicRiskUtils';
+import { EYEBROW_SX, TNUM, getInsetSurface, getCardShellSx } from 'styles/designTokens';
 
 interface AccountStatsProps {
   balance: number;
@@ -46,17 +47,6 @@ interface AccountStatsProps {
   isReadOnly?: boolean;
   max_daily_drawdown?: number;
 }
-
-// Tabular numerics used throughout so columns don't jitter.
-const TNUM = "'tnum' on, 'lnum' on";
-
-const EYEBROW_SX = {
-  fontSize: '0.66rem',
-  fontWeight: 700,
-  letterSpacing: '0.08em',
-  textTransform: 'uppercase' as const,
-  color: 'text.secondary',
-};
 
 const AccountStats: React.FC<AccountStatsProps> = ({
   balance,
@@ -91,9 +81,7 @@ const AccountStats: React.FC<AccountStatsProps> = ({
   const totalAccountValue = balance + totalProfit;
 
   const hairline = isDark ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
-  const surfaceInset = isDark
-    ? 'rgba(255,255,255,0.03)'
-    : alpha(theme.palette.text.primary, 0.03);
+  const surfaceInset = getInsetSurface(theme);
 
   // PnL color signals — green/red/neutral
   const pnlColor =
@@ -124,13 +112,11 @@ const AccountStats: React.FC<AccountStatsProps> = ({
     <Paper
       elevation={0}
       sx={{
+        ...getCardShellSx(theme, 'lg'),
         display: 'flex',
         flexDirection: 'column',
         gap: 1.25,
         p: 1.75,
-        borderRadius: '12px',
-        bgcolor: 'background.paper',
-        border: `1px solid ${hairline}`,
         boxShadow: isDark
           ? '0 2px 8px rgba(0,0,0,0.3)'
           : '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)',

@@ -1,15 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   Box,
-  Paper,
   Typography,
   useTheme,
-  Card,
-  CardContent,
-  Alert,
-  Stack,
   alpha,
-  LinearProgress,
   FormControl,
   InputLabel,
   Select,
@@ -19,195 +13,112 @@ import {
   TextField,
   InputAdornment,
   ToggleButtonGroup,
-  ToggleButton
+  ToggleButton,
 } from '@mui/material';
 import {
-  InfoOutlined,
   Analytics,
   TrendingDown,
   TrendingUp,
   EventNote,
-  Search as SearchIcon
+  Search as SearchIcon,
 } from '@mui/icons-material';
-import { Trade, TradeEconomicEvent, Calendar } from 'features/calendar/types/dualWrite';
-import { ImpactLevel, Currency } from 'features/events/types/economicCalendar';
+import { Trade } from 'features/calendar/types/dualWrite';
+import { ImpactLevel } from 'features/events/types/economicCalendar';
 import { cleanEventNameForPinning } from 'features/events/utils/eventNameUtils';
 import { formatValue } from 'utils/formatters';
 
 import RoundedTabs from 'components/common/RoundedTabs';
 import { getCurrenciesForPair } from 'features/events/services/tradeEconomicEventService';
 import { getSessionForTimestamp } from 'utils/sessionTimeUtils';
+import { EYEBROW_SX, TNUM, getInsetSurface, getInsetTileSx } from 'styles/designTokens';
+import CardShell from 'components/common/CardShell';
+import StatTile from 'components/common/StatTile';
+import EyebrowRow from 'components/common/EyebrowRow';
+import InfoStrip from 'components/common/InfoStrip';
+import CompareBar from 'components/common/CompareBar';
 
-// Helper function to get flag URL
 const getFlagUrl = (flagCode?: string, size: string = 'w40'): string => {
   if (!flagCode) return '';
   return `https://flagcdn.com/${size}/${flagCode.toLowerCase()}.png`;
 };
 
 interface EconomicEventCorrelationAnalysisProps {
-  calendarId: string; // Single calendar ID
+  calendarId: string;
   trades: Trade[];
   timePeriod: 'month' | 'quarter' | 'ytd' | 'year' | 'all';
   selectedDate: Date;
   setMultipleTradesDialog?: (dialogState: any) => void;
-  economicCorrelations?: any; // Pre-calculated economic correlations { high: {...}, medium: {...} }
+  economicCorrelations?: any;
 }
-
-interface TradeEventCorrelation {
-  trade: Trade;
-  economicEvents: TradeEconomicEvent[];
-  hasHighImpactEvents: boolean;
-  hasMediumImpactEvents: boolean;
-  eventCount: number;
-}
-
-interface EventTradeDetails {
-  event: string;
-  losingTrades: Trade[];
-  winningTrades: Trade[];
-  totalLoss: number;
-  totalWin: number;
-  avg_loss: number;
-  avg_win: number;
-  count: number;
-  win_rate: number;
-  // Economic event details
-  economicEventDetails?: {
-    country?: string;
-    flagCode?: string;
-    flagUrl?: string;
-  };
-}
-
-interface CorrelationStats {
-  // Losing trades stats
-  totalLosingTrades: number;
-  losingTradesWithHighImpact: number;
-  losingTradesWithMediumImpact: number;
-  losingTradesWithAnyEvents: number;
-  highImpactLossCorrelationRate: number;
-  mediumImpactLossCorrelationRate: number;
-  anyEventLossCorrelationRate: number;
-  avgLossWithEvents: number;
-  avgLossWithoutEvents: number;
-
-  // Winning trades stats
-  totalWinningTrades: number;
-  winningTradesWithHighImpact: number;
-  winningTradesWithMediumImpact: number;
-  winningTradesWithAnyEvents: number;
-  highImpactWinCorrelationRate: number;
-  mediumImpactWinCorrelationRate: number;
-  anyEventWinCorrelationRate: number;
-  avgWinWithEvents: number;
-  avgWinWithoutEvents: number;
-
-  // Combined stats
-  mostCommonEventTypes: EventTradeDetails[];
-  impactDistribution: Record<ImpactLevel, number>;
-}
-
-
 
 const EconomicEventCorrelationAnalysis: React.FC<EconomicEventCorrelationAnalysisProps> = ({
-  calendarId,
   trades,
-  timePeriod,
-  selectedDate,
   setMultipleTradesDialog,
-  economicCorrelations
+  economicCorrelations,
 }) => {
   const theme = useTheme();
   const [selectedImpact, setSelectedImpact] = useState<ImpactLevel>('High');
   const [selectedCurrency, setSelectedCurrency] = useState<string>('ALL');
   const [eventSearch, setEventSearch] = useState<string>('');
   const [groupEvents, setGroupEvents] = useState<boolean>(false);
+  const [correlationStats, setCorrelationStats] = useState<any>({});
+  const [isCalculating] = useState(false);
 
-  // Async calculation states
-  const [correlationStats, setCorrelationStats] = useState<any>({
-    totalLosingTrades: 0,
-    totalWinningTrades: 0,
-    highImpactLossCorrelationRate: 0,
-    mediumImpactLossCorrelationRate: 0,
-    anyEventLossCorrelationRate: 0,
-    highImpactWinCorrelationRate: 0,
-    mediumImpactWinCorrelationRate: 0,
-    anyEventWinCorrelationRate: 0,
-    losingTradesWithHighImpact: 0,
-    losingTradesWithMediumImpact: 0,
-    losingTradesWithAnyEvents: 0,
-    winningTradesWithHighImpact: 0,
-    winningTradesWithMediumImpact: 0,
-    winningTradesWithAnyEvents: 0,
-    avgLossWithEvents: 0,
-    avgLossWithoutEvents: 0,
-    avgWinWithEvents: 0,
-    avgWinWithoutEvents: 0,
-    mostCommonEventTypes: []
-  });
-  const [isCalculating, setIsCalculating] = useState(false);
+  const impactTabs = useMemo(
+    () => [
+      { label: 'High', value: 'High' },
+      { label: 'Medium', value: 'Medium' },
+    ],
+    [],
+  );
 
-  // Define tabs for impact level selection
-  const impactTabs = [
-    { label: 'High', value: 'High' },
-    { label: 'Medium', value: 'Medium' },
-  ];
+  const CURRENCIES = useMemo(() => {
+    const currencyTags = trades
+      .map((trade) => trade.tags)
+      .flat()
+      .filter((tag) => tag?.includes('pair:'))
+      .map((tag) => tag?.split(':')[1])
+      .filter((pair): pair is string => pair !== undefined)
+      .map((pair) => getCurrenciesForPair(pair))
+      .flat();
+    return Array.from(new Set(currencyTags));
+  }, [trades]);
 
-    
-// Currency options for filtering - using same currencies as calendar settings 
-const CURRENCIES = useMemo(() => {
-  const currencyTags = trades
-    .map(trade => trade.tags)
-    .flat()
-    .filter(tag => tag?.includes('pair:'))
-    .map(tag => tag?.split(':')[1])
-    .filter((pair): pair is string => pair !== undefined).map(pair => getCurrenciesForPair(pair)).flat();
-  
-  return Array.from(new Set(currencyTags));
-}, [trades]);
+  const CURRENCY_OPTIONS = useMemo(
+    () => [
+      { value: 'ALL', label: 'All Currencies' },
+      ...CURRENCIES.map((currency) => ({ value: currency, label: currency })),
+    ],
+    [CURRENCIES],
+  );
 
-const CURRENCY_OPTIONS = [
-  { value: 'ALL', label: 'All Currencies' },
-  ...CURRENCIES.map(currency => ({ value: currency, label: currency }))
-];
+  const getImpactTabIndex = (currentImpact: ImpactLevel): number =>
+    impactTabs.findIndex((tab) => tab.value === currentImpact);
 
-  // Convert string value to tab index for RoundedTabs
-  const getImpactTabIndex = (currentImpact: ImpactLevel): number => {
-    return impactTabs.findIndex(tab => tab.value === currentImpact);
-  };
-
-  // Handle tab change for impact level
   const handleImpactTabChange = (_: React.SyntheticEvent, newIndex: number) => {
     const newImpact = impactTabs[newIndex]?.value as ImpactLevel;
-    if (newImpact) {
-      setSelectedImpact(newImpact);
-    }
+    if (newImpact) setSelectedImpact(newImpact);
   };
 
-  // Use pre-calculated economic correlations from server (instant switching between impact levels!)
+  const handleCurrencyChange = (event: SelectChangeEvent<string>) =>
+    setSelectedCurrency(event.target.value);
+
+  // ── Per-impact server payload → session-filtered + rehydrated stats ──
   useEffect(() => {
     if (!economicCorrelations) {
       setCorrelationStats({});
       return;
     }
-
-    // Select data based on impact level (High or Medium)
-    const impactData = selectedImpact === 'High'
-      ? economicCorrelations.high
-      : economicCorrelations.medium;
-
+    const impactData =
+      selectedImpact === 'High' ? economicCorrelations.high : economicCorrelations.medium;
     if (!impactData) {
       setCorrelationStats({});
       return;
     }
 
-    // Post-filter mostCommonEventTypes: only keep trades whose session
-    // matches the session derived from the event's time_utc.
-    //
-    // Server emits losing_trade_ids/winning_trade_ids (UUID arrays) instead of
-    // full trade rows to keep the payload small. We rehydrate from the
-    // top-level `trades` prop here. Old payload shape (losingTrades / winningTrades
-    // as Trade arrays) still accepted as fallback for transitional deploys.
+    // Server emits losing_trade_ids / winning_trade_ids (UUID arrays) instead
+    // of full rows. Rehydrate from the top-level `trades` prop; fall back to
+    // legacy full-row payloads (losingTrades / winningTrades).
     const tradesById = new Map<string, Trade>();
     trades.forEach((t) => {
       if (t?.id) tradesById.set(String(t.id), t);
@@ -226,408 +137,429 @@ const CURRENCY_OPTIONS = [
       }
       return Array.isArray(eventType?.[fullKey]) ? eventType[fullKey] : [];
     };
+
     const stats = { ...(impactData.correlationStats || {}) };
     if (stats.mostCommonEventTypes) {
-      stats.mostCommonEventTypes = stats.mostCommonEventTypes.map((eventType: any) => {
-        const losingHydrated  = rehydrate(eventType, 'losing');
-        const winningHydrated = rehydrate(eventType, 'winning');
-        const filterTradesBySession = (trades: any[]) => {
-          if (!trades) return [];
-          return trades.filter((trade: any) => {
-            if (!trade.session) return true;
-            // Parse economic_events — may be string if doubly-serialized
-            let events: any[] = trade.economic_events || [];
-            if (typeof events === 'string') {
-              try { events = JSON.parse(events); } catch { return true; }
-            }
-            if (!Array.isArray(events) || events.length === 0) return true;
-            // Find event by name + currency (exact, then case-insensitive)
-            const eventName = eventType.event;
-            const eventCurrency = eventType.currency;
-            const matchingEvent = events.find((e: any) =>
-              e.name === eventName && (!eventCurrency || e.currency === eventCurrency)
-            ) || events.find((e: any) =>
-              e.name?.toLowerCase() === eventName?.toLowerCase() &&
-              (!eventCurrency || e.currency?.toLowerCase() === eventCurrency?.toLowerCase())
-            );
+      stats.mostCommonEventTypes = stats.mostCommonEventTypes
+        .map((eventType: any) => {
+          const losingHydrated = rehydrate(eventType, 'losing');
+          const winningHydrated = rehydrate(eventType, 'winning');
+          const filterTradesBySession = (rows: any[]) => {
+            if (!rows) return [];
+            return rows.filter((trade: any) => {
+              if (!trade.session) return true;
+              let events: any[] = trade.economic_events || [];
+              if (typeof events === 'string') {
+                try {
+                  events = JSON.parse(events);
+                } catch {
+                  return true;
+                }
+              }
+              if (!Array.isArray(events) || events.length === 0) return true;
+              const eventName = eventType.event;
+              const eventCurrency = eventType.currency;
+              const matchingEvent =
+                events.find(
+                  (e: any) =>
+                    e.name === eventName &&
+                    (!eventCurrency || e.currency === eventCurrency),
+                ) ||
+                events.find(
+                  (e: any) =>
+                    e.name?.toLowerCase() === eventName?.toLowerCase() &&
+                    (!eventCurrency ||
+                      e.currency?.toLowerCase() === eventCurrency?.toLowerCase()),
+                );
+              if (!matchingEvent?.time_utc) return true;
+              const eventSession = getSessionForTimestamp(matchingEvent.time_utc);
+              return !eventSession || trade.session === eventSession;
+            });
+          };
 
-            if (!matchingEvent?.time_utc) return true;
-            const eventSession = getSessionForTimestamp(matchingEvent.time_utc);
-            return !eventSession || trade.session === eventSession;
-          });
-        };
-
-        const filteredLosing = filterTradesBySession(losingHydrated);
-        const filteredWinning = filterTradesBySession(winningHydrated);
-        const losingCount = filteredLosing.length;
-        const winningCount = filteredWinning.length;
-        const totalCount = losingCount + winningCount;
-        const totalLoss = filteredLosing.reduce(
-          (sum: number, t: any) => sum + Math.abs(t.amount || 0), 0
-        );
-        const totalWin = filteredWinning.reduce(
-          (sum: number, t: any) => sum + (t.amount || 0), 0
-        );
-
-        return {
-          ...eventType,
-          losingTrades: filteredLosing,
-          winningTrades: filteredWinning,
-          count: totalCount,
-          totalLoss,
-          totalWin,
-          avg_loss: losingCount > 0 ? totalLoss / losingCount : 0,
-          avg_win: winningCount > 0 ? totalWin / winningCount : 0,
-          win_rate: totalCount > 0 ? (winningCount / totalCount) * 100 : 0
-        };
-      }).filter((eventType: any) => eventType.count > 0);
+          const filteredLosing = filterTradesBySession(losingHydrated);
+          const filteredWinning = filterTradesBySession(winningHydrated);
+          const losingCount = filteredLosing.length;
+          const winningCount = filteredWinning.length;
+          const totalCount = losingCount + winningCount;
+          const totalLoss = filteredLosing.reduce(
+            (sum: number, t: any) => sum + Math.abs(t.amount || 0),
+            0,
+          );
+          const totalWin = filteredWinning.reduce(
+            (sum: number, t: any) => sum + (t.amount || 0),
+            0,
+          );
+          return {
+            ...eventType,
+            losingTrades: filteredLosing,
+            winningTrades: filteredWinning,
+            count: totalCount,
+            totalLoss,
+            totalWin,
+            avg_loss: losingCount > 0 ? totalLoss / losingCount : 0,
+            avg_win: winningCount > 0 ? totalWin / winningCount : 0,
+            win_rate: totalCount > 0 ? (winningCount / totalCount) * 100 : 0,
+          };
+        })
+        .filter((eventType: any) => eventType.count > 0);
     }
     setCorrelationStats(stats);
   }, [economicCorrelations, selectedImpact, selectedCurrency, trades]);
 
-  // Get losing and winning trades (kept for legacy compatibility)
-  const losingTrades = useMemo(() => {
-    return trades.filter(trade => trade.trade_type === 'loss');
-  }, [trades]);
+  const losingTrades = useMemo(
+    () => trades.filter((trade) => trade.trade_type === 'loss'),
+    [trades],
+  );
+  const winningTrades = useMemo(
+    () => trades.filter((trade) => trade.trade_type === 'win'),
+    [trades],
+  );
 
-  const winningTrades = useMemo(() => {
-    return trades.filter(trade => trade.trade_type === 'win');
-  }, [trades]);
+  const insetBg = getInsetSurface(theme);
 
+  // Header band content for CardShell — title + eyebrow + right controls.
+  const headerControls = (
+    <>
+      <RoundedTabs
+        tabs={impactTabs}
+        activeTab={getImpactTabIndex(selectedImpact)}
+        onTabChange={handleImpactTabChange}
+        size="small"
+      />
+      <FormControl size="small" sx={{ minWidth: 140 }}>
+        <InputLabel>Currency</InputLabel>
+        <Select value={selectedCurrency} onChange={handleCurrencyChange} label="Currency">
+          {CURRENCY_OPTIONS.map((option) => (
+            <MenuItem key={option.value} value={option.value}>
+              {option.label}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+    </>
+  );
 
+  const cardHead = {
+    icon: <Analytics sx={{ fontSize: 16 }} />,
+    title: 'Economic Event Correlation',
+    eyebrow: `${selectedImpact} impact · ${selectedCurrency === 'ALL' ? 'All currencies' : selectedCurrency}`,
+    right: headerControls,
+  };
 
-
-
-  // Note: Heavy calculations moved to async service
-
-  // Note: Correlation statistics now calculated asynchronously in service
-
-
-
-
-
+  // ── Empty state ─────────────────────────────────────────────────────
   if (losingTrades.length === 0 && winningTrades.length === 0) {
     return (
-      <Paper sx={{ p: 3, mb: 3 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          <Analytics sx={{ mr: 1, color: theme.palette.primary.main }} />
-          <Typography variant="h6">Economic Event Correlation Analysis</Typography>
+      <CardShell head={cardHead} sx={{ mb: 3 }}>
+        <Box sx={{ p: 3 }}>
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+            No trades found for the selected period.
+          </Typography>
         </Box>
-        <Typography variant="body2" color="text.secondary">
-          No trades found for the selected period.
-        </Typography>
-      </Paper>
+      </CardShell>
     );
   }
 
-  const handleCurrencyChange = (event: SelectChangeEvent<string>) => {
-    setSelectedCurrency(event.target.value);
-  };
+  // ── Derived figures for tiles ───────────────────────────────────────
+  const lossPct = correlationStats.anyEventLossCorrelationRate || 0;
+  const winPct = correlationStats.anyEventWinCorrelationRate || 0;
+  const totalLosing = correlationStats.totalLosingTrades || 0;
+  const totalWinning = correlationStats.totalWinningTrades || 0;
+  const losingWithEvents = correlationStats.losingTradesWithEvents || 0;
+  const winningWithEvents = correlationStats.winningTradesWithEvents || 0;
+  const avgLossWith = correlationStats.avgLossWithEvents || 0;
+  const avgLossNo = correlationStats.avgLossWithoutEvents || 0;
+  const avgWinWith = correlationStats.avgWinWithEvents || 0;
+  const avgWinNo = correlationStats.avgWinWithoutEvents || 0;
+  const lossBarMax = Math.max(Math.abs(avgLossWith), Math.abs(avgLossNo), 1);
+  const winBarMax = Math.max(avgWinWith, avgWinNo, 1);
 
-  return (
-    <Paper sx={{ mb: 3 }}>
-      <Box sx={{ p: 3 }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2, gap: 2 }}>
-          <Stack direction="row" alignItems="center" spacing={2} sx={{ flex: 1 }}>
-            <Typography
-              variant="h6"
+  // ── Most-common-events: optional grouping + search filter ───────────
+  const eventList = (() => {
+    let events: any[] = correlationStats.mostCommonEventTypes || [];
+    if (groupEvents) {
+      const grouped = new Map<string, any>();
+      events.forEach((eventType: any) => {
+        const cleanedName = cleanEventNameForPinning(eventType.event);
+        const key = `${cleanedName}::${eventType.currency || ''}`;
+        if (grouped.has(key)) {
+          const existing = grouped.get(key);
+          const mergedLosing = [
+            ...(existing.losingTrades || []),
+            ...(eventType.losingTrades || []),
+          ];
+          const mergedWinning = [
+            ...(existing.winningTrades || []),
+            ...(eventType.winningTrades || []),
+          ];
+          const losingCount = mergedLosing.length;
+          const winningCount = mergedWinning.length;
+          const totalCount = losingCount + winningCount;
+          const totalLoss = mergedLosing.reduce(
+            (s: number, t: any) => s + Math.abs(t.amount || 0),
+            0,
+          );
+          const totalWin = mergedWinning.reduce(
+            (s: number, t: any) => s + (t.amount || 0),
+            0,
+          );
+          grouped.set(key, {
+            ...existing,
+            event: cleanedName,
+            losingTrades: mergedLosing,
+            winningTrades: mergedWinning,
+            count: totalCount,
+            totalLoss,
+            totalWin,
+            avg_loss: losingCount > 0 ? totalLoss / losingCount : 0,
+            avg_win: winningCount > 0 ? totalWin / winningCount : 0,
+            win_rate: totalCount > 0 ? (winningCount / totalCount) * 100 : 0,
+          });
+        } else {
+          grouped.set(key, { ...eventType, event: cleanedName });
+        }
+      });
+      events = Array.from(grouped.values()).sort((a: any, b: any) => b.count - a.count);
+    }
+    return events
+      .filter((eventType: any) => {
+        if (!eventSearch.trim()) return true;
+        const query = eventSearch.toLowerCase();
+        return (
+          eventType.event?.toLowerCase().includes(query) ||
+          eventType.currency?.toLowerCase().includes(query)
+        );
+      })
+      .slice(0, eventSearch.trim() ? 20 : 9);
+  })();
+
+  const totalEventTypes = correlationStats.mostCommonEventTypes?.length || 0;
+
+  // Reusable mini-section: eyebrow row + 2 stat tiles for losing/winning summary.
+  const renderSummaryGroup = (
+    accent: string,
+    label: string,
+    rightLabel: string,
+    countLabel: string,
+    total: number,
+    pct: number,
+    withEvents: number,
+    DownIcon: React.ReactNode,
+    EvIcon: React.ReactNode,
+  ) => (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+      <EyebrowRow accent={accent} label={label} rightLabel={rightLabel} />
+      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
+        <StatTile
+          icon={DownIcon}
+          label={countLabel}
+          value={total}
+          valueColor={accent}
+        />
+        <StatTile
+          icon={EvIcon}
+          label="Tied to events"
+          value={`${pct.toFixed(1)}%`}
+          valueColor={accent}
+          subtitle={`${withEvents} of ${total} trades`}
+        />
+      </Box>
+    </Box>
+  );
+
+  // Reusable mini-section: "with events" vs "without events" comparison card.
+  const renderCompareCard = (
+    title: string,
+    accent: string,
+    withVal: number,
+    noVal: number,
+    barMax: number,
+  ) => (
+    <Box
+      sx={{
+        ...getInsetTileSx(theme),
+        p: 1.75,
+        borderRadius: '12px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 1.5,
+      }}
+    >
+      <EyebrowRow accent={accent} label={title} />
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+        {[
+          { label: 'With events', value: withVal, color: accent },
+          { label: 'Without events', value: noVal, color: theme.palette.text.secondary },
+        ].map((row) => (
+          <Box key={row.label}>
+            <Box
               sx={{
                 display: 'flex',
-                alignItems: 'center',
-               
-                gap: 1,
-                color: theme.palette.text.primary,
-                fontWeight: 600
+                justifyContent: 'space-between',
+                alignItems: 'baseline',
+                mb: 0.625,
               }}
             >
-              <Analytics sx={{ color: theme.palette.primary.main }} />
-              Economic Event Correlation Analysis
-            </Typography>
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                {row.label}
+              </Typography>
+              <Typography
+                sx={{
+                  fontSize: '0.95rem',
+                  fontWeight: 700,
+                  color: row.color,
+                  fontFeatureSettings: TNUM,
+                  letterSpacing: '-0.01em',
+                }}
+              >
+                {formatValue(row.value)}
+              </Typography>
+            </Box>
+            <CompareBar value={row.value} max={barMax} color={row.color} />
+          </Box>
+        ))}
+      </Box>
+    </Box>
+  );
 
-          </Stack>
-
-          
-            <RoundedTabs
-              tabs={impactTabs}
-              activeTab={getImpactTabIndex(selectedImpact)}
-              onTabChange={handleImpactTabChange}
-              size="small"
-            />
-
-          <FormControl size="small" sx={{ minWidth: 120 }}>
-            <InputLabel>Currency</InputLabel>
-            <Select
-              value={selectedCurrency}
-              onChange={handleCurrencyChange}
-              label="Currency"
-            >
-              {CURRENCY_OPTIONS.map((option) => (
-                <MenuItem key={option.value} value={option.value}>
-                  {option.label}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </Stack>
-
-        <Alert
-          severity="info"
+  return (
+    <CardShell head={cardHead} sx={{ mb: 3 }}>
+      {isCalculating ? (
+        <Box
           sx={{
-            mb: 2,
-            backgroundColor: alpha(theme.palette.info.main, 0.1),
-            '& .MuiAlert-icon': {
-              color: theme.palette.info.main
-            }
-          }}
-        >
-          This analysis correlates your trades with economic events that occurred during the same trading sessions to help identify patterns.
-          {selectedCurrency !== 'ALL' && (
-            <> Currently filtering events for <strong>{selectedCurrency}</strong> currency.</>
-          )}
-        </Alert>
-
-        {/* Loading State */}
-        {isCalculating && (
-          <Box sx={{
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            justifyContent: 'center',
-            py: 4,
-            gap: 2
-          }}>
-            <CircularProgress size={40} />
-            <Typography variant="body2" color="text.secondary">
-              Calculating economic event correlations...
-            </Typography>
-          </Box>
-        )}
-
-        {/* Summary Statistics - Losing Trades */}
-        {!isCalculating && (
-          <>
-            <Typography variant="h6" sx={{ mb: 2, color: 'error.main' }}>
-              Losing Trades - {selectedImpact} Impact Events
-            </Typography>
-      <Box sx={{
-        display: 'grid',
-        gridTemplateColumns: {
-          xs: '1fr',
-          sm: 'repeat(2, 1fr)'
-        },
-        gap: 2,
-        mb: 3
-      }}>
-        <Card sx={{ bgcolor: alpha(theme.palette.error.main, 0.1) }}>
-          <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-              <TrendingDown sx={{ color: theme.palette.error.main, mr: 1 }} />
-              <Typography variant="body2" color="text.secondary">Total Losing Trades</Typography>
-            </Box>
-            <Typography variant="h4" color="error.main">
-              {correlationStats.totalLosingTrades || 0}
-            </Typography>
-          </CardContent>
-        </Card>
-
-        <Card sx={{
-          bgcolor: alpha(
-            selectedImpact === 'High' ? theme.palette.error.main :
-            selectedImpact === 'Medium' ? theme.palette.warning.main :
-            selectedImpact === 'Low' ? theme.palette.success.main :
-            theme.palette.secondary.main, // Holiday
-            0.1
-          )
-        }}>
-          <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-              <EventNote sx={{
-                color: selectedImpact === 'High' ? theme.palette.error.main :
-                       selectedImpact === 'Medium' ? theme.palette.warning.main :
-                       selectedImpact === 'Low' ? theme.palette.success.main :
-                       theme.palette.secondary.main, // Holiday
-                mr: 1
-              }} />
-              <Typography variant="body2" color="text.secondary">{selectedImpact} Impact Events</Typography>
-            </Box>
-            <Typography variant="h4" sx={{
-              color: selectedImpact === 'High' ? 'error.main' :
-                     selectedImpact === 'Medium' ? 'warning.main' :
-                     selectedImpact === 'Low' ? 'success.main' :
-                     'secondary.main' // Holiday
-            }}>
-              {(correlationStats.anyEventLossCorrelationRate || 0).toFixed(1)}%
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              {correlationStats.losingTradesWithEvents || 0} trades
-            </Typography>
-          </CardContent>
-        </Card>
-      </Box>
-
-      {/* Summary Statistics - Winning Trades */}
-      <Typography variant="h6" sx={{ mb: 2, color: 'success.main' }}>
-      Winning Trades - {selectedImpact} Impact Events
-      </Typography>
-      <Box sx={{
-        display: 'grid',
-        gridTemplateColumns: {
-          xs: '1fr',
-          sm: 'repeat(2, 1fr)'
-        },
-        gap: 2,
-        mb: 2
-      }}>
-        <Card sx={{ bgcolor: alpha(theme.palette.success.main, 0.1) }}>
-          <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-              <TrendingUp sx={{ color: theme.palette.success.main, mr: 1 }} />
-              <Typography variant="body2" color="text.secondary">Total Winning Trades</Typography>
-            </Box>
-            <Typography variant="h4" color="success.main">
-              {correlationStats.totalWinningTrades || 0}
-            </Typography>
-          </CardContent>
-        </Card>
-
-        <Card sx={{
-          bgcolor: alpha(
-            selectedImpact === 'High' ? theme.palette.error.main :
-            selectedImpact === 'Medium' ? theme.palette.warning.main :
-            selectedImpact === 'Low' ? theme.palette.success.main :
-            theme.palette.secondary.main, // Holiday
-            0.1
-          )
-        }}>
-          <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-              <EventNote sx={{
-                color: selectedImpact === 'High' ? theme.palette.error.main :
-                       selectedImpact === 'Medium' ? theme.palette.warning.main :
-                       selectedImpact === 'Low' ? theme.palette.success.main :
-                       theme.palette.secondary.main, // Holiday
-                mr: 1
-              }} />
-              <Typography variant="body2" color="text.secondary">{selectedImpact} Impact Events</Typography>
-            </Box>
-            <Typography variant="h4" sx={{
-              color: selectedImpact === 'High' ? 'error.main' :
-                     selectedImpact === 'Medium' ? 'warning.main' :
-                     selectedImpact === 'Low' ? 'success.main' :
-                     'secondary.main' // Holiday
-            }}>
-              {(correlationStats.anyEventWinCorrelationRate || 0).toFixed(1)}%
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              {correlationStats.winningTradesWithEvents || 0} trades
-            </Typography>
-          </CardContent>
-        </Card>
-      </Box>
-
-
-
-        <Box sx={{
-          display: 'grid',
-          gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' },
-          gap: 2,
-          mb: 2
-        }}>
-          {/* Average Loss Comparison */}
-          <Card>
-            <CardContent>
-              <Typography variant="h6" sx={{ mb: 2 }}>Average Loss Comparison</Typography>
-              <Stack spacing={2}>
-                <Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="body2">With Economic Events</Typography>
-                    <Typography variant="body2" color="error.main">
-                      {formatValue(correlationStats.avgLossWithEvents || 0)}
-                    </Typography>
-                  </Box>
-                  <LinearProgress
-                    variant="determinate"
-                    value={(correlationStats.avgLossWithEvents || 0) > 0 ? 100 : 0}
-                    color="error"
-                  />
-                </Box>
-                <Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="body2">Without Economic Events</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {formatValue(correlationStats.avgLossWithoutEvents || 0)}
-                    </Typography>
-                  </Box>
-                  <LinearProgress
-                    variant="determinate"
-                    value={(correlationStats.avgLossWithoutEvents || 0) > 0 ?
-                      ((correlationStats.avgLossWithoutEvents || 0) / Math.max((correlationStats.avgLossWithEvents || 0), (correlationStats.avgLossWithoutEvents || 0))) * 100 : 0}
-                    color="inherit"
-                  />
-                </Box>
-              </Stack>
-            </CardContent>
-          </Card>
-
-          {/* Average Win Comparison */}
-          <Card>
-            <CardContent>
-              <Typography variant="h6" sx={{ mb: 2 }}>Average Win Comparison</Typography>
-              <Stack spacing={2}>
-                <Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="body2">With Economic Events</Typography>
-                    <Typography variant="body2" color="success.main">
-                      {formatValue(correlationStats.avgWinWithEvents || 0)}
-                    </Typography>
-                  </Box>
-                  <LinearProgress
-                    variant="determinate"
-                    value={(correlationStats.avgWinWithEvents || 0) > 0 ? 100 : 0}
-                    color="success"
-                  />
-                </Box>
-                <Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="body2">Without Economic Events</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {formatValue(correlationStats.avgWinWithoutEvents || 0)}
-                    </Typography>
-                  </Box>
-                  <LinearProgress
-                    variant="determinate"
-                    value={(correlationStats.avgWinWithoutEvents || 0) > 0 ?
-                      ((correlationStats.avgWinWithoutEvents || 0) / Math.max((correlationStats.avgWinWithEvents || 0), (correlationStats.avgWinWithoutEvents || 0))) * 100 : 0}
-                    color="inherit"
-                  />
-                </Box>
-              </Stack>
-            </CardContent>
-          </Card>
+            py: 6,
+            gap: 2,
+          }}
+        >
+          <CircularProgress size={28} />
+          <Typography variant="body2" color="text.secondary">
+            Calculating economic event correlations…
+          </Typography>
         </Box>
+      ) : (
+        <Box sx={{ p: 2.5, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+          <InfoStrip>
+            This analysis correlates your trades with economic events that occurred
+            during the same trading sessions, surfacing patterns in your performance.
+            {selectedCurrency !== 'ALL' && (
+              <>
+                {' '}
+                Filtered to{' '}
+                <Box component="span" sx={{ color: 'primary.main', fontWeight: 600 }}>
+                  {selectedCurrency}
+                </Box>{' '}
+                events.
+              </>
+            )}
+          </InfoStrip>
 
-        {/* Most Common Event Types */}
-        <Card>
-          <CardContent>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="h6">Most Common Event Types</Typography>
+          {/* Summary: losing vs winning trades */}
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
+              gap: 2,
+            }}
+          >
+            {renderSummaryGroup(
+              theme.palette.error.main,
+              'Losing trades',
+              `${selectedImpact} impact correlation`,
+              'Total losing',
+              totalLosing,
+              lossPct,
+              losingWithEvents,
+              <TrendingDown sx={{ fontSize: 14, color: theme.palette.error.main }} />,
+              <EventNote sx={{ fontSize: 14, color: theme.palette.error.main }} />,
+            )}
+            {renderSummaryGroup(
+              theme.palette.success.main,
+              'Winning trades',
+              `${selectedImpact} impact correlation`,
+              'Total winning',
+              totalWinning,
+              winPct,
+              winningWithEvents,
+              <TrendingUp sx={{ fontSize: 14, color: theme.palette.success.main }} />,
+              <EventNote sx={{ fontSize: 14, color: theme.palette.success.main }} />,
+            )}
+          </Box>
+
+          {/* Average loss/win comparison */}
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
+              gap: 2,
+            }}
+          >
+            {renderCompareCard('Average loss', theme.palette.error.main, avgLossWith, avgLossNo, lossBarMax)}
+            {renderCompareCard('Average win', theme.palette.success.main, avgWinWith, avgWinNo, winBarMax)}
+          </Box>
+
+          {/* Most common event types — nested sub-card with inverted header
+              (eyebrow above title, no icon pill) so it reads as scoped */}
+          <Box
+            sx={{
+              border: `1px solid ${theme.palette.divider}`,
+              borderRadius: `${theme.palette.custom.radius.lg}px`,
+              overflow: 'hidden',
+            }}
+          >
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 1.5,
+                px: 2,
+                py: 1.5,
+                borderBottom: `1px solid ${theme.palette.divider}`,
+                flexWrap: 'wrap',
+              }}
+            >
+              <Box>
+                <Typography sx={EYEBROW_SX}>Most common event types</Typography>
+                <Typography
+                  sx={{
+                    fontSize: '0.95rem',
+                    fontWeight: 600,
+                    color: 'text.primary',
+                    mt: 0.25,
+                    letterSpacing: '-0.01em',
+                  }}
+                >
+                  Showing {eventList.length} of {totalEventTypes}
+                </Typography>
+              </Box>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <ToggleButtonGroup
                   size="small"
                   value={groupEvents ? 'grouped' : 'individual'}
                   exclusive
-                  onChange={(_, val) => { if (val) setGroupEvents(val === 'grouped'); }}
+                  onChange={(_, val) => {
+                    if (val) setGroupEvents(val === 'grouped');
+                  }}
                 >
-                  <ToggleButton value="individual" sx={{ textTransform: 'none', px: 1.5, py: 0.5 }}>
+                  <ToggleButton
+                    value="individual"
+                    sx={{ textTransform: 'none', px: 1.5, py: 0.5 }}
+                  >
                     Individual
                   </ToggleButton>
-                  <ToggleButton value="grouped" sx={{ textTransform: 'none', px: 1.5, py: 0.5 }}>
+                  <ToggleButton
+                    value="grouped"
+                    sx={{ textTransform: 'none', px: 1.5, py: 0.5 }}
+                  >
                     Grouped
                   </ToggleButton>
                 </ToggleButtonGroup>
                 <TextField
                   size="small"
-                  placeholder="Search events..."
+                  placeholder="Search events…"
                   value={eventSearch}
                   onChange={(e) => setEventSearch(e.target.value)}
                   slotProps={{
@@ -637,190 +569,296 @@ const CURRENCY_OPTIONS = [
                           <SearchIcon fontSize="small" />
                         </InputAdornment>
                       ),
-                    }
+                    },
                   }}
-                  sx={{ width: 250 }}
+                  sx={{ width: 240 }}
                 />
               </Box>
             </Box>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-                {(() => {
-                  let events = correlationStats.mostCommonEventTypes || [];
-                  // Group events by cleaned name + currency when enabled
-                  if (groupEvents) {
-                    const grouped = new Map<string, any>();
-                    events.forEach((eventType: any) => {
-                      const cleanedName = cleanEventNameForPinning(eventType.event);
-                      const key = `${cleanedName}::${eventType.currency || ''}`;
-                      if (grouped.has(key)) {
-                        const existing = grouped.get(key);
-                        const mergedLosing = [...(existing.losingTrades || []), ...(eventType.losingTrades || [])];
-                        const mergedWinning = [...(existing.winningTrades || []), ...(eventType.winningTrades || [])];
-                        const losingCount = mergedLosing.length;
-                        const winningCount = mergedWinning.length;
-                        const totalCount = losingCount + winningCount;
-                        const totalLoss = mergedLosing.reduce((s: number, t: any) => s + Math.abs(t.amount || 0), 0);
-                        const totalWin = mergedWinning.reduce((s: number, t: any) => s + (t.amount || 0), 0);
-                        grouped.set(key, {
-                          ...existing,
-                          event: cleanedName,
-                          losingTrades: mergedLosing,
-                          winningTrades: mergedWinning,
-                          count: totalCount,
-                          totalLoss,
-                          totalWin,
-                          avg_loss: losingCount > 0 ? totalLoss / losingCount : 0,
-                          avg_win: winningCount > 0 ? totalWin / winningCount : 0,
-                          win_rate: totalCount > 0 ? (winningCount / totalCount) * 100 : 0
-                        });
-                      } else {
-                        grouped.set(key, { ...eventType, event: cleanedName });
-                      }
-                    });
-                    events = Array.from(grouped.values()).sort((a: any, b: any) => b.count - a.count);
-                  }
-                  return events
-                    .filter((eventType: any) => {
-                      if (!eventSearch.trim()) return true;
-                      const query = eventSearch.toLowerCase();
-                      return eventType.event?.toLowerCase().includes(query) ||
-                        eventType.currency?.toLowerCase().includes(query);
-                    })
-                    .slice(0, eventSearch.trim() ? 20 : 9)
-                    .map((eventType: any, index: number) => (
-                <Card
-                  key={index}
-                  variant="outlined"
+
+            <Box sx={{ p: 2 }}>
+              {eventList.length === 0 ? (
+                <Typography variant="body2" sx={{ color: 'text.secondary', py: 1 }}>
+                  No common event types found.
+                </Typography>
+              ) : (
+                <Box
                   sx={{
-                    flex: '1 1 300px', // Grow, shrink, with 300px minimum width
-                    minWidth: 300,
-                    maxWidth: 400
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                    gap: 1.5,
                   }}
                 >
-                  <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                      <Box sx={{ flex: 1 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                          {eventType.economicEventDetails?.flagCode && (
-                            <Box
-                              component="img"
-                              src={getFlagUrl(eventType.economicEventDetails.flagCode)}
-                              alt={eventType.economicEventDetails.flagCode || 'flag'}
-                              sx={{
-                                width: 20,
-                                height: 15,
-                                borderRadius: 0.5,
-                                objectFit: 'cover'
-                              }}
-                              onError={(e) => {
-                                // Hide image if it fails to load
-                                (e.target as HTMLElement).style.display = 'none';
-                              }}
-                            />
-                          )}
-                          <Typography variant="body2" sx={{ fontWeight: 500, lineHeight: 1.2 }}>
-                            {eventType.event}
-                          </Typography>
-                        </Box>
+                  {eventList.map((eventType: any, index: number) => (
+                    <EventTile
+                      key={`${eventType.event}-${eventType.currency}-${index}`}
+                      eventType={eventType}
+                      insetBg={insetBg}
+                      hairline={theme.palette.divider}
+                      onClickLosing={
+                        setMultipleTradesDialog
+                          ? () => {
+                              if ((eventType.losingTrades || []).length > 0) {
+                                setMultipleTradesDialog({
+                                  open: true,
+                                  trades: eventType.losingTrades || [],
+                                  title: `Losing trades during "${eventType.event}" events`,
+                                  subtitle: `${(eventType.losingTrades || []).length} losing trades · Avg loss: ${formatValue(eventType.avg_loss)}`,
+                                });
+                              }
+                            }
+                          : undefined
+                      }
+                      onClickWinning={
+                        setMultipleTradesDialog
+                          ? () => {
+                              if ((eventType.winningTrades || []).length > 0) {
+                                setMultipleTradesDialog({
+                                  open: true,
+                                  trades: eventType.winningTrades || [],
+                                  title: `Winning trades during "${eventType.event}" events`,
+                                  subtitle: `${(eventType.winningTrades || []).length} winning trades · Avg win: ${formatValue(eventType.avg_win)}`,
+                                });
+                              }
+                            }
+                          : undefined
+                      }
+                    />
+                  ))}
+                </Box>
+              )}
+            </Box>
+          </Box>
+        </Box>
+      )}
+    </CardShell>
+  );
+};
 
-                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
-                          {eventType.count || 0} trades • {(eventType.win_rate || 0).toFixed(1)}% win rate
-                        </Typography>
-                      </Box>
-                      
-                    </Box>
+// ─── EventTile ────────────────────────────────────────────────────────────
+// Single event-type tile with two clickable segments below the divider.
+// Kept inline because its structure (flag + clamped name + count caption +
+// two-segment footer) is unique to this analysis.
 
-                    <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
-                      {/* Clickable Losing Trades Section */}
-                      <Box
-                        sx={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 0.5,
-                          cursor: setMultipleTradesDialog && (eventType.losingTrades || []).length > 0 ? 'pointer' : 'default',
-                          p: 0.5,
-                          borderRadius: 1,
-                          '&:hover': setMultipleTradesDialog && (eventType.losingTrades || []).length > 0 ? {
-                            bgcolor: alpha(theme.palette.error.main, 0.08)
-                          } : {}
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (setMultipleTradesDialog && (eventType.losingTrades || []).length > 0) {
-                            setMultipleTradesDialog({
-                              open: true,
-                              trades: eventType.losingTrades || [],
-                              title: `Losing trades during "${eventType.event}" events`,
-                              subtitle: `${(eventType.losingTrades || []).length} losing trades • Avg loss: ${formatValue(eventType.avg_loss)}`
-                            });
-                          }
-                        }}
-                      >
-                        <Typography variant="body2" sx={{ fontWeight: 600, color: 'error.main' }}>
-                          {(eventType.losingTrades || []).length}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-                          losses
-                        </Typography>
-                        <Typography variant="caption" color="error.main" sx={{ fontSize: '0.7rem' }}>
-                          ({formatValue(eventType.avg_loss)})
-                        </Typography>
-                      </Box>
+interface EventTileProps {
+  eventType: any;
+  insetBg: string;
+  hairline: string;
+  onClickLosing?: () => void;
+  onClickWinning?: () => void;
+}
 
-                      <Box sx={{ width: '1px', height: '16px', bgcolor: 'divider' }} />
-
-                      {/* Clickable Winning Trades Section */}
-                      <Box
-                        sx={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 0.5,
-                          cursor: setMultipleTradesDialog && (eventType.winningTrades || []).length > 0 ? 'pointer' : 'default',
-                          p: 0.5,
-                          borderRadius: 1,
-                          '&:hover': setMultipleTradesDialog && (eventType.winningTrades || []).length > 0 ? {
-                            bgcolor: alpha(theme.palette.success.main, 0.08)
-                          } : {}
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (setMultipleTradesDialog && (eventType.winningTrades || []).length > 0) {
-                            setMultipleTradesDialog({
-                              open: true,
-                              trades: eventType.winningTrades || [],
-                              title: `Winning trades during "${eventType.event}" events`,
-                              subtitle: `${(eventType.winningTrades || []).length} winning trades • Avg win: ${formatValue(eventType.avg_win)}`
-                            });
-                          }
-                        }}
-                      >
-                        <Typography variant="body2" sx={{ fontWeight: 600, color: 'success.main' }}>
-                          {(eventType.winningTrades || []).length}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-                          wins
-                        </Typography>
-                        <Typography variant="caption" color="success.main" sx={{ fontSize: '0.7rem' }}>
-                          ({formatValue(eventType.avg_win)})
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </CardContent>
-                </Card>
-              ));
-                })()}
-                {(correlationStats.mostCommonEventTypes || []).length === 0 && (
-                  <Typography variant="body2" color="text.secondary">
-                    No common event types found
-                  </Typography>
-                )}
-              </Box>
-          </CardContent>
-        </Card>
-          </>
+const EventTile: React.FC<EventTileProps> = ({
+  eventType,
+  insetBg,
+  hairline,
+  onClickLosing,
+  onClickWinning,
+}) => {
+  const theme = useTheme();
+  const losingCount = (eventType.losingTrades || []).length;
+  const winningCount = (eventType.winningTrades || []).length;
+  return (
+    <Box
+      sx={{
+        p: 1.5,
+        borderRadius: '10px',
+        bgcolor: insetBg,
+        border: `1px solid ${hairline}`,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 1,
+      }}
+    >
+      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.875, minWidth: 0 }}>
+        {eventType.economicEventDetails?.flagCode && (
+          <Box
+            component="img"
+            src={getFlagUrl(eventType.economicEventDetails.flagCode)}
+            alt={eventType.economicEventDetails.flagCode || 'flag'}
+            sx={{
+              width: 18,
+              height: 13,
+              borderRadius: '2px',
+              objectFit: 'cover',
+              flexShrink: 0,
+              mt: '3px',
+            }}
+            onError={(e) => {
+              (e.target as HTMLElement).style.display = 'none';
+            }}
+          />
         )}
+        <Box sx={{ minWidth: 0, flex: 1 }}>
+          <Typography
+            sx={{
+              fontSize: '0.85rem',
+              fontWeight: 600,
+              lineHeight: 1.3,
+              color: 'text.primary',
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+            }}
+          >
+            {eventType.event}
+          </Typography>
+          <Typography
+            sx={{
+              fontSize: '0.7rem',
+              color: 'text.tertiary',
+              fontFeatureSettings: TNUM,
+              mt: 0.25,
+            }}
+          >
+            {eventType.count || 0} trades · {(eventType.win_rate || 0).toFixed(1)}% win
+          </Typography>
+        </Box>
       </Box>
-    </Paper>
+
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: 0.5,
+          borderTop: `1px solid ${hairline}`,
+          pt: 1,
+        }}
+      >
+        <SegmentButton
+          ariaLabel="Show losing trades"
+          color={theme.palette.error.main}
+          arrow="↓"
+          count={losingCount}
+          countLabel="losses"
+          amount={eventType.avg_loss}
+          sign="−"
+          onClick={onClickLosing}
+          disabled={losingCount === 0}
+        />
+        <SegmentButton
+          ariaLabel="Show winning trades"
+          color={theme.palette.success.main}
+          arrow="↑"
+          count={winningCount}
+          countLabel="wins"
+          amount={eventType.avg_win}
+          sign="+"
+          onClick={onClickWinning}
+          disabled={winningCount === 0}
+        />
+      </Box>
+    </Box>
+  );
+};
+
+// ─── SegmentButton ────────────────────────────────────────────────────────
+
+interface SegmentButtonProps {
+  ariaLabel: string;
+  color: string;
+  arrow: string;
+  count: number;
+  countLabel: string;
+  amount: number;
+  sign: string;
+  onClick?: () => void;
+  disabled: boolean;
+}
+
+const SegmentButton: React.FC<SegmentButtonProps> = ({
+  ariaLabel,
+  color,
+  arrow,
+  count,
+  countLabel,
+  amount,
+  sign,
+  onClick,
+  disabled,
+}) => {
+  const interactive = !!onClick && !disabled;
+  return (
+    <Box
+      role={interactive ? 'button' : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      aria-label={ariaLabel}
+      onClick={
+        interactive
+          ? (e) => {
+              e.stopPropagation();
+              onClick!();
+            }
+          : undefined
+      }
+      onKeyDown={
+        interactive
+          ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onClick!();
+              }
+            }
+          : undefined
+      }
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 0.5,
+        px: 0.875,
+        py: 0.625,
+        borderRadius: '6px',
+        cursor: interactive ? 'pointer' : 'default',
+        opacity: disabled ? 0.5 : 1,
+        transition: 'background-color 150ms ease',
+        '&:hover': interactive ? { bgcolor: alpha(color, 0.1) } : {},
+        '&:focus-visible': interactive
+          ? { outline: 'none', boxShadow: `0 0 0 3px ${alpha(color, 0.25)}` }
+          : {},
+      }}
+    >
+      <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.375 }}>
+        <Typography
+          component="span"
+          sx={{ fontSize: '0.8rem', fontWeight: 700, color, lineHeight: 1 }}
+        >
+          {arrow}
+        </Typography>
+        <Typography
+          component="span"
+          sx={{
+            fontSize: '0.85rem',
+            fontWeight: 700,
+            color,
+            fontFeatureSettings: TNUM,
+            lineHeight: 1,
+          }}
+        >
+          {count}
+        </Typography>
+        <Typography
+          component="span"
+          sx={{ fontSize: '0.7rem', color: 'text.tertiary', lineHeight: 1 }}
+        >
+          {countLabel}
+        </Typography>
+      </Box>
+      <Typography
+        component="span"
+        sx={{
+          fontSize: '0.72rem',
+          fontWeight: 600,
+          color,
+          fontFeatureSettings: TNUM,
+          letterSpacing: '-0.01em',
+        }}
+      >
+        {sign}
+        {formatValue(Math.abs(amount || 0)).replace(/^[+-]/, '')}
+      </Typography>
+    </Box>
   );
 };
 
