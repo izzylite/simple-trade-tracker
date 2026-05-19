@@ -24,6 +24,8 @@ import { useNotesPanelState } from 'features/notes/contexts/NotesPanelStateConte
 
 import NoteListPanel from 'features/notes/components/NoteListPanel';
 import NoteEditorDialog from 'features/notes/components/NoteEditorDialog';
+import * as notesService from 'features/notes/services/notesService';
+import { logger } from 'utils/logger';
 
 const CalendarNotesPanel: React.FC = () => {
   const {
@@ -69,6 +71,18 @@ const CalendarNotesPanel: React.FC = () => {
         onNoteClick={openNote}
         onTogglePin={isReadOnly ? undefined : handleTogglePin}
         onToggleArchive={isReadOnly ? undefined : handleToggleArchive}
+        onDelete={
+          isReadOnly
+            ? undefined
+            : async (note) => {
+                try {
+                  await notesService.deleteNote(note.id);
+                  removeNote(note.id);
+                } catch (err) {
+                  logger.error('Error deleting note from list panel:', err);
+                }
+              }
+        }
         tab={tab}
         onTabChange={setTab}
         pill={pill}

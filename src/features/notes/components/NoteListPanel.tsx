@@ -27,7 +27,9 @@ import {
   FilterList as FilterListIcon,
   KeyboardArrowDown as ArrowDownIcon,
   AutoAwesome as SparkleIcon,
+  DeleteOutline as DeleteIcon,
 } from '@mui/icons-material';
+import ConfirmationDialog from 'components/common/ConfirmationDialog';
 import { convertFromRaw } from 'draft-js';
 import { format } from 'date-fns';
 
@@ -68,6 +70,11 @@ interface NoteListPanelProps {
   onTogglePin?: (note: Note) => void;
   /** Optional — toggles archived state on the given note. */
   onToggleArchive?: (note: Note) => void;
+  /**
+   * Optional — permanently deletes the given note. The panel renders a
+   * built-in confirmation dialog before invoking this callback.
+   */
+  onDelete?: (note: Note) => void | Promise<void>;
   /** Optional — opens an Orion chat targeted at this note context. */
   onAskOrion?: () => void;
   tab: NotesTab;
@@ -372,6 +379,7 @@ interface InlineNoteRowProps {
   onOpen: () => void;
   onTogglePin?: () => void;
   onToggleArchive?: () => void;
+  onDelete?: () => void;
   isSelected?: boolean;
   tab: NotesTab;
 }
@@ -384,6 +392,7 @@ const InlineNoteRow: React.FC<InlineNoteRowProps> = ({
   onOpen,
   onTogglePin,
   onToggleArchive,
+  onDelete,
   isSelected,
   tab,
 }) => {
@@ -539,6 +548,15 @@ const InlineNoteRow: React.FC<InlineNoteRowProps> = ({
                 {tab === 'archived' ? 'Restore' : 'Archive'}
               </ActionButton>
             )}
+            {onDelete && (
+              <ActionButton
+                onClick={onDelete}
+                danger
+                icon={<DeleteIcon sx={{ fontSize: '0.72rem' }} />}
+              >
+                Delete
+              </ActionButton>
+            )}
           </Box>
         </Box>
       )}
@@ -548,13 +566,22 @@ const InlineNoteRow: React.FC<InlineNoteRowProps> = ({
 
 interface ActionButtonProps {
   primary?: boolean;
+  danger?: boolean;
   onClick: () => void;
   icon: React.ReactNode;
   children: React.ReactNode;
 }
 
-const ActionButton: React.FC<ActionButtonProps> = ({ primary, onClick, icon, children }) => {
+const ActionButton: React.FC<ActionButtonProps> = ({ primary, danger, onClick, icon, children }) => {
   const theme = useTheme();
+  const idleColor = danger ? theme.palette.error.main : theme.palette.text.secondary;
+  const hoverBg = danger
+    ? alpha(theme.palette.error.main, 0.08)
+    : alpha(theme.palette.text.primary, 0.04);
+  const hoverColor = danger ? theme.palette.error.main : theme.palette.text.primary;
+  const idleBorder = danger
+    ? alpha(theme.palette.error.main, 0.35)
+    : theme.palette.divider;
   return (
     <Box
       component="button"
@@ -569,17 +596,17 @@ const ActionButton: React.FC<ActionButtonProps> = ({ primary, onClick, icon, chi
         alignItems: 'center',
         gap: 0.5,
         bgcolor: primary ? 'primary.main' : 'transparent',
-        border: primary ? 0 : `1px solid ${theme.palette.divider}`,
+        border: primary ? 0 : `1px solid ${idleBorder}`,
         borderRadius: '6px',
-        color: primary ? 'primary.contrastText' : 'text.secondary',
+        color: primary ? 'primary.contrastText' : idleColor,
         font: 'inherit',
         fontSize: '0.7rem',
         fontWeight: 600,
         cursor: 'pointer',
         transition: 'all 120ms',
         '&:hover': {
-          bgcolor: primary ? 'primary.dark' : alpha(theme.palette.text.primary, 0.04),
-          color: primary ? 'primary.contrastText' : 'text.primary',
+          bgcolor: primary ? 'primary.dark' : hoverBg,
+          color: primary ? 'primary.contrastText' : hoverColor,
         },
       }}
     >
@@ -605,6 +632,7 @@ const NoteListPanel: React.FC<NoteListPanelProps> = ({
   canCreateNote,
   onTogglePin,
   onToggleArchive,
+  onDelete,
   onAskOrion,
   tab,
   onTabChange,
@@ -625,6 +653,8 @@ const NoteListPanel: React.FC<NoteListPanelProps> = ({
   const expandedId = isControlled ? expandedIdProp ?? null : expandedIdInternal;
   const setExpandedId = isControlled ? onExpandedIdChange! : setExpandedIdInternal;
   const [filterAnchor, setFilterAnchor] = useState<null | HTMLElement>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Note | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Tag → count across the current note set
   const tagCounts = useMemo(() => {
@@ -650,6 +680,17 @@ const NoteListPanel: React.FC<NoteListPanelProps> = ({
   const handleOpen = useCallback((note: Note) => {
     onNoteClick(note);
   }, [onNoteClick]);
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!deleteTarget || !onDelete) return;
+    try {
+      setDeleting(true);
+      await onDelete(deleteTarget);
+      setDeleteTarget(null);
+    } finally {
+      setDeleting(false);
+    }
+  }, [deleteTarget, onDelete]);
 
   const activeFilterLabel = pill === 'all' ? 'All tags' : getTagDisplayLabel(pill);
 
@@ -977,6 +1018,7 @@ const NoteListPanel: React.FC<NoteListPanelProps> = ({
                   onOpen={() => handleOpen(note)}
                   onTogglePin={onTogglePin ? () => onTogglePin(note) : undefined}
                   onToggleArchive={onToggleArchive ? () => onToggleArchive(note) : undefined}
+                  onDelete={onDelete ? () => setDeleteTarget(note) : undefined}
                   isSelected={note.id === selectedNoteId}
                   tab={tab}
                 />
@@ -1068,6 +1110,22 @@ const NoteListPanel: React.FC<NoteListPanelProps> = ({
           </Button>
         </Box>
       )}
+
+      <ConfirmationDialog
+        open={!!deleteTarget}
+        title="Delete Note"
+        message={
+          deleteTarget
+            ? `Are you sure you want to permanently delete "${deleteTarget.title || 'Untitled'}"? This action cannot be undone.`
+            : ''
+        }
+        confirmText="Delete"
+        cancelText="Cancel"
+        confirmColor="error"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+        isSubmitting={deleting}
+      />
     </Box>
   );
 };
