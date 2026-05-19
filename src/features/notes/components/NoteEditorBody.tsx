@@ -27,7 +27,6 @@ import {
   useTheme,
   alpha,
   Typography,
-  Alert,
   Button,
   ToggleButtonGroup,
   ToggleButton,
@@ -105,11 +104,13 @@ import {
   GAME_PLAN_TAG,
 } from 'features/notes/types/note';
 import { scrollbarStyles } from 'styles/scrollbarStyles';
+import { EYEBROW_SX, getInsetSurface } from 'styles/designTokens';
+import InfoStrip from 'components/common/InfoStrip';
 import { logger } from 'utils/logger';
 import { isGroupedTag, getTagName, getTagGroup } from 'utils/tagColors';
 import NoteShareButton from 'features/notes/components/NoteShareButton';
 import { useNoteNavigation } from 'features/notes/hooks/useNoteNavigation';
-import { getContentAsJson } from 'components/common/RichTextEditor/utils/draftUtils';
+import { getContentAsJson, hasContent as editorHasContent } from 'components/common/RichTextEditor/utils/draftUtils';
 import { IMPACT_COLORS, CURRENCY_FLAGS } from 'features/events/types/economicCalendar';
 import type { ImpactLevel, Currency } from 'features/events/types/economicCalendar';
 import {
@@ -385,20 +386,19 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
     // may lag by one render when save fires in the same event as a
     // keystroke (e.g. picker-chip click). Falling back to state for the
     // case where the editor hasn't mounted yet.
-    const liveContent = editorRef.current?.editorState
-      ? getContentAsJson(editorRef.current.editorState)
+    const liveEditorState = editorRef.current?.editorState;
+    const liveContent = liveEditorState
+      ? getContentAsJson(liveEditorState)
       : content;
-    // Persist partial drafts — title or content alone is enough. Reject only
-    // if both are empty AND nothing else (cover, reminder, tags, color) has
-    // been set, to avoid creating an entirely blank row.
+    // Require real content — title OR editor body text. Metadata alone
+    // (cover, tags, color, reminder) doesn't justify creating a row, and
+    // `liveContent.trim() !== ''` is unreliable because the Draft.js JSON
+    // serialization is non-empty even for a blank editor.
     const hasTitle = title.trim() !== '';
-    const hasContent = liveContent.trim() !== '';
-    const hasOtherSignal =
-      coverImage !== null ||
-      tags.length > 0 ||
-      noteColor !== undefined ||
-      (reminderType !== 'none' && isReminderActive);
-    if (!hasTitle && !hasContent && !hasOtherSignal) return;
+    const hasBody = liveEditorState
+      ? editorHasContent(liveEditorState)
+      : content.trim() !== '' && content !== '{"blocks":[],"entityMap":{}}';
+    if (!hasTitle && !hasBody) return;
 
     savingRef.current = true;
     // Snapshot the values being sent NOW. After save we'll commit this to
@@ -504,13 +504,14 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
     // No snapshot yet — either a fresh existing-note edit or a new draft.
     const liveNote = noteRef.current;
     if (!liveNote) {
-      const hasNonEmptyTitle = title && title.trim() !== '';
-      const hasNonEmptyContent = liveContent && liveContent.trim() !== '';
-      const hasCoverImage = coverImage !== null;
-      const hasReminder = reminderType !== 'none' && isReminderActive;
-      const hasTags = tags.length > 0;
-      const hasColor = noteColor !== undefined;
-      return Boolean(hasNonEmptyTitle || hasNonEmptyContent || hasCoverImage || hasReminder || hasTags || hasColor);
+      // Mirror saveNote's gate: a new draft is only "dirty" once the user
+      // has typed a title or body. Cover/tags/color/reminder alone won't
+      // be persisted, so don't flag them as dirty either.
+      const hasNonEmptyTitle = title.trim() !== '';
+      const hasNonEmptyBody = editorRef.current?.editorState
+        ? editorHasContent(editorRef.current.editorState)
+        : liveContent.trim() !== '' && liveContent !== '{"blocks":[],"entityMap":{}}';
+      return hasNonEmptyTitle || hasNonEmptyBody;
     }
     const titleChanged = title !== liveNote.title;
     const contentChanged = liveContent !== liveNote.content;
@@ -697,7 +698,7 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
           gap: 1,
           px: 2,
           py: 1,
-          borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+          borderBottom: `1px solid ${theme.palette.divider}`,
           flexShrink: 0,
         }}
       >
@@ -772,8 +773,8 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
           overflowX: 'auto',
           overflowY: 'hidden',
           flexShrink: 0,
-          borderBottom: `1px solid ${alpha(theme.palette.divider, 0.15)}`,
-          bgcolor: alpha(theme.palette.background.paper, 0.6),
+          borderBottom: `1px solid ${theme.palette.divider}`,
+          bgcolor: getInsetSurface(theme),
           whiteSpace: 'nowrap',
           '&::-webkit-scrollbar': { height: 0, display: 'none' },
           scrollbarWidth: 'none',
@@ -803,14 +804,14 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
                 onMouseDown={(e) => { e.preventDefault(); editorRef.current?.handleMentionSelect(tag); }}
                 sx={{
                   cursor: 'pointer', flexShrink: 0,
-                  bgcolor: isSelected ? alpha(theme.palette.primary.main, 0.1) : alpha(theme.palette.text.primary, 0.06),
+                  bgcolor: isSelected ? theme.palette.custom.tintViolet.soft : getInsetSurface(theme),
                   color: isSelected ? theme.palette.primary.main : theme.palette.text.secondary,
                   fontWeight: 600, fontSize: '0.73rem',
                   border: isSelected
-                    ? `1.5px solid ${alpha(theme.palette.primary.main, 0.25)}`
-                    : `1px solid ${alpha(theme.palette.text.primary, 0.15)}`,
+                    ? `1px solid ${alpha(theme.palette.primary.main, 0.25)}`
+                    : `1px solid ${theme.palette.divider}`,
                   transition: 'all 150ms cubic-bezier(0.22, 1, 0.36, 1)',
-                  '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.1), color: theme.palette.primary.main },
+                  '&:hover': { bgcolor: theme.palette.custom.tintViolet.soft, color: theme.palette.primary.main },
                   '& .MuiChip-icon': { color: 'inherit' },
                 }}
               />
@@ -832,14 +833,14 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
                 onMouseDown={(e) => { e.preventDefault(); editorRef.current?.handleNoteLinkSelect(n.id, n.title); }}
                 sx={{
                   cursor: 'pointer', flexShrink: 0,
-                  bgcolor: isSelected ? alpha(theme.palette.primary.main, 0.1) : alpha(theme.palette.text.primary, 0.06),
+                  bgcolor: isSelected ? theme.palette.custom.tintViolet.soft : getInsetSurface(theme),
                   color: isSelected ? theme.palette.primary.main : theme.palette.text.secondary,
                   fontWeight: 600, fontSize: '0.73rem',
                   border: isSelected
-                    ? `1.5px solid ${alpha(theme.palette.primary.main, 0.25)}`
-                    : `1px solid ${alpha(theme.palette.text.primary, 0.15)}`,
+                    ? `1px solid ${alpha(theme.palette.primary.main, 0.25)}`
+                    : `1px solid ${theme.palette.divider}`,
                   transition: 'all 150ms cubic-bezier(0.22, 1, 0.36, 1)',
-                  '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.1), color: theme.palette.primary.main },
+                  '&:hover': { bgcolor: theme.palette.custom.tintViolet.soft, color: theme.palette.primary.main },
                   '& .MuiChip-icon': { color: 'inherit' },
                 }}
               />
@@ -877,12 +878,12 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
                 }}
                 sx={{
                   cursor: 'pointer', flexShrink: 0,
-                  bgcolor: isSelected ? alpha(impactColor, 0.1) : alpha(theme.palette.text.primary, 0.06),
+                  bgcolor: isSelected ? alpha(impactColor, 0.1) : getInsetSurface(theme),
                   color: isSelected ? impactColor : theme.palette.text.secondary,
                   fontWeight: 600, fontSize: '0.73rem',
                   border: isSelected
-                    ? `1.5px solid ${alpha(impactColor, 0.25)}`
-                    : `1px solid ${alpha(theme.palette.text.primary, 0.15)}`,
+                    ? `1px solid ${alpha(impactColor, 0.25)}`
+                    : `1px solid ${theme.palette.divider}`,
                   transition: 'all 150ms cubic-bezier(0.22, 1, 0.36, 1)',
                   '&:hover': { bgcolor: alpha(impactColor, 0.1), color: impactColor },
                   '& .MuiChip-icon': { color: 'inherit' },
@@ -894,7 +895,7 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
           <Typography
             variant="caption"
             sx={{
-              color: alpha(theme.palette.text.secondary, 0.4),
+              color: 'text.disabled',
               fontStyle: 'italic',
               fontSize: '0.75rem',
               userSelect: 'none',
@@ -943,7 +944,7 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
             justifyContent: 'space-between',
             px: 3,
             py: 0.75,
-            borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+            borderBottom: `1px solid ${theme.palette.divider}`,
           }}
         >
           <Box
@@ -951,9 +952,9 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
             sx={{ display: 'flex', alignItems: 'center', gap: 1, cursor: 'pointer', py: 0.25, '&:hover': { opacity: 0.8 } }}
           >
             {isReminderActive
-              ? <ReminderIcon sx={{ color: 'info.main', fontSize: '1rem' }} />
+              ? <ReminderIcon sx={{ color: 'primary.main', fontSize: '1rem' }} />
               : <NoReminderIcon sx={{ color: 'text.disabled', fontSize: '1rem' }} />}
-            <Typography sx={{ fontSize: '0.78rem', fontWeight: 600, color: 'text.secondary', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+            <Typography sx={EYEBROW_SX}>
               Settings
             </Typography>
             {isReminderActive && reminderType !== 'none' && (
@@ -988,7 +989,7 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
 
         {/* Settings collapse */}
         <Collapse in={isReminderExpanded}>
-          <Box sx={{ px: 3, py: 2, bgcolor: alpha(theme.palette.info.main, 0.02) }}>
+          <Box sx={{ px: 3, py: 2, bgcolor: getInsetSurface(theme) }}>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
               Set a reminder to display this note on specific days. Perfect for game plans, daily routines, or weekly trading strategies.
             </Typography>
@@ -1165,10 +1166,16 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
         {/* Editor area */}
         <Box sx={{ maxWidth: 800, margin: '0 auto', px: { xs: 3, md: 7 }, py: 4 }}>
           {note && note.is_archived && (
-            <Alert severity="warning" sx={{ mb: 2 }}>
-              This note is archived.
-              <Button onClick={handleArchiveNote} size="small" variant="outlined" sx={{ ml: 2 }}>Unarchive</Button>
-            </Alert>
+            <Box sx={{ mb: 2 }}>
+              <InfoStrip tone="warning">
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap', flex: 1 }}>
+                  <Typography variant="body2" sx={{ color: 'text.secondary', lineHeight: 1.5 }}>
+                    This note is archived.
+                  </Typography>
+                  <Button onClick={handleArchiveNote} size="small" variant="outlined">Unarchive</Button>
+                </Box>
+              </InfoStrip>
+            </Box>
           )}
 
           {/* Tag chips above title */}
@@ -1185,12 +1192,12 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
                     fontSize: '0.72rem',
                     fontWeight: 600,
                     borderRadius: '999px',
-                    bgcolor: alpha(theme.palette.primary.main, 0.12),
-                    color: theme.palette.primary.light,
-                    border: `1px solid ${alpha(theme.palette.primary.main, 0.28)}`,
+                    bgcolor: theme.palette.custom.tintViolet.soft,
+                    color: theme.palette.primary.main,
+                    border: `1px solid ${alpha(theme.palette.primary.main, 0.15)}`,
                     '& .MuiChip-label': { px: 1 },
                     '& .MuiChip-deleteIcon': {
-                      color: alpha(theme.palette.primary.light, 0.7),
+                      color: alpha(theme.palette.primary.main, 0.7),
                       fontSize: '0.85rem',
                       '&:hover': { color: theme.palette.error.main },
                     },
@@ -1293,11 +1300,8 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
       >
         <Typography
           sx={{
-            fontSize: '0.65rem',
-            fontWeight: 600,
-            letterSpacing: '0.16em',
-            textTransform: 'uppercase',
-            color: 'text.disabled',
+            ...EYEBROW_SX,
+            color: 'text.tertiary',
             px: 1.5,
             py: 1,
             borderBottom: `1px solid ${theme.palette.divider}`,
