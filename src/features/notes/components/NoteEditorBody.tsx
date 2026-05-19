@@ -390,15 +390,14 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
     const liveContent = liveEditorState
       ? getContentAsJson(liveEditorState)
       : content;
-    // Require real content — title OR editor body text. Metadata alone
-    // (cover, tags, color, reminder) doesn't justify creating a row, and
-    // `liveContent.trim() !== ''` is unreliable because the Draft.js JSON
-    // serialization is non-empty even for a blank editor.
-    const hasTitle = title.trim() !== '';
+    // Require real body content. Title/metadata alone (cover, tags, color,
+    // reminder) don't justify creating a row. `liveContent.trim() !== ''`
+    // is unreliable because the Draft.js JSON serialization is non-empty
+    // even for a blank editor — use `editorHasContent` instead.
     const hasBody = liveEditorState
       ? editorHasContent(liveEditorState)
       : content.trim() !== '' && content !== '{"blocks":[],"entityMap":{}}';
-    if (!hasTitle && !hasBody) return;
+    if (!hasBody) return;
 
     savingRef.current = true;
     // Snapshot the values being sent NOW. After save we'll commit this to
@@ -505,13 +504,11 @@ const NoteEditorBody = forwardRef<NoteEditorBodyHandle, NoteEditorBodyProps>(({
     const liveNote = noteRef.current;
     if (!liveNote) {
       // Mirror saveNote's gate: a new draft is only "dirty" once the user
-      // has typed a title or body. Cover/tags/color/reminder alone won't
-      // be persisted, so don't flag them as dirty either.
-      const hasNonEmptyTitle = title.trim() !== '';
-      const hasNonEmptyBody = editorRef.current?.editorState
+      // has typed body content. Title/cover/tags/color/reminder alone
+      // won't be persisted, so don't flag them as dirty either.
+      return editorRef.current?.editorState
         ? editorHasContent(editorRef.current.editorState)
         : liveContent.trim() !== '' && liveContent !== '{"blocks":[],"entityMap":{}}';
-      return hasNonEmptyTitle || hasNonEmptyBody;
     }
     const titleChanged = title !== liveNote.title;
     const contentChanged = liveContent !== liveNote.content;
