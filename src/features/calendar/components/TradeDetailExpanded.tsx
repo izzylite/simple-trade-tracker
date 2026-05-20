@@ -39,6 +39,10 @@ import { TradeOperationsProps } from '../types/tradeOperations';
 import { Z_INDEX } from 'styles/zIndex';
 import { useTradeSyncContextOptional } from '../contexts/TradeSyncContext';
 import { normalizeTradeDates } from '../utils/tradeUtils';
+import { EYEBROW_SX, TNUM, MONO_FONT, getInsetTileSx } from 'styles/designTokens';
+import PnlValue from 'components/common/PnlValue';
+
+const numberSx = { fontFamily: MONO_FONT, fontFeatureSettings: TNUM } as const;
 
 // Global cache to track loaded images across the entire application
 const imageLoadCache = new Set<string>();
@@ -372,10 +376,8 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                   {/* Entry/Exit Prices */}
                   {(trade.entry_price || trade.exit_price) && (
                     <Paper elevation={0} sx={{
+                      ...getInsetTileSx(theme),
                       p: { xs: 1, sm: 1.5 }, // Reduced padding on mobile
-                      borderRadius: 2,
-                      backgroundColor: alpha(theme.palette.info.main, 0.05),
-                      border: `1px solid ${alpha(theme.palette.info.main, 0.1)}`,
                       display: 'flex',
                       flexDirection: 'column',
                       gap: 0.5,
@@ -390,20 +392,20 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                       }}>
                         {trade.entry_price && (
                           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                            <Typography variant="caption" sx={{ fontWeight: 600, color: 'info.main' }}>
+                            <Typography sx={EYEBROW_SX}>
                               Entry Price
                             </Typography>
-                            <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                            <Typography variant="body1" sx={{ fontWeight: 600, ...numberSx }}>
                               {trade.entry_price}
                             </Typography>
                           </Box>
                         )}
                         {trade.exit_price && (
                           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                            <Typography variant="caption" sx={{ fontWeight: 600, color: 'info.main' }}>
+                            <Typography sx={EYEBROW_SX}>
                               Exit Price
                             </Typography>
-                            <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                            <Typography variant="body1" sx={{ fontWeight: 600, ...numberSx }}>
                               {trade.exit_price}
                             </Typography>
                           </Box>
@@ -414,10 +416,8 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                   {/* Stop Loss/Take Profit */}
                   {(trade.stop_loss || trade.take_profit) && (
                     <Paper elevation={0} sx={{
+                      ...getInsetTileSx(theme),
                       p: { xs: 1, sm: 1.5 }, // Reduced padding on mobile
-                      borderRadius: 2,
-                      backgroundColor: alpha(theme.palette.warning.main, 0.05),
-                      border: `1px solid ${alpha(theme.palette.warning.main, 0.1)}`,
                       display: 'flex',
                       flexDirection: 'column',
                       gap: 0.5,
@@ -432,20 +432,20 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                       }}>
                         {trade.stop_loss && (
                           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                            <Typography variant="caption" sx={{ fontWeight: 600, color: 'warning.main' }}>
+                            <Typography sx={EYEBROW_SX}>
                               Stop Loss
                             </Typography>
-                            <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                            <Typography variant="body1" sx={{ fontWeight: 600, ...numberSx }}>
                               {trade.stop_loss}
                             </Typography>
                           </Box>
                         )}
                         {trade.take_profit && (
                           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                            <Typography variant="caption" sx={{ fontWeight: 600, color: 'warning.main' }}>
+                            <Typography sx={EYEBROW_SX}>
                               Take Profit
                             </Typography>
-                            <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                            <Typography variant="body1" sx={{ fontWeight: 600, ...numberSx }}>
                               {trade.take_profit}
                             </Typography>
                           </Box>
@@ -455,20 +455,8 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                   )}
                   {/* PnL */}
                   <Paper elevation={0} sx={{
+                    ...getInsetTileSx(theme),
                     p: { xs: 1, sm: 1.5 }, // Reduced padding on mobile
-                    borderRadius: 2,
-                    backgroundColor: alpha(
-                      trade.amount > 0 ? theme.palette.success.main :
-                        trade.amount < 0 ? theme.palette.error.main :
-                          theme.palette.grey[500],
-                      0.1
-                    ),
-                    border: `1px solid ${alpha(
-                      trade.amount > 0 ? theme.palette.success.main :
-                        trade.amount < 0 ? theme.palette.error.main :
-                          theme.palette.grey[500],
-                      0.2
-                    )}`,
                     display: 'flex',
                     flexDirection: 'column',
                     gap: 0.5
@@ -478,85 +466,68 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                         fontSize: 18,
                         color: trade.amount > 0 ? 'success.main' : trade.amount < 0 ? 'error.main' : 'text.secondary'
                       }} />
-                      <Typography variant="caption" sx={{
-                        fontWeight: 600,
-                        color: trade.amount > 0 ? 'success.main' : trade.amount < 0 ? 'error.main' : 'text.secondary'
-                      }}>
+                      <Typography sx={EYEBROW_SX}>
                         PnL
                       </Typography>
                     </Box>
-                    <Box sx={{
-                      display: 'flex',
-                      flexDirection: { xs: 'column', sm: 'row' }, // Stack vertically on mobile
-                      justifyContent: 'space-between',
-                      alignItems: { xs: 'flex-start', sm: 'center' }, // Align left on mobile
-                      gap: { xs: 1, sm: 0 } // Add gap on mobile
-                    }}>
-                      <Typography variant="h6" sx={{
-                        fontWeight: 700,
-                        color: trade.amount > 0 ? 'success.main' : trade.amount < 0 ? 'error.main' : 'text.primary',
-                        fontSize: '1.1rem'
-                      }}>
-                        {trade.amount > 0 ? '+' : ''}{trade.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </Typography>
-
-
-                    </Box>
+                    <PnlValue
+                      amount={trade.amount}
+                      format={(n) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      size="lg"
+                    />
                   </Paper>
 
                   {/* Date */}
                   <Paper elevation={0} sx={{
+                    ...getInsetTileSx(theme),
                     p: { xs: 1, sm: 1.5 }, // Reduced padding on mobile
-                    borderRadius: 2,
-                    backgroundColor: alpha(theme.palette.primary.main, 0.05),
-                    border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
                     display: 'flex',
                     flexDirection: 'column',
                     gap: 0.5
                   }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                       <CalendarIcon sx={{ fontSize: 18, color: 'primary.main' }} />
-                      <Typography variant="caption" sx={{ fontWeight: 600, color: 'primary.main' }}>
+                      <Typography sx={EYEBROW_SX}>
                         {format(typeof trade.trade_date === 'string' ? parseISO(trade.trade_date) : trade.trade_date, 'EEEE')}
                       </Typography>
                     </Box>
                     <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
                       <Typography variant="h6" sx={{
                         fontWeight: 700,
-                        fontSize: { xs: '1rem', sm: '1.1rem' }
+                        fontSize: { xs: '1rem', sm: '1.1rem' },
+                        ...numberSx
                       }}>
                         {format(typeof trade.trade_date === 'string' ? parseISO(trade.trade_date) : trade.trade_date, 'MMMM d, yyyy')}
                       </Typography>
-                      
+
                     </Box>
                   </Paper>
 
                   {/* Risk to Reward */}
                   {trade.risk_to_reward && (
                     <Paper elevation={0} sx={{
+                      ...getInsetTileSx(theme),
                       p: { xs: 1, sm: 1.5 }, // Reduced padding on mobile
-                      borderRadius: 2,
-                      backgroundColor: alpha(theme.palette.warning.main, 0.05),
-                      border: `1px solid ${alpha(theme.palette.warning.main, 0.1)}`,
                       display: 'flex',
                       flexDirection: 'column',
                       gap: 0.5
                     }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                         <RiskIcon sx={{ fontSize: 18, color: 'warning.main' }} />
-                        <Typography variant="caption" sx={{ fontWeight: 600, color: 'warning.main' }}>
+                        <Typography sx={EYEBROW_SX}>
                           Risk to Reward
                         </Typography>
                       </Box>
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                        <Typography variant="h6" sx={{ fontWeight: 700, fontSize: '1.1rem' }}>
+                        <Typography variant="h6" sx={{ fontWeight: 700, fontSize: '1.1rem', ...numberSx }}>
                           {trade.risk_to_reward}
                         </Typography>
                         {trade.trade_type === 'win' && trade.risk_to_reward && (
                           <Typography variant="caption" sx={{
                             color: 'text.secondary',
                             fontSize: '0.75rem',
-                            fontWeight: 500
+                            fontWeight: 500,
+                            ...numberSx
                           }}>
                             Amount Risked: ${(() => {
                               const amountRisked = Math.abs(trade.amount) / trade.risk_to_reward;
@@ -571,17 +542,15 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                   {/* Session */}
                   {trade.session && (
                     <Paper elevation={0} sx={{
+                      ...getInsetTileSx(theme),
                       p: { xs: 1, sm: 1.5 }, // Reduced padding on mobile
-                      borderRadius: 2,
-                      backgroundColor: alpha(theme.palette.info.main, 0.05),
-                      border: `1px solid ${alpha(theme.palette.info.main, 0.1)}`,
                       display: 'flex',
                       flexDirection: 'column',
                       gap: 0.5
                     }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                         <SessionIcon sx={{ fontSize: 18, color: 'info.main' }} />
-                        <Typography variant="caption" sx={{ fontWeight: 600, color: 'info.main' }}>
+                        <Typography sx={EYEBROW_SX}>
                           Session
                         </Typography>
                       </Box>
@@ -599,7 +568,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                   <Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
                       <ImageIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-                      <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, display: 'block' }}>
+                      <Typography sx={{ ...EYEBROW_SX, display: 'block' }}>
                         Images
                       </Typography>
                     </Box>
@@ -815,7 +784,7 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                   <Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
                       <NoteIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-                      <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, display: 'block' }}>
+                      <Typography sx={{ ...EYEBROW_SX, display: 'block' }}>
                         Notes
                       </Typography>
                     </Box>
