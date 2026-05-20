@@ -7,6 +7,7 @@ import { Trade, Calendar } from 'features/calendar/types/dualWrite';
 import { DynamicRiskSettings } from 'features/calendar/utils/dynamicRiskUtils';
 import { EconomicCalendarFilterSettings } from 'features/events/hooks/useEconomicCalendarFilters';
 import { scrollbarStyles } from 'styles/scrollbarStyles';
+import { EYEBROW_SX } from 'styles/designTokens';
 import { useTheme } from '@mui/material/styles';
 import { useOverviewPanelState } from 'features/performance/contexts/OverviewPanelStateContext';
 
@@ -129,17 +130,7 @@ const StatsContent: React.FC<StatsContentProps> = ({
 
         {calendarId && (
           <Box>
-            <Typography
-              sx={{
-                px: 1,
-                pb: 0.75,
-                fontSize: '0.66rem',
-                fontWeight: 700,
-                letterSpacing: '0.08em',
-                textTransform: 'uppercase',
-                color: 'text.secondary',
-              }}
-            >
+            <Typography sx={{ ...EYEBROW_SX, px: 1, pb: 0.75 }}>
               Stats
             </Typography>
             <PerformanceCharts
