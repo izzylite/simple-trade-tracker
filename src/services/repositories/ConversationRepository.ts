@@ -19,11 +19,17 @@ import { supabase } from 'config/supabase';
 import { generateConversationTitle } from 'features/orion/utils/conversationTitle';
 
 /**
- * Pagination options for conversation queries
+ * Pagination options for conversation queries.
+ *
+ * `pinnedOnly` is server-side — when true, the query adds `pinned = true`
+ * to both the count and the row select, so pagination math reflects only
+ * the pinned subset. Client-side filtering after the fact would
+ * under-count when pinned matches happen to live past the first page.
  */
 export interface ConversationPaginationOptions {
   limit?: number;
   offset?: number;
+  pinnedOnly?: boolean;
 }
 
 /**
@@ -45,8 +51,21 @@ const parseDate = (dateValue: any, fallback: Date = new Date()): Date => {
 };
 
 /**
- * Transform Supabase conversation data to AIConversation type
- * Converts string dates to Date objects and serializable messages to ChatMessage
+ * Columns selected by the history-list queries. Deliberately excludes the
+ * heavy `messages` JSONB blob — the full thread is loaded lazily via
+ * `findById` when the user opens a conversation. `last_message_preview` is
+ * the denormalized snapshot rendered in the list.
+ */
+const LIST_COLUMNS =
+  'id, calendar_id, user_id, trade_id, title, message_count, pinned, ' +
+  'last_message_preview, created_at, updated_at';
+
+/**
+ * Transform Supabase conversation data to AIConversation type.
+ * Converts string dates to Date objects and serializable messages to
+ * ChatMessage. When the row was fetched by a list query (no `messages`
+ * column), leaves `messages` undefined — callers must call `findById` to
+ * hydrate the full thread instead of treating an absent array as empty.
  */
 const transformSupabaseConversation = (data: any): AIConversation => {
   return {
@@ -54,10 +73,12 @@ const transformSupabaseConversation = (data: any): AIConversation => {
     pinned: Boolean(data.pinned),
     created_at: parseDate(data.created_at),
     updated_at: parseDate(data.updated_at),
-    messages: data.messages ? data.messages.map((msg: SerializableChatMessage) => ({
-      ...msg,
-      timestamp: parseDate(msg.timestamp)
-    })) : []
+    messages: data.messages
+      ? data.messages.map((msg: SerializableChatMessage) => ({
+          ...msg,
+          timestamp: parseDate(msg.timestamp)
+        }))
+      : undefined
   } as AIConversation;
 };
 
@@ -116,14 +137,17 @@ export class ConversationRepository extends AbstractBaseRepository<AIConversatio
     const DEFAULT_LIMIT = 15;
     const limit = options?.limit ?? DEFAULT_LIMIT;
     const offset = options?.offset ?? 0;
+    const pinnedOnly = options?.pinnedOnly === true;
 
     try {
       // Get total count first
-      const { count, error: countError } = await supabase
+      let countQuery = supabase
         .from('ai_conversations')
         .select('*', { count: 'exact', head: true })
         .eq('calendar_id', calendarId)
         .is('trade_id', null);
+      if (pinnedOnly) countQuery = countQuery.eq('pinned', true);
+      const { count, error: countError } = await countQuery;
 
       if (countError) {
         logger.error('Error counting conversations by calendar ID:', countError);
@@ -132,12 +156,14 @@ export class ConversationRepository extends AbstractBaseRepository<AIConversatio
 
       const totalCount = count ?? 0;
 
-      // Get paginated data
-      const { data, error } = await supabase
+      // Get paginated data — list shape only (no `messages` blob).
+      let dataQuery = supabase
         .from('ai_conversations')
-        .select('*')
+        .select(LIST_COLUMNS)
         .eq('calendar_id', calendarId)
-        .is('trade_id', null)
+        .is('trade_id', null);
+      if (pinnedOnly) dataQuery = dataQuery.eq('pinned', true);
+      const { data, error } = await dataQuery
         .order('updated_at', { ascending: false })
         .range(offset, offset + limit - 1);
 
@@ -169,13 +195,16 @@ export class ConversationRepository extends AbstractBaseRepository<AIConversatio
     const DEFAULT_LIMIT = 15;
     const limit = options?.limit ?? DEFAULT_LIMIT;
     const offset = options?.offset ?? 0;
+    const pinnedOnly = options?.pinnedOnly === true;
 
     try {
       // Get total count first
-      const { count, error: countError } = await supabase
+      let countQuery = supabase
         .from('ai_conversations')
         .select('*', { count: 'exact', head: true })
         .eq('trade_id', tradeId);
+      if (pinnedOnly) countQuery = countQuery.eq('pinned', true);
+      const { count, error: countError } = await countQuery;
 
       if (countError) {
         logger.error('Error counting conversations by trade ID:', countError);
@@ -184,11 +213,13 @@ export class ConversationRepository extends AbstractBaseRepository<AIConversatio
 
       const totalCount = count ?? 0;
 
-      // Get paginated data
-      const { data, error } = await supabase
+      // Get paginated data — list shape only (no `messages` blob).
+      let dataQuery = supabase
         .from('ai_conversations')
-        .select('*')
-        .eq('trade_id', tradeId)
+        .select(LIST_COLUMNS)
+        .eq('trade_id', tradeId);
+      if (pinnedOnly) dataQuery = dataQuery.eq('pinned', true);
+      const { data, error } = await dataQuery
         .order('updated_at', { ascending: false })
         .range(offset, offset + limit - 1);
 
@@ -241,14 +272,17 @@ export class ConversationRepository extends AbstractBaseRepository<AIConversatio
     const DEFAULT_LIMIT = 15;
     const limit = options?.limit ?? DEFAULT_LIMIT;
     const offset = options?.offset ?? 0;
+    const pinnedOnly = options?.pinnedOnly === true;
 
     try {
-      const { count, error: countError } = await supabase
+      let countQuery = supabase
         .from('ai_conversations')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', userId)
         .is('calendar_id', null)
         .is('trade_id', null);
+      if (pinnedOnly) countQuery = countQuery.eq('pinned', true);
+      const { count, error: countError } = await countQuery;
 
       if (countError) {
         logger.error('Error counting user-level conversations:', countError);
@@ -257,12 +291,14 @@ export class ConversationRepository extends AbstractBaseRepository<AIConversatio
 
       const totalCount = count ?? 0;
 
-      const { data, error } = await supabase
+      let dataQuery = supabase
         .from('ai_conversations')
-        .select('*')
+        .select(LIST_COLUMNS)
         .eq('user_id', userId)
         .is('calendar_id', null)
-        .is('trade_id', null)
+        .is('trade_id', null);
+      if (pinnedOnly) dataQuery = dataQuery.eq('pinned', true);
+      const { data, error } = await dataQuery
         .order('updated_at', { ascending: false })
         .range(offset, offset + limit - 1);
 
@@ -282,6 +318,117 @@ export class ConversationRepository extends AbstractBaseRepository<AIConversatio
       };
     } catch (error) {
       logger.error('Error loading user-level conversations:', error);
+      return { conversations: [], totalCount: 0, hasMore: false };
+    }
+  }
+
+  /**
+   * Scope for server-side text search. Mirrors the three list contexts
+   * (`findByCalendarId`, `findByTradeId`, `findUserLevel`) so search
+   * results respect the same boundaries as the list the user is browsing.
+   */
+  // (kept inline to avoid leaking another export from this file)
+  // searchConversations dispatches on `kind` below.
+
+  /**
+   * Server-side ILIKE search against the denormalized `searchable` column
+   * (title + every message's content). Indexed via pg_trgm GIN so it stays
+   * fast at scale. List shape only — no `messages` blob; selecting a
+   * result still hits `findById` for the full thread.
+   *
+   * Wildcards (`%`, `_`, `\`) are stripped from the query so user typing
+   * doesn't accidentally trigger pattern matching. Short queries (< 2
+   * chars) return an empty result rather than scanning the whole table.
+   */
+  async searchConversations(
+    scope:
+      | { kind: 'calendar'; calendarId: string }
+      | { kind: 'trade'; tradeId: string }
+      | { kind: 'user'; userId: string },
+    query: string,
+    options?: ConversationPaginationOptions
+  ): Promise<PaginatedConversations> {
+    const DEFAULT_LIMIT = 15;
+    const limit = options?.limit ?? DEFAULT_LIMIT;
+    const offset = options?.offset ?? 0;
+    const pinnedOnly = options?.pinnedOnly === true;
+
+    const sanitized = query.replace(/[\\%_]/g, '').trim();
+    if (sanitized.length < 2) {
+      return { conversations: [], totalCount: 0, hasMore: false };
+    }
+    const pattern = `%${sanitized}%`;
+
+    try {
+      // Scope filter applied inline to both queries — Supabase JS's filter
+      // builder isn't typed in a way that lets us factor it into a shared
+      // helper without `any`-casting, so we just repeat the three branches.
+      const buildCountQuery = () => {
+        let q = supabase
+          .from('ai_conversations')
+          .select('*', { count: 'exact', head: true })
+          .ilike('searchable', pattern);
+        if (scope.kind === 'calendar') {
+          q = q.eq('calendar_id', scope.calendarId).is('trade_id', null);
+        } else if (scope.kind === 'trade') {
+          q = q.eq('trade_id', scope.tradeId);
+        } else {
+          q = q
+            .eq('user_id', scope.userId)
+            .is('calendar_id', null)
+            .is('trade_id', null);
+        }
+        if (pinnedOnly) q = q.eq('pinned', true);
+        return q;
+      };
+
+      const buildDataQuery = () => {
+        let q = supabase
+          .from('ai_conversations')
+          .select(LIST_COLUMNS)
+          .ilike('searchable', pattern);
+        if (scope.kind === 'calendar') {
+          q = q.eq('calendar_id', scope.calendarId).is('trade_id', null);
+        } else if (scope.kind === 'trade') {
+          q = q.eq('trade_id', scope.tradeId);
+        } else {
+          q = q
+            .eq('user_id', scope.userId)
+            .is('calendar_id', null)
+            .is('trade_id', null);
+        }
+        if (pinnedOnly) q = q.eq('pinned', true);
+        return q;
+      };
+
+      const { count, error: countError } = await buildCountQuery();
+      if (countError) {
+        logger.error('Error counting search results:', countError);
+        return { conversations: [], totalCount: 0, hasMore: false };
+      }
+
+      const totalCount = count ?? 0;
+
+      const { data, error } = await buildDataQuery()
+        .order('updated_at', { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      if (error) {
+        logger.error('Error running conversation search:', error);
+        return { conversations: [], totalCount, hasMore: false };
+      }
+
+      const conversations = data
+        ? data.map((item: unknown) => transformSupabaseConversation(item))
+        : [];
+
+      return {
+        conversations,
+        totalCount,
+        hasMore: offset + conversations.length < totalCount
+      };
+    } catch (error) {
+      logger.error('Error running conversation search:', error);
       return { conversations: [], totalCount: 0, hasMore: false };
     }
   }
@@ -320,7 +467,11 @@ export class ConversationRepository extends AbstractBaseRepository<AIConversatio
 
     // Generate title if not provided. The shared util takes the raw first
     // user message content (slash-command framing is stripped inside).
-    const firstUserMessage = entity.messages.find(m => m.role === 'user');
+    // `messages` is optional on AIConversation (list rows omit it) but
+    // create callers always supply the initial messages array — fall back
+    // to [] defensively so TypeScript is satisfied for the new optional type.
+    const entityMessages = entity.messages ?? [];
+    const firstUserMessage = entityMessages.find(m => m.role === 'user');
     const title = entity.title
       || generateConversationTitle(firstUserMessage?.content);
 
@@ -328,7 +479,7 @@ export class ConversationRepository extends AbstractBaseRepository<AIConversatio
       calendar_id: entity.calendar_id,
       user_id: entity.user_id,
       title: title.substring(0, 100), // Enforce max length
-      messages: serializeMessages(entity.messages),
+      messages: serializeMessages(entityMessages),
       message_count: entity.message_count,
       created_at: now,
       updated_at: now

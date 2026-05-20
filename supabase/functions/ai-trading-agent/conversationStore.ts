@@ -153,9 +153,18 @@ export async function appendUserMessage(
   // 0 so the next assistant-message persist triggers a fresh embed once
   // messages.length crosses the threshold. Also NULL the embedding itself
   // so search doesn't surface stale results in the interim.
+  // `last_message_preview` is a denormalized snapshot of the last message's
+  // content (≤200 chars) so the history list query can drop the full
+  // `messages` JSONB blob. Source it from the actual last entry in
+  // nextMessages — for normal sends that's the user message, but on
+  // edit-resend with preserved reminder fires the last entry is the
+  // most recent reminder fire instead.
+  const lastMsg = nextMessages[nextMessages.length - 1] as { content?: unknown } | undefined;
+  const lastContent = typeof lastMsg?.content === 'string' ? lastMsg.content : '';
   const updatePayload: Record<string, unknown> = {
     messages: nextMessages,
     message_count: nextMessages.length,
+    last_message_preview: lastContent ? lastContent.slice(0, 200) : null,
     updated_at: new Date().toISOString(),
   };
   if (truncated) {
@@ -229,9 +238,13 @@ export async function appendAssistantMessage(
   const next = [...existing, assistantMessage];
   const currentCount = Number(convo.message_count ?? 0);
 
+  const assistantContent = typeof assistantMessage.content === 'string'
+    ? assistantMessage.content
+    : '';
   const updatePayload: Record<string, unknown> = {
     messages: next,
     message_count: currentCount + 1,
+    last_message_preview: assistantContent ? assistantContent.slice(0, 200) : null,
     updated_at: new Date().toISOString(),
   };
   if (typeof promptTokenCount === 'number' && promptTokenCount > 0) {

@@ -2177,6 +2177,7 @@ async function handleReminderRequest(req: Request, body: AgentRequest): Promise<
   const appendPayload: Record<string, unknown> = {
     messages: [...existingMessages, newMessage],
     message_count: currentCount + 1,
+    last_message_preview: finalText ? finalText.slice(0, 200) : null,
   };
   if (nextTurnEstimate > 0) {
     appendPayload.last_prompt_tokens = nextTurnEstimate;

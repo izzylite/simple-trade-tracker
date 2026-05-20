@@ -75,14 +75,21 @@ export interface SerializableChatMessage extends Omit<ChatMessage, 'timestamp'> 
   images?: AttachedImage[]; // Images are already serializable
 }
 
-// Conversation stored in database (after transformation from repository)
+// Conversation stored in database (after transformation from repository).
+// `messages` is optional because list queries (findByCalendarId etc.) drop
+// the heavy JSONB blob to keep the history payload small — callers that need
+// the full thread fetch via `findById` after the user opens a conversation.
+// `last_message_preview` is a denormalized snapshot (≤200 chars) of the last
+// message's content, written by the edge function on every append; it's what
+// the history list renders in place of the full messages array.
 export interface AIConversation {
   id: string;
   calendar_id: string;
   user_id: string;
   trade_id?: string | null; // Optional: NULL = calendar-level, set = trade-specific
   title: string;
-  messages: ChatMessage[]; // Transformed to ChatMessage with Date objects
+  messages?: ChatMessage[]; // Present on findById; absent on list queries
+  last_message_preview?: string | null;
   message_count: number;
   pinned: boolean;
   created_at: Date;
@@ -96,7 +103,8 @@ export interface SerializableAIConversation {
   user_id: string;
   trade_id?: string | null; // Optional: NULL = calendar-level, set = trade-specific
   title: string;
-  messages: SerializableChatMessage[]; // Messages with string timestamps
+  messages?: SerializableChatMessage[];
+  last_message_preview?: string | null;
   message_count: number;
   pinned: boolean;
   created_at: string;

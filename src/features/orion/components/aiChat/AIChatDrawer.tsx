@@ -164,7 +164,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
         // (priorId === null). The back-arrow appears in both cases; the
         // handler picks the right restore action based on the captured id.
         setDeepLinkOrigin({ conversationId: priorId ?? null });
-        effectiveChatState.selectConversation(convo);
+        void effectiveChatState.selectConversation(convo);
         setScrollToMessageId(pendingDeepLink.messageId ?? null);
         onDeepLinkConsumed?.();
       })
@@ -212,7 +212,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
       .findById(origin.conversationId)
       .then((convo) => {
         if (convo) {
-          effectiveChatState.selectConversation(convo);
+          void effectiveChatState.selectConversation(convo);
         } else {
           logger.warn(
             'AIChatDrawer return-to-previous: conversation not found',

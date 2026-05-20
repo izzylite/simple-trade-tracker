@@ -20,6 +20,7 @@ import {
   TextField,
   InputAdornment,
   CircularProgress,
+  Skeleton,
 } from '@mui/material';
 import {
   Delete as DeleteIcon,
@@ -195,6 +196,7 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
     conversations,
     loadingConversations,
     loadingMoreConversations,
+    loadingMessages,
     hasMoreConversations,
     totalConversationsCount,
     isAtContextLimit,
@@ -205,6 +207,9 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
     setInputForEdit,
     loadConversations,
     loadMoreConversations,
+    searchConversations,
+    pinnedOnly,
+    setPinnedFilter,
     selectConversation,
     currentConversationId,
     deleteConversation,
@@ -242,8 +247,9 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
   const [conversationToDelete, setConversationToDelete] =
     useState<string | null>(null);
   const [historySearchQuery, setHistorySearchQuery] = useState('');
-  const [historyFilter, setHistoryFilter] =
-    useState<'all' | 'pinned'>('all');
+  // Pinned filter is owned by useAIChat now (server-side filter via
+  // `.eq('pinned', true)`). The chip's visual selected state derives from
+  // the hook's `pinnedOnly` value.
 
   // Economic event detail dialog state
   const [selectedEvent, setSelectedEvent] =
@@ -258,33 +264,20 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
   // tags pre-selected. Used by the "New Slash Command" system command.
   const [newNoteInitialTags, setNewNoteInitialTags] = useState<string[] | null>(null);
 
-  // Filter conversations based on search query + pinned filter
-  const filteredConversations = useMemo(() => {
-    const scoped = historyFilter === 'pinned'
-      ? conversations.filter(c => c.pinned)
-      : conversations;
+  // Both text search and pinned filter are server-side now, so the
+  // hook's `conversations` already reflects both filters. No client-side
+  // filtering layer needed.
 
-    if (!historySearchQuery.trim()) {
-      return scoped;
-    }
-    const query = historySearchQuery.toLowerCase();
-    return scoped.filter(conversation => {
-      if (conversation.title?.toLowerCase().includes(query)) {
-        return true;
-      }
-      if (
-        (conversation as any).preview?.toLowerCase().includes(query)
-      ) {
-        return true;
-      }
-      if (conversation.messages && Array.isArray(conversation.messages)) {
-        return conversation.messages.some(message =>
-          message.content?.toLowerCase().includes(query)
-        );
-      }
-      return false;
-    });
-  }, [conversations, historySearchQuery, historyFilter]);
+  // Debounce text-search input → server. 250ms is the standard "feels
+  // immediate" window without firing a request on every keystroke. The
+  // hook short-circuits sub-2-char queries and treats empty as "exit
+  // search mode and reload the default list".
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void searchConversations(historySearchQuery);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [historySearchQuery, searchConversations]);
 
   // Focus input when content becomes active
   useEffect(() => {
@@ -403,7 +396,11 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
   };
 
   const handleSelectConversation = (conversation: AIConversation) => {
-    selectConversation(conversation);
+    // Fire-and-forget — selectConversation now lazy-loads messages internally
+    // and surfaces progress via `loadingMessages`. Closing history right away
+    // keeps the interaction snappy; the chat surface renders skeletons until
+    // the fetch resolves.
+    void selectConversation(conversation);
     setShowHistoryView(false);
   };
 
@@ -442,11 +439,11 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
   const handleNavigateFromReminder = async (conversationId: string) => {
     const cached = conversations.find(c => c.id === conversationId);
     if (cached) {
-      selectConversation(cached);
+      await selectConversation(cached);
     } else {
       const fetched = await conversationRepoRef.current.findById(conversationId);
       if (fetched) {
-        selectConversation(fetched);
+        await selectConversation(fetched);
       } else {
         logger.warn(
           'Reminder target conversation not found:', conversationId
@@ -490,18 +487,14 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
   };
 
   const getPreviewText = (conversation: AIConversation): string => {
-    const firstUserMessage =
-      conversation.messages.find(msg => msg.role === 'user');
-    if (!firstUserMessage || !firstUserMessage.content) return 'No messages';
+    // Read from the denormalized `last_message_preview` column — list rows
+    // don't carry the full messages array anymore. Strip any [Referenced …:]
+    // block framing so command/note invocations don't leak into the sidebar,
+    // matching the prior client-side rendering.
+    const raw = conversation.last_message_preview ?? '';
+    if (!raw) return 'No messages';
 
-    const raw = firstUserMessage.content;
-    // Strip [Referenced …:] block syntax so the preview reads naturally
-    // instead of leaking "[Referenced command: …]" into the sidebar.
     let preview = stripReferencedBlocks(raw).trim();
-    // Bare invocation (no typed text): fall back to the body of the first
-    // block so the user sees what the command/note actually says.
-    // Handles both old format `[Referenced command:\n` and new format
-    // `[Referenced command "Title":\n`.
     if (!preview) {
       const firstBlockBody = raw.match(
         /\[Referenced (?:command|note)(?:\s+"[^"]*")?:\n([\s\S]*?)\n\]/
@@ -542,8 +535,72 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
           height: '100%',
           display: 'flex',
           flexDirection: 'column',
-          overflow: 'hidden'
+          overflow: 'hidden',
+          position: 'relative',
         }}>
+            {/* Skeleton overlay while the lazy `findById` for a freshly
+                selected conversation resolves. Covers the entire chat
+                surface (including the input) — the user can't usefully
+                type until the messages have hydrated. Mimics the bubble
+                layout so the eye lands where the real content will appear. */}
+            {loadingMessages && (
+              <Box
+                sx={{
+                  position: 'absolute',
+                  inset: 0,
+                  backgroundColor: theme.palette.background.default,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 1.75,
+                  px: 2.5,
+                  pt: 2.5,
+                  pb: 2,
+                  overflow: 'hidden',
+                  zIndex: 15,
+                }}
+              >
+                {/* user bubble — right aligned */}
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <Skeleton
+                    variant="rounded"
+                    animation="wave"
+                    width="58%"
+                    height={44}
+                    sx={{ borderRadius: 2 }}
+                  />
+                </Box>
+                {/* assistant bubble — left aligned, taller */}
+                <Box sx={{ display: 'flex', justifyContent: 'flex-start' }}>
+                  <Skeleton
+                    variant="rounded"
+                    animation="wave"
+                    width="82%"
+                    height={96}
+                    sx={{ borderRadius: 2 }}
+                  />
+                </Box>
+                {/* user bubble — right aligned, shorter */}
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <Skeleton
+                    variant="rounded"
+                    animation="wave"
+                    width="42%"
+                    height={32}
+                    sx={{ borderRadius: 2 }}
+                  />
+                </Box>
+                {/* assistant bubble — left aligned */}
+                <Box sx={{ display: 'flex', justifyContent: 'flex-start' }}>
+                  <Skeleton
+                    variant="rounded"
+                    animation="wave"
+                    width="70%"
+                    height={68}
+                    sx={{ borderRadius: 2 }}
+                  />
+                </Box>
+              </Box>
+            )}
             <AIChatInterface
               ref={chatInterfaceRef}
               messages={messages}
@@ -643,20 +700,22 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
                 }}
                 sx={inputSx}
               />
-              {/* Filter pills — mirror chipStyle() language */}
+              {/* Filter pills — mirror chipStyle() language. Clicks call
+                  through to the hook so the server-side filter applies
+                  to both default and search modes. */}
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
                 <Box
                   component="span"
                   role="button"
                   tabIndex={0}
-                  onClick={() => setHistoryFilter('all')}
+                  onClick={() => { void setPinnedFilter(false); }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault();
-                      setHistoryFilter('all');
+                      void setPinnedFilter(false);
                     }
                   }}
-                  sx={chipStyle(historyFilter === 'all')}
+                  sx={chipStyle(!pinnedOnly)}
                 >
                   All
                 </Box>
@@ -664,14 +723,14 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
                   component="span"
                   role="button"
                   tabIndex={0}
-                  onClick={() => setHistoryFilter('pinned')}
+                  onClick={() => { void setPinnedFilter(true); }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault();
-                      setHistoryFilter('pinned');
+                      void setPinnedFilter(true);
                     }
                   }}
-                  sx={chipStyle(historyFilter === 'pinned')}
+                  sx={chipStyle(pinnedOnly)}
                 >
                   <PushPinIcon sx={{ fontSize: 13 }} />
                   Pinned
@@ -687,19 +746,19 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
             }}>
               {loadingConversations ? (
                 <EconomicEventShimmer count={10} />
-              ) : filteredConversations.length === 0 ? (
+              ) : conversations.length === 0 ? (
                 <Box sx={{ p: 3 }}>
                   <Alert severity="info">
                     {historySearchQuery.trim()
                       ? `No conversations found matching "${historySearchQuery}"`
-                      : historyFilter === 'pinned'
+                      : pinnedOnly
                         ? 'No pinned conversations yet. Pin a conversation from the list to keep it handy.'
                         : 'No conversation history yet. Start chatting with the AI to create your first conversation!'}
                   </Alert>
                 </Box>
               ) : (
                 <List sx={{ p: 0, px: 1.5, pt: 0.5 }}>
-                  {filteredConversations.map((conversation) => {
+                  {conversations.map((conversation) => {
                     const isActive = conversation.id === currentConversationId;
                     return (
                       <ListItem

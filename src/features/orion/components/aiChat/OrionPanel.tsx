@@ -29,6 +29,7 @@ import {
   Alert,
   alpha,
   useTheme,
+  Skeleton,
 } from '@mui/material';
 import {
   Close as CloseIcon,
@@ -73,7 +74,13 @@ interface AIChatBundle {
   getWelcomeMessage: () => ChatMessageType;
   conversations: AIConversation[];
   loadingConversations: boolean;
-  selectConversation: (conversation: AIConversation) => void;
+  /** True while the messages JSONB for the just-selected conversation is
+   *  being fetched. Drives the skeleton bubbles in the chat surface. */
+  loadingMessages: boolean;
+  /** Server-side pinned-only filter for the history list. */
+  pinnedOnly: boolean;
+  setPinnedFilter: (value: boolean) => Promise<void>;
+  selectConversation: (conversation: AIConversation) => Promise<void>;
   deleteConversation: (conversationId: string) => Promise<boolean>;
 }
 
@@ -94,14 +101,11 @@ interface OrionPanelProps {
 }
 
 const getPreviewText = (conversation: AIConversation): string => {
-  const firstUserMessage = conversation.messages.find((msg) => msg.role === 'user');
-  if (firstUserMessage && firstUserMessage.content) {
-    return (
-      firstUserMessage.content.substring(0, 80) +
-      (firstUserMessage.content.length > 80 ? '...' : '')
-    );
-  }
-  return 'No messages';
+  // Read from the denormalized `last_message_preview` column — list rows
+  // no longer carry the full `messages` array (loaded lazily on selection).
+  const raw = conversation.last_message_preview ?? '';
+  if (!raw) return 'No messages';
+  return raw.length > 80 ? `${raw.substring(0, 80)}...` : raw;
 };
 
 const OrionPanel: React.FC<OrionPanelProps> = ({
@@ -127,7 +131,10 @@ const OrionPanel: React.FC<OrionPanelProps> = ({
 
   const handleSelectConversation = useCallback(
     (conversation: AIConversation) => {
-      aiChat.selectConversation(conversation);
+      // Fire-and-forget — `selectConversation` lazy-loads the full messages
+      // and exposes progress via `aiChat.loadingMessages`. Toggling history
+      // immediately keeps the click responsive while the fetch resolves.
+      void aiChat.selectConversation(conversation);
       onToggleHistory();
     },
     [aiChat, onToggleHistory],
@@ -269,6 +276,7 @@ const OrionPanel: React.FC<OrionPanelProps> = ({
                 display: 'flex',
                 flexDirection: 'column',
                 overflow: 'hidden',
+                position: 'relative',
                 '& .MuiTypography-body1': { fontSize: '0.82rem', lineHeight: 1.45 },
                 '& .MuiTypography-body2': { fontSize: '0.76rem', lineHeight: 1.4 },
                 '& .MuiTypography-caption': { fontSize: '0.65rem', lineHeight: 1.35 },
@@ -300,6 +308,40 @@ const OrionPanel: React.FC<OrionPanelProps> = ({
                 onNoteClick={onNoteClick}
                 isReadOnly={isReadOnly}
               />
+              {/* Skeleton overlay while a just-selected conversation's full
+                  messages lazy-load. Mirrors AIChatContent's overlay so the
+                  trade-gallery / event-detail focus panel gets the same
+                  hydration feedback. */}
+              {aiChat.loadingMessages && (
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    inset: 0,
+                    backgroundColor: theme.palette.background.default,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 1.5,
+                    px: 2,
+                    pt: 2,
+                    pb: 1.5,
+                    overflow: 'hidden',
+                    zIndex: 15,
+                  }}
+                >
+                  <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <Skeleton variant="rounded" animation="wave" width="58%" height={38} sx={{ borderRadius: 2 }} />
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'flex-start' }}>
+                    <Skeleton variant="rounded" animation="wave" width="82%" height={80} sx={{ borderRadius: 2 }} />
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <Skeleton variant="rounded" animation="wave" width="42%" height={28} sx={{ borderRadius: 2 }} />
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'flex-start' }}>
+                    <Skeleton variant="rounded" animation="wave" width="70%" height={58} sx={{ borderRadius: 2 }} />
+                  </Box>
+                </Box>
+              )}
             </Box>
 
             {/* History View */}

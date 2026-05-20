@@ -101,6 +101,9 @@ export interface UseAIChatReturn {
   conversations: AIConversation[];
   loadingConversations: boolean;
   loadingMoreConversations: boolean;
+  /** True while the messages JSONB for the just-selected conversation is
+   *  being fetched. Drives the skeleton bubbles in the chat surface. */
+  loadingMessages: boolean;
   hasMoreConversations: boolean;
   totalConversationsCount: number;
   /** True once estimated tokens reach `tokenBudget` — input is locked. */
@@ -121,7 +124,16 @@ export interface UseAIChatReturn {
   // Conversation management
   loadConversations: () => Promise<void>;
   loadMoreConversations: () => Promise<void>;
-  selectConversation: (conversation: AIConversation) => void;
+  /** Run a server-side ILIKE search against the `searchable` column (scoped
+   *  to the current context — calendar / trade / userLevel) and swap the
+   *  history list with the results. Pass an empty / sub-2-char string to
+   *  exit search mode and reload the default first page. */
+  searchConversations: (query: string) => Promise<void>;
+  /** Server-side pinned-only filter (true ⇒ list only pinned). */
+  pinnedOnly: boolean;
+  /** Toggle the pinned filter and trigger a reload in the current mode. */
+  setPinnedFilter: (value: boolean) => Promise<void>;
+  selectConversation: (conversation: AIConversation) => Promise<void>;
   deleteConversation: (conversationId: string) => Promise<boolean>;
   togglePinConversation: (conversationId: string) => Promise<boolean>;
   startNewChat: () => Promise<void>;
@@ -164,7 +176,28 @@ export function useAIChat({
   const [conversations, setConversations] = useState<AIConversation[]>([]);
   const [loadingConversations, setLoadingConversations] = useState(false);
   const [loadingMoreConversations, setLoadingMoreConversations] = useState(false);
+  const [loadingMessages, setLoadingMessages] = useState(false);
   const [hasMoreConversations, setHasMoreConversations] = useState(false);
+  // When non-null, the history list reflects server-side search results
+  // for this query (scoped to the current calendar/trade/userLevel).
+  // `loadMoreConversations` consults this to decide which paginator to call.
+  // Cleared by `loadConversations()` and by `searchConversations('')`.
+  const [searchQuery, setSearchQuery] = useState<string | null>(null);
+  const searchQueryRef = useRef<string | null>(null);
+  searchQueryRef.current = searchQuery;
+  // Server-side pinned-only filter. Mirrored to a ref so the loadMore /
+  // search callbacks can read the current value without rebinding on every
+  // toggle (they already depend on enough things).
+  const [pinnedOnly, setPinnedOnlyState] = useState(false);
+  const pinnedOnlyRef = useRef(false);
+  pinnedOnlyRef.current = pinnedOnly;
+  // Monotonic request token. Every conversation list fetch (load / search /
+  // loadMore) increments this and checks it before writing — so if a newer
+  // fetch started before an older one resolves (rapid filter toggle, scope
+  // switch mid-loadMore, search debounce overlap), the older write is
+  // discarded. Prevents stale-overwrite flicker that the query-only guards
+  // can't catch when scope changes between fetches.
+  const loadTokenRef = useRef(0);
   const [totalConversationsCount, setTotalConversationsCount] = useState(0);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   // Recomputes on every messages identity change. The heuristic is cheap
@@ -310,27 +343,52 @@ export function useAIChat({
   }, [currentConversationId, conversationRepo]);
 
   /**
+   * Resolve the active history scope from the current chat context.
+   * Centralized so loadConversations, loadMoreConversations, and
+   * searchConversations all dispatch identically.
+   */
+  const getActiveScope = useCallback(():
+    | { kind: 'trade'; tradeId: string }
+    | { kind: 'calendar'; calendarId: string }
+    | { kind: 'user'; userId: string }
+    | null => {
+    if (trade?.id) return { kind: 'trade', tradeId: trade.id };
+    if (calendar?.id && !saveAsUserLevel) {
+      return { kind: 'calendar', calendarId: calendar.id };
+    }
+    if (userId) return { kind: 'user', userId };
+    return null;
+  }, [trade?.id, calendar?.id, saveAsUserLevel, userId]);
+
+  /**
    * Load conversations - either trade-specific or calendar-level
    * If trade is provided: loads trade-specific conversations
    * If only calendar: loads calendar-level conversations (without trade_id)
-   * Resets pagination and loads first page
+   * Resets pagination and loads first page. Also exits search mode if
+   * the caller was in it — calendar/trade context changes should always
+   * land on the default list.
    */
   const loadConversations = useCallback(async () => {
+    setSearchQuery(null);
+    const pinned = pinnedOnlyRef.current;
+    const token = ++loadTokenRef.current;
     // Trade-specific: load conversations for this trade
     if (trade?.id) {
       setLoadingConversations(true);
       try {
         const result = await conversationRepo.findByTradeId(trade.id, {
           limit: CONVERSATIONS_PAGE_SIZE,
-          offset: 0
+          offset: 0,
+          pinnedOnly: pinned,
         });
+        if (token !== loadTokenRef.current) return;
         setConversations(result.conversations);
         setHasMoreConversations(result.hasMore);
         setTotalConversationsCount(result.totalCount);
       } catch (error) {
         logger.error('Error loading trade conversations:', error);
       } finally {
-        setLoadingConversations(false);
+        if (token === loadTokenRef.current) setLoadingConversations(false);
       }
       return;
     }
@@ -342,15 +400,17 @@ export function useAIChat({
       try {
         const result = await conversationRepo.findByCalendarId(calendar.id, {
           limit: CONVERSATIONS_PAGE_SIZE,
-          offset: 0
+          offset: 0,
+          pinnedOnly: pinned,
         });
+        if (token !== loadTokenRef.current) return;
         setConversations(result.conversations);
         setHasMoreConversations(result.hasMore);
         setTotalConversationsCount(result.totalCount);
       } catch (error) {
         logger.error('Error loading conversations:', error);
       } finally {
-        setLoadingConversations(false);
+        if (token === loadTokenRef.current) setLoadingConversations(false);
       }
       return;
     }
@@ -362,26 +422,98 @@ export function useAIChat({
     try {
       const result = await conversationRepo.findUserLevel(userId, {
         limit: CONVERSATIONS_PAGE_SIZE,
-        offset: 0
+        offset: 0,
+        pinnedOnly: pinned,
       });
+      if (token !== loadTokenRef.current) return;
       setConversations(result.conversations);
       setHasMoreConversations(result.hasMore);
       setTotalConversationsCount(result.totalCount);
     } catch (error) {
       logger.error('Error loading user-level conversations:', error);
     } finally {
-      setLoadingConversations(false);
+      if (token === loadTokenRef.current) setLoadingConversations(false);
     }
   }, [userId, calendar?.id, trade?.id, conversationRepo]);
 
   /**
-   * Load more conversations (pagination)
-   * Appends to existing conversations list
+   * Run a server-side search against the `searchable` column and replace
+   * the history list with the matches. Pass an empty / sub-2-char query
+   * to exit search mode and restore the default list. The UI is expected
+   * to debounce calls — every keystroke would otherwise hit Postgres.
+   */
+  const searchConversations = useCallback(async (query: string) => {
+    const trimmed = query.trim();
+    if (trimmed.length < 2) {
+      // Exiting search mode — fall back to the default loader.
+      if (searchQueryRef.current !== null) {
+        await loadConversations();
+      }
+      return;
+    }
+
+    const scope = getActiveScope();
+    if (!scope) return;
+
+    setSearchQuery(trimmed);
+    setLoadingConversations(true);
+    const token = ++loadTokenRef.current;
+    try {
+      const result = await conversationRepo.searchConversations(scope, trimmed, {
+        limit: CONVERSATIONS_PAGE_SIZE,
+        offset: 0,
+        pinnedOnly: pinnedOnlyRef.current,
+      });
+      // Guard against out-of-order responses or any newer fetch (search
+      // typed further, scope changed, pinned toggled). The token check
+      // subsumes the query-only check.
+      if (token !== loadTokenRef.current) return;
+      setConversations(result.conversations);
+      setHasMoreConversations(result.hasMore);
+      setTotalConversationsCount(result.totalCount);
+    } catch (error) {
+      logger.error('Error searching conversations:', error);
+    } finally {
+      if (token === loadTokenRef.current) setLoadingConversations(false);
+    }
+  }, [getActiveScope, conversationRepo, loadConversations]);
+
+  /**
+   * Load more conversations (pagination).
+   * Dispatches by current mode: search results when a query is active,
+   * otherwise the default list scoped to trade/calendar/userLevel.
    */
   const loadMoreConversations = useCallback(async () => {
     if (loadingMoreConversations || !hasMoreConversations) return;
 
     const currentOffset = conversations.length;
+    const pinned = pinnedOnlyRef.current;
+    // Same token gate as load/search — if a fresh load fires while this
+    // append is in flight (filter toggle, calendar switch, new search),
+    // the in-flight append should NOT clobber the new list.
+    const token = ++loadTokenRef.current;
+
+    // Search mode: paginate the search results, not the default list.
+    if (searchQuery) {
+      const scope = getActiveScope();
+      if (!scope) return;
+      setLoadingMoreConversations(true);
+      try {
+        const result = await conversationRepo.searchConversations(scope, searchQuery, {
+          limit: CONVERSATIONS_PAGE_SIZE,
+          offset: currentOffset,
+          pinnedOnly: pinned,
+        });
+        if (token !== loadTokenRef.current) return;
+        setConversations(prev => [...prev, ...result.conversations]);
+        setHasMoreConversations(result.hasMore);
+      } catch (error) {
+        logger.error('Error loading more search results:', error);
+      } finally {
+        if (token === loadTokenRef.current) setLoadingMoreConversations(false);
+      }
+      return;
+    }
 
     // Trade-specific
     if (trade?.id) {
@@ -389,14 +521,16 @@ export function useAIChat({
       try {
         const result = await conversationRepo.findByTradeId(trade.id, {
           limit: CONVERSATIONS_PAGE_SIZE,
-          offset: currentOffset
+          offset: currentOffset,
+          pinnedOnly: pinned,
         });
+        if (token !== loadTokenRef.current) return;
         setConversations(prev => [...prev, ...result.conversations]);
         setHasMoreConversations(result.hasMore);
       } catch (error) {
         logger.error('Error loading more trade conversations:', error);
       } finally {
-        setLoadingMoreConversations(false);
+        if (token === loadTokenRef.current) setLoadingMoreConversations(false);
       }
       return;
     }
@@ -407,14 +541,16 @@ export function useAIChat({
       try {
         const result = await conversationRepo.findByCalendarId(calendar.id, {
           limit: CONVERSATIONS_PAGE_SIZE,
-          offset: currentOffset
+          offset: currentOffset,
+          pinnedOnly: pinned,
         });
+        if (token !== loadTokenRef.current) return;
         setConversations(prev => [...prev, ...result.conversations]);
         setHasMoreConversations(result.hasMore);
       } catch (error) {
         logger.error('Error loading more conversations:', error);
       } finally {
-        setLoadingMoreConversations(false);
+        if (token === loadTokenRef.current) setLoadingMoreConversations(false);
       }
       return;
     }
@@ -426,14 +562,16 @@ export function useAIChat({
     try {
       const result = await conversationRepo.findUserLevel(userId, {
         limit: CONVERSATIONS_PAGE_SIZE,
-        offset: currentOffset
+        offset: currentOffset,
+        pinnedOnly: pinned,
       });
+      if (token !== loadTokenRef.current) return;
       setConversations(prev => [...prev, ...result.conversations]);
       setHasMoreConversations(result.hasMore);
     } catch (error) {
       logger.error('Error loading more user-level conversations:', error);
     } finally {
-      setLoadingMoreConversations(false);
+      if (token === loadTokenRef.current) setLoadingMoreConversations(false);
     }
   }, [
     userId,
@@ -442,8 +580,30 @@ export function useAIChat({
     conversations.length,
     loadingMoreConversations,
     hasMoreConversations,
-    conversationRepo
+    conversationRepo,
+    searchQuery,
+    getActiveScope,
   ]);
+
+  /**
+   * Toggle the server-side pinned-only history filter. Updates the ref
+   * synchronously so the immediate reload sees the new value (state
+   * updates from setPinnedOnlyState don't flush in time for the call
+   * inside the same callback). If a search is active, the reload stays
+   * in search mode with the new pinned flag applied; otherwise it
+   * re-fetches the default first page.
+   */
+  const setPinnedFilter = useCallback(async (value: boolean) => {
+    if (pinnedOnlyRef.current === value) return;
+    pinnedOnlyRef.current = value;
+    setPinnedOnlyState(value);
+
+    if (searchQueryRef.current) {
+      await searchConversations(searchQueryRef.current);
+    } else {
+      await loadConversations();
+    }
+  }, [searchConversations, loadConversations]);
 
   /**
    * Start a new chat
@@ -456,14 +616,44 @@ export function useAIChat({
   }, []);
 
   /**
-   * Select a conversation from history
+   * Select a conversation from history.
+   *
+   * List queries don't carry the heavy `messages` JSONB blob, so we fetch the
+   * full row via `findById` here. If the caller already has messages (e.g.
+   * the reminder navigation path that calls `findById` itself before handing
+   * us the conversation), we skip the fetch and use them directly. The
+   * `loadingMessages` flag drives the skeleton bubbles in the chat surface.
+   *
+   * `currentConversationId` is set first so realtime subscriptions to the
+   * row attach immediately — without that, a reminder fire that lands while
+   * the fetch is in flight would be missed.
    */
-  const selectConversation = useCallback((conversation: AIConversation) => {
-    setMessages(conversation.messages as ChatMessageType[]);
-    setCurrentConversationId(conversation.id);
+  const selectConversation = useCallback(async (conversation: AIConversation) => {
     setEditingMessageId(null);
-    logger.log('Loaded conversation:', conversation.id);
-  }, []);
+    setCurrentConversationId(conversation.id);
+
+    if (conversation.messages) {
+      setMessages(conversation.messages as ChatMessageType[]);
+      logger.log('Loaded conversation (preloaded):', conversation.id);
+      return;
+    }
+
+    setMessages([]);
+    setLoadingMessages(true);
+    try {
+      const full = await conversationRepo.findById(conversation.id);
+      if (!full) {
+        logger.warn('Conversation not found on lazy load:', conversation.id);
+        return;
+      }
+      setMessages((full.messages ?? []) as ChatMessageType[]);
+      logger.log('Loaded conversation (lazy):', conversation.id);
+    } catch (error) {
+      logger.error('Error lazy-loading conversation messages:', error);
+    } finally {
+      setLoadingMessages(false);
+    }
+  }, [conversationRepo]);
 
   /**
    * Delete a conversation
@@ -995,6 +1185,7 @@ What would you like to know about your trading?`,
     conversations,
     loadingConversations,
     loadingMoreConversations,
+    loadingMessages,
     hasMoreConversations,
     totalConversationsCount,
     isAtContextLimit,
@@ -1012,6 +1203,9 @@ What would you like to know about your trading?`,
     // Conversation management
     loadConversations,
     loadMoreConversations,
+    searchConversations,
+    pinnedOnly,
+    setPinnedFilter,
     selectConversation,
     deleteConversation,
     togglePinConversation,
