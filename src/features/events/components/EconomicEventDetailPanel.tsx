@@ -40,6 +40,7 @@ import { TradeOperationsProps } from 'features/calendar/types/tradeOperations';
 import Shimmer from 'components/Shimmer';
 import { supabaseAIChatService } from 'features/orion/services/supabaseAIChatService';
 import { supabase } from 'config/supabase';
+import { EYEBROW_SX, TNUM, MONO_FONT, getInsetTileSx } from 'styles/designTokens';
 
 interface EconomicEventDetailPanelProps {
   event: EconomicEvent;
@@ -424,10 +425,10 @@ ${eventTrades.map((t) => `- ${t.id}`).join('\n')}
           </Box>
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(5, 1fr)' }, gap: 1 }}>
             <StatCard label="Total" value={stats.total} />
-            <StatCard label="Wins" value={stats.wins} color="success.main" tint={alpha(theme.palette.success.main, 0.06)} border={alpha(theme.palette.success.main, 0.15)} />
-            <StatCard label="Losses" value={stats.losses} color="error.main" tint={alpha(theme.palette.error.main, 0.06)} border={alpha(theme.palette.error.main, 0.15)} />
-            <StatCard label="Breakeven" value={stats.breakevens} color="warning.main" tint={alpha(theme.palette.warning.main, 0.06)} border={alpha(theme.palette.warning.main, 0.15)} />
-            <StatCard label="Win Rate" value={`${stats.win_rate}%`} color="primary.main" tint={alpha(theme.palette.primary.main, 0.06)} border={alpha(theme.palette.primary.main, 0.15)} />
+            <StatCard label="Wins" value={stats.wins} color="success.main" />
+            <StatCard label="Losses" value={stats.losses} color="error.main" />
+            <StatCard label="Breakeven" value={stats.breakevens} color="warning.main" />
+            <StatCard label="Win Rate" value={`${stats.win_rate}%`} color="primary.main" />
           </Box>
         </Box>
 
@@ -601,23 +602,21 @@ const StatCard: React.FC<{
   label: string;
   value: number | string;
   color?: string;
-  tint?: string;
-  border?: string;
-}> = ({ label, value, color, tint, border }) => {
+}> = ({ label, value, color }) => {
   const theme = useTheme();
   return (
-    <Box
-      sx={{
-        p: 1.25,
-        borderRadius: 1,
-        backgroundColor: tint ?? theme.palette.background.paper,
-        border: `1px solid ${border ?? alpha(theme.palette.divider, 0.15)}`,
-      }}
-    >
-      <Typography variant="caption" color="text.secondary">
-        {label}
-      </Typography>
-      <Typography variant="subtitle1" sx={{ fontWeight: 700, color: color ?? 'text.primary' }}>
+    <Box sx={{ ...getInsetTileSx(theme), display: 'flex', flexDirection: 'column', gap: 0.25 }}>
+      <Typography sx={EYEBROW_SX}>{label}</Typography>
+      <Typography
+        sx={{
+          fontWeight: 700,
+          fontSize: '1.1rem',
+          color: color ?? 'text.primary',
+          fontFamily: MONO_FONT,
+          fontFeatureSettings: TNUM,
+          letterSpacing: '-0.01em',
+        }}
+      >
         {value}
       </Typography>
     </Box>
