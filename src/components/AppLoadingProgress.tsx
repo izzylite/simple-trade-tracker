@@ -32,7 +32,7 @@ const AppLoadingProgress: React.FC = () => {
   }, [prefersDarkMode]);
 
   const colors = useMemo(() => ({
-    background: isDarkMode ? '#0a0e27' : '#e8edf4',
+    background: isDarkMode ? '#080808' : '#e8edf4',
     primary: isDarkMode ? '#a78bfa' : '#7c3aed',
     primaryDark: isDarkMode ? '#8b5cf6' : '#5b21b6',
     textPrimary: isDarkMode ? '#ffffff' : '#1a2027',
