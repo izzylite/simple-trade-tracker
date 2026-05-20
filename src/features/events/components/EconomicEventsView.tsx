@@ -11,7 +11,7 @@
  * pages themselves. This component only renders the reusable core.
  */
 
-import React, { useCallback, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Box,
   ButtonBase,
@@ -742,8 +742,22 @@ const EconomicEventsView: React.FC<EconomicEventsViewProps> = ({
   }, [initialDate?.getTime(), anchorToDate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Filter read/write — calendar-level source of truth ────────────────────
-  const filterSettings: EconomicCalendarFilterSettings =
+  const persistedFilters: EconomicCalendarFilterSettings =
     calendar?.economic_calendar_filters || DEFAULT_FILTER_SETTINGS;
+
+  // Optimistic local copy so impact/currency pill toggles reflect instantly,
+  // before the async onUpdateCalendarProperty write round-trips back through
+  // the calendar prop. Reconciled below when the persisted source changes.
+  const [filterSettings, setFilterSettings] =
+    useState<EconomicCalendarFilterSettings>(persistedFilters);
+
+  // Re-sync when the persisted source changes (calendar switch or the write
+  // landing). Keyed on the filters reference, which is fresh after each write.
+  useEffect(() => {
+    setFilterSettings(persistedFilters);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calendar?.id, calendar?.economic_calendar_filters]);
+
   const selectedCurrencies = filterSettings.currencies;
   const selectedImpacts = filterSettings.impacts;
   const notificationsEnabled = filterSettings.notificationsEnabled;
@@ -751,6 +765,8 @@ const EconomicEventsView: React.FC<EconomicEventsViewProps> = ({
   const updateFilters = useCallback(
     (patch: Partial<EconomicCalendarFilterSettings>) => {
       if (!calendar?.id || !onUpdateCalendarProperty || isReadOnly) return;
+      // Optimistic: reflect the change locally immediately.
+      setFilterSettings((prev) => ({ ...prev, ...patch }));
       void onUpdateCalendarProperty(calendar.id, (cal) => ({
         ...cal,
         economic_calendar_filters: {

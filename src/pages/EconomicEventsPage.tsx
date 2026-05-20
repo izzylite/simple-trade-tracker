@@ -174,8 +174,20 @@ const EconomicEventsPageInner: React.FC = () => {
   const { calendar, isReadOnly: calendarIsReadOnly } = useTradesContext();
   const { onUpdateCalendarProperty } = useTradeOperations();
 
-  const filterSettings: EconomicCalendarFilterSettings =
+  const persistedFilters: EconomicCalendarFilterSettings =
     calendar?.economic_calendar_filters || DEFAULT_FILTER_SETTINGS;
+
+  // Optimistic local copy so impact/currency pill toggles reflect instantly,
+  // before the async onUpdateCalendarProperty write round-trips back through
+  // the calendar prop. Reconciled below when the persisted source changes.
+  const [filterSettings, setFilterSettings] =
+    useState<EconomicCalendarFilterSettings>(persistedFilters);
+
+  useEffect(() => {
+    setFilterSettings(persistedFilters);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calendar?.id, calendar?.economic_calendar_filters]);
+
   const selectedCurrencies = filterSettings.currencies;
   const selectedImpacts = filterSettings.impacts;
   const notificationsEnabled = filterSettings.notificationsEnabled;
@@ -183,6 +195,8 @@ const EconomicEventsPageInner: React.FC = () => {
   const updateFilters = useCallback(
     (patch: Partial<EconomicCalendarFilterSettings>) => {
       if (!calendar?.id || !onUpdateCalendarProperty || calendarIsReadOnly) return;
+      // Optimistic: reflect the change locally immediately.
+      setFilterSettings((prev) => ({ ...prev, ...patch }));
       void onUpdateCalendarProperty(calendar.id, (cal) => ({
         ...cal,
         economic_calendar_filters: {
