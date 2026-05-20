@@ -148,7 +148,7 @@ async function searchConversations(
       created_at: string;
       updated_at: string;
       similarity: number;
-      last_message_content: string;
+      snippet: string;
     }>)
       .filter((r) => r.similarity >= SEARCH_SIMILARITY_FLOOR)
       .slice(0, boundedLimit);
@@ -162,14 +162,14 @@ async function searchConversations(
     }
 
     const lines = rows.map((r, i) => {
-      const snippet = (r.last_message_content ?? "")
+      const snippet = (r.snippet ?? "")
         .substring(0, 200)
         .replace(/\s+/g, " ");
       return (
         `[${i + 1}] id=${r.id}  similarity=${r.similarity.toFixed(2)}\n` +
         `    Title: ${r.title ?? "(untitled)"}\n` +
         `    ${r.message_count} messages | updated ${r.updated_at}\n` +
-        `    Last message: ${snippet}${snippet.length >= 200 ? "..." : ""}`
+        `    Opening: ${snippet}${snippet.length >= 200 ? "..." : ""}`
       );
     });
 
