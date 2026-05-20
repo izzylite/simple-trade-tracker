@@ -21,7 +21,15 @@ import {
   CUSTOM_TOOL_NAMES
 } from './tools.ts';
 import { fetchEmbeddedData, type EmbeddedData } from './embedDataFetcher.ts';
-import { appendUserMessage, appendAssistantMessage } from './conversationStore.ts';
+import {
+  appendUserMessage,
+  appendAssistantMessage,
+  MAX_PROMPT_TOKENS,
+} from './conversationStore.ts';
+import {
+  maybeUpdateEmbedding,
+  handleBackfillEmbeddings,
+} from './tools/recall-conversations.ts';
 import { rehostChartUrlsInText } from './imageRehost.ts';
 import { validateReferenceIds, hasReferenceTags, type ValidationResult } from './idValidator.ts';
 import { buildSecureSystemPrompt, buildTemporalContext } from "./systemPrompt.ts";
@@ -219,6 +227,39 @@ function logUsageMetadata(
 }
 
 /**
+ * Emit one greppable per-turn audit line tying token cost to a conversation
+ * and the tools that ran. This is the lightweight observability we keep
+ * pre-telemetry-table (see CLAUDE.md "deferred: orion_tool_telemetry"):
+ * 24h edge logs become filterable by conversationId during debugging, and
+ * the firstPrompt→finalPrompt delta shows how much tool results (e.g. a
+ * recall_conversations get returning a transcript page) inflated the
+ * context this turn.
+ *
+ * Grep: `[TurnAudit] conv=<id>` for one conversation, or `tools=*recall*`
+ * to find recall-heavy turns. firstPrompt = the turn's initial round
+ * prompt; finalPrompt = the last round's prompt (the gap is mostly
+ * tool-result tokens that DON'T persist into the next turn's history).
+ */
+function logTurnAudit(
+  conversationId: string | undefined,
+  functionCalls: Array<{ name: string }>,
+  firstRoundUsage: Record<string, unknown> | undefined,
+  lastUsage: Record<string, unknown> | undefined,
+): void {
+  const toolNames = functionCalls.map((f) => f.name);
+  const firstPrompt = Number(firstRoundUsage?.promptTokenCount ?? 0);
+  const finalPrompt = Number(lastUsage?.promptTokenCount ?? 0);
+  const finalOutput = Number(lastUsage?.candidatesTokenCount ?? 0);
+  log(
+    `[TurnAudit] conv=${conversationId ?? 'none'} ` +
+    `tools=[${toolNames.join(',')}] ` +
+    `firstPrompt=${firstPrompt} finalPrompt=${finalPrompt} ` +
+    `toolInflation=${finalPrompt - firstPrompt} output=${finalOutput}`,
+    'info'
+  );
+}
+
+/**
  * Parsed function call from Gemini response. `thoughtSignature` is required
  * by Gemini 3.x — the API emits it as a sibling field of `functionCall` on the
  * Part, and the next turn's model part must echo it back verbatim or the API
@@ -293,7 +334,12 @@ async function callGeminiWithContents(
     mode?: 'AUTO' | 'ANY' | 'NONE';
     systemInstruction?: string;
   }
-): Promise<{ text: string; functionCall?: ParsedFunctionCall; rawParts: Array<Record<string, unknown>> }> {
+): Promise<{
+  text: string;
+  functionCall?: ParsedFunctionCall;
+  rawParts: Array<Record<string, unknown>>;
+  usageMetadata?: Record<string, unknown>;
+}> {
   // Non-streaming: delegate to the shared `_shared/gemini.ts` helper.
   // The shared version handles body construction, error handling, and
   // part extraction; we just map the return shape (shared returns
@@ -312,6 +358,7 @@ async function callGeminiWithContents(
       text: result.text,
       functionCall: result.functionCalls[0],
       rawParts: result.rawParts,
+      usageMetadata: result.usageMetadata,
     };
   }
 
@@ -391,7 +438,7 @@ async function callGeminiWithContents(
   }
 
   logUsageMetadata('callGeminiWithContents', lastUsageMetadata);
-  return { text, functionCall, rawParts };
+  return { text, functionCall, rawParts, usageMetadata: lastUsageMetadata };
 }
 
 /**
@@ -759,7 +806,14 @@ async function callGeminiStreaming(
   tools: GeminiFunctionDeclaration[],
   writer: WritableStreamDefaultWriter,
   userImages?: Array<{ url: string; mimeType: string }>
-): Promise<{ text?: string; functionCall?: ParsedFunctionCall; functionCalls?: ParsedFunctionCall[]; emptyBug?: boolean; rawParts?: Array<Record<string, unknown>> }> {
+): Promise<{
+  text?: string;
+  functionCall?: ParsedFunctionCall;
+  functionCalls?: ParsedFunctionCall[];
+  emptyBug?: boolean;
+  rawParts?: Array<Record<string, unknown>>;
+  usageMetadata?: Record<string, unknown>;
+}> {
   const apiUrl = buildGeminiUrl(apiKey, true);
 
   // Build user message parts (text + optional images)
@@ -1012,19 +1066,19 @@ async function callGeminiStreaming(
   // Return result - include text alongside function calls when available
   // This allows us to capture any text Gemini sends before/with function calls
   if (functionCalls.length > 1) {
-    return { functionCalls, text: fullText || undefined, rawParts };
+    return { functionCalls, text: fullText || undefined, rawParts, usageMetadata: lastUsageMetadata };
   } else if (functionCall) {
-    return { functionCall, text: fullText || undefined, rawParts };
+    return { functionCall, text: fullText || undefined, rawParts, usageMetadata: lastUsageMetadata };
   }
 
   // No function calls - return text (may be empty if model returned nothing)
   if (!fullText) {
     log('Warning: Gemini returned empty response (no text, no function calls) - known API bug', 'warn');
     // Signal that this is the known empty bug so caller can retry
-    return { text: '', emptyBug: true, rawParts };
+    return { text: '', emptyBug: true, rawParts, usageMetadata: lastUsageMetadata };
   }
 
-  return { text: fullText, rawParts };
+  return { text: fullText, rawParts, usageMetadata: lastUsageMetadata };
 }
 
 /**
@@ -1078,6 +1132,23 @@ function handleStreamingRequest(
       let turnCount = 0;
       const maxTurns = 15;
       const maxRetries = 3;
+      // For gating the NEXT turn we need to predict what its first Gemini
+      // call will see: system + tools + persisted_history + new_user_msg.
+      // That's almost exactly what THIS turn's first round prompt was, plus
+      // this turn's final assistant text (which will join the persisted
+      // history). We capture both:
+      //   firstRoundUsage   — prompt size before any tool calls; ~equals what
+      //                       Turn T+1's first round will face (minus the new
+      //                       user msg, plus this turn's assistant output).
+      //   lastUsageMetadata — final round's usage; we use its candidatesTokenCount
+      //                       (assistant output) to refine the estimate.
+      //
+      // Persisting the final round's promptTokenCount directly would spuriously
+      // inflate the gate after a `recall_conversations` (or any tool that
+      // returns a big payload) — tool results don't persist into the next
+      // turn's history, but their tokens show up in the final round's prompt.
+      let firstRoundUsage: Record<string, unknown> | undefined;
+      let lastUsageMetadata: Record<string, unknown> | undefined;
       // Wall-clock budget: Supabase edge functions are hard-killed at 150s for
       // the initial request (Free + Pro). Track turn-start so we can bail out
       // BEFORE infra terminates us, giving the persist step a chance to run.
@@ -1095,6 +1166,10 @@ function handleStreamingRequest(
         writer,
         userImages // Pass user-attached images on initial request
       );
+      if (result.usageMetadata) {
+        firstRoundUsage = result.usageMetadata;
+        lastUsageMetadata = result.usageMetadata;
+      }
 
       // RETRY LOGIC: Handle known Gemini empty content bug
       // See: https://discuss.ai.google.dev/t/gemini-2-5-pro-with-empty-response-text/81175
@@ -1143,6 +1218,12 @@ function handleStreamingRequest(
             writer,
             userImages // Preserve user images across retries
           );
+          if (result.usageMetadata) {
+            // Retries replace the initial call's result — treat the successful
+            // retry as the new "first round" for gate-estimation purposes.
+            firstRoundUsage = result.usageMetadata;
+            lastUsageMetadata = result.usageMetadata;
+          }
 
           if (!result.emptyBug && (result.text || result.functionCall || result.functionCalls)) {
             log(`Retry ${retryAttempt} succeeded`, 'info');
@@ -1337,12 +1418,18 @@ function handleStreamingRequest(
         // Continuation call — conversationContents is already in Gemini format.
         // If the model returns both text and a function call in the same turn,
         // the text was narration (streamed already); text_reset corrects the UI.
-        const { text: newText, functionCall: newFunctionCall, rawParts: newRawParts } = await callGeminiWithContents(
+        const {
+          text: newText,
+          functionCall: newFunctionCall,
+          rawParts: newRawParts,
+          usageMetadata: newUsage,
+        } = await callGeminiWithContents(
           googleApiKey,
           conversationContents,
           allTools,
           { streaming: true, writer, maxOutputTokens: 8000, systemInstruction: systemPrompt }
         );
+        if (newUsage) lastUsageMetadata = newUsage;
 
         if (!newFunctionCall && newText) {
           // Text was already streamed as text_chunk — this is the final answer
@@ -1382,6 +1469,7 @@ function handleStreamingRequest(
             allTools,
             { streaming: false, maxOutputTokens: 4000, mode: 'NONE', systemInstruction: systemPrompt }
           );
+          if (synthesisResult.usageMetadata) lastUsageMetadata = synthesisResult.usageMetadata;
           if (synthesisResult.text) {
             finalText = synthesisResult.text;
             await sendSSE(writer, 'text_chunk', { text: finalText });
@@ -1471,6 +1559,7 @@ function handleStreamingRequest(
               allTools,
               { streaming: true, writer, maxOutputTokens: 8000, systemInstruction: systemPrompt }
             );
+            if (result.usageMetadata) lastUsageMetadata = result.usageMetadata;
             correctedText = result.text;
           } catch (error) {
             log(`Gemini correction call failed: ${error}`, 'error');
@@ -1578,6 +1667,17 @@ function handleStreamingRequest(
             rehostChartUrlsInText(persistClient, rehostCtx, assistantRecord.content),
             rehostChartUrlsInText(persistClient, rehostCtx, assistantRecord.messageHtml),
           ]);
+          // Estimate what Turn T+1's first Gemini call will see:
+          //   first round prompt (this turn's history + user_msg + system + tools)
+          //   + this turn's assistant output (about to be persisted into history)
+          //
+          // Tool-call rounds intentionally excluded — their results don't
+          // persist into the next turn's history, so the final round's
+          // promptTokenCount would over-charge the gate. See block comment
+          // above where firstRoundUsage is declared.
+          const firstRoundPrompt = Number(firstRoundUsage?.promptTokenCount ?? 0);
+          const assistantOutput = Number(lastUsageMetadata?.candidatesTokenCount ?? 0);
+          const nextTurnEstimate = firstRoundPrompt + assistantOutput;
           const assistantPersist = await appendAssistantMessage(persistClient, {
             conversationId,
             userId,
@@ -1586,12 +1686,18 @@ function handleStreamingRequest(
               content: rehostedContent,
               messageHtml: rehostedHtml || undefined,
             },
+            promptTokenCount: nextTurnEstimate > 0 ? nextTurnEstimate : undefined,
           });
           if (!assistantPersist.ok && !assistantPersist.deleted) {
             log('Assistant message persist failed (streaming)', 'error', {
               conversationId,
               error: assistantPersist.error,
             });
+          }
+          // Re-embed for semantic recall if delta threshold hit. Self-gated;
+          // throws are swallowed inside — never blocks the persist.
+          if (assistantPersist.ok && !assistantPersist.deleted) {
+            await maybeUpdateEmbedding(persistClient, conversationId, userId);
           }
         })();
         // EdgeRuntime is the Supabase-blessed handle for background work.
@@ -1605,6 +1711,9 @@ function handleStreamingRequest(
           await persistTask;
         }
       }
+
+      // Per-turn token-cost audit line (greppable by conversationId / tool).
+      logTurnAudit(conversationId, functionCalls, firstRoundUsage, lastUsageMetadata);
 
       // Send done event (with cleaned/validated text)
       await sendSSE(writer, 'done', {
@@ -1772,10 +1881,10 @@ async function handleReminderRequest(req: Request, body: AgentRequest): Promise<
     return errorResponse('Forbidden: reminder ownership mismatch', 403);
   }
 
-  // ---- 3e. Load conversation + check 50-message cap ----
+  // ---- 3e. Load conversation + check token-budget cap ----
   const { data: convo, error: convoErr } = await serviceClient
     .from('ai_conversations')
-    .select('id, user_id, calendar_id, title, messages, message_count')
+    .select('id, user_id, calendar_id, title, messages, message_count, last_prompt_tokens')
     .eq('id', conversationId)
     .single();
 
@@ -1806,14 +1915,15 @@ async function handleReminderRequest(req: Request, body: AgentRequest): Promise<
   }
 
   const currentCount = Number(convo.message_count ?? 0);
-  if (currentCount >= 50) {
+  const currentPromptTokens = Number(convo.last_prompt_tokens ?? 0);
+  if (currentPromptTokens >= MAX_PROMPT_TOKENS) {
     await serviceClient
       .from('reminders')
-      .update({ status: 'failed', last_error: 'conversation_full' })
+      .update({ status: 'failed', last_error: 'token_budget_exceeded' })
       .eq('id', reminderId);
     return successResponse(
-      { claimed: true, fired: false, reason: 'conversation_full' },
-      'Conversation full'
+      { claimed: true, fired: false, reason: 'token_budget_exceeded' },
+      'Conversation token budget exhausted'
     );
   }
 
@@ -1897,6 +2007,12 @@ async function handleReminderRequest(req: Request, body: AgentRequest): Promise<
 
   let finalText = '';
   const functionCalls: Array<{ name: string; args: unknown; result: string }> = [];
+  // See block comment in handleStreamingRequest. We track first-round prompt
+  // tokens (for gate estimation) separately from the final round's usage
+  // (for assistant-output token count) so a tool-heavy reminder fire doesn't
+  // spuriously inflate the next turn's gate.
+  let firstRoundUsage: Record<string, unknown> | undefined;
+  let lastUsageMetadata: Record<string, unknown> | undefined;
   try {
     // Build tools (MCP + custom) — same as chat path.
     const geminiMcpTools = await getCachedMCPTools(
@@ -1909,6 +2025,10 @@ async function handleReminderRequest(req: Request, body: AgentRequest): Promise<
 
     // Initial call.
     let result = await callGemini(googleApiKey, systemPrompt, userTurnMessage, conversationHistory, allTools);
+    if (result.usageMetadata) {
+      firstRoundUsage = result.usageMetadata;
+      lastUsageMetadata = result.usageMetadata;
+    }
 
     const conversationContents: Array<{ role: string; parts: Array<Record<string, unknown>> }> = [
       ...conversationHistory.map(msg => ({
@@ -1977,6 +2097,7 @@ async function handleReminderRequest(req: Request, body: AgentRequest): Promise<
         allTools,
         { streaming: false, maxOutputTokens: 4000, systemInstruction: systemPrompt }
       );
+      if (cont.usageMetadata) lastUsageMetadata = cont.usageMetadata;
       result = cont.functionCall
         ? { functionCall: cont.functionCall, rawParts: cont.rawParts }
         : { text: cont.text, rawParts: cont.rawParts };
@@ -1995,6 +2116,7 @@ async function handleReminderRequest(req: Request, body: AgentRequest): Promise<
           allTools,
           { streaming: false, maxOutputTokens: 4000, mode: 'NONE', systemInstruction: systemPrompt }
         );
+        if (synth.usageMetadata) lastUsageMetadata = synth.usageMetadata;
         if (synth.text) finalText = synth.text;
       } catch (synthErr) {
         log(`[reminder] Forced synthesis failed: ${synthErr}`, 'error');
@@ -2039,18 +2161,31 @@ async function handleReminderRequest(req: Request, body: AgentRequest): Promise<
   };
 
   const existingMessages = Array.isArray(convo.messages) ? convo.messages : [];
-  // Atomic cap guard: `.lt('message_count', 50)` filters at the row-lock
-  // level. If a concurrent reminder fire pushed count to 50 between our 3e
-  // read and this UPDATE, the WHERE fails and `appendData` is null — we then
-  // mark this reminder failed as conversation_full (don't double-write).
+  // Atomic cap guard: `.lt('last_prompt_tokens', MAX_PROMPT_TOKENS)` filters
+  // at the row-lock level. If a concurrent turn pushed tokens past the cap
+  // between our 3e read and this UPDATE, the WHERE fails and `appendData` is
+  // null — we then mark this reminder failed (don't double-write).
+  //
+  // Persist an estimate of what the NEXT turn's first round prompt will be:
+  //   first round prompt (this fire's history + reminder instructions + system + tools)
+  //   + this fire's assistant output (joins the persisted history).
+  // Tool-call rounds' prompts are excluded — those results don't persist into
+  // the next turn's history. See block comment in handleStreamingRequest.
+  const firstRoundPrompt = Number(firstRoundUsage?.promptTokenCount ?? 0);
+  const assistantOutput = Number(lastUsageMetadata?.candidatesTokenCount ?? 0);
+  const nextTurnEstimate = firstRoundPrompt + assistantOutput;
+  const appendPayload: Record<string, unknown> = {
+    messages: [...existingMessages, newMessage],
+    message_count: currentCount + 1,
+  };
+  if (nextTurnEstimate > 0) {
+    appendPayload.last_prompt_tokens = nextTurnEstimate;
+  }
   const { data: appendData, error: appendErr } = await serviceClient
     .from('ai_conversations')
-    .update({
-      messages: [...existingMessages, newMessage],
-      message_count: currentCount + 1,
-    })
+    .update(appendPayload)
     .eq('id', conversationId)
-    .lt('message_count', 50)
+    .lt('last_prompt_tokens', MAX_PROMPT_TOKENS)
     .select('id')
     .maybeSingle();
 
@@ -2068,12 +2203,29 @@ async function handleReminderRequest(req: Request, body: AgentRequest): Promise<
     // here. Either way, don't pretend this fired.
     await serviceClient
       .from('reminders')
-      .update({ status: 'failed', last_error: 'conversation_full_or_gone' })
+      .update({ status: 'failed', last_error: 'token_budget_exceeded_or_gone' })
       .eq('id', reminderId);
     return successResponse(
-      { claimed: true, fired: false, reason: 'conversation_full_or_gone' },
+      { claimed: true, fired: false, reason: 'token_budget_exceeded_or_gone' },
       'Append skipped'
     );
+  }
+
+  // Per-turn token-cost audit line (greppable by conversationId / tool).
+  // functionCalls here is {name,args,result}[] — logTurnAudit only reads name.
+  logTurnAudit(conversationId, functionCalls, firstRoundUsage, lastUsageMetadata);
+
+  // Re-embed for semantic recall — same gate as the chat path. Reminder
+  // fires count as new messages too, so the conversation's topical centre
+  // can shift after a fire (e.g. "FOMC reminder" appears in a chat that was
+  // about something else). Run inside waitUntil so a slow embed doesn't
+  // delay the notification insert below.
+  const er = (globalThis as { EdgeRuntime?: { waitUntil(p: Promise<unknown>): void } }).EdgeRuntime;
+  const embedTask = maybeUpdateEmbedding(serviceClient, conversationId, userId);
+  if (er?.waitUntil) {
+    er.waitUntil(embedTask);
+  } else {
+    await embedTask;
   }
 
   // ---- 3i. Mark reminder fired ----
@@ -2138,6 +2290,9 @@ async function handleReminderRequest(req: Request, body: AgentRequest): Promise<
   );
 }
 
+// handleBackfillEmbeddings moved to tools/recall-conversations.ts. Imported
+// at the top of this file and dispatched below for mode='backfill_embeddings'.
+
 /**
  * Main edge function handler
  */
@@ -2169,6 +2324,13 @@ Deno.serve(async (req: Request) => {
     // Both fire paths (cron dispatcher + browser local timer) hit this entry.
     if (body.mode === 'reminder') {
       return await handleReminderRequest(req, body);
+    }
+
+    // mode='backfill_embeddings' branch — one-shot admin endpoint that
+    // walks ai_conversations rows with NULL embedding and fills them in.
+    // Service-role only. Safe to re-run (idempotent on the NULL check).
+    if (body.mode === 'backfill_embeddings') {
+      return await handleBackfillEmbeddings(req);
     }
 
     const { message, userId, calendarId, focusedTradeId, conversationHistory = [], calendarContext, images } = body;
@@ -2227,12 +2389,12 @@ Deno.serve(async (req: Request) => {
     });
 
     if (!persistResult.ok) {
-      if (persistResult.code === 'message_limit_reached') {
+      if (persistResult.code === 'token_budget_exceeded') {
         return new Response(
           JSON.stringify({
             success: false,
-            code: 'message_limit_reached',
-            error: 'This conversation has reached the 50-message limit. Start a new chat to continue.',
+            code: 'token_budget_exceeded',
+            error: 'This conversation has used its context budget. Start a new chat to continue.',
           }),
           { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
@@ -2378,6 +2540,12 @@ Deno.serve(async (req: Request) => {
     // measurement (the first call is where the long systemInstruction prefix
     // gets cached or served from cache).
     const initialUsage = result.usageMetadata;
+    // See block comment in handleStreamingRequest for why we capture both
+    // first-round and last-round usage rather than just the last round.
+    // Final round's promptTokenCount over-charges the gate after tool calls
+    // since tool results don't persist into the next turn's history.
+    const firstRoundUsage: Record<string, unknown> | undefined = result.usageMetadata;
+    let lastUsageMetadata: Record<string, unknown> | undefined = result.usageMetadata;
 
     const functionCalls: Array<{ name: string; args: unknown; result: string }> = [];
     let finalText = '';
@@ -2474,12 +2642,18 @@ Deno.serve(async (req: Request) => {
       });
 
       // Non-streaming continuation with updated conversation history.
-      const { text: newText, functionCall: newFunctionCall, rawParts: newRawParts } = await callGeminiWithContents(
+      const {
+        text: newText,
+        functionCall: newFunctionCall,
+        rawParts: newRawParts,
+        usageMetadata: newUsage,
+      } = await callGeminiWithContents(
         googleApiKey,
         conversationContents,
         allTools,
         { streaming: false, maxOutputTokens: 4000, systemInstruction: systemPrompt }
       );
+      if (newUsage) lastUsageMetadata = newUsage;
       result = newFunctionCall
         ? { functionCall: newFunctionCall, rawParts: newRawParts }
         : { text: newText, rawParts: newRawParts };
@@ -2501,6 +2675,7 @@ Deno.serve(async (req: Request) => {
           allTools,
           { streaming: false, maxOutputTokens: 4000, mode: 'NONE', systemInstruction: systemPrompt }
         );
+        if (synthesisResult.usageMetadata) lastUsageMetadata = synthesisResult.usageMetadata;
         if (synthesisResult.text) {
           finalText = synthesisResult.text;
           log(`Forced synthesis succeeded (${finalText.length} chars)`, 'info');
@@ -2584,6 +2759,7 @@ Deno.serve(async (req: Request) => {
             allTools,
             { streaming: false, maxOutputTokens: 8000, systemInstruction: systemPrompt }
           );
+          if (result.usageMetadata) lastUsageMetadata = result.usageMetadata;
           correctedText = result.text;
         } catch (error) {
           log(`Gemini correction call failed: ${error}`, 'error');
@@ -2659,6 +2835,9 @@ Deno.serve(async (req: Request) => {
 
     log('Response validated - security check passed', 'info');
 
+    // Per-turn token-cost audit line (greppable by conversationId / tool).
+    logTurnAudit(conversationId, functionCalls, firstRoundUsage, lastUsageMetadata);
+
     // ---- Persist the assistant reply at turn end ----
     // Same waitUntil pattern as the streaming path: survives past the 150s
     // initial-request window. See: https://supabase.com/docs/guides/functions/limits
@@ -2683,6 +2862,9 @@ Deno.serve(async (req: Request) => {
         rehostCtx,
         assistantRecord.content,
       );
+      const firstRoundPrompt = Number(firstRoundUsage?.promptTokenCount ?? 0);
+      const assistantOutput = Number(lastUsageMetadata?.candidatesTokenCount ?? 0);
+      const nextTurnEstimate = firstRoundPrompt + assistantOutput;
       const assistantPersist = await appendAssistantMessage(serviceClientForPersistence, {
         conversationId,
         userId,
@@ -2690,12 +2872,17 @@ Deno.serve(async (req: Request) => {
           ...assistantRecord,
           content: rehostedContent,
         },
+        promptTokenCount: nextTurnEstimate > 0 ? nextTurnEstimate : undefined,
       });
       if (!assistantPersist.ok && !assistantPersist.deleted) {
         log('Assistant message persist failed (non-streaming)', 'error', {
           conversationId,
           error: assistantPersist.error,
         });
+      }
+      // Same re-embed step as the streaming path.
+      if (assistantPersist.ok && !assistantPersist.deleted) {
+        await maybeUpdateEmbedding(serviceClientForPersistence, conversationId, userId);
       }
     })();
     const er = (globalThis as { EdgeRuntime?: { waitUntil(p: Promise<unknown>): void } }).EdgeRuntime;

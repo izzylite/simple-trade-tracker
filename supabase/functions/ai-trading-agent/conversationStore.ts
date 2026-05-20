@@ -14,17 +14,37 @@
 
 import { createServiceClient, log } from '../_shared/supabase.ts';
 
+// NOTE: `maybeUpdateEmbedding` (the turn-end re-embed gate) used to live
+// here but was moved to `tools/recall-conversations.ts` — it's part of the
+// recall feature, not core message persistence. This file now only handles
+// conversation row append/truncate logic.
+
+/**
+ * Server-side context-budget cap. Gated on Gemini's `promptTokenCount` from
+ * the final round of the previous turn — exact, includes system prompt +
+ * tool defs + history.
+ *
+ * Default 250K is ~2-3× the client meter's 80K user-content threshold (the
+ * client doesn't count system+tools, which are large for Orion). The client
+ * lock kicks in first for normal use; this server cap is a runaway guard
+ * against a buggy client or pathological input. Override via env.
+ */
+export const MAX_PROMPT_TOKENS: number = (() => {
+  const v = Number(Deno.env.get('ORION_MAX_PROMPT_TOKENS'));
+  return Number.isFinite(v) && v > 0 ? v : 250_000;
+})();
+
 export type AppendUserMessageResult =
   | { ok: true; conversationId: string }
-  | { ok: false; code: 'message_limit_reached' | 'forbidden' | 'unknown'; message?: string };
+  | { ok: false; code: 'token_budget_exceeded' | 'forbidden' | 'unknown'; message?: string };
 
 /**
  * Persist the user's message at turn start.
  *
  * On first turn of a new conversation the row may not exist yet — UPSERT it
  * with `ignoreDuplicates: true` so subsequent turns are a no-op. Then append
- * the message via the same atomic `message_count < 100` guard the reminder
- * fire path uses, so two-tab races can't blow past the cap.
+ * the message via an atomic `last_prompt_tokens < MAX_PROMPT_TOKENS` guard so
+ * two-tab races can't blow past the cap.
  *
  * On edit-resend, the existing messages array is truncated at `editingMessageId`
  * (inclusive) before append. Mirrors the frontend's `messages.slice(0, idx)`
@@ -33,7 +53,7 @@ export type AppendUserMessageResult =
  *
  * Returns one of:
  *   { ok: true, conversationId }            — message persisted
- *   { ok: false, code: 'message_limit_reached' }
+ *   { ok: false, code: 'token_budget_exceeded' }
  *   { ok: false, code: 'forbidden' }        — row exists but belongs to another user
  *   { ok: false, code: 'unknown', message } — DB error
  */
@@ -75,7 +95,7 @@ export async function appendUserMessage(
   // Step B: read the row to confirm ownership and get the current messages.
   const { data: convo, error: readErr } = await serviceClient
     .from('ai_conversations')
-    .select('id, user_id, messages, message_count')
+    .select('id, user_id, messages, message_count, last_prompt_tokens')
     .eq('id', conversationId)
     .single();
   if (readErr || !convo) {
@@ -92,9 +112,9 @@ export async function appendUserMessage(
 
   // Step C: build the next messages array. On edit-resend, truncate at the
   // edited message's id so old turns are dropped server-side. Otherwise just
-  // append. Atomic UPDATE guarded by `message_count < 100` so two-tab races
-  // can't blow past the cap; if a parallel turn raced us to the cap this
-  // UPDATE matches 0 rows and we return the cap error.
+  // append. Atomic UPDATE guarded by `last_prompt_tokens < MAX_PROMPT_TOKENS`
+  // so two-tab races can't blow past the cap; if a parallel turn raced us to
+  // the cap this UPDATE matches 0 rows and we return the cap error.
   //
   // Reminder-fired messages (metadata.triggered_by starts with "reminder:")
   // are INDEPENDENT events, not turn-tree replies. They MUST survive an
@@ -110,6 +130,7 @@ export async function appendUserMessage(
     m.metadata.triggered_by.startsWith('reminder:');
   let truncatedExisting: unknown[] = existingRaw;
   let preservedFires: unknown[] = [];
+  let truncated = false;
   if (editingMessageId) {
     const idx = existingRaw.findIndex(
       // deno-lint-ignore no-explicit-any
@@ -119,27 +140,42 @@ export async function appendUserMessage(
       truncatedExisting = existingRaw.slice(0, idx);
       // Reminder fires from the discarded tail survive verbatim.
       preservedFires = existingRaw.slice(idx).filter(isReminderFire);
+      truncated = true;
     }
   }
   const nextMessages = [...truncatedExisting, userMessage, ...preservedFires];
 
+  // On edit-resend (truncation), the existing embedding represents content
+  // that no longer exists in the conversation. If we leave
+  // `embedded_at_message_count` pointing at the pre-truncate count, the
+  // delta gate (messages.length - embedded_at_message_count >= N) goes
+  // NEGATIVE and the embedding never refreshes — stale forever. Reset to
+  // 0 so the next assistant-message persist triggers a fresh embed once
+  // messages.length crosses the threshold. Also NULL the embedding itself
+  // so search doesn't surface stale results in the interim.
+  const updatePayload: Record<string, unknown> = {
+    messages: nextMessages,
+    message_count: nextMessages.length,
+    updated_at: new Date().toISOString(),
+  };
+  if (truncated) {
+    updatePayload.embedding = null;
+    updatePayload.embedded_at_message_count = 0;
+  }
+
   const { data: updated, error: updateErr } = await serviceClient
     .from('ai_conversations')
-    .update({
-      messages: nextMessages,
-      message_count: nextMessages.length,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updatePayload)
     .eq('id', conversationId)
     .eq('user_id', userId)
-    .lt('message_count', 100)
+    .lt('last_prompt_tokens', MAX_PROMPT_TOKENS)
     .select('id')
     .maybeSingle();
   if (updateErr) {
     return { ok: false, code: 'unknown', message: updateErr.message };
   }
   if (!updated) {
-    return { ok: false, code: 'message_limit_reached' };
+    return { ok: false, code: 'token_budget_exceeded' };
   }
 
   return { ok: true, conversationId };
@@ -150,9 +186,15 @@ export async function appendUserMessage(
  *
  * Always UPDATE (never UPSERT) — if the user hit /clear mid-turn and deleted
  * the row, this becomes a no-op rather than resurrecting it. We don't enforce
- * the message_count cap here: the user-message append already gated entry to
- * the turn, so worst case we land at count = 101 (cap + assistant), which is
+ * the cap here: the user-message append already gated entry to the turn, so
+ * worst case we land slightly past the cap (cap + assistant), which is
  * acceptable.
+ *
+ * When `promptTokenCount` is provided, persist it as `last_prompt_tokens` in
+ * the same UPDATE — this is the next turn's gate input. Pass the
+ * `promptTokenCount` from the FINAL Gemini round (not the cumulative sum
+ * across rounds); each round's value already includes the full accumulated
+ * context Gemini just processed.
  */
 export async function appendAssistantMessage(
   serviceClient: ReturnType<typeof createServiceClient>,
@@ -160,9 +202,10 @@ export async function appendAssistantMessage(
     conversationId: string;
     userId: string;
     assistantMessage: Record<string, unknown>;
+    promptTokenCount?: number;
   }
 ): Promise<{ ok: boolean; deleted?: boolean; error?: string }> {
-  const { conversationId, userId, assistantMessage } = params;
+  const { conversationId, userId, assistantMessage, promptTokenCount } = params;
 
   const { data: convo, error: readErr } = await serviceClient
     .from('ai_conversations')
@@ -186,13 +229,18 @@ export async function appendAssistantMessage(
   const next = [...existing, assistantMessage];
   const currentCount = Number(convo.message_count ?? 0);
 
+  const updatePayload: Record<string, unknown> = {
+    messages: next,
+    message_count: currentCount + 1,
+    updated_at: new Date().toISOString(),
+  };
+  if (typeof promptTokenCount === 'number' && promptTokenCount > 0) {
+    updatePayload.last_prompt_tokens = promptTokenCount;
+  }
+
   const { error: updateErr } = await serviceClient
     .from('ai_conversations')
-    .update({
-      messages: next,
-      message_count: currentCount + 1,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updatePayload)
     .eq('id', conversationId)
     .eq('user_id', userId);
   if (updateErr) {
@@ -201,3 +249,7 @@ export async function appendAssistantMessage(
   }
   return { ok: true };
 }
+
+// maybeUpdateEmbedding moved to tools/recall-conversations.ts (write side of
+// the recall feature). Keep it imported from there by the persist sites in
+// index.ts — this file no longer owns embedding logic.

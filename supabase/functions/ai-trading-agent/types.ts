@@ -209,7 +209,7 @@ export interface UserAttachedImage {
 }
 
 // Request/Response Types
-export type AgentRequestMode = 'chat' | 'reminder';
+export type AgentRequestMode = 'chat' | 'reminder' | 'backfill_embeddings';
 
 export interface AgentRequest {
   message: string;
