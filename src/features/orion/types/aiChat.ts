@@ -95,8 +95,7 @@ export interface AIConversation {
    * Server-measured prompt-token estimate for the NEXT turn (Gemini's
    * promptTokenCount from the final round of the most recent turn +
    * that turn's assistant output). Drives the context-budget meter in
-   * the chat UI — replaces client-side `estimateConversationTokens`.
-   * Absent on rows that haven't had a turn yet (treat as 0).
+   * the chat UI. Absent on rows that haven't had a turn yet (treat as 0).
    */
   last_prompt_tokens?: number;
   pinned: boolean;
