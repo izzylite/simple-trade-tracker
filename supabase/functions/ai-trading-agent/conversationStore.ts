@@ -35,8 +35,64 @@ export const MAX_PROMPT_TOKENS: number = (() => {
   return Number.isFinite(v) && v > 0 ? v : 250_000;
 })();
 
+/**
+ * UX-level "you're getting close" threshold. Below this the meter is green,
+ * past it the input locks client-side. Distinct from `MAX_PROMPT_TOKENS`
+ * which is the runaway-guard hard cap enforced by the DB UPDATE in
+ * `appendUserMessage`. Override via env.
+ *
+ * Default 80K matches the previous client-side `estimateConversationTokens`
+ * budget — chosen because Gemini attention measurably degrades well before
+ * the 1M context limit and 80K is generous enough that most chats never
+ * hit it.
+ */
+export const SOFT_PROMPT_TOKENS: number = (() => {
+  const v = Number(Deno.env.get('ORION_SOFT_PROMPT_TOKENS'));
+  return Number.isFinite(v) && v > 0 ? v : 80_000;
+})();
+
+/**
+ * Gate progress published to the client. `used` is the SERVER-MEASURED
+ * `last_prompt_tokens` value (Gemini's promptTokenCount from the final
+ * round of the last turn — exact, includes system + tools + history).
+ * `softLimit` is what the UI locks against; `hardLimit` is what the DB
+ * UPDATE gates against. `pct` is `used/softLimit * 100` clamped to 0-100
+ * so the meter never overruns the bar visually.
+ */
+export interface ConversationGate {
+  used: number;
+  softLimit: number;
+  hardLimit: number;
+  pct: number;
+}
+
+export function buildGate(used: number): ConversationGate {
+  const safeUsed = Math.max(0, Math.floor(used));
+  const pct = Math.min(100, Math.round((safeUsed / SOFT_PROMPT_TOKENS) * 100));
+  return {
+    used: safeUsed,
+    softLimit: SOFT_PROMPT_TOKENS,
+    hardLimit: MAX_PROMPT_TOKENS,
+    pct,
+  };
+}
+
 export type AppendUserMessageResult =
-  | { ok: true; conversationId: string }
+  | {
+      ok: true;
+      conversationId: string;
+      /**
+       * Prior history slice the agent loop must feed to Gemini as
+       * `conversationHistory`. Mirrors what the DB row contained BEFORE
+       * the new user message was appended (and, on edit-resend, AFTER
+       * truncation at `editingMessageId`). Filtered to `{role, content}`
+       * pairs Gemini's contents-builder accepts.
+       *
+       * Always returned even on first-turn (empty array) so callers don't
+       * branch on presence.
+       */
+      priorHistory: Array<{ role: 'user' | 'assistant'; content: string }>;
+    }
   | { ok: false; code: 'token_budget_exceeded' | 'forbidden' | 'unknown'; message?: string };
 
 /**
@@ -206,7 +262,27 @@ export async function appendUserMessage(
     await deleteAllChunks(serviceClient, conversationId);
   }
 
-  return { ok: true, conversationId };
+  // Build the priorHistory slice for the caller. `truncatedExisting` is
+  // the pre-existing messages array AFTER edit-truncation but BEFORE we
+  // appended this turn's user message + preserved fires — i.e. the exact
+  // history Gemini should see. Filter to user/assistant text messages
+  // only; system frames and non-string content don't belong in the
+  // contents-builder input.
+  const priorHistory = truncatedExisting
+    .filter(
+      // deno-lint-ignore no-explicit-any
+      (m: any) =>
+        m && typeof m === 'object' &&
+        (m.role === 'user' || m.role === 'assistant') &&
+        typeof m.content === 'string',
+    )
+    // deno-lint-ignore no-explicit-any
+    .map((m: any) => ({
+      role: m.role as 'user' | 'assistant',
+      content: m.content as string,
+    }));
+
+  return { ok: true, conversationId, priorHistory };
 }
 
 /**
