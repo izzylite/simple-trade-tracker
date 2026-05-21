@@ -11,11 +11,24 @@ import type { Calendar } from 'features/calendar/types/calendar';
 import type { ChatMessage as ChatMessageType, AttachedImage } from 'features/orion/types/aiChat';
 
 
+/**
+ * Server-published context-budget progress. The backend is the single
+ * source of truth — the UI just renders these numbers, no local
+ * estimation. `pct` is `used/softLimit * 100` already clamped 0-100.
+ */
+export interface ConversationGate {
+  used: number;
+  softLimit: number;
+  hardLimit: number;
+  pct: number;
+}
+
 export interface AgentResponse {
   success: boolean;
   message: string;
   messageHtml?: string;
   error?: string; // Error message from edge function
+  gate?: ConversationGate;
   citations?: Array<{
     id: string;
     title: string;
