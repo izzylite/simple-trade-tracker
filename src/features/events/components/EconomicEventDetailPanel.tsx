@@ -263,7 +263,6 @@ ${eventTrades.map((t) => `- ${t.id}`).join('\n')}
         prompt,
         session.user.id,
         undefined,
-        []
       );
 
       if (response.success) {

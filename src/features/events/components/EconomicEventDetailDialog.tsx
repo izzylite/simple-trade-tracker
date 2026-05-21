@@ -344,7 +344,6 @@ ${eventTrades.map(t => `- ${t.id}`).join('\n')}
         prompt,
         session.user.id,
         undefined, // No calendar context — pinning + AI now run user-scoped
-        [], // No conversation history context needed for this one-shot query
       );
 
       if (response.success) {
