@@ -2389,8 +2389,20 @@ Deno.serve(async (req: Request) => {
       return await handleBackfillEmbeddings(req);
     }
 
-    const { message, userId, calendarId, focusedTradeId, conversationHistory = [], calendarContext, images } = body;
+    // NOTE: `conversationHistory` is intentionally NOT destructured from the
+    // body. The server now reads prior history from the DB via the
+    // appendUserMessage response below. Accepting it here would let a stale
+    // client (old tab, mid-deploy bundle) silently override the DB-truth.
+    const { message, userId, calendarId, focusedTradeId, calendarContext, images } = body;
     const conversationId = body.conversationId;
+    // Soft compat: warn if a client still ships the old field so we can
+    // grep for stragglers after the FE deploy lands.
+    if (Array.isArray(body.conversationHistory) && body.conversationHistory.length > 0) {
+      log(
+        `Ignoring body.conversationHistory (${body.conversationHistory.length} msgs) — server reads from DB now`,
+        'warn',
+      );
+    }
 
     // Allow image-only messages (no text required if images present)
     const hasContent = message || (images && images.length > 0);
@@ -2467,6 +2479,13 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // appendUserMessage returns the pre-existing messages array
+    // (post-truncate, pre-append) shaped for Gemini's contents builder.
+    // This is the authoritative history for THIS turn — replaces the
+    // client-sent payload.
+    const priorHistory = persistResult.priorHistory;
+    log(`Server-fetched history: ${priorHistory.length} prior messages`, 'info');
+
     const googleApiKey = Deno.env.get('GOOGLE_API_KEY');
     if (!googleApiKey) {
       return new Response(
@@ -2485,7 +2504,7 @@ Deno.serve(async (req: Request) => {
 
     log(`Processing request for user ${userId}`, 'info');
     log(`Input message (first 200 chars): "${effectiveMessage.substring(0, 200)}"`, 'info');
-    log(`Message length: ${effectiveMessage.length}, History length: ${conversationHistory.length}, Images: ${images?.length || 0}`, 'info');
+    log(`Message length: ${effectiveMessage.length}, History length: ${priorHistory.length}, Images: ${images?.length || 0}`, 'info');
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const projectRef = supabaseUrl.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1];
@@ -2573,7 +2592,7 @@ Deno.serve(async (req: Request) => {
         googleApiKey,
         systemPrompt,
         messageWithReminder,
-        conversationHistory,
+        priorHistory,
         allTools,
         userId,
         calendarId,
@@ -2589,7 +2608,7 @@ Deno.serve(async (req: Request) => {
     // Non-streaming path (existing implementation)
     // Note: Non-streaming doesn't support images yet - use streaming mode for image analysis
     // Initial call
-    let result = await callGemini(googleApiKey, systemPrompt, messageWithReminder, conversationHistory, allTools);
+    let result = await callGemini(googleApiKey, systemPrompt, messageWithReminder, priorHistory, allTools);
 
     // Capture initial-call usage for response metadata — loop continuations
     // overwrite `result`, losing the field we care about for cache-hit
@@ -2616,7 +2635,7 @@ Deno.serve(async (req: Request) => {
     // systemPrompt is passed separately via the `systemInstruction` field
     // on each callGeminiWithContents call — not embedded here.
     const conversationContents: Array<{ role: string; parts: Array<Record<string, unknown>> }> = [
-      ...conversationHistory.map(msg => ({
+      ...priorHistory.map(msg => ({
         role: msg.role === 'user' ? 'user' : 'model',
         parts: [{ text: msg.content }]
       })),
