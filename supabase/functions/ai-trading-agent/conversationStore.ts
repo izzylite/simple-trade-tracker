@@ -13,6 +13,7 @@
  */
 
 import { createServiceClient, log } from '../_shared/supabase.ts';
+import { deleteAllChunks } from './tools/recall-chunks.ts';
 
 // NOTE: `maybeUpdateEmbedding` (the turn-end re-embed gate) used to live
 // here but was moved to `tools/recall-conversations.ts` — it's part of the
@@ -185,6 +186,24 @@ export async function appendUserMessage(
   }
   if (!updated) {
     return { ok: false, code: 'token_budget_exceeded' };
+  }
+
+  // On edit-resend, drop the window-level chunks too. We've already NULLed
+  // the conv-level embedding and reset embedded_at_message_count above —
+  // those alone are enough to make the conversation invisible to semantic
+  // recall until the next gate fires. But window chunks live in a sibling
+  // table and aren't touched by the UPDATE; without this explicit DELETE
+  // they would survive and `match_conversations` could still return chunk
+  // hints pointing at messages that no longer exist (the LATERAL chunk
+  // join runs even when the parent's embedding is NULL? No — the parent's
+  // `embedding IS NOT NULL` filter scopes it out. But a brief window
+  // between this UPDATE and the next gate fire could still surface stale
+  // chunks for other RPCs we add later. Best to keep the invariant simple:
+  // truncation = no chunks until regenerated). Fire-and-forget — if it
+  // fails, the next gate's `planChunkRegen` with lastEmbedCount=0 will
+  // overwrite from chunk_idx=0 anyway.
+  if (truncated) {
+    await deleteAllChunks(serviceClient, conversationId);
   }
 
   return { ok: true, conversationId };

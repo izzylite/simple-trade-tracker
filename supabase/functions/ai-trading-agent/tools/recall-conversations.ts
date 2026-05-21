@@ -22,6 +22,7 @@ import {
 } from "../../_shared/supabase.ts";
 import { AGENT_MEMORY_TAG } from "../../_shared/noteTags.ts";
 import { embedText, truncateForEmbedding } from "../../_shared/embed.ts";
+import { planChunkRegen, writeChunkBatch } from "./recall-chunks.ts";
 import type { GeminiFunctionDeclaration, ToolContext } from "./types.ts";
 
 /**
@@ -42,12 +43,39 @@ function constantTimeEqual(a: string, b: string): boolean {
 export const recallConversationsTool: GeminiFunctionDeclaration = {
   name: "recall_conversations",
   description:
-    `Search past chat conversations with this user, or fetch a paginated slice of one's transcript. Pick ONE \`action\`:
+    `Search past chat conversations with this user, or fetch a paginated slice of one's transcript. Two \`action\`s: "search" and "get".
 
-- action="search" — SEMANTIC search over past conversations (gemini-embedding-001 + pgvector cosine). Phrase the \`query\` like a natural-language description of what you're looking for ("position sizing during high vol", "FOMC bias change"), NOT as a strict keyword. The embedding will find conceptually related conversations even when exact words don't match. By default, ALL of the user's conversation history is searched — conversations are not auto-expired. Pass \`since_days\` ONLY if the user's request has an explicit recency signal ("this week", "yesterday", "in the last month"). Optional \`limit\` (default 5, max 10). Returns: [{ id, title, similarity, message_count, snippet }] ranked by relevance. Conversations under similarity 0.35 are filtered as noise. A new or just-edited conversation may not be searchable for a turn or two while its embedding refreshes — fall back to action="get" by id if you have it.
-- action="get" — fetch a PAGINATED slice of one conversation. Needs \`conversation_id\` (from a prior search — do NOT guess ids). Returns the LAST N messages by default. Optional \`limit\` (default 50, max 100) and \`offset\` (default 0, counts from the END — offset=0 is the most recent page, offset=50 with limit=50 returns the previous page). Response includes how many older/newer messages exist so you can page deeper if needed.
+## Standard workflow — exactly TWO tool calls per "remember when X" question
 
-ONLY use when the user explicitly references a past chat ("last time", "yesterday we discussed", "you told me before", "show me what we said about X"). For structured "what happened / when did" questions, prefer manage_event(action="recall") — faster and more precise. ${AGENT_MEMORY_TAG} notes (manage_note search) remain the primary long-term memory.`,
+1. action="search" with a natural-language phrasing of what the user asked for.
+2. action="get" on the top result, passing its \`best_slice_start\` as \`start_msg_idx\`. Read the slice and answer.
+
+**Do not call recall_conversations again in the same turn** unless:
+- The user explicitly referenced TWO different past chats (rare).
+- The first get's slice clearly doesn't contain what was asked AND another result from the same search list has similarity >= 0.5 — get THAT one. Do NOT re-search.
+
+### Stopping rules
+
+- Empty search results (no rows returned) → "I couldn't find that in our past chats — can you give me more detail?" Stop. **Do not rephrase and re-search.** Ask the user a clarifying question instead.
+- Top result similarity 0.35–0.49 with no \`best_slice_start\` (conversation too short for chunking) → fetch with default tail paging, then decide.
+- Top result similarity >= 0.5 → confident match. Go straight to \`get\` with \`start_msg_idx=best_slice_start\`.
+
+### Anti-pattern (avoid)
+
+Calling \`search\` 3+ times in one turn with rephrased queries. *Cost: each extra search round-trip adds ~5K input tokens and ~3s latency; 7 searches in one turn risks the 130s wall-clock cut-off.* Trust the first search. If the user's reference is too vague to land on, asking a clarifying question is cheaper and more honest than fishing.
+
+## Action reference
+
+- action="search" — SEMANTIC search over past conversations (gemini-embedding-2 + pgvector cosine, at both conversation and window level). Phrase the \`query\` like a natural-language description ("position sizing during high vol", "FOMC bias change"), NOT a strict keyword. ALL conversation history is searched by default — conversations are not auto-expired. Pass \`since_days\` ONLY if the user gave an explicit recency signal ("this week", "yesterday"). Optional \`limit\` (default 5, max 10). Returns: \`[{ id, title, similarity, message_count, snippet, best_slice_start, best_slice_end, slice_similarity }]\` — noise below similarity 0.35 is server-filtered (empty results = no real match). A new or just-edited conversation may not be searchable for a turn or two while its embedding refreshes — fall back to action="get" by id if you have it.
+- action="get" — fetch a PAGINATED slice of one conversation. Needs \`conversation_id\` (from a prior search — do NOT guess ids). Three paging modes:
+   1. (PREFERRED after search) Pass \`start_msg_idx\` from the search result's \`best_slice_start\` field — lands directly on the topically-matched slice. Forward-indexed (0 = first message).
+   2. Default tail: omit both \`offset\` and \`start_msg_idx\` to get the latest \`limit\` messages.
+   3. Tail-counted pagination: pass \`offset\` to walk backwards from the tail (offset=50 with limit=50 returns the page before the latest).
+   Optional \`limit\` (default 50, max 100). Response includes a message-range header so you can page deeper.
+
+## When to use this tool at all
+
+ONLY when the user explicitly references a past chat ("last time", "yesterday we discussed", "you told me before", "show me what we said about X"). For structured "what happened / when did" questions, prefer manage_event(action="recall") — faster and more precise. ${AGENT_MEMORY_TAG} notes (manage_note search) remain the primary long-term memory.`,
   parameters: {
     type: "object",
     properties: {
@@ -74,7 +102,12 @@ ONLY use when the user explicitly references a past chat ("last time", "yesterda
       offset: {
         type: "number",
         description:
-          "action=get only: number of recent messages to skip. 0 = latest page (default). 50 = skip the latest 50, return the page before that. Use to walk backwards through a long conversation.",
+          "action=get only: number of recent messages to skip (tail-counted). 0 = latest page (default). 50 = skip the latest 50, return the page before that. IGNORED when `start_msg_idx` is provided. Use only when paging backwards from the tail without a chunk hint.",
+      },
+      start_msg_idx: {
+        type: "number",
+        description:
+          "action=get only: forward-indexed slice start (0 = first message). Pass `best_slice_start` from a search result to land directly on the topically-matched passage. Takes precedence over `offset` when both are provided. This is the right way to consume search results — only fall back to `offset` when no chunk hint exists or when explicitly walking backwards through the tail.",
       },
       conversation_id: {
         type: "string",
@@ -153,6 +186,10 @@ async function searchConversations(
       updated_at: string;
       similarity: number;
       snippet: string;
+      best_chunk_idx: number | null;
+      best_chunk_start_msg_idx: number | null;
+      best_chunk_end_msg_idx: number | null;
+      best_chunk_similarity: number | null;
     }>)
       .filter((r) => r.similarity >= SEARCH_SIMILARITY_FLOOR)
       .slice(0, boundedLimit);
@@ -175,10 +212,25 @@ async function searchConversations(
       const snippet = (r.snippet ?? "")
         .substring(0, 200)
         .replace(/\s+/g, " ");
+      // best_slice_* is the chunk-level position hint. NULL when the
+      // conversation is below MIN_MSGS_FOR_CHUNKING (no chunks exist yet)
+      // — in that case the conv-level embedding already covered the whole
+      // thread, and the caller should fall back to default tail paging.
+      // We display 1-indexed message numbers in the human-readable hint
+      // but pass the raw 0-indexed start_msg_idx in the action="get" call.
+      const sliceLine =
+        r.best_chunk_start_msg_idx != null &&
+        r.best_chunk_end_msg_idx != null
+          ? `\n    Best slice: messages ${r.best_chunk_start_msg_idx + 1}-${
+              r.best_chunk_end_msg_idx + 1
+            } (best_slice_start=${r.best_chunk_start_msg_idx}, slice_sim=${
+              (r.best_chunk_similarity ?? 0).toFixed(2)
+            })`
+          : "\n    Best slice: (none — conversation too short for chunking; use default paging)";
       return (
         `[${i + 1}] id=${r.id}  similarity=${r.similarity.toFixed(2)}\n` +
         `    Title: ${r.title ?? "(untitled)"}\n` +
-        `    ${r.message_count} messages | updated ${r.updated_at}\n` +
+        `    ${r.message_count} messages | updated ${r.updated_at}${sliceLine}\n` +
         `    Opening: ${snippet}${snippet.length >= 200 ? "..." : ""}`
       );
     });
@@ -187,7 +239,7 @@ async function searchConversations(
       rows.length === 1 ? "" : "s"
     } semantically matching "${q}":\n\n${
       lines.join("\n\n")
-    }\n\nUse recall_conversations(action="get", conversation_id=...) to read the transcript of any result.`;
+    }\n\nTo read the matched slice of any result, call recall_conversations(action="get", conversation_id=..., start_msg_idx=<best_slice_start>). Omit start_msg_idx to read from the conversation tail instead.`;
   } catch (error) {
     return `Failed to search conversations: ${
       error instanceof Error ? error.message : "Unknown"
@@ -209,6 +261,7 @@ async function getConversation(
   conversationId: string,
   limit: number,
   offset: number,
+  startMsgIdx: number | undefined,
 ): Promise<string> {
   try {
     if (!conversationId) return "conversation_id is required.";
@@ -269,22 +322,38 @@ async function getConversation(
       return `Conversation "${data.title ?? "(untitled)"}" has no messages.`;
     }
 
-    // Page from the END (latest first). offset=0 returns the last `limit`
-    // messages; offset=50 with limit=50 returns the page before that.
-    // Clamp aggressively — a bad limit/offset from the model shouldn't blow
-    // up the response or return a confusing empty slice.
+    // Two slice modes:
+    //   - start_msg_idx (forward-indexed) — used after action="search" to
+    //     land on the chunk-matched passage. Takes precedence when set.
+    //   - offset (tail-counted) — backwards-compatible default. offset=0
+    //     returns the last `limit` messages; offset=50 with limit=50
+    //     returns the page before that.
+    // Clamp aggressively — a bad limit/offset/start_msg_idx from the model
+    // shouldn't blow up the response or return a confusing empty slice.
     const boundedLimit = Math.max(1, Math.min(GET_MAX_LIMIT, Math.floor(limit)));
-    const boundedOffset = Math.max(0, Math.floor(offset));
-    // sliceEnd is exclusive index of the last message in the page; sliceStart
-    // is inclusive. We want the page that ENDS `boundedOffset` messages
-    // before the tail.
-    const sliceEnd = Math.max(0, total - boundedOffset);
-    const sliceStart = Math.max(0, sliceEnd - boundedLimit);
+    let sliceStart: number;
+    let sliceEnd: number;
+    let usedStartMsgIdx = false;
+    if (typeof startMsgIdx === "number" && startMsgIdx >= 0) {
+      // Forward-indexed mode. Clamp into [0, total) so a stale chunk hint
+      // pointing past the (possibly truncated) tail still produces a valid
+      // slice — degrades to "last page" rather than crashing.
+      const clampedStart = Math.min(Math.max(0, Math.floor(startMsgIdx)), Math.max(0, total - 1));
+      sliceStart = clampedStart;
+      sliceEnd = Math.min(total, clampedStart + boundedLimit);
+      usedStartMsgIdx = true;
+    } else {
+      const boundedOffset = Math.max(0, Math.floor(offset));
+      sliceEnd = Math.max(0, total - boundedOffset);
+      sliceStart = Math.max(0, sliceEnd - boundedLimit);
+    }
     const page = messages.slice(sliceStart, sliceEnd);
     if (page.length === 0) {
+      const hint = usedStartMsgIdx
+        ? `start_msg_idx=${startMsgIdx} is past the end. Reduce or omit it.`
+        : `offset=${Math.max(0, Math.floor(offset))} is past the start. Reduce offset to read older content.`;
       return (
-        `Conversation "${data.title ?? "(untitled)"}" has ${total} messages but ` +
-        `offset=${boundedOffset} is past the start. Reduce offset to read older content.`
+        `Conversation "${data.title ?? "(untitled)"}" has ${total} messages but ${hint}`
       );
     }
 
@@ -297,17 +366,27 @@ async function getConversation(
 
     // Tell the model exactly what slice it got and what's still available
     // so it can decide to page deeper without guessing. "older" = closer to
-    // the start of the conversation; "newer" = closer to the tail (which
-    // would only be non-zero if the model passed a non-default offset).
+    // the start of the conversation; "newer" = closer to the tail.
     const olderCount = sliceStart;
     const newerCount = total - sliceEnd;
     const sliceHeader =
       `Conversation "${data.title ?? "(untitled)"}" — showing messages ${sliceStart + 1}-${sliceEnd} of ${total} ` +
       `(${olderCount} older, ${newerCount} newer not shown). ` +
       `created ${data.created_at}, last updated ${data.updated_at}.`;
-    const pagingHint = olderCount > 0
-      ? `\n\nTo read older messages, call recall_conversations(action="get", conversation_id="${data.id}", offset=${boundedOffset + boundedLimit}, limit=${boundedLimit}).`
-      : "";
+    // Continuation hint shape depends on which mode the caller used.
+    // Forward-indexed: suggest start_msg_idx = sliceEnd (next page forward).
+    // Tail-indexed:    suggest offset += boundedLimit (next page backward).
+    // Forward mode walks toward the tail (newer), tail mode walks toward
+    // the start (older) — different directions, so we hint accordingly.
+    let pagingHint = "";
+    if (usedStartMsgIdx && newerCount > 0) {
+      pagingHint =
+        `\n\nTo read the next slice forward, call recall_conversations(action="get", conversation_id="${data.id}", start_msg_idx=${sliceEnd}, limit=${boundedLimit}).`;
+    } else if (!usedStartMsgIdx && olderCount > 0) {
+      const nextOffset = Math.max(0, Math.floor(offset)) + boundedLimit;
+      pagingHint =
+        `\n\nTo read older messages, call recall_conversations(action="get", conversation_id="${data.id}", offset=${nextOffset}, limit=${boundedLimit}).`;
+    }
 
     return `${sliceHeader}\n\n${transcript}${pagingHint}`;
   } catch (error) {
@@ -345,7 +424,21 @@ export async function executeRecallConversations(
       : "";
     const limit = typeof args.limit === "number" ? args.limit : GET_DEFAULT_LIMIT;
     const offset = typeof args.offset === "number" ? args.offset : 0;
-    return await getConversation(supabase, userId, conversationId, limit, offset);
+    // start_msg_idx takes precedence over offset when both are present.
+    // Pass `undefined` (not 0) when omitted so getConversation can
+    // distinguish "model explicitly asked for the first page forward"
+    // from "model didn't pass a chunk hint at all."
+    const startMsgIdx = typeof args.start_msg_idx === "number"
+      ? args.start_msg_idx
+      : undefined;
+    return await getConversation(
+      supabase,
+      userId,
+      conversationId,
+      limit,
+      offset,
+      startMsgIdx,
+    );
   }
   return JSON.stringify({
     success: false,
@@ -657,6 +750,43 @@ export async function maybeUpdateEmbedding(
         return { updated: false };
       }
       committed = true;
+
+      // Window-level chunk pass. Runs AFTER the conv-level embed commits
+      // so a chunk-pass failure doesn't roll back the CAS claim — the
+      // conversation remains semantically searchable at conv-level via the
+      // fresh embedding we just wrote. Chunks are additive precision; if
+      // this pass partially fails, the next gate fire's planChunkRegen
+      // will see `lastEmbedCount = messages.length` and rebuild only the
+      // tail-most window(s), so the gap gets filled on the next normal
+      // turn rather than forcing a manual repair.
+      try {
+        const plan = planChunkRegen(messages, lastEmbedCount);
+        if (plan.toGenerate.length > 0) {
+          const result = await writeChunkBatch(
+            serviceClient,
+            conversationId,
+            userId,
+            messages.length,
+            plan,
+          );
+          log("maybeUpdateEmbedding chunk pass", "info", {
+            conversationId,
+            chunksEmbedded: result.embedded,
+            chunksErrors: result.errors,
+            firstRegenIdx: plan.firstRegenIdx,
+            maxNewIdx: plan.maxNewIdx,
+          });
+        }
+        // belowThreshold (messages.length < MIN_MSGS_FOR_CHUNKING) is the
+        // common case for new short conversations — no log needed, the
+        // conv-level embed already covers them.
+      } catch (chunkErr) {
+        log("maybeUpdateEmbedding chunk pass threw — skipping (chunks will retry next gate)", "warn", {
+          conversationId,
+          error: chunkErr instanceof Error ? chunkErr.message : String(chunkErr),
+        });
+      }
+
       return { updated: true };
     } finally {
       if (!committed) {

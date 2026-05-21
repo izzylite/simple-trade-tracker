@@ -21,6 +21,14 @@ The platform is built around five core features. All design, architecture, and p
 
 Follow KISS, YAGNI, and SOLID principles. Fail fast — check for errors early and raise exceptions immediately.
 
+**Build for scale, not for the current user.** This project is being built for scale (thousands of users, year-long conversation histories, multi-year trade journals). Design decisions must be made against the *at-scale* failure modes, not against the current single-user data point.
+
+- Never use "the failure isn't happening on current data" as a reason to defer a scaling-shaped design. Falsifying a failure on small-N data does NOT falsify the design — it just means the failure mode hasn't been reached yet.
+- When asked "is X worth building?", reason about behavior at 10K+ users with year-long histories, not about today's row counts.
+- The "ship the cheap version, instrument it, decide later" pattern is a trap for a product targeting scale — the cheap version becomes the prod version that ships to the at-scale user.
+- This applies to BOTH directions: design for scale from day 1 AND argue from scale assumptions when evaluating proposals.
+- This does NOT override YAGNI for feature creep or unrelated abstractions — scale-thinking is about the load/precision/quality axis specifically, not about adding hypothetical features.
+
 ## Design Source of Truth
 
 Before any UI work — new component, redesign, restyle, dialog, page, panel, marketing surface — absorb the style language from `.aidesigner/handoff/journotrades-design-system/project/`. Apply the *style concept* (type scale, color usage, spacing rhythm, button and input shape, focus ring, chip language) even if no specimen matches the surface 1:1. Do **not** treat the handoff as a lookup table for pixel-matching one component to one file.
