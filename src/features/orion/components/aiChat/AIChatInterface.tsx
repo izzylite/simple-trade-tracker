@@ -10,6 +10,7 @@ import {
   Box,
   IconButton,
   Button,
+  Tooltip,
   Typography,
   useTheme,
   alpha
@@ -20,7 +21,8 @@ import {
   Stop as StopIcon,
   Image as ImageIcon,
   Close as CloseIcon,
-  KeyboardArrowDown as ScrollDownIcon
+  KeyboardArrowDown as ScrollDownIcon,
+  InfoOutlined as InfoIcon,
 } from '@mui/icons-material';
 import { useDialogTokens } from 'styles/dialogTokens';
 import ChatMessage from 'features/orion/components/aiChat/ChatMessage';
@@ -698,16 +700,37 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
             >
               <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 0.75 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
-                  <Typography
-                    component="span"
-                    sx={{
-                      ...monoLabelSx,
-                      fontSize: '0.66rem',
-                      color: meterColor,
-                    }}
-                  >
-                    {isAtContextLimit ? 'Context Budget Reached' : 'Context Budget'}
-                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0 }}>
+                    <Typography
+                      component="span"
+                      sx={{
+                        ...monoLabelSx,
+                        fontSize: '0.66rem',
+                        color: meterColor,
+                      }}
+                    >
+                      {isAtContextLimit ? 'Context Budget Reached' : 'Context Budget'}
+                    </Typography>
+                    <Tooltip
+                      title={isAtContextLimit
+                        ? 'This conversation has used its context budget. Start a new chat to keep responses sharp.'
+                        : 'This conversation is getting long. Responses may start to drift — consider starting a new chat soon.'}
+                      arrow
+                      placement="top"
+                      enterTouchDelay={0}
+                      leaveTouchDelay={4000}
+                    >
+                      <InfoIcon
+                        sx={{
+                          fontSize: '0.85rem',
+                          color: meterColor,
+                          opacity: 0.7,
+                          cursor: 'help',
+                          '&:hover': { opacity: 1 },
+                        }}
+                      />
+                    </Tooltip>
+                  </Box>
                   <Typography
                     component="span"
                     sx={{
@@ -742,18 +765,6 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
                     }}
                   />
                 </Box>
-                <Typography
-                  variant="body2"
-                  sx={{
-                    fontSize: '0.82rem',
-                    lineHeight: 1.45,
-                    color: theme.palette.text.secondary,
-                  }}
-                >
-                  {isAtContextLimit
-                    ? 'This conversation has used its context budget. Start a new chat to keep responses sharp.'
-                    : 'This conversation is getting long. Responses may start to drift — consider starting a new chat soon.'}
-                </Typography>
               </Box>
               {isAtContextLimit && (
                 <Button
