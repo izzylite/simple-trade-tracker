@@ -44,7 +44,7 @@ export const recallConversationsTool: GeminiFunctionDeclaration = {
   description:
     `Search past chat conversations with this user, or fetch a paginated slice of one's transcript. Pick ONE \`action\`:
 
-- action="search" — SEMANTIC search over past conversations (gemini-embedding-001 + pgvector cosine). Phrase the \`query\` like a natural-language description of what you're looking for ("position sizing during high vol", "FOMC bias change"), NOT as a strict keyword. The embedding will find conceptually related conversations even when exact words don't match. Optional \`since_days\` (default 30), \`limit\` (default 5, max 10). Returns: [{ id, title, similarity, message_count, snippet }] ranked by relevance. Conversations under similarity 0.35 are filtered as noise. A new or just-edited conversation may not be searchable for a turn or two while its embedding refreshes — fall back to action="get" by id if you have it.
+- action="search" — SEMANTIC search over past conversations (gemini-embedding-001 + pgvector cosine). Phrase the \`query\` like a natural-language description of what you're looking for ("position sizing during high vol", "FOMC bias change"), NOT as a strict keyword. The embedding will find conceptually related conversations even when exact words don't match. By default, ALL of the user's conversation history is searched — conversations are not auto-expired. Pass \`since_days\` ONLY if the user's request has an explicit recency signal ("this week", "yesterday", "in the last month"). Optional \`limit\` (default 5, max 10). Returns: [{ id, title, similarity, message_count, snippet }] ranked by relevance. Conversations under similarity 0.35 are filtered as noise. A new or just-edited conversation may not be searchable for a turn or two while its embedding refreshes — fall back to action="get" by id if you have it.
 - action="get" — fetch a PAGINATED slice of one conversation. Needs \`conversation_id\` (from a prior search — do NOT guess ids). Returns the LAST N messages by default. Optional \`limit\` (default 50, max 100) and \`offset\` (default 0, counts from the END — offset=0 is the most recent page, offset=50 with limit=50 returns the previous page). Response includes how many older/newer messages exist so you can page deeper if needed.
 
 ONLY use when the user explicitly references a past chat ("last time", "yesterday we discussed", "you told me before", "show me what we said about X"). For structured "what happened / when did" questions, prefer manage_event(action="recall") — faster and more precise. ${AGENT_MEMORY_TAG} notes (manage_note search) remain the primary long-term memory.`,
@@ -64,7 +64,7 @@ ONLY use when the user explicitly references a past chat ("last time", "yesterda
       since_days: {
         type: "number",
         description:
-          "Only conversations updated in the last N days (action=search, default 30).",
+          "Optional date filter (action=search). If omitted, ALL conversations are searched — this is the right default for vague references like 'last time we discussed X'. Pass a value ONLY when the user explicitly anchors recency: 7 for 'this week', 30 for 'this month', 90 for 'this quarter'. Applied as a hard SQL filter BEFORE similarity ranking, so matches outside the window are invisible — be conservative.",
       },
       limit: {
         type: "number",
@@ -103,13 +103,17 @@ async function searchConversations(
   supabase: SupabaseClient,
   userId: string,
   query: string,
-  sinceDays: number = 30,
+  sinceDays: number | undefined,
   limit: number = 5,
 ): Promise<string> {
   try {
     const boundedLimit = Math.max(1, Math.min(10, Math.floor(limit)));
-    const sinceIso = new Date(Date.now() - sinceDays * 86400 * 1000)
-      .toISOString();
+    // No default time window — conversations don't auto-expire, so the user's
+    // full history should be searchable unless Orion explicitly narrows it.
+    // Passing null to the RPC bypasses the updated_at predicate entirely.
+    const sinceIso = typeof sinceDays === "number" && sinceDays > 0
+      ? new Date(Date.now() - sinceDays * 86400 * 1000).toISOString()
+      : null;
     const q = (query || "").trim();
     if (!q) return "Query is required for search_conversations.";
 
@@ -154,10 +158,16 @@ async function searchConversations(
       .slice(0, boundedLimit);
 
     if (rows.length === 0) {
+      const scopeNote = sinceIso
+        ? ` in the last ${sinceDays} days`
+        : "";
+      const widenHint = sinceIso
+        ? " — try widening or dropping since_days, or rephrasing"
+        : " — try rephrasing the query (semantic embeddings reward natural-language descriptions over keywords)";
       return (
-        `No past conversations semantically matched "${q}" in the last ${sinceDays} days. ` +
+        `No past conversations semantically matched "${q}"${scopeNote}. ` +
         `Note: conversations that haven't been indexed yet (very new, or pre-2026-05-19) ` +
-        `won't appear here — try widening since_days or rephrasing.`
+        `won't appear here${widenHint}.`
       );
     }
 
@@ -285,9 +295,12 @@ export async function executeRecallConversations(
 
   if (action === "search") {
     const query = typeof args.query === "string" ? args.query : "";
+    // No default — undefined means "search the user's full conversation
+    // history." Orion supplies a value only when the request has an explicit
+    // recency anchor (see tool description).
     const sinceDays = typeof args.since_days === "number"
       ? args.since_days
-      : 30;
+      : undefined;
     const limit = typeof args.limit === "number" ? args.limit : 5;
     return await searchConversations(supabase, userId, query, sinceDays, limit);
   }
@@ -525,40 +538,115 @@ export async function maybeUpdateEmbedding(
       return { updated: false };
     }
 
-    const title = typeof convo.title === "string" ? convo.title : "";
-    const rawInput = buildEmbedInput(title, messages);
-    const input = truncateForEmbedding(rawInput);
-    if (!input.trim()) return { updated: false };
-
-    // RETRIEVAL_DOCUMENT — indexing for later retrieval. The query side
-    // uses RETRIEVAL_QUERY (see searchConversations above). Asymmetric
-    // task types are NOT optional — same type on both sides measurably
-    // degrades recall.
-    const vec = await embedText(input, "RETRIEVAL_DOCUMENT");
-
-    // Monotonic guard on the write: if a concurrent caller already updated
-    // the embedding past our snapshot (e.g. a reminder fire racing the
-    // chat-turn persist), our UPDATE no-ops cleanly. Without this, two
-    // writers each computing against messages.length=N would both fire
-    // (wasting an embed call) and last-writer-wins could even regress
-    // embedded_at_message_count if the slower writer started earlier.
-    const { error: writeErr } = await serviceClient
+    // Atomic claim: CAS-bump embedded_at_message_count from lastEmbedCount
+    // to messages.length BEFORE doing the expensive embed call. Only one
+    // worker can win this CAS for a given snapshot — concurrent callers
+    // (reminder fire vs chat-turn persist) that read the same lastEmbedCount
+    // will lose the CAS and exit without paying for an embed.
+    //
+    // This is the gate that prevents the wasted Gemini call. The previous
+    // .lt write predicate prevented stale OVERWRITE after the embed call
+    // landed, but didn't stop the duplicate embed from happening. Bumping
+    // the count first turns the count itself into a lock-free claim token.
+    //
+    // Note: the predicate is `.eq(lastEmbedCount)`. If anyone else has
+    // already advanced the count (mid-embed claim by another worker, OR
+    // a completed embedding from a newer snapshot), the predicate fails
+    // and we exit. force=true (backfill) still respects this — backfill
+    // serializes anyway, so contention there is impossible by construction.
+    const { data: claimed, error: claimErr } = await serviceClient
       .from("ai_conversations")
-      .update({
-        embedding: vec,
-        embedded_at_message_count: messages.length,
-      })
+      .update({ embedded_at_message_count: messages.length })
       .eq("id", conversationId)
       .eq("user_id", userId)
-      .lt("embedded_at_message_count", messages.length);
-    if (writeErr) {
-      log("maybeUpdateEmbedding write failed", "warn", {
+      .eq("embedded_at_message_count", lastEmbedCount)
+      .select("id")
+      .maybeSingle();
+    if (claimErr) {
+      log("maybeUpdateEmbedding claim failed", "warn", {
         conversationId,
-        error: writeErr.message,
+        error: claimErr.message,
       });
       return { updated: false };
     }
-    return { updated: true };
+    if (!claimed) {
+      // CAS lost — another worker advanced the count between our read and
+      // our claim. They're either mid-embed or finished. Either way, no
+      // wasted embed call on our side.
+      return { updated: false };
+    }
+
+    // From here we hold the claim. ANY exit without a successful embedding
+    // write must roll back the count so the next turn re-fires the gate;
+    // otherwise the row sits with count=messages.length but a stale (or
+    // null) embedding, and the gate won't trigger again until +N more
+    // messages accumulate. The finally block handles all exit paths.
+    let committed = false;
+    try {
+      const title = typeof convo.title === "string" ? convo.title : "";
+      const rawInput = buildEmbedInput(title, messages);
+      const input = truncateForEmbedding(rawInput);
+      if (!input.trim()) return { updated: false };
+
+      // RETRIEVAL_DOCUMENT — indexing for later retrieval. The query side
+      // uses RETRIEVAL_QUERY (see searchConversations above). Asymmetric
+      // task types are NOT optional — same type on both sides measurably
+      // degrades recall.
+      const vec = await embedText(input, "RETRIEVAL_DOCUMENT");
+
+      // Commit: write the embedding. Count is already at messages.length
+      // from the claim, so the predicate is .eq (we still hold it), not .lt.
+      // If a newer claim leapfrogged us in the race window (possible only
+      // if EMBED_EVERY_N_MESSAGES more messages arrived during our embed
+      // call — rare), our write no-ops and the newer claim's embedding wins.
+      const { data: updated, error: writeErr } = await serviceClient
+        .from("ai_conversations")
+        .update({ embedding: vec })
+        .eq("id", conversationId)
+        .eq("user_id", userId)
+        .eq("embedded_at_message_count", messages.length)
+        .select("id")
+        .maybeSingle();
+      if (writeErr) {
+        log("maybeUpdateEmbedding write failed", "warn", {
+          conversationId,
+          error: writeErr.message,
+        });
+        return { updated: false };
+      }
+      if (!updated) {
+        log("maybeUpdateEmbedding skipped — leapfrogged by newer claim", "info", {
+          conversationId,
+          ourSnapshotLength: messages.length,
+        });
+        return { updated: false };
+      }
+      committed = true;
+      return { updated: true };
+    } finally {
+      if (!committed) {
+        // Release the claim. CAS-conditional on count still equalling our
+        // claim value — if a newer claim leapfrogged us, theirs stands and
+        // our rollback no-ops cleanly. Best-effort: a failed rollback only
+        // means the gate won't re-fire until +N more messages, which is
+        // acceptable degradation for a rare error path.
+        try {
+          await serviceClient
+            .from("ai_conversations")
+            .update({ embedded_at_message_count: lastEmbedCount })
+            .eq("id", conversationId)
+            .eq("user_id", userId)
+            .eq("embedded_at_message_count", messages.length);
+        } catch (rollbackErr) {
+          log("maybeUpdateEmbedding rollback failed — gate may stall until +N msgs", "warn", {
+            conversationId,
+            error: rollbackErr instanceof Error
+              ? rollbackErr.message
+              : String(rollbackErr),
+          });
+        }
+      }
+    }
   } catch (err) {
     // Embed API failure should NOT propagate. The persist already
     // succeeded by the time we get here; a missing embedding just means
