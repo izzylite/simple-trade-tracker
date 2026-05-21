@@ -4,7 +4,7 @@
  * Extracts core AI chat logic for use across different UI components
  */
 
-import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import {
   ChatMessage as ChatMessageType,
@@ -20,7 +20,6 @@ import {
   ConversationPaginationOptions
 } from 'services/repositories/ConversationRepository';
 import { logger } from 'utils/logger';
-import { estimateConversationTokens } from 'features/orion/utils/tokenEstimation';
 import { supabase } from 'config/supabase';
 
 const CONVERSATIONS_PAGE_SIZE = 15;
@@ -76,11 +75,6 @@ export interface UseAIChatOptions {
   userId: string | undefined;
   calendar?: Calendar;
   trade?: Trade;
-  /**
-   * Total estimated tokens (text + images) the conversation may consume
-   * before the input is locked. Heuristic; see utils/tokenEstimation.ts.
-   */
-  tokenBudget?: number;
   autoSaveConversation?: boolean;
   /**
    * When true, conversations save to userId only (calendar_id = null)
@@ -106,11 +100,11 @@ export interface UseAIChatReturn {
   loadingMessages: boolean;
   hasMoreConversations: boolean;
   totalConversationsCount: number;
-  /** True once estimated tokens reach `tokenBudget` — input is locked. */
+  /** True once the server-published gate.used reaches gate.softLimit — input is locked. */
   isAtContextLimit: boolean;
-  /** Estimated tokens used by the current conversation. */
+  /** Server-published prompt tokens used by the current conversation (alias for gate.used). */
   tokenUsage: number;
-  /** Effective token budget (defaulted from `tokenBudget` option). */
+  /** Server-published soft limit the UI locks against (alias for gate.softLimit). */
   tokenBudget: number;
   editingMessageId: string | null;
 
@@ -145,28 +139,19 @@ export interface UseAIChatReturn {
   getWelcomeMessage: () => ChatMessageType;
 }
 
-// Default conversational context budget. Gemini supports 1M tokens, but
-// agent attention measurably degrades well before that — 80K is the sweet
-// spot: generous enough that most chats never hit it, tight enough to
-// catch truly bloated turns (long pastes, multi-image threads) before
-// quality rots.
-const TOKEN_BUDGET_DEFAULT = 80_000;
+// Fallback defaults for the gate before the server has published one
+// (brand-new chat, or a row whose last_prompt_tokens is still NULL).
+// Server overrides these on the first done event and on findById.
+const GATE_DEFAULT_SOFT = 80_000;
+const GATE_DEFAULT_HARD = 250_000;
 
 export function useAIChat({
   userId,
   calendar,
   trade,
-  tokenBudget: tokenBudgetOption,
   autoSaveConversation = true,
   saveAsUserLevel = false,
 }: UseAIChatOptions): UseAIChatReturn {
-  // Coerce non-positive overrides (0, negative, NaN) to the default. Without
-  // this, `tokenBudget: 0` would make `tokenUsage >= tokenBudget` true from
-  // mount and lock the input before the user ever types.
-  const tokenBudget =
-    typeof tokenBudgetOption === 'number' && tokenBudgetOption > 0
-      ? tokenBudgetOption
-      : TOKEN_BUDGET_DEFAULT;
   // State
   const [messages, setMessages] = useState<ChatMessageType[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -200,16 +185,17 @@ export function useAIChat({
   const loadTokenRef = useRef(0);
   const [totalConversationsCount, setTotalConversationsCount] = useState(0);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
-  // Recomputes on every messages identity change. The heuristic is cheap
-  // (~chars/4 + flat per-image cost) so doing it inline avoids the extra
-  // render pass a `useState + useEffect` pair would cost on every streaming
-  // chunk, and keeps `tokenUsage` in lockstep with `messages` (no window
-  // where one belongs to convo A and the other to convo B during a switch).
-  const tokenUsage = useMemo(
-    () => estimateConversationTokens(messages),
-    [messages],
-  );
-  const isAtContextLimit = tokenUsage >= tokenBudget;
+  // Server-published gate. Seeded from `last_prompt_tokens` on
+  // selectConversation; updated on every streaming `done` event; reset on
+  // startNewChat. Defaults model a fresh conversation (0 used); server
+  // overrides on first turn.
+  const [gateUsed, setGateUsed] = useState<number>(0);
+  const [gateSoftLimit, setGateSoftLimit] = useState<number>(GATE_DEFAULT_SOFT);
+  const [_gateHardLimit, setGateHardLimit] = useState<number>(GATE_DEFAULT_HARD);
+
+  const tokenUsage = gateUsed;
+  const tokenBudget = gateSoftLimit;
+  const isAtContextLimit = gateUsed >= gateSoftLimit;
 
   // Refs
   const conversationRepo = useRef(new ConversationRepository()).current;
@@ -612,6 +598,7 @@ export function useAIChat({
     setMessages([]);
     setCurrentConversationId(null);
     setEditingMessageId(null);
+    setGateUsed(0);
     logger.log('Started new conversation (local reset)');
   }, []);
 
@@ -640,13 +627,24 @@ export function useAIChat({
       void conversationRepo.touch(conversation.id, userId);
     }
 
+    // Apply messages + seed gate from the row in one place so both the
+    // preloaded-row branch and the lazy-load branch stay in sync. The list
+    // queries don't carry last_prompt_tokens (they exclude the heavy cols),
+    // so the preloaded branch usually gates from 0 until findById fires;
+    // the lazy branch always lands on the real value.
+    const applyConversation = (convo: AIConversation) => {
+      setMessages((convo.messages ?? []) as ChatMessageType[]);
+      setGateUsed(typeof convo.last_prompt_tokens === 'number' ? convo.last_prompt_tokens : 0);
+    };
+
     if (conversation.messages) {
-      setMessages(conversation.messages as ChatMessageType[]);
+      applyConversation(conversation);
       logger.log('Loaded conversation (preloaded):', conversation.id);
       return;
     }
 
     setMessages([]);
+    setGateUsed(0);
     setLoadingMessages(true);
     try {
       const full = await conversationRepo.findById(conversation.id);
@@ -654,7 +652,7 @@ export function useAIChat({
         logger.warn('Conversation not found on lazy load:', conversation.id);
         return;
       }
-      setMessages((full.messages ?? []) as ChatMessageType[]);
+      applyConversation(full);
       logger.log('Loaded conversation (lazy):', conversation.id);
     } catch (error) {
       logger.error('Error lazy-loading conversation messages:', error);
@@ -1003,10 +1001,19 @@ export function useAIChat({
             embeddedNotes = event.data.embeddedNotes;
             break;
 
-          case 'done':
+          case 'done': {
             messageHtml = event.data.messageHtml || '';
+            const gate = event.data.gate as
+              | { used: number; softLimit: number; hardLimit: number; pct: number }
+              | undefined;
+            if (gate) {
+              setGateUsed(gate.used);
+              setGateSoftLimit(gate.softLimit);
+              setGateHardLimit(gate.hardLimit);
+            }
             logger.log('AI response streaming complete');
             break;
+          }
 
           case 'error':
             throw new Error(event.data.error || 'Streaming error');
