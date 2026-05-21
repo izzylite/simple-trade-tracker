@@ -42,35 +42,8 @@ const CitationsSection: React.FC<CitationsSectionProps> = ({
     return null;
   }
 
-  const getToolColor = (toolName: string): 'default' | 'primary' | 'secondary' | 'error' | 'warning' | 'info' | 'success' => {
-    switch (toolName) {
-      case 'search_web':
-        return 'primary';
-      case 'scrape_url':
-        return 'secondary';
-      case 'execute_sql':
-        return 'info';
-      case 'price_data':
-        return 'success';
-      default:
-        return 'default';
-    }
-  };
+   
 
-  const getToolLabel = (toolName: string): string => {
-    switch (toolName) {
-      case 'search_web':
-        return 'Web';
-      case 'scrape_url':
-        return 'Article';
-      case 'execute_sql':
-        return 'DB';
-      case 'price_data':
-        return 'Price';
-      default:
-        return toolName;
-    }
-  };
 
   const getDomainFromUrl = (url: string): string => {
     try {
@@ -164,7 +137,7 @@ const CitationsSection: React.FC<CitationsSectionProps> = ({
       sx={{
         display: 'flex',
         flexDirection: 'column',
-        maxWidth: compact ? 350 : 'none',
+        maxWidth: compact ? 350 : '100%',
       }}
     >
       {/* Sticky header — citations scroll beneath it */}
@@ -196,11 +169,12 @@ const CitationsSection: React.FC<CitationsSectionProps> = ({
       <Box
         sx={{
           display: 'flex',
-          flexDirection: 'column',
-          gap: 0.5,
+          flexDirection: compact ? 'column' : 'row',
+          flexWrap: compact ? 'nowrap' : 'wrap',
+          gap: compact ? 0.5 : 0.75,
           p: compact ? 1.5 : 0,
           maxHeight: compact ? 260 : 'none',
-          overflow: 'auto',
+          overflow: compact ? 'auto' : 'visible',
         }}
       >
       {citations.map((citation) => (
@@ -208,16 +182,19 @@ const CitationsSection: React.FC<CitationsSectionProps> = ({
           key={citation.id}
           variant="outlined"
           sx={{
-            px: 1.5,
-            py: 1,
+            px: 1.25,
+            py: 0.75,
             borderRadius: 2,
             backgroundColor: alpha(theme.palette.background.paper, 0.8),
             border: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
             display: 'flex',
             alignItems: 'center',
-            gap: 1.5,
+            gap: 1,
             cursor: 'pointer',
             transition: 'all 150ms cubic-bezier(0.22, 1, 0.36, 1)',
+            flex: compact ? '1 1 auto' : '0 0 auto',
+            maxWidth: compact ? 'none' : 180,
+            minWidth: 0,
             '&:hover': {
               backgroundColor: alpha(theme.palette.action.hover, 0.2),
               borderColor: alpha(theme.palette.primary.main, 0.4)
@@ -258,22 +235,7 @@ const CitationsSection: React.FC<CitationsSectionProps> = ({
             </Typography>
           </Box>
 
-          {/* Tool tag */}
-          {citation.toolName && (
-            <Chip
-              label={getToolLabel(citation.toolName)}
-              size="small"
-              color={getToolColor(citation.toolName)}
-              variant="outlined"
-              sx={{
-                height: 18,
-                fontSize: '0.6rem',
-                flexShrink: 0,
-                borderRadius: 999,
-                '& .MuiChip-label': { px: 0.75 }
-              }}
-            />
-          )}
+     
 
           {/* Open icon */}
           <OpenInNewIcon sx={{ fontSize: 14, color: 'text.secondary', flexShrink: 0 }} />
@@ -391,7 +353,7 @@ const CitationsSection: React.FC<CitationsSectionProps> = ({
       {/* Collapse for non-compact mode */}
       {!compact && (
         <Collapse in={expanded} timeout="auto" sx={{ alignSelf: 'stretch' }}>
-          <Box sx={{ mt: 1, minWidth: 260, maxWidth: 380 }}>
+          <Box sx={{ mt: 1, width: '100%' }}>
             {renderCitationsList()}
           </Box>
         </Collapse>
