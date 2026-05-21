@@ -29,7 +29,7 @@ import {
   Alert,
   alpha,
   useTheme,
-  Skeleton,
+  CircularProgress,
 } from '@mui/material';
 import {
   Close as CloseIcon,
@@ -308,7 +308,7 @@ const OrionPanel: React.FC<OrionPanelProps> = ({
                 onNoteClick={onNoteClick}
                 isReadOnly={isReadOnly}
               />
-              {/* Skeleton overlay while a just-selected conversation's full
+              {/* Loading overlay while a just-selected conversation's full
                   messages lazy-load. Mirrors AIChatContent's overlay so the
                   trade-gallery / event-detail focus panel gets the same
                   hydration feedback. */}
@@ -319,27 +319,12 @@ const OrionPanel: React.FC<OrionPanelProps> = ({
                     inset: 0,
                     backgroundColor: theme.palette.background.default,
                     display: 'flex',
-                    flexDirection: 'column',
-                    gap: 1.5,
-                    px: 2,
-                    pt: 2,
-                    pb: 1.5,
-                    overflow: 'hidden',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                     zIndex: 15,
                   }}
                 >
-                  <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                    <Skeleton variant="rounded" animation="wave" width="58%" height={38} sx={{ borderRadius: 2 }} />
-                  </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'flex-start' }}>
-                    <Skeleton variant="rounded" animation="wave" width="82%" height={80} sx={{ borderRadius: 2 }} />
-                  </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                    <Skeleton variant="rounded" animation="wave" width="42%" height={28} sx={{ borderRadius: 2 }} />
-                  </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'flex-start' }}>
-                    <Skeleton variant="rounded" animation="wave" width="70%" height={58} sx={{ borderRadius: 2 }} />
-                  </Box>
+                  <CircularProgress size={28} />
                 </Box>
               )}
             </Box>

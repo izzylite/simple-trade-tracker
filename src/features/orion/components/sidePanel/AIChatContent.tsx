@@ -20,7 +20,6 @@ import {
   TextField,
   InputAdornment,
   CircularProgress,
-  Skeleton,
 } from '@mui/material';
 import {
   Delete as DeleteIcon,
@@ -538,11 +537,10 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
           overflow: 'hidden',
           position: 'relative',
         }}>
-            {/* Skeleton overlay while the lazy `findById` for a freshly
-                selected conversation resolves. Covers the entire chat
-                surface (including the input) — the user can't usefully
-                type until the messages have hydrated. Mimics the bubble
-                layout so the eye lands where the real content will appear. */}
+            {/* Loading overlay while the lazy `findById` for a freshly
+                selected conversation resolves. Covers the chat surface
+                (including the input) — the user can't usefully type until
+                the messages have hydrated. */}
             {loadingMessages && (
               <Box
                 sx={{
@@ -550,55 +548,12 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
                   inset: 0,
                   backgroundColor: theme.palette.background.default,
                   display: 'flex',
-                  flexDirection: 'column',
-                  gap: 1.75,
-                  px: 2.5,
-                  pt: 2.5,
-                  pb: 2,
-                  overflow: 'hidden',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                   zIndex: 15,
                 }}
               >
-                {/* user bubble — right aligned */}
-                <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                  <Skeleton
-                    variant="rounded"
-                    animation="wave"
-                    width="58%"
-                    height={44}
-                    sx={{ borderRadius: 2 }}
-                  />
-                </Box>
-                {/* assistant bubble — left aligned, taller */}
-                <Box sx={{ display: 'flex', justifyContent: 'flex-start' }}>
-                  <Skeleton
-                    variant="rounded"
-                    animation="wave"
-                    width="82%"
-                    height={96}
-                    sx={{ borderRadius: 2 }}
-                  />
-                </Box>
-                {/* user bubble — right aligned, shorter */}
-                <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                  <Skeleton
-                    variant="rounded"
-                    animation="wave"
-                    width="42%"
-                    height={32}
-                    sx={{ borderRadius: 2 }}
-                  />
-                </Box>
-                {/* assistant bubble — left aligned */}
-                <Box sx={{ display: 'flex', justifyContent: 'flex-start' }}>
-                  <Skeleton
-                    variant="rounded"
-                    animation="wave"
-                    width="70%"
-                    height={68}
-                    sx={{ borderRadius: 2 }}
-                  />
-                </Box>
+                <CircularProgress size={32} sx={{ color: violet }} />
               </Box>
             )}
             <AIChatInterface
