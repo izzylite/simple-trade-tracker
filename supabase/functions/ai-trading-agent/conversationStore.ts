@@ -52,6 +52,23 @@ export const SOFT_PROMPT_TOKENS: number = (() => {
 })();
 
 /**
+ * Per-message byte cap, enforced server-side as defense-in-depth against
+ * the FE char cap. A single oversized paste (long log, CSV, article body)
+ * on a brand-new conversation would otherwise bypass the gate entirely
+ * (last_prompt_tokens = 0 for a fresh row) and ship the whole thing to
+ * Gemini in one turn.
+ *
+ * Default 200KB ≈ 50K English tokens — roughly aligns with the FE's 50K
+ * char limit (UTF-8 + image-data-url overhead push bytes higher). Bytes
+ * not chars because the underlying network/storage cost is bytes.
+ * Override via env.
+ */
+export const MAX_USER_MESSAGE_BYTES: number = (() => {
+  const v = Number(Deno.env.get('ORION_MAX_USER_MESSAGE_BYTES'));
+  return Number.isFinite(v) && v > 0 ? v : 200_000;
+})();
+
+/**
  * Gate progress published to the client. `used` is the SERVER-MEASURED
  * `last_prompt_tokens` value (Gemini's promptTokenCount from the final
  * round of the last turn — exact, includes system + tools + history).

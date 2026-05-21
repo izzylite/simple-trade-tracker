@@ -27,6 +27,7 @@ import {
   appendAssistantMessage,
   buildGate,
   MAX_PROMPT_TOKENS,
+  MAX_USER_MESSAGE_BYTES,
   type ConversationGate,
 } from './conversationStore.ts';
 import {
@@ -2461,6 +2462,30 @@ Deno.serve(async (req: Request) => {
       return new Response(
         JSON.stringify({ success: false, error: 'Missing required field: conversationId' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Per-message byte cap — defense in depth against the FE char cap.
+    // Reject before persistence so an oversized paste never lands in
+    // ai_conversations.messages and never reaches Gemini. UTF-8 byte
+    // length matches what would actually get transmitted/stored.
+    const messageBytes = typeof message === 'string'
+      ? new TextEncoder().encode(message).byteLength
+      : 0;
+    if (messageBytes > MAX_USER_MESSAGE_BYTES) {
+      log(
+        `Rejecting oversized user message: ${messageBytes} bytes > ${MAX_USER_MESSAGE_BYTES}`,
+        'warn',
+      );
+      return new Response(
+        JSON.stringify({
+          success: false,
+          code: 'message_too_large',
+          error: `Message is too long (${Math.round(messageBytes / 1024)}KB). ` +
+            `Maximum is ${Math.round(MAX_USER_MESSAGE_BYTES / 1024)}KB per message. ` +
+            `Try splitting it into smaller chunks.`,
+        }),
+        { status: 413, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 

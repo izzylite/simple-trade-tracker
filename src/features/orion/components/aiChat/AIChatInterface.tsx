@@ -51,6 +51,14 @@ import { expandMentionsForSend, stripReferencedBlocks } from 'features/orion/uti
 // Image limit for AI agent requests (must match backend MAX_IMAGES_PER_REQUEST)
 const MAX_IMAGES = 4;
 
+// Per-message character cap. ~12.5K English tokens — catches an
+// accidental long paste (log, CSV, article body) before any network
+// round-trip. Backend has a tighter byte cap (200KB ≈ same order of
+// magnitude after UTF-8 + mention expansion) as defense in depth.
+const MAX_USER_MESSAGE_CHARS = 50_000;
+// Start surfacing a character counter when within this many chars of the cap.
+const CHAR_COUNTER_WARN_AT = MAX_USER_MESSAGE_CHARS - 5_000;
+
 // Type for question templates
 export interface QuestionTemplate {
   category: string;
@@ -397,6 +405,19 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
       const outgoing = segments.length > 0
         ? expandMentionsForSend(segments, notesMap)
         : plainText;
+
+      // Hard guard on outgoing message length — checked AFTER mention
+      // expansion since a single @note chip can balloon into several KB
+      // of body text. Backend has a matching byte cap as defense in
+      // depth; this surfaces the limit before the network round-trip.
+      if (outgoing.length > MAX_USER_MESSAGE_CHARS) {
+        setMentionWarning(
+          `Message is too long (${outgoing.length.toLocaleString()} characters; limit is ` +
+            `${MAX_USER_MESSAGE_CHARS.toLocaleString()}). Try splitting it into smaller chunks ` +
+            `or referencing fewer notes.`
+        );
+        return;
+      }
 
       const imagesToSend = attachedImages.length > 0 ? [...attachedImages] : undefined;
       setInputMessage('');
@@ -1251,7 +1272,11 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
             <Button
               aria-label="Send message"
               onClick={handleSendMessage}
-              disabled={(!inputMessage.trim() && attachedImages.length === 0) || isAtContextLimit}
+              disabled={
+                (!inputMessage.trim() && attachedImages.length === 0) ||
+                isAtContextLimit ||
+                inputMessage.length > MAX_USER_MESSAGE_CHARS
+              }
               size="small"
               endIcon={<SendIcon sx={{ fontSize: 14, transform: 'rotate(-12deg)' }} />}
               sx={{
@@ -1270,23 +1295,46 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
           )}
         </Box>
 
-        {/* Helper Text */}
-        <Typography
-          component="span"
+        {/* Helper Text + char counter (counter only renders when nearing the cap) */}
+        <Box
           sx={{
             mt: 0.875,
-            display: 'block',
-            textAlign: 'center',
-            fontSize: '0.68rem',
-            fontWeight: 400,
-            letterSpacing: 0,
-            textTransform: 'none',
-            lineHeight: 1.5,
-            color: alpha(theme.palette.text.secondary, 0.7),
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 1,
+            flexWrap: 'wrap',
           }}
         >
-          {`Enter to send · Shift+Enter newline · / for commands · @ for notes & tags · Up to ${MAX_IMAGES} images`}
-        </Typography>
+          <Typography
+            component="span"
+            sx={{
+              fontSize: '0.68rem',
+              fontWeight: 400,
+              letterSpacing: 0,
+              textTransform: 'none',
+              lineHeight: 1.5,
+              color: alpha(theme.palette.text.secondary, 0.7),
+            }}
+          >
+            {`Enter to send · Shift+Enter newline · / for commands · @ for notes & tags · Up to ${MAX_IMAGES} images`}
+          </Typography>
+          {inputMessage.length >= CHAR_COUNTER_WARN_AT && (
+            <Typography
+              component="span"
+              sx={{
+                fontSize: '0.68rem',
+                fontWeight: 600,
+                lineHeight: 1.5,
+                color: inputMessage.length > MAX_USER_MESSAGE_CHARS
+                  ? theme.palette.error.main
+                  : theme.palette.warning.main,
+              }}
+            >
+              {`${inputMessage.length.toLocaleString()} / ${MAX_USER_MESSAGE_CHARS.toLocaleString()}`}
+            </Typography>
+          )}
+        </Box>
       </Box>
 
     </Box>
