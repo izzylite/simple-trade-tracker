@@ -243,6 +243,18 @@ function logUsageMetadata(
  * prompt; finalPrompt = the last round's prompt (the gap is mostly
  * tool-result tokens that DON'T persist into the next turn's history).
  */
+/**
+ * Coerce a usageMetadata field to a finite non-negative integer.
+ * Gemini's usageMetadata sometimes ships partial payloads (cache-only
+ * round, error-stripped response). `Number(undefined) = NaN`, and NaN
+ * propagates through buildGate into the FE meter as "NaN%". This keeps
+ * the gate output well-formed even when inputs aren't.
+ */
+function finiteOrZero(v: unknown): number {
+  const n = Number(v ?? 0);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
 function logTurnAudit(
   conversationId: string | undefined,
   functionCalls: Array<{ name: string }>,
@@ -1713,10 +1725,12 @@ function handleStreamingRequest(
         // promptTokenCount would over-charge the gate. See block comment
         // above where firstRoundUsage is declared. Hoisted out of persistTask
         // so the `done` SSE event can publish it before the waitUntil DB
-        // write resolves.
-        const firstRoundPrompt = Number(firstRoundUsage?.promptTokenCount ?? 0);
-        const assistantOutput = Number(lastUsageMetadata?.candidatesTokenCount ?? 0);
-        nextTurnEstimate = firstRoundPrompt + assistantOutput;
+        // write resolves. `finiteOrZero` keeps NaN/Infinity from partial
+        // usageMetadata payloads out of the gate — buildGate would propagate
+        // NaN otherwise and the FE meter would render "NaN%".
+        nextTurnEstimate =
+          finiteOrZero(firstRoundUsage?.promptTokenCount) +
+          finiteOrZero(lastUsageMetadata?.candidatesTokenCount);
         const persistTask = (async () => {
           const persistClient = createServiceClient();
           // Rehost ephemeral QuickChart URLs into ai-chat-images so the
@@ -2899,9 +2913,10 @@ Deno.serve(async (req: Request) => {
     // Estimate Turn T+1's first Gemini prompt size — same accounting as the
     // streaming path. Hoisted from inside persistTask so the JSON response
     // can publish `gate` to the FE alongside the assistant message.
-    const firstRoundPrompt = Number(firstRoundUsage?.promptTokenCount ?? 0);
-    const assistantOutput = Number(lastUsageMetadata?.candidatesTokenCount ?? 0);
-    const nextTurnEstimate = firstRoundPrompt + assistantOutput;
+    // finiteOrZero coerces partial-usageMetadata NaNs to 0 (see helper).
+    const nextTurnEstimate =
+      finiteOrZero(firstRoundUsage?.promptTokenCount) +
+      finiteOrZero(lastUsageMetadata?.candidatesTokenCount);
     const gate: ConversationGate | undefined = conversationId
       ? buildGate(nextTurnEstimate)
       : undefined;

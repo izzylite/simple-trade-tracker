@@ -13,7 +13,7 @@ import {
 } from 'features/orion/types/aiChat';
 import { Calendar } from 'features/calendar/types/calendar';
 import { Trade } from 'features/calendar/types/trade';
-import { supabaseAIChatService } from 'features/orion/services/supabaseAIChatService';
+import { supabaseAIChatService, type ConversationGate } from 'features/orion/services/supabaseAIChatService';
 import { generateConversationTitle } from 'features/orion/utils/conversationTitle';
 import {
   ConversationRepository,
@@ -298,6 +298,18 @@ export function useAIChat({
       });
     };
 
+    // Refresh the gate meter when the row's last_prompt_tokens changes —
+    // happens on every reminder fire (which writes a new assistant message
+    // via appendAssistantMessage). Without this the meter stays stale until
+    // the user re-selects the conversation.
+    const refreshGateFromRow = (next: unknown): void => {
+      const lpt = (next as { last_prompt_tokens?: unknown } | null | undefined)
+        ?.last_prompt_tokens;
+      if (typeof lpt === 'number' && Number.isFinite(lpt) && lpt >= 0) {
+        setGateUsed(lpt);
+      }
+    };
+
     const channel = supabase
       .channel(`ai-convo-realtime-${currentConversationId}`)
       .on(
@@ -310,6 +322,7 @@ export function useAIChat({
         },
         (payload: any) => {
           mergeReminderMessages(payload?.new?.messages);
+          refreshGateFromRow(payload?.new);
         }
       )
       .subscribe((status) => {
@@ -320,6 +333,7 @@ export function useAIChat({
         void conversationRepo.findById(currentConversationId).then((convo) => {
           if (!convo) return;
           mergeReminderMessages(convo.messages);
+          refreshGateFromRow(convo);
         });
       });
 
@@ -592,15 +606,37 @@ export function useAIChat({
   }, [searchConversations, loadConversations]);
 
   /**
+   * Abort any in-flight streaming request without the message-filter
+   * cleanup `cancelRequest` does. Used by selectConversation /
+   * startNewChat — they're about to overwrite messages state anyway, so
+   * the filter step is wasteful and could briefly flash empty bubbles
+   * before the new state lands.
+   */
+  const abortActiveStream = useCallback(() => {
+    if (!abortControllerRef.current) return;
+    cancelRequestedRef.current = true;
+    abortControllerRef.current.abort();
+    abortControllerRef.current = null;
+    activeRequestRef.current = null;
+    setIsLoading(false);
+    setIsTyping(false);
+    setToolExecutionStatus('');
+  }, []);
+
+  /**
    * Start a new chat
    */
   const startNewChat = useCallback(async () => {
+    // Kill any in-flight send for the previous chat — otherwise its done
+    // event would fire after we've reset state and overwrite gate/messages
+    // for the now-departed conversation.
+    abortActiveStream();
     setMessages([]);
     setCurrentConversationId(null);
     setEditingMessageId(null);
     setGateUsed(0);
     logger.log('Started new conversation (local reset)');
-  }, []);
+  }, [abortActiveStream]);
 
   /**
    * Select a conversation from history.
@@ -616,6 +652,10 @@ export function useAIChat({
    * the fetch is in flight would be missed.
    */
   const selectConversation = useCallback(async (conversation: AIConversation) => {
+    // Kill any in-flight send for the previous chat before switching —
+    // otherwise its done event lands after we've swapped state and
+    // overwrites gate/messages for the wrong conversation.
+    abortActiveStream();
     setEditingMessageId(null);
     setCurrentConversationId(conversation.id);
 
@@ -659,7 +699,7 @@ export function useAIChat({
     } finally {
       setLoadingMessages(false);
     }
-  }, [conversationRepo, userId]);
+  }, [conversationRepo, userId, abortActiveStream]);
 
   /**
    * Delete a conversation
@@ -1003,13 +1043,24 @@ export function useAIChat({
 
           case 'done': {
             messageHtml = event.data.messageHtml || '';
-            const gate = event.data.gate as
-              | { used: number; softLimit: number; hardLimit: number; pct: number }
-              | undefined;
-            if (gate) {
-              setGateUsed(gate.used);
-              setGateSoftLimit(gate.softLimit);
-              setGateHardLimit(gate.hardLimit);
+            // Validate every numeric field before committing to state — a
+            // partial usageMetadata on the server can produce NaN/Infinity
+            // which would render the meter as "NaN%" and break the
+            // tokenUsage >= softLimit comparison.
+            const rawGate = event.data.gate as ConversationGate | undefined;
+            if (
+              rawGate &&
+              Number.isFinite(rawGate.used) &&
+              Number.isFinite(rawGate.softLimit) &&
+              Number.isFinite(rawGate.hardLimit) &&
+              rawGate.softLimit > 0 &&
+              rawGate.hardLimit > 0
+            ) {
+              setGateUsed(Math.max(0, rawGate.used));
+              setGateSoftLimit(rawGate.softLimit);
+              setGateHardLimit(rawGate.hardLimit);
+            } else if (rawGate) {
+              logger.warn('Dropping malformed gate payload from done event:', rawGate);
             }
             logger.log('AI response streaming complete');
             break;
