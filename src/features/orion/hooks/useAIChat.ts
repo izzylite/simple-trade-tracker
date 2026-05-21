@@ -632,6 +632,14 @@ export function useAIChat({
     setEditingMessageId(null);
     setCurrentConversationId(conversation.id);
 
+    // Fire-and-forget: bump last_accessed_at so cleanup-stale-ai-conversations
+    // treats this as a fresh access. Day-gated server-side (max 1 write/day
+    // per row), so spamming open/close doesn't write-amplify. Errors are
+    // logged inside .touch() and never propagate.
+    if (userId) {
+      void conversationRepo.touch(conversation.id, userId);
+    }
+
     if (conversation.messages) {
       setMessages(conversation.messages as ChatMessageType[]);
       logger.log('Loaded conversation (preloaded):', conversation.id);
@@ -653,7 +661,7 @@ export function useAIChat({
     } finally {
       setLoadingMessages(false);
     }
-  }, [conversationRepo]);
+  }, [conversationRepo, userId]);
 
   /**
    * Delete a conversation

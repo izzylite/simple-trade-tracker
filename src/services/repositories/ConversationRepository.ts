@@ -125,6 +125,30 @@ export class ConversationRepository extends AbstractBaseRepository<AIConversatio
   }
 
   /**
+   * Bump last_accessed_at on the conversation. Used as a "still useful"
+   * signal that defers cleanup: a conversation that surfaces in semantic
+   * recall or that the user opens in the UI shouldn't be eligible for the
+   * 24-month TTL even if no new messages were appended.
+   *
+   * Fire-and-forget — the RPC is day-gated server-side (at most one write
+   * per row per day) and the caller's UX should never block on it. Errors
+   * are logged but never thrown.
+   */
+  async touch(conversationId: string, userId: string): Promise<void> {
+    try {
+      const { error } = await supabase.rpc('touch_ai_conversation', {
+        p_conversation_id: conversationId,
+        p_user_id: userId,
+      });
+      if (error) {
+        logger.warn('touch_ai_conversation failed:', error.message);
+      }
+    } catch (error) {
+      logger.warn('touch_ai_conversation threw:', error);
+    }
+  }
+
+  /**
    * Find all conversations for a specific calendar (calendar-level only, excludes trade-specific)
    * Ordered by most recently updated first
    * @param calendarId - The calendar ID to filter by

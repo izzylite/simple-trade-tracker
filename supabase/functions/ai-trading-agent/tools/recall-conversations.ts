@@ -228,6 +228,41 @@ async function getConversation(
       return `Conversation ${conversationId} not found (or not owned by this user).`;
     }
 
+    // Fire-and-forget last_accessed_at bump via touch_ai_conversation RPC.
+    // Day-gated server-side, so spamming get() doesn't write-amplify. Wrap
+    // in waitUntil so a slow Postgres call never delays the tool result —
+    // the bump is incidental to the actual fetch the model is waiting on.
+    // Wrap in async IIFE so the supabase thenable becomes a real Promise
+    // (waitUntil's typing rejects PromiseLike).
+    // Catch both the error-in-result-object case (supabase.rpc convention)
+    // AND any thrown exception (network, runtime). Without the outer catch,
+    // a thrown rpc call becomes an unhandled rejection — fine in waitUntil
+    // (logged by the runtime), but a Deno warning/crash in local/dev where
+    // no waitUntil is registered.
+    const touchTask: Promise<void> = (async () => {
+      try {
+        const { error: touchErr } = await supabase.rpc("touch_ai_conversation", {
+          p_conversation_id: conversationId,
+          p_user_id: userId,
+        });
+        if (touchErr) {
+          log("touch_ai_conversation (action=get) failed", "warn", {
+            conversationId,
+            error: touchErr.message,
+          });
+        }
+      } catch (err) {
+        log("touch_ai_conversation (action=get) threw", "warn", {
+          conversationId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    })();
+    const er = (globalThis as { EdgeRuntime?: { waitUntil(p: Promise<unknown>): void } }).EdgeRuntime;
+    if (er?.waitUntil) er.waitUntil(touchTask);
+    // Local/dev: runs unobserved, but the inner try/catch keeps it from
+    // becoming an unhandled rejection.
+
     const messages = (data.messages as ConversationMessage[] | null) ?? [];
     const total = messages.length;
     if (total === 0) {
