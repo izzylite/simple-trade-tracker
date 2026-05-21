@@ -5,6 +5,7 @@
 
 import { corsHeaders, handleCors, log, createServiceClient, errorResponse, successResponse } from '../_shared/supabase.ts';
 import { callGemini as sharedCallGemini } from '../_shared/gemini.ts';
+import { estimateTurnCost, formatCostLine, type UsageRound } from '../_shared/geminiCost.ts';
 import {
   callMCPTool,
   getCachedMCPTools,
@@ -245,6 +246,10 @@ function logTurnAudit(
   functionCalls: Array<{ name: string }>,
   firstRoundUsage: Record<string, unknown> | undefined,
   lastUsage: Record<string, unknown> | undefined,
+  // Per-round usage snapshots so we can compute end-to-end dollar cost.
+  // Optional for backward compat — when omitted, the [USAGE_DOLLARS] line
+  // is skipped and only the existing [TurnAudit] line is emitted.
+  roundUsages?: Array<Record<string, unknown>>,
 ): void {
   const toolNames = functionCalls.map((f) => f.name);
   const firstPrompt = Number(firstRoundUsage?.promptTokenCount ?? 0);
@@ -257,6 +262,15 @@ function logTurnAudit(
     `toolInflation=${finalPrompt - firstPrompt} output=${finalOutput}`,
     'info'
   );
+
+  // Dollar-cost line. Same observability cadence (one per turn) but charges
+  // the FRESH portion of each round's prompt at the input rate and the
+  // CACHED portion at the cache rate — matches Gemini's billing model.
+  // Skipped when no round usages were captured (e.g. error paths).
+  if (roundUsages && roundUsages.length > 0) {
+    const breakdown = estimateTurnCost(roundUsages as UsageRound[], MODEL);
+    log(formatCostLine(breakdown), 'info');
+  }
 }
 
 /**
@@ -405,7 +419,14 @@ async function callGeminiWithContents(
       for (const line of lines) {
         if (!line.trim() || line.startsWith('data: [DONE]')) continue;
         const jsonLine = line.startsWith('data: ') ? line.slice(6) : line;
-        if (!jsonLine.trim()) continue;
+        const trimmed = jsonLine.trim();
+        if (!trimmed) continue;
+        // Skip structural fragments from pretty-printed JSON array wrappers
+        // ('}', '  }', '[', ']', ','). Gemini's `alt=sse` stream occasionally
+        // intersperses these between data events; they aren't JSON objects
+        // on their own, and trying to parse them spams warnings without
+        // affecting the actual chunk parsing.
+        if (!trimmed.startsWith('{')) continue;
         try {
           const chunk = JSON.parse(jsonLine);
           if (chunk.usageMetadata) lastUsageMetadata = chunk.usageMetadata;
@@ -959,7 +980,12 @@ async function callGeminiStreaming(
 
           // Remove "data: " prefix if present
           const jsonLine = line.startsWith('data: ') ? line.slice(6) : line;
-          if (!jsonLine.trim()) continue;
+          const trimmed = jsonLine.trim();
+          if (!trimmed) continue;
+          // Skip structural fragments from pretty-printed JSON array wrappers
+          // ('}', '  }', '[', ']', ','). See the matching filter in
+          // callGeminiWithContents — same Gemini SSE quirk.
+          if (!trimmed.startsWith('{')) continue;
 
           try {
             const chunk = JSON.parse(jsonLine);
@@ -1149,6 +1175,9 @@ function handleStreamingRequest(
       // turn's history, but their tokens show up in the final round's prompt.
       let firstRoundUsage: Record<string, unknown> | undefined;
       let lastUsageMetadata: Record<string, unknown> | undefined;
+      // Per-round usage snapshots for cost computation in logTurnAudit. Every
+      // place that sets lastUsageMetadata also pushes here.
+      const roundUsages: Array<Record<string, unknown>> = [];
       // Wall-clock budget: Supabase edge functions are hard-killed at 150s for
       // the initial request (Free + Pro). Track turn-start so we can bail out
       // BEFORE infra terminates us, giving the persist step a chance to run.
@@ -1169,6 +1198,7 @@ function handleStreamingRequest(
       if (result.usageMetadata) {
         firstRoundUsage = result.usageMetadata;
         lastUsageMetadata = result.usageMetadata;
+        roundUsages.push(result.usageMetadata);
       }
 
       // RETRY LOGIC: Handle known Gemini empty content bug
@@ -1221,8 +1251,16 @@ function handleStreamingRequest(
           if (result.usageMetadata) {
             // Retries replace the initial call's result — treat the successful
             // retry as the new "first round" for gate-estimation purposes.
+            // Cost-wise: retries that produced output still cost money, but
+            // we only record the SUCCESSFUL final retry to avoid double-
+            // counting (the empty-bug retries returned empty output and the
+            // user wasn't billed for a real turn — they were billed only for
+            // the prompt-tokens of each attempt, which is small enough that
+            // not modeling it doesn't materially change the per-turn cost
+            // line).
             firstRoundUsage = result.usageMetadata;
             lastUsageMetadata = result.usageMetadata;
+            roundUsages.push(result.usageMetadata);
           }
 
           if (!result.emptyBug && (result.text || result.functionCall || result.functionCalls)) {
@@ -1429,7 +1467,10 @@ function handleStreamingRequest(
           allTools,
           { streaming: true, writer, maxOutputTokens: 8000, systemInstruction: systemPrompt }
         );
-        if (newUsage) lastUsageMetadata = newUsage;
+        if (newUsage) {
+          lastUsageMetadata = newUsage;
+          roundUsages.push(newUsage);
+        }
 
         if (!newFunctionCall && newText) {
           // Text was already streamed as text_chunk — this is the final answer
@@ -1469,7 +1510,10 @@ function handleStreamingRequest(
             allTools,
             { streaming: false, maxOutputTokens: 4000, mode: 'NONE', systemInstruction: systemPrompt }
           );
-          if (synthesisResult.usageMetadata) lastUsageMetadata = synthesisResult.usageMetadata;
+          if (synthesisResult.usageMetadata) {
+            lastUsageMetadata = synthesisResult.usageMetadata;
+            roundUsages.push(synthesisResult.usageMetadata);
+          }
           if (synthesisResult.text) {
             finalText = synthesisResult.text;
             await sendSSE(writer, 'text_chunk', { text: finalText });
@@ -1559,7 +1603,10 @@ function handleStreamingRequest(
               allTools,
               { streaming: true, writer, maxOutputTokens: 8000, systemInstruction: systemPrompt }
             );
-            if (result.usageMetadata) lastUsageMetadata = result.usageMetadata;
+            if (result.usageMetadata) {
+              lastUsageMetadata = result.usageMetadata;
+              roundUsages.push(result.usageMetadata);
+            }
             correctedText = result.text;
           } catch (error) {
             log(`Gemini correction call failed: ${error}`, 'error');
@@ -1713,7 +1760,7 @@ function handleStreamingRequest(
       }
 
       // Per-turn token-cost audit line (greppable by conversationId / tool).
-      logTurnAudit(conversationId, functionCalls, firstRoundUsage, lastUsageMetadata);
+      logTurnAudit(conversationId, functionCalls, firstRoundUsage, lastUsageMetadata, roundUsages);
 
       // Send done event (with cleaned/validated text)
       await sendSSE(writer, 'done', {
@@ -2013,6 +2060,7 @@ async function handleReminderRequest(req: Request, body: AgentRequest): Promise<
   // spuriously inflate the next turn's gate.
   let firstRoundUsage: Record<string, unknown> | undefined;
   let lastUsageMetadata: Record<string, unknown> | undefined;
+  const roundUsages: Array<Record<string, unknown>> = [];
   try {
     // Build tools (MCP + custom) — same as chat path.
     const geminiMcpTools = await getCachedMCPTools(
@@ -2028,6 +2076,7 @@ async function handleReminderRequest(req: Request, body: AgentRequest): Promise<
     if (result.usageMetadata) {
       firstRoundUsage = result.usageMetadata;
       lastUsageMetadata = result.usageMetadata;
+      roundUsages.push(result.usageMetadata);
     }
 
     const conversationContents: Array<{ role: string; parts: Array<Record<string, unknown>> }> = [
@@ -2097,7 +2146,10 @@ async function handleReminderRequest(req: Request, body: AgentRequest): Promise<
         allTools,
         { streaming: false, maxOutputTokens: 4000, systemInstruction: systemPrompt }
       );
-      if (cont.usageMetadata) lastUsageMetadata = cont.usageMetadata;
+      if (cont.usageMetadata) {
+        lastUsageMetadata = cont.usageMetadata;
+        roundUsages.push(cont.usageMetadata);
+      }
       result = cont.functionCall
         ? { functionCall: cont.functionCall, rawParts: cont.rawParts }
         : { text: cont.text, rawParts: cont.rawParts };
@@ -2116,7 +2168,10 @@ async function handleReminderRequest(req: Request, body: AgentRequest): Promise<
           allTools,
           { streaming: false, maxOutputTokens: 4000, mode: 'NONE', systemInstruction: systemPrompt }
         );
-        if (synth.usageMetadata) lastUsageMetadata = synth.usageMetadata;
+        if (synth.usageMetadata) {
+          lastUsageMetadata = synth.usageMetadata;
+          roundUsages.push(synth.usageMetadata);
+        }
         if (synth.text) finalText = synth.text;
       } catch (synthErr) {
         log(`[reminder] Forced synthesis failed: ${synthErr}`, 'error');
@@ -2214,7 +2269,7 @@ async function handleReminderRequest(req: Request, body: AgentRequest): Promise<
 
   // Per-turn token-cost audit line (greppable by conversationId / tool).
   // functionCalls here is {name,args,result}[] — logTurnAudit only reads name.
-  logTurnAudit(conversationId, functionCalls, firstRoundUsage, lastUsageMetadata);
+  logTurnAudit(conversationId, functionCalls, firstRoundUsage, lastUsageMetadata, roundUsages);
 
   // Re-embed for semantic recall — same gate as the chat path. Reminder
   // fires count as new messages too, so the conversation's topical centre
@@ -2547,6 +2602,8 @@ Deno.serve(async (req: Request) => {
     // since tool results don't persist into the next turn's history.
     const firstRoundUsage: Record<string, unknown> | undefined = result.usageMetadata;
     let lastUsageMetadata: Record<string, unknown> | undefined = result.usageMetadata;
+    const roundUsages: Array<Record<string, unknown>> = [];
+    if (result.usageMetadata) roundUsages.push(result.usageMetadata);
 
     const functionCalls: Array<{ name: string; args: unknown; result: string }> = [];
     let finalText = '';
@@ -2654,7 +2711,10 @@ Deno.serve(async (req: Request) => {
         allTools,
         { streaming: false, maxOutputTokens: 4000, systemInstruction: systemPrompt }
       );
-      if (newUsage) lastUsageMetadata = newUsage;
+      if (newUsage) {
+        lastUsageMetadata = newUsage;
+        roundUsages.push(newUsage);
+      }
       result = newFunctionCall
         ? { functionCall: newFunctionCall, rawParts: newRawParts }
         : { text: newText, rawParts: newRawParts };
@@ -2676,7 +2736,10 @@ Deno.serve(async (req: Request) => {
           allTools,
           { streaming: false, maxOutputTokens: 4000, mode: 'NONE', systemInstruction: systemPrompt }
         );
-        if (synthesisResult.usageMetadata) lastUsageMetadata = synthesisResult.usageMetadata;
+        if (synthesisResult.usageMetadata) {
+          lastUsageMetadata = synthesisResult.usageMetadata;
+          roundUsages.push(synthesisResult.usageMetadata);
+        }
         if (synthesisResult.text) {
           finalText = synthesisResult.text;
           log(`Forced synthesis succeeded (${finalText.length} chars)`, 'info');
@@ -2760,7 +2823,10 @@ Deno.serve(async (req: Request) => {
             allTools,
             { streaming: false, maxOutputTokens: 8000, systemInstruction: systemPrompt }
           );
-          if (result.usageMetadata) lastUsageMetadata = result.usageMetadata;
+          if (result.usageMetadata) {
+            lastUsageMetadata = result.usageMetadata;
+            roundUsages.push(result.usageMetadata);
+          }
           correctedText = result.text;
         } catch (error) {
           log(`Gemini correction call failed: ${error}`, 'error');
@@ -2837,7 +2903,7 @@ Deno.serve(async (req: Request) => {
     log('Response validated - security check passed', 'info');
 
     // Per-turn token-cost audit line (greppable by conversationId / tool).
-    logTurnAudit(conversationId, functionCalls, firstRoundUsage, lastUsageMetadata);
+    logTurnAudit(conversationId, functionCalls, firstRoundUsage, lastUsageMetadata, roundUsages);
 
     // ---- Persist the assistant reply at turn end ----
     // Same waitUntil pattern as the streaming path: survives past the 150s
