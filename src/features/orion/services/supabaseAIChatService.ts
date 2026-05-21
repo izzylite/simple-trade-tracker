@@ -139,7 +139,6 @@ class SupabaseAIChatService {
     message: string,
     userId: string,
     calendar: Calendar | undefined,
-    conversationHistory: ChatMessageType[] = [],
     signal?: AbortSignal,
     focusedTradeId?: string,
     images?: AttachedImage[],
@@ -160,13 +159,10 @@ class SupabaseAIChatService {
       // Get valid auth token with auto-refresh
       const session = await this.getValidSession();
 
-      // Convert conversation history
-      const formattedHistory = conversationHistory.map(msg => ({
-        role: msg.role as 'user' | 'assistant',
-        content: msg.content
-      }));
-
-      // Call edge function with streaming
+      // NOTE: conversationHistory is intentionally NOT sent. The server
+      // reads the canonical history from the DB via appendUserMessage. This
+      // keeps the request payload constant-size regardless of conversation
+      // length (was ~100KB for a 200-message chat).
       const url = this.getFunctionUrl() + '?stream=true';
       const response = await fetch(url, {
         method: 'POST',
@@ -184,7 +180,6 @@ class SupabaseAIChatService {
           editingMessageId,
           titleHint,
           focusedTradeId: focusedTradeId || undefined,
-          conversationHistory: formattedHistory,
           calendarContext: calendar
             ? this.buildCalendarContext(calendar)
             : undefined,
@@ -363,7 +358,6 @@ class SupabaseAIChatService {
     message: string,
     userId: string,
     calendar: Calendar | undefined,
-    conversationHistory: ChatMessageType[] = [],
     focusedTradeId?: string
   ): Promise<AgentResponse> {
     try {
@@ -375,15 +369,10 @@ class SupabaseAIChatService {
       const { processedMessage, tagContext } = this.processTagMentions(message, availableTags);
       const finalMessage = processedMessage + tagContext;
 
-      // Convert conversation history to the format expected by the edge function
-      const formattedHistory = conversationHistory.map(msg => ({
-        role: msg.role as 'user' | 'assistant',
-        content: msg.content
-      }));
-
       // Get valid auth token with auto-refresh
       const session = await this.getValidSession();
 
+      // Same payload contract as sendMessageStreaming — no conversationHistory.
       const response = await fetch(
         `${supabaseUrl}/functions/v1/${this.FUNCTION_NAME}`,
         {
@@ -397,7 +386,6 @@ class SupabaseAIChatService {
             userId,
             calendarId: calendar?.id,
             focusedTradeId: focusedTradeId || undefined,
-            conversationHistory: formattedHistory,
             calendarContext: calendar
               ? this.buildCalendarContext(calendar)
               : undefined,

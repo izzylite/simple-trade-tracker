@@ -766,22 +766,23 @@ export function useAIChat({
 
     cancelRequestedRef.current = false;
 
-    let baseHistory: ChatMessageType[];
-    let userMessage: ChatMessageType;
     // Capture the edit-mode signal before we reset it below — the backend
     // needs it to truncate the persisted messages array. Without this, the
     // edit-and-resend flow leaves orphaned old turns in the DB, and they
     // reappear on next reload.
     const editTargetId = editingMessageId;
+    const isFirstSend = !editingMessageId && messages.length === 0;
+    let userMessage: ChatMessageType;
 
-    // Handle edit mode
+    // Handle edit mode. The server now reads history from the DB so we no
+    // longer build a `baseHistory` payload — the slice below (when an edit
+    // truncation happens) is purely for the optimistic UI update.
     if (editingMessageId) {
       const messageIndex = messages.findIndex(
         msg => msg.id === editingMessageId && msg.role === 'user'
       );
 
       if (messageIndex === -1) {
-        baseHistory = messages;
         userMessage = {
           id: uuidv4(),
           role: 'user',
@@ -793,7 +794,7 @@ export function useAIChat({
         };
         setMessages(prev => [...prev, userMessage]);
       } else {
-        baseHistory = messages.slice(0, messageIndex);
+        const baseHistoryForUI = messages.slice(0, messageIndex);
         const originalMessage = messages[messageIndex];
         userMessage = {
           ...originalMessage,
@@ -814,12 +815,10 @@ export function useAIChat({
               ?.triggered_by === 'string' &&
             (m as { metadata: { triggered_by: string } }).metadata.triggered_by.startsWith('reminder:')
           );
-        const updatedMessages = [...baseHistory, userMessage, ...preservedFires];
-        setMessages(updatedMessages);
+        setMessages([...baseHistoryForUI, userMessage, ...preservedFires]);
       }
       setEditingMessageId(null);
     } else {
-      baseHistory = messages;
       userMessage = {
         id: uuidv4(),
         role: 'user',
@@ -876,7 +875,6 @@ export function useAIChat({
       // from the user message content with slash-command and note-reference
       // framing stripped, so the History sidebar reads naturally instead
       // of "[Referenced command: ...]".
-      const isFirstSend = baseHistory.length === 0;
       const titleHint = isFirstSend
         ? generateConversationTitle(userMessage.content)
         : undefined;
@@ -885,7 +883,6 @@ export function useAIChat({
         trimmedMessage,
         userId,
         calendar,
-        baseHistory,
         abortController.signal,
         trade?.id,
         images,
