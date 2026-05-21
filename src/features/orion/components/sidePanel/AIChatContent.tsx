@@ -503,6 +503,35 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
     return preview.length > 80 ? `${preview.substring(0, 80)}...` : preview;
   };
 
+  // Render text with case-insensitive highlights wherever `query` matches.
+  // Sub-2-char queries are skipped (matches the hook's server-side gate —
+  // no point lighting up isolated letters). Regex special chars in the
+  // query are escaped so user typing `(` or `?` doesn't crash the match.
+  const renderWithHighlight = (text: string, query: string): React.ReactNode => {
+    const q = query.trim();
+    if (q.length < 2 || !text) return text;
+    const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const parts = text.split(new RegExp(`(${escaped})`, 'ig'));
+    return parts.map((part, i) =>
+      part.toLowerCase() === q.toLowerCase()
+        ? (
+            <Box
+              key={i}
+              component="mark"
+              sx={{
+                backgroundColor: alpha(violet, 0.28),
+                color: 'inherit',
+                px: 0.25,
+                borderRadius: 0.5,
+              }}
+            >
+              {part}
+            </Box>
+          )
+        : part
+    );
+  };
+
   return (
     <Box sx={{
       display: 'flex',
@@ -758,7 +787,7 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
                                   whiteSpace: 'nowrap'
                                 }}
                               >
-                                {conversation.title}
+                                {renderWithHighlight(conversation.title, historySearchQuery)}
                               </Typography>
                               <Box
                                 sx={{
@@ -793,7 +822,7 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
                                 mb: 0.65
                               }}
                             >
-                              {getPreviewText(conversation)}
+                              {renderWithHighlight(getPreviewText(conversation), historySearchQuery)}
                             </Typography>
                             <Box sx={{
                               display: 'flex',
