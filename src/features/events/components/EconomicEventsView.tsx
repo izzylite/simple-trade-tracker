@@ -198,10 +198,12 @@ export const FilterPill: React.FC<{
 export const CurrencyChips: React.FC<{
   selected: Currency[];
   onToggle: (c: Currency) => void;
+  /** Single-shot clear — avoids the N-write storm of looping onToggle. */
+  onClear?: () => void;
   theme: Theme;
   /** Compact mode: tighter chip padding/font. Wrap behavior is the same. */
   compact?: boolean;
-}> = ({ selected, onToggle, theme, compact = false }) => {
+}> = ({ selected, onToggle, onClear, theme, compact = false }) => {
   const allOff = selected.length === 0;
   return (
     <Box
@@ -250,7 +252,7 @@ export const CurrencyChips: React.FC<{
         <Tooltip title="Clear currency filter" placement="top" arrow>
           <IconButton
             size="small"
-            onClick={() => selected.forEach((c) => onToggle(c))}
+            onClick={onClear ?? (() => selected.forEach((c) => onToggle(c)))}
             aria-label="Clear currency filter"
             sx={{
               flexShrink: 0,
@@ -747,16 +749,19 @@ const EconomicEventsView: React.FC<EconomicEventsViewProps> = ({
 
   // Optimistic local copy so impact/currency pill toggles reflect instantly,
   // before the async onUpdateCalendarProperty write round-trips back through
-  // the calendar prop. Reconciled below when the persisted source changes.
+  // the calendar prop. Re-anchored only on calendar switch — depending on
+  // the filter object reference would re-fire on every one of our own writes
+  // (a fresh ref with identical content), forcing a second full rerender of
+  // the events grid per tap.
   const [filterSettings, setFilterSettings] =
     useState<EconomicCalendarFilterSettings>(persistedFilters);
 
-  // Re-sync when the persisted source changes (calendar switch or the write
-  // landing). Keyed on the filters reference, which is fresh after each write.
   useEffect(() => {
-    setFilterSettings(persistedFilters);
+    setFilterSettings(
+      calendar?.economic_calendar_filters || DEFAULT_FILTER_SETTINGS,
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [calendar?.id, calendar?.economic_calendar_filters]);
+  }, [calendar?.id]);
 
   const selectedCurrencies = filterSettings.currencies;
   const selectedImpacts = filterSettings.impacts;
@@ -786,6 +791,12 @@ const EconomicEventsView: React.FC<EconomicEventsViewProps> = ({
       updateFilters({ currencies: next });
     },
     [selectedCurrencies, updateFilters]
+  );
+  // Single write — the previous Clear button looped onToggle per chip,
+  // queueing N sequential DB writes + N cascading rerenders.
+  const clearCurrencies = useCallback(
+    () => updateFilters({ currencies: [] }),
+    [updateFilters],
   );
   const toggleImpact = useCallback(
     (i: ImpactLevel) => {
@@ -1000,6 +1011,7 @@ const EconomicEventsView: React.FC<EconomicEventsViewProps> = ({
         <CurrencyChips
           selected={selectedCurrencies}
           onToggle={toggleCurrency}
+          onClear={clearCurrencies}
           theme={theme}
           compact={compact}
         />

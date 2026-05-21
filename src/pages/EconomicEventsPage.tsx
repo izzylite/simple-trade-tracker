@@ -90,8 +90,6 @@ const IMPACT_LEVELS: Array<{ value: ImpactLevel; label: string }> = [
   { value: 'Medium', label: 'Med' },
   { value: 'Low', label: 'Low' },
 ];
-const ALL_IMPACTS: ImpactLevel[] = ['High', 'Medium', 'Low'];
-
 const HUB_TABS: Array<{ value: HubTab; label: string }> = [
   { value: 'all', label: 'All' },
   { value: 'upcoming', label: 'Upcoming' },
@@ -179,14 +177,19 @@ const EconomicEventsPageInner: React.FC = () => {
 
   // Optimistic local copy so impact/currency pill toggles reflect instantly,
   // before the async onUpdateCalendarProperty write round-trips back through
-  // the calendar prop. Reconciled below when the persisted source changes.
+  // the calendar prop. Re-anchored only when the user switches calendars —
+  // depending on the filter object reference would re-fire on every one of
+  // our own writes (the persisted object is a fresh ref with identical
+  // content), causing a second full-page rerender per tap.
   const [filterSettings, setFilterSettings] =
     useState<EconomicCalendarFilterSettings>(persistedFilters);
 
   useEffect(() => {
-    setFilterSettings(persistedFilters);
+    setFilterSettings(
+      calendar?.economic_calendar_filters || DEFAULT_FILTER_SETTINGS,
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [calendar?.id, calendar?.economic_calendar_filters]);
+  }, [calendar?.id]);
 
   const selectedCurrencies = filterSettings.currencies;
   const selectedImpacts = filterSettings.impacts;
@@ -218,6 +221,13 @@ const EconomicEventsPageInner: React.FC = () => {
     [selectedCurrencies, updateFilters]
   );
 
+  // Single write — the previous implementation looped onToggle per chip,
+  // queueing N sequential DB writes + N cascading rerenders.
+  const clearCurrencies = useCallback(
+    () => updateFilters({ currencies: [] }),
+    [updateFilters],
+  );
+
   const toggleImpact = useCallback(
     (i: ImpactLevel) => {
       const next = selectedImpacts.includes(i)
@@ -227,10 +237,6 @@ const EconomicEventsPageInner: React.FC = () => {
     },
     [selectedImpacts, updateFilters]
   );
-
-  const setAllImpacts = useCallback(() => {
-    updateFilters({ impacts: ALL_IMPACTS });
-  }, [updateFilters]);
 
   const setNotificationsEnabled = useCallback(
     (v: boolean) => updateFilters({ notificationsEnabled: v }),
@@ -582,7 +588,6 @@ const EconomicEventsPageInner: React.FC = () => {
           <FilterPill
             selected={selectedImpacts}
             onToggle={toggleImpact}
-            onSelectAll={setAllImpacts}
             theme={theme}
           />
           <Tooltip
@@ -631,6 +636,7 @@ const EconomicEventsPageInner: React.FC = () => {
         <CurrencyChips
           selected={selectedCurrencies}
           onToggle={toggleCurrency}
+          onClear={clearCurrencies}
           theme={theme}
         />
       </Stack>
@@ -855,18 +861,13 @@ const EconomicEventsPage: React.FC = () => (
 );
 
 // ──────────────────────────────────────────────
-// Filter pill — multi-select High / Med / Low + All shortcut
+// Filter pill — multi-select High / Med / Low
 // ──────────────────────────────────────────────
 const FilterPill: React.FC<{
   selected: ImpactLevel[];
   onToggle: (v: ImpactLevel) => void;
-  onSelectAll: () => void;
   theme: Theme;
-}> = ({ selected, onToggle, onSelectAll, theme }) => {
-  const allActive =
-    selected.length === ALL_IMPACTS.length &&
-    ALL_IMPACTS.every((i) => selected.includes(i));
-
+}> = ({ selected, onToggle, theme }) => {
   const impactButtonSx = (active: boolean, color: string) => ({
     px: 1.5,
     py: 0.75,
@@ -879,21 +880,6 @@ const FilterPill: React.FC<{
     '&:hover': {
       color: active ? '#fff' : color,
       bgcolor: active ? alpha(color, 0.85) : alpha(color, 0.12),
-    },
-  });
-
-  const allButtonSx = (active: boolean) => ({
-    px: 1.5,
-    py: 0.75,
-    borderRadius: 0.875,
-    fontSize: '0.8rem',
-    fontWeight: 600,
-    color: active ? theme.palette.primary.contrastText : theme.palette.text.secondary,
-    bgcolor: active ? 'primary.main' : 'transparent',
-    transition: 'background 150ms, color 150ms',
-    '&:hover': {
-      color: active ? theme.palette.primary.contrastText : theme.palette.text.primary,
-      bgcolor: active ? theme.palette.primary.dark : theme.palette.action.hover,
     },
   });
 
@@ -921,9 +907,6 @@ const FilterPill: React.FC<{
           </ButtonBase>
         );
       })}
-      <ButtonBase onClick={onSelectAll} sx={allButtonSx(allActive)}>
-        All
-      </ButtonBase>
     </Stack>
   );
 };
@@ -934,8 +917,9 @@ const FilterPill: React.FC<{
 const CurrencyChips: React.FC<{
   selected: Currency[];
   onToggle: (c: Currency) => void;
+  onClear: () => void;
   theme: Theme;
-}> = ({ selected, onToggle, theme }) => {
+}> = ({ selected, onToggle, onClear, theme }) => {
   const allOff = selected.length === 0;
   return (
     <Stack
@@ -985,7 +969,7 @@ const CurrencyChips: React.FC<{
       })}
       {!allOff && (
         <ButtonBase
-          onClick={() => selected.forEach((c) => onToggle(c))}
+          onClick={onClear}
           sx={{
             px: 1,
             py: 0.5,

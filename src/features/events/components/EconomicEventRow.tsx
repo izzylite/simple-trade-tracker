@@ -537,4 +537,22 @@ const EconomicEventRow: React.FC<EconomicEventRowProps> = ({
   );
 };
 
-export default EconomicEventRow;
+// Functions (onClick / onTogglePin) are inline-arrow closures at every call
+// site and would defeat naive React.memo. The closures only depend on data
+// props we already compare (event identity, pinned, busy), so we ignore
+// function refs and skip rendering when nothing visible has changed.
+const arePropsEqual = (
+  prev: EconomicEventRowProps,
+  next: EconomicEventRowProps,
+): boolean =>
+  prev.event === next.event &&
+  prev.firstRow === next.firstRow &&
+  prev.isNow === next.isNow &&
+  prev.pinned === next.pinned &&
+  prev.busy === next.busy &&
+  prev.tradeCount === next.tradeCount &&
+  prev.pinnedNotes === next.pinnedNotes &&
+  prev.currentTime === next.currentTime &&
+  prev.theme === next.theme;
+
+export default React.memo(EconomicEventRow, arePropsEqual);
