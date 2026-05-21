@@ -25,7 +25,9 @@ import { fetchEmbeddedData, type EmbeddedData } from './embedDataFetcher.ts';
 import {
   appendUserMessage,
   appendAssistantMessage,
+  buildGate,
   MAX_PROMPT_TOKENS,
+  type ConversationGate,
 } from './conversationStore.ts';
 import {
   maybeUpdateEmbedding,
@@ -1686,6 +1688,10 @@ function handleStreamingRequest(
       // on Pro). Without this, a slow turn that races the wall-clock leaves
       // the assistant message un-persisted and the chat UI shows only the
       // reasoning bubble. See: https://supabase.com/docs/guides/functions/limits
+      // Hoisted outside `if (conversationId)` so the `done` SSE event below
+      // can publish the gate value even when this was a hypothetical no-
+      // conversation send (defensive — chat-entry already rejected those).
+      let nextTurnEstimate = 0;
       if (conversationId) {
         const assistantRecord = {
           id: crypto.randomUUID(),
@@ -1699,6 +1705,18 @@ function handleStreamingRequest(
             ? functionCalls.map(fc => ({ name: fc.name, label: fc.name }))
             : undefined,
         };
+        // Estimate what Turn T+1's first Gemini call will see:
+        //   first round prompt (this turn's history + user_msg + system + tools)
+        //   + this turn's assistant output (about to be persisted into history).
+        // Tool-call rounds intentionally excluded — their results don't
+        // persist into the next turn's history, so the final round's
+        // promptTokenCount would over-charge the gate. See block comment
+        // above where firstRoundUsage is declared. Hoisted out of persistTask
+        // so the `done` SSE event can publish it before the waitUntil DB
+        // write resolves.
+        const firstRoundPrompt = Number(firstRoundUsage?.promptTokenCount ?? 0);
+        const assistantOutput = Number(lastUsageMetadata?.candidatesTokenCount ?? 0);
+        nextTurnEstimate = firstRoundPrompt + assistantOutput;
         const persistTask = (async () => {
           const persistClient = createServiceClient();
           // Rehost ephemeral QuickChart URLs into ai-chat-images so the
@@ -1714,17 +1732,6 @@ function handleStreamingRequest(
             rehostChartUrlsInText(persistClient, rehostCtx, assistantRecord.content),
             rehostChartUrlsInText(persistClient, rehostCtx, assistantRecord.messageHtml),
           ]);
-          // Estimate what Turn T+1's first Gemini call will see:
-          //   first round prompt (this turn's history + user_msg + system + tools)
-          //   + this turn's assistant output (about to be persisted into history)
-          //
-          // Tool-call rounds intentionally excluded — their results don't
-          // persist into the next turn's history, so the final round's
-          // promptTokenCount would over-charge the gate. See block comment
-          // above where firstRoundUsage is declared.
-          const firstRoundPrompt = Number(firstRoundUsage?.promptTokenCount ?? 0);
-          const assistantOutput = Number(lastUsageMetadata?.candidatesTokenCount ?? 0);
-          const nextTurnEstimate = firstRoundPrompt + assistantOutput;
           const assistantPersist = await appendAssistantMessage(persistClient, {
             conversationId,
             userId,
@@ -1762,10 +1769,18 @@ function handleStreamingRequest(
       // Per-turn token-cost audit line (greppable by conversationId / tool).
       logTurnAudit(conversationId, functionCalls, firstRoundUsage, lastUsageMetadata, roundUsages);
 
-      // Send done event (with cleaned/validated text)
+      // Send done event (with cleaned/validated text). `gate` is the
+      // server-published context-budget progress — the FE no longer
+      // estimates locally, it just renders this. Computed from
+      // nextTurnEstimate so this is Turn T+1's projected prompt size,
+      // matching what we just wrote to last_prompt_tokens.
+      const gateForDone: ConversationGate | undefined = conversationId
+        ? buildGate(nextTurnEstimate)
+        : undefined;
       await sendSSE(writer, 'done', {
         success: !!cleanedFinalText,
         messageHtml,
+        gate: gateForDone,
         metadata: {
           functionCalls,
           model: MODEL,
@@ -2881,10 +2896,21 @@ Deno.serve(async (req: Request) => {
 
     log(`Fetched ${embeddedData.trades.size} embedded trades, ${embeddedData.events.size} embedded events, and ${embeddedData.notes.size} embedded notes`, 'info');
 
+    // Estimate Turn T+1's first Gemini prompt size — same accounting as the
+    // streaming path. Hoisted from inside persistTask so the JSON response
+    // can publish `gate` to the FE alongside the assistant message.
+    const firstRoundPrompt = Number(firstRoundUsage?.promptTokenCount ?? 0);
+    const assistantOutput = Number(lastUsageMetadata?.candidatesTokenCount ?? 0);
+    const nextTurnEstimate = firstRoundPrompt + assistantOutput;
+    const gate: ConversationGate | undefined = conversationId
+      ? buildGate(nextTurnEstimate)
+      : undefined;
+
     const formattedResponse = {
       success: !!cleanedFinalText,
       message: cleanedFinalText,
       messageHtml,
+      gate,
       citations,
       embeddedTrades: Object.keys(embeddedTrades).length > 0 ? embeddedTrades : undefined,
       embeddedEvents: Object.keys(embeddedEvents).length > 0 ? embeddedEvents : undefined,
@@ -2948,9 +2974,8 @@ Deno.serve(async (req: Request) => {
         rehostCtx,
         assistantRecord.content,
       );
-      const firstRoundPrompt = Number(firstRoundUsage?.promptTokenCount ?? 0);
-      const assistantOutput = Number(lastUsageMetadata?.candidatesTokenCount ?? 0);
-      const nextTurnEstimate = firstRoundPrompt + assistantOutput;
+      // nextTurnEstimate hoisted to outer scope so the JSON response can
+      // publish the gate value without re-computing.
       const assistantPersist = await appendAssistantMessage(serviceClientForPersistence, {
         conversationId,
         userId,
