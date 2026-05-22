@@ -128,7 +128,7 @@ export class ConversationRepository extends AbstractBaseRepository<AIConversatio
    * Bump last_accessed_at on the conversation. Used as a "still useful"
    * signal that defers cleanup: a conversation that surfaces in semantic
    * recall or that the user opens in the UI shouldn't be eligible for the
-   * 24-month TTL even if no new messages were appended.
+   * 12-month TTL even if no new messages were appended.
    *
    * Fire-and-forget — the RPC is day-gated server-side (at most one write
    * per row per day) and the caller's UX should never block on it. Errors
