@@ -1,259 +1,328 @@
 import React from 'react';
-import {
-  Box,
-  Card,
-  CardContent,
-  Typography,
-  List,
-  ListItem,
-  ListItemText,
-  Chip,
-  Collapse,
-  IconButton,
-  alpha,
-  Tooltip
-} from '@mui/material';
+import { Box, Typography, Collapse, alpha, useTheme } from '@mui/material';
 import {
   SwapHoriz,
   ExpandMore,
-  ExpandLess,
-  Info
+  ChevronRight,
+  WarningAmber,
 } from '@mui/icons-material';
 import { TypeConversion } from '../../types/import';
 import { TRADE_FIELD_METADATA } from '../../utils/importValidation';
+import { useDialogTokens, MONO_FONT } from 'styles/dialogTokens';
+import { formatCount } from 'utils/formatters';
+
+const TNUM = "'tnum' on, 'lnum' on";
 
 interface TypeConverterPanelProps {
   conversions: TypeConversion[];
 }
 
-export const TypeConverterPanel: React.FC<TypeConverterPanelProps> = ({ conversions }) => {
+/**
+ * Compact type-conversion list — one expandable row per conversion.
+ * Header: field name · from-type → to-type · row count · optional warning chip.
+ * Expanded: description + a couple of example transforms.
+ * Matches the import-dialog token language (mono, hairlines, surfaceInset).
+ */
+export const TypeConverterPanel: React.FC<TypeConverterPanelProps> = ({
+  conversions,
+}) => {
+  const theme = useTheme();
   const [expandedIndex, setExpandedIndex] = React.useState<number | null>(null);
+  const {
+    violet,
+    violetSoft,
+    violetBorder,
+    surfaceInset,
+    hairline,
+    monoSectionLabelSx,
+  } = useDialogTokens();
 
-  const handleToggleExpand = (index: number) => {
-    setExpandedIndex(expandedIndex === index ? null : index);
-  };
-
-  if (conversions.length === 0) {
-    return null;
-  }
+  if (conversions.length === 0) return null;
 
   return (
-    <Card
+    <Box
       sx={{
-        bgcolor: 'background.paper',
-        border: '1px solid',
-        borderColor: 'divider'
+        border: `1px solid ${hairline}`,
+        borderRadius: 1.5,
+        overflow: 'hidden',
+        bgcolor: surfaceInset,
       }}
     >
-      <CardContent>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-          <SwapHoriz sx={{ color: 'info.main' }} />
-          <Typography variant="h6">
-            Type Conversions
-          </Typography>
-          <Chip
-            label={conversions.length}
-            size="small"
-            color="info"
-            sx={{ ml: 'auto' }}
-          />
+      {/* Header strip */}
+      <Box
+        sx={{
+          px: 1.5,
+          py: 1,
+          borderBottom: `1px solid ${hairline}`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 1,
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+          <SwapHoriz sx={{ fontSize: 14, color: violet }} />
+          <Typography sx={monoSectionLabelSx}>Type conversions</Typography>
         </Box>
-
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          The following data type conversions will be applied during import:
+        <Typography
+          sx={{
+            fontFamily: MONO_FONT,
+            fontFeatureSettings: TNUM,
+            fontSize: '0.66rem',
+            color: alpha(theme.palette.text.secondary, 0.8),
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+          }}
+        >
+          {conversions.length}
         </Typography>
+      </Box>
 
-        <List disablePadding>
-          {conversions.map((conversion, index) => {
-            const isExpanded = expandedIndex === index;
-            const fieldMetadata = TRADE_FIELD_METADATA[conversion.field];
+      {/* Conversion rows */}
+      <Box>
+        {conversions.map((conversion, index) => {
+          const isExpanded = expandedIndex === index;
+          const metadata = TRADE_FIELD_METADATA[conversion.field];
 
-            return (
-              <ListItem
-                key={index}
-                disablePadding
+          return (
+            <Box
+              key={index}
+              sx={{
+                borderBottom:
+                  index < conversions.length - 1 ? `1px solid ${hairline}` : 'none',
+              }}
+            >
+              {/* Header row */}
+              <Box
+                onClick={() => setExpandedIndex(isExpanded ? null : index)}
                 sx={{
-                  mb: 1,
-                  flexDirection: 'column',
-                  alignItems: 'stretch',
-                  bgcolor: alpha('#2196f3', 0.05),
-                  borderRadius: 1,
-                  border: '1px solid',
-                  borderColor: alpha('#2196f3', 0.2),
-                  overflow: 'hidden'
+                  px: 1.5,
+                  py: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1,
+                  cursor: 'pointer',
+                  transition: 'background-color 120ms ease',
+                  '&:hover': {
+                    bgcolor: alpha(theme.palette.text.primary, 0.02),
+                  },
                 }}
               >
                 <Box
                   sx={{
+                    width: 16,
                     display: 'flex',
                     alignItems: 'center',
-                    p: 1.5,
-                    cursor: 'pointer',
-                    '&:hover': {
-                      bgcolor: alpha('#2196f3', 0.08)
-                    }
+                    justifyContent: 'center',
+                    color: alpha(theme.palette.text.secondary, 0.6),
+                    flexShrink: 0,
                   }}
-                  onClick={() => handleToggleExpand(index)}
                 >
-                  <Box sx={{ flex: 1 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                      <Typography variant="body2" fontWeight={600}>
-                        {fieldMetadata.displayName}
-                      </Typography>
-                      <Chip
-                        label={`${conversion.affectedRows} rows`}
-                        size="small"
-                        sx={{
-                          height: 20,
-                          fontSize: '0.7rem',
-                          bgcolor: alpha('#2196f3', 0.15),
-                          color: 'info.main'
-                        }}
-                      />
-                    </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Chip
-                        label={conversion.fromType}
-                        size="small"
-                        variant="outlined"
-                        sx={{
-                          height: 22,
-                          fontSize: '0.7rem',
-                          borderColor: alpha('#666', 0.3)
-                        }}
-                      />
-                      <SwapHoriz sx={{ fontSize: 16, color: 'text.secondary' }} />
-                      <Chip
-                        label={conversion.toType}
-                        size="small"
-                        sx={{
-                          height: 22,
-                          fontSize: '0.7rem',
-                          bgcolor: alpha('#4caf50', 0.1),
-                          color: 'success.main',
-                          border: '1px solid',
-                          borderColor: alpha('#4caf50', 0.3)
-                        }}
-                      />
-                      {conversion.warnings > 0 && (
-                        <Tooltip title={`${conversion.warnings} warnings`}>
-                          <Chip
-                            label={`⚠ ${conversion.warnings}`}
-                            size="small"
-                            sx={{
-                              height: 22,
-                              fontSize: '0.7rem',
-                              bgcolor: alpha('#ff9800', 0.1),
-                              color: 'warning.main'
-                            }}
-                          />
-                        </Tooltip>
-                      )}
-                    </Box>
-                  </Box>
-
-                  <IconButton
-                    size="small"
-                    sx={{ ml: 1 }}
-                  >
-                    {isExpanded ? <ExpandLess /> : <ExpandMore />}
-                  </IconButton>
+                  {isExpanded ? (
+                    <ExpandMore sx={{ fontSize: 16 }} />
+                  ) : (
+                    <ChevronRight sx={{ fontSize: 16 }} />
+                  )}
                 </Box>
 
-                <Collapse in={isExpanded} timeout="auto">
-                  <Box sx={{ px: 1.5, pb: 1.5, pt: 0 }}>
+                {/* Field name */}
+                <Typography
+                  sx={{
+                    fontFamily: MONO_FONT,
+                    fontSize: '0.76rem',
+                    fontWeight: 600,
+                    color: theme.palette.text.primary,
+                    minWidth: 0,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {metadata.displayName}
+                </Typography>
+
+                {/* Type transform: fromType → toType */}
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 0.5,
+                    flex: 1,
+                    minWidth: 0,
+                  }}
+                >
+                  <Box
+                    sx={{
+                      fontFamily: MONO_FONT,
+                      fontSize: '0.66rem',
+                      color: alpha(theme.palette.text.secondary, 0.85),
+                      bgcolor: surfaceInset,
+                      border: `1px solid ${hairline}`,
+                      borderRadius: 0.75,
+                      px: 0.6,
+                      py: 0.15,
+                    }}
+                  >
+                    {conversion.fromType}
+                  </Box>
+                  <SwapHoriz
+                    sx={{ fontSize: 12, color: violet, flexShrink: 0 }}
+                  />
+                  <Box
+                    sx={{
+                      fontFamily: MONO_FONT,
+                      fontSize: '0.66rem',
+                      color: violet,
+                      bgcolor: violetSoft,
+                      border: `1px solid ${violetBorder}`,
+                      borderRadius: 0.75,
+                      px: 0.6,
+                      py: 0.15,
+                    }}
+                  >
+                    {conversion.toType}
+                  </Box>
+                </Box>
+
+                {/* Row count + optional warning */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
+                  {conversion.warnings > 0 && (
                     <Box
                       sx={{
-                        bgcolor: 'background.paper',
-                        borderRadius: 1,
-                        p: 1.5,
-                        border: '1px solid',
-                        borderColor: 'divider'
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 0.25,
+                        fontFamily: MONO_FONT,
+                        fontFeatureSettings: TNUM,
+                        fontSize: '0.64rem',
+                        fontWeight: 600,
+                        color: theme.palette.warning.main,
                       }}
                     >
-                      <Box sx={{ display: 'flex', alignItems: 'start', gap: 1, mb: 1 }}>
-                        <Info sx={{ fontSize: 16, color: 'text.secondary', mt: 0.25 }} />
-                        <Typography variant="caption" color="text.secondary">
-                          {fieldMetadata.description}
-                        </Typography>
-                      </Box>
+                      <WarningAmber sx={{ fontSize: 11 }} />
+                      {conversion.warnings}
+                    </Box>
+                  )}
+                  <Typography
+                    sx={{
+                      fontFamily: MONO_FONT,
+                      fontFeatureSettings: TNUM,
+                      fontSize: '0.66rem',
+                      fontWeight: 600,
+                      color: alpha(theme.palette.text.secondary, 0.75),
+                    }}
+                  >
+                    {formatCount(conversion.affectedRows)} rows
+                  </Typography>
+                </Box>
+              </Box>
 
-                      {conversion.examples.length > 0 && (
-                        <Box sx={{ mt: 1.5 }}>
-                          <Typography variant="caption" fontWeight={600} sx={{ display: 'block', mb: 1 }}>
-                            Example conversions:
-                          </Typography>
-                          {conversion.examples.map((example, exIndex) => (
+              {/* Expanded detail */}
+              <Collapse in={isExpanded} timeout="auto">
+                <Box
+                  sx={{
+                    px: 1.5,
+                    pb: 1.25,
+                    pl: 4,
+                    pt: 0.5,
+                    borderTop: `1px solid ${hairline}`,
+                    bgcolor: alpha(theme.palette.text.primary, 0.015),
+                  }}
+                >
+                  <Typography
+                    sx={{
+                      fontFamily: "'DM Sans', sans-serif",
+                      fontSize: '0.72rem',
+                      color: alpha(theme.palette.text.secondary, 0.8),
+                      lineHeight: 1.5,
+                      mt: 0.75,
+                      mb: conversion.examples.length > 0 ? 1 : 0,
+                    }}
+                  >
+                    {metadata.description}
+                  </Typography>
+
+                  {conversion.examples.length > 0 && (
+                    <Box>
+                      <Typography
+                        sx={{
+                          fontFamily: MONO_FONT,
+                          fontSize: '0.6rem',
+                          fontWeight: 600,
+                          letterSpacing: '0.14em',
+                          textTransform: 'uppercase',
+                          color: alpha(theme.palette.text.secondary, 0.7),
+                          mb: 0.5,
+                        }}
+                      >
+                        Examples
+                      </Typography>
+                      {conversion.examples.slice(0, 3).map((ex, exIdx) => {
+                        const original = String(ex.original);
+                        const converted =
+                          typeof ex.converted === 'object'
+                            ? JSON.stringify(ex.converted)
+                            : String(ex.converted);
+                        return (
+                          <Box
+                            key={exIdx}
+                            sx={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 0.75,
+                              mb: 0.4,
+                            }}
+                          >
                             <Box
-                              key={exIndex}
                               sx={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 1,
-                                mb: 0.5,
-                                p: 0.75,
-                                bgcolor: alpha('#000', 0.02),
+                                fontFamily: MONO_FONT,
+                                fontSize: '0.7rem',
+                                color: alpha(theme.palette.text.primary, 0.65),
+                                bgcolor: alpha(theme.palette.text.primary, 0.04),
+                                border: `1px solid ${hairline}`,
                                 borderRadius: 0.5,
-                                fontSize: '0.75rem'
+                                px: 0.6,
+                                py: 0.2,
+                                maxWidth: 140,
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
                               }}
                             >
-                              <Typography
-                                variant="caption"
-                                sx={{
-                                  fontFamily: 'monospace',
-                                  px: 0.75,
-                                  py: 0.25,
-                                  bgcolor: alpha('#f44336', 0.1),
-                                  color: 'error.dark',
-                                  borderRadius: 0.5
-                                }}
-                              >
-                                {String(example.original)}
-                              </Typography>
-                              <SwapHoriz sx={{ fontSize: 14, color: 'text.secondary' }} />
-                              <Typography
-                                variant="caption"
-                                sx={{
-                                  fontFamily: 'monospace',
-                                  px: 0.75,
-                                  py: 0.25,
-                                  bgcolor: alpha('#4caf50', 0.1),
-                                  color: 'success.dark',
-                                  borderRadius: 0.5
-                                }}
-                              >
-                                {typeof example.converted === 'object'
-                                  ? JSON.stringify(example.converted)
-                                  : String(example.converted)}
-                              </Typography>
+                              {original}
                             </Box>
-                          ))}
-                        </Box>
-                      )}
+                            <SwapHoriz
+                              sx={{ fontSize: 11, color: violet, flexShrink: 0 }}
+                            />
+                            <Box
+                              sx={{
+                                fontFamily: MONO_FONT,
+                                fontSize: '0.7rem',
+                                color: theme.palette.success.main,
+                                bgcolor: alpha(theme.palette.success.main, 0.08),
+                                border: `1px solid ${alpha(theme.palette.success.main, 0.28)}`,
+                                borderRadius: 0.5,
+                                px: 0.6,
+                                py: 0.2,
+                                maxWidth: 140,
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {converted}
+                            </Box>
+                          </Box>
+                        );
+                      })}
                     </Box>
-                  </Box>
-                </Collapse>
-              </ListItem>
-            );
-          })}
-        </List>
-
-        <Box
-          sx={{
-            mt: 2,
-            p: 1.5,
-            bgcolor: alpha('#2196f3', 0.05),
-            borderRadius: 1,
-            border: '1px solid',
-            borderColor: alpha('#2196f3', 0.2)
-          }}
-        >
-          <Typography variant="caption" color="text.secondary">
-            <strong>Note:</strong> All conversions are automatic and will be applied when you import the data.
-            If any conversion fails, that row will be marked with an error.
-          </Typography>
-        </Box>
-      </CardContent>
-    </Card>
+                  )}
+                </Box>
+              </Collapse>
+            </Box>
+          );
+        })}
+      </Box>
+    </Box>
   );
 };

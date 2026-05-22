@@ -32,6 +32,7 @@ import { ImportPreview } from './ImportPreview';
 import { ValidationSummary } from './ValidationSummary';
 import { TypeConverterPanel } from './TypeConverterPanel';
 import { MappingTemplateManager } from './MappingTemplateManager';
+import { AssetMappingPanel } from './AssetMappingPanel';
 import {
   detectColumnMapping,
   validateRequiredFieldsMapped,
@@ -55,7 +56,80 @@ interface ImportMappingDialogProps {
   file: File | null;
 }
 
-const STEPS = ['Upload & Parse', 'Map Columns', 'Preview & Validate'];
+const STEPS = ['Upload', 'Map', 'Assets', 'Preview'];
+
+type NoticeTone = 'warning' | 'info' | 'success' | 'error';
+
+interface NoticeStripProps {
+  tone: NoticeTone;
+  title: string;
+  body: string;
+}
+
+/**
+ * Compact inset notice — replaces MUI Alert with the dialog's token language.
+ * Mono uppercase eyebrow on the left, body copy on the right, hairline border,
+ * subtle tone-tinted background.
+ */
+const NoticeStrip: React.FC<NoticeStripProps> = ({ tone, title, body }) => {
+  const theme = useTheme();
+  const { hairline } = useDialogTokens();
+
+  const toneColor =
+    tone === 'warning'
+      ? theme.palette.warning.main
+      : tone === 'error'
+        ? theme.palette.error.main
+        : tone === 'success'
+          ? theme.palette.success.main
+          : theme.palette.info.main;
+
+  return (
+    <Box
+      sx={{
+        display: 'flex',
+        alignItems: 'stretch',
+        borderRadius: 1.25,
+        border: `1px solid ${hairline}`,
+        bgcolor: alpha(toneColor, 0.06),
+        overflow: 'hidden',
+      }}
+    >
+      <Box
+        sx={{
+          width: 3,
+          bgcolor: toneColor,
+          flexShrink: 0,
+        }}
+      />
+      <Box sx={{ px: 1.5, py: 1, flex: 1, minWidth: 0 }}>
+        <Typography
+          sx={{
+            fontFamily: MONO_FONT,
+            fontSize: '0.66rem',
+            fontWeight: 700,
+            letterSpacing: '0.14em',
+            textTransform: 'uppercase',
+            color: toneColor,
+            mb: 0.4,
+          }}
+        >
+          {title}
+        </Typography>
+        <Typography
+          sx={{
+            fontFamily: "'DM Sans', sans-serif",
+            fontSize: '0.78rem',
+            color: alpha(theme.palette.text.primary, 0.78),
+            lineHeight: 1.5,
+          }}
+        >
+          {body}
+        </Typography>
+      </Box>
+    </Box>
+  );
+};
 
 export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
   open,
@@ -100,6 +174,12 @@ export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
   const [currentStep, setCurrentStep] = useState<number>(0);
   const [fileData, setFileData] = useState<ImportFileData | null>(null);
   const [columnMappings, setColumnMappings] = useState<ColumnMapping[]>([]);
+  // Asset-mapping step state — `splitColumn` is the file column to group by;
+  // `assetAssignments` is uppercased-value → currency-pair (e.g. "EU" → "EURUSD").
+  // On import these get applied as `pair:XXXYYY` tags so trades join the
+  // economic-events index. Step is fully optional.
+  const [splitColumn, setSplitColumn] = useState<string | null>(null);
+  const [assetAssignments, setAssetAssignments] = useState<Record<string, string>>({});
   const [previewRows, setPreviewRows] = useState<ImportPreviewRow[]>([]);
   const [validationSummary, setValidationSummary] =
     useState<ValidationSummaryType | null>(null);
@@ -129,18 +209,22 @@ export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
       setCurrentStep(0);
       setFileData(null);
       setColumnMappings([]);
+      setSplitColumn(null);
+      setAssetAssignments({});
       setPreviewRows([]);
       setValidationSummary(null);
       setError(null);
     }
   }, [open, file]);
 
-  // Auto-validate when mappings change
+  // Auto-validate when mappings or asset assignments change. Including
+  // splitColumn/assetAssignments so preview tags reflect the asset step.
   useEffect(() => {
     if (fileData && columnMappings.length > 0 && currentStep >= 1) {
       validateData();
     }
-  }, [columnMappings, fileData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [columnMappings, fileData, splitColumn, assetAssignments]);
 
   const parseFile = async (file: File) => {
     setIsProcessing(true);
@@ -323,7 +407,29 @@ export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
       config,
     );
 
-    setPreviewRows(rows);
+    // Apply asset-mapping pair tags so the preview accurately reflects what
+    // will land. Walks each row, looks up its split-column value, and appends
+    // `pair:XXXYYY` if the user assigned a pair to that group.
+    const enriched = splitColumn
+      ? rows.map((row) => {
+          const raw = String(fileData.rows[row.rowIndex]?.[splitColumn] ?? '').trim();
+          const key = raw.toUpperCase() || '(EMPTY)';
+          const pair = assetAssignments[key];
+          if (!pair) return row;
+          const existing = row.mappedData.tags || [];
+          const pairTag = `pair:${pair}`;
+          if (existing.includes(pairTag)) return row;
+          return {
+            ...row,
+            mappedData: {
+              ...row.mappedData,
+              tags: [...existing, pairTag],
+            },
+          };
+        })
+      : rows;
+
+    setPreviewRows(enriched);
     setValidationSummary(summary);
   };
 
@@ -368,35 +474,9 @@ export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
         return;
       }
 
-      // Check if any pair-related tags are mapped
-      // Look for columns mapped to tags, or unmapped columns that will become tags
-      const hasPairColumn = fileData?.columns.some(
-        (col) =>
-          col.toLowerCase().includes('pair') ||
-          col.toLowerCase().includes('symbol') ||
-          col.toLowerCase().includes('instrument'),
-      );
-
-      if (hasPairColumn) {
-        const pairColumnMapping = columnMappings.find((m) => {
-          const colName = m.fileColumn.toLowerCase();
-          return (
-            colName.includes('pair') ||
-            colName.includes('symbol') ||
-            colName.includes('instrument')
-          );
-        });
-
-        // If pair column exists but is mapped to 'ignore', warn user
-        if (pairColumnMapping?.target === 'ignore') {
-          setSnackbarMessage(
-            '⚠️ Warning: Pair/Symbol column is set to "Ignore". Trades will not have economic events attached. Consider mapping it to "Tags" or "Create Tag".',
-          );
-          setSnackbarSeverity('error');
-          setSnackbarOpen(true);
-          // Don't return - allow them to proceed with warning
-        }
-      }
+      // Note: pair/symbol/instrument detection used to warn here. That is now
+      // handled by the Assets step (next), where the user can group trades by
+      // any column and assign currency pairs explicitly. No pre-warning needed.
 
       validateData();
     }
@@ -480,6 +560,8 @@ export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
   const subtitle = (() => {
     if (currentStep === 0) return 'Parsing your file…';
     if (currentStep === 1) return 'Map your CSV columns to trade fields';
+    if (currentStep === 2)
+      return 'Optional — link trades to currency pairs for economic events';
     return 'Review and confirm before importing';
   })();
 
@@ -500,74 +582,70 @@ export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
       ? handleNext
       : undefined;
 
-  // Chip-style step indicator
+  // Clean step rail — numbered violet circles connected by hairlines.
+  // Mirrors the landing-page import dialog mock (no pill chrome around labels).
   const StepIndicator: React.FC = () => (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
       {STEPS.map((label, idx) => {
         const active = idx === currentStep;
         const completed = idx < currentStep;
-        const numColor = completed
-          ? violet
-          : active
-            ? violet
-            : theme.palette.text.secondary;
         return (
           <React.Fragment key={label}>
-            <Box
-              sx={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 0.75,
-                px: 1.25,
-                py: 0.5,
-                borderRadius: 999,
-                border: `1px solid ${
-                  active || completed ? violetBorder : hairline
-                }`,
-                backgroundColor:
-                  active || completed ? violetSofter : surfaceInset,
-                fontFamily: MONO_FONT,
-                fontSize: '0.7rem',
-                fontWeight: 600,
-                letterSpacing: '0.08em',
-                textTransform: 'uppercase' as const,
-                color: active || completed ? violet : theme.palette.text.secondary,
-                transition: 'all 120ms ease',
-              }}
-            >
-              {completed ? (
-                <CheckCircleIcon sx={{ fontSize: 13, color: violet }} />
-              ) : (
-                <Box
-                  component="span"
-                  sx={{
-                    width: 16,
-                    height: 16,
-                    borderRadius: '50%',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '0.65rem',
-                    fontWeight: 700,
-                    color: numColor,
-                    backgroundColor: active
-                      ? alpha(violet, 0.22)
-                      : surfaceInset,
-                    border: `1px solid ${active ? violetBorder : hairline}`,
-                  }}
-                >
-                  {idx + 1}
-                </Box>
-              )}
-              {label}
+            <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>
+              <Box
+                component="span"
+                sx={{
+                  width: 18,
+                  height: 18,
+                  borderRadius: '50%',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontFamily: MONO_FONT,
+                  fontSize: '0.65rem',
+                  fontWeight: 700,
+                  border: `1.5px solid ${
+                    active || completed ? violet : hairline
+                  }`,
+                  backgroundColor: active ? violet : 'transparent',
+                  color: active
+                    ? '#fff'
+                    : completed
+                      ? violet
+                      : alpha(theme.palette.text.secondary, 0.6),
+                  lineHeight: 1,
+                  transition: 'all 120ms ease',
+                  flexShrink: 0,
+                }}
+              >
+                {completed ? (
+                  <CheckCircleIcon sx={{ fontSize: 14, color: violet }} />
+                ) : (
+                  idx + 1
+                )}
+              </Box>
+              <Typography
+                sx={{
+                  fontFamily: MONO_FONT,
+                  fontSize: '0.7rem',
+                  fontWeight: 500,
+                  letterSpacing: '0.14em',
+                  textTransform: 'uppercase' as const,
+                  color: active
+                    ? theme.palette.text.primary
+                    : alpha(theme.palette.text.secondary, 0.7),
+                }}
+              >
+                {label}
+              </Typography>
             </Box>
             {idx < STEPS.length - 1 && (
               <Box
                 sx={{
-                  width: 16,
-                  height: 1,
-                  backgroundColor:
-                    idx < currentStep ? violetBorder : hairline,
+                  flex: 1,
+                  maxWidth: 56,
+                  height: '1px',
+                  backgroundColor: idx < currentStep ? violet : hairline,
                 }}
               />
             )}
@@ -587,7 +665,7 @@ export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
         title="Import trades"
         subtitle={subtitle}
         headerIcon={headerIcon}
-        maxWidth="lg"
+        maxWidth="sm"
         fullWidth
         primaryButtonText={primaryButtonText}
         primaryButtonAction={primaryButtonAction}
@@ -630,23 +708,29 @@ export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
               border: `1px solid ${hairline}`,
               boxShadow: theme.shadows[10],
               backgroundImage: 'none',
-              height: '90vh',
+              maxWidth: 560,
+              height: '85vh',
               overflow: 'hidden',
             },
           },
         }}
-        contentSx={{ px: 2.5, py: 2 }}
+        // flex: 1 + minHeight: 0 makes the body fill remaining vertical space
+        // so the footer stays pinned to the bottom even when step content is
+        // short (e.g. Assets empty state). overflowY:auto already handles tall
+        // steps like Preview.
+        contentSx={{ px: 2.5, py: 2, flex: 1, minHeight: 0 }}
       >
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.25 }}>
-          {/* Step indicator */}
+          {/* Step rail — sits flush at the top of the dialog body */}
           <Box
             sx={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 1,
+              px: 1.5,
+              py: 1.25,
+              borderRadius: 1.25,
+              border: `1px solid ${hairline}`,
+              backgroundColor: surfaceInset,
             }}
           >
-            <Typography sx={monoLabelSx}>Progress</Typography>
             <StepIndicator />
           </Box>
 
@@ -835,66 +919,40 @@ export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
                     </Box>
                   )}
 
-                  {/* Columns section */}
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 1,
-                    }}
-                  >
-                    <Typography sx={monoLabelSx}>Columns</Typography>
-                    <ColumnMapper
-                      fileColumns={fileData.columns}
-                      columnMappings={columnMappings}
-                      sampleData={fileData.rows.slice(0, 5)}
-                      onMappingChange={handleMappingChange}
-                    />
-                  </Box>
+                  {/* Columns — ColumnMapper renders its own status strip + headers */}
+                  <ColumnMapper
+                    fileColumns={fileData.columns}
+                    columnMappings={columnMappings}
+                    sampleData={fileData.rows.slice(0, 5)}
+                    onMappingChange={handleMappingChange}
+                  />
                 </Box>
               )}
 
-              {currentStep === 2 && validationSummary && (
+              {currentStep === 2 && (
+                <AssetMappingPanel
+                  fileData={fileData}
+                  splitColumn={splitColumn}
+                  onSplitColumnChange={setSplitColumn}
+                  assetAssignments={assetAssignments}
+                  onAssetAssignmentsChange={setAssetAssignments}
+                />
+              )}
+
+              {currentStep === 3 && validationSummary && (
                 <Box
                   sx={{
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: 2,
+                    gap: 1.75,
                   }}
                 >
-                  {/* Warning about deleting existing trades */}
-                  <Alert
-                    severity="warning"
-                    sx={{
-                      borderRadius: 1.5,
-                      border: `1px solid ${alpha(
-                        theme.palette.warning.main,
-                        0.3,
-                      )}`,
-                      backgroundColor: alpha(theme.palette.warning.main, 0.08),
-                    }}
-                  >
-                    <Typography
-                      sx={{
-                        fontWeight: 700,
-                        fontSize: '0.85rem',
-                        mb: 0.5,
-                      }}
-                    >
-                      Importing will replace all existing trades
-                    </Typography>
-                    <Typography
-                      sx={{
-                        fontSize: '0.8rem',
-                        color: theme.palette.text.secondary,
-                        lineHeight: 1.5,
-                      }}
-                    >
-                      All current trades in this calendar will be permanently
-                      deleted before importing the new trades. This action
-                      cannot be undone. Make sure you have a backup if needed.
-                    </Typography>
-                  </Alert>
+                  {/* Destructive notice — mono eyebrow + body text in an inset strip */}
+                  <NoticeStrip
+                    tone="warning"
+                    title="Importing replaces existing trades"
+                    body="All current trades in this calendar will be permanently deleted before the new ones are written. This action cannot be undone."
+                  />
 
                   <ValidationSummary summary={validationSummary} />
 
@@ -904,7 +962,7 @@ export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
                     />
                   )}
 
-                  {/* Check if trades will have pair tags for economic events */}
+                  {/* Economic events context — tone depends on pair/session coverage */}
                   {(() => {
                     const hasPairTags = previewRows.some((row) => {
                       const tags = row.mappedData.tags || [];
@@ -912,147 +970,43 @@ export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
                         tag.toLowerCase().startsWith('pair:'),
                       );
                     });
-
                     const hasSession = previewRows.some(
                       (row) => row.mappedData.session,
                     );
 
                     if (!hasPairTags) {
                       return (
-                        <Alert
-                          severity="warning"
-                          sx={{
-                            borderRadius: 1.5,
-                            border: `1px solid ${alpha(
-                              theme.palette.warning.main,
-                              0.3,
-                            )}`,
-                            backgroundColor: alpha(
-                              theme.palette.warning.main,
-                              0.08,
-                            ),
-                          }}
-                        >
-                          <Typography
-                            sx={{
-                              fontWeight: 700,
-                              fontSize: '0.85rem',
-                              mb: 0.5,
-                            }}
-                          >
-                            Economic events not available
-                          </Typography>
-                          <Typography
-                            sx={{
-                              fontSize: '0.78rem',
-                              color: theme.palette.text.secondary,
-                              lineHeight: 1.5,
-                            }}
-                          >
-                            No pair tags detected in your import. Trades will be
-                            imported without economic events. To include
-                            economic events, ensure you have a "Pair" column
-                            (e.g., EURUSD, GBPJPY) mapped to "Tags" or "Create
-                            Tag".
-                          </Typography>
-                        </Alert>
-                      );
-                    } else if (!hasSession) {
-                      return (
-                        <Alert
-                          severity="info"
-                          sx={{
-                            borderRadius: 1.5,
-                            border: `1px solid ${alpha(
-                              theme.palette.info.main,
-                              0.3,
-                            )}`,
-                            backgroundColor: alpha(
-                              theme.palette.info.main,
-                              0.08,
-                            ),
-                          }}
-                        >
-                          <Typography
-                            sx={{
-                              fontWeight: 700,
-                              fontSize: '0.85rem',
-                              mb: 0.5,
-                            }}
-                          >
-                            Partial economic events
-                          </Typography>
-                          <Typography
-                            sx={{
-                              fontSize: '0.78rem',
-                              color: theme.palette.text.secondary,
-                              lineHeight: 1.5,
-                            }}
-                          >
-                            Pair tags detected, but no session information.
-                            Economic events will only be fetched for trades
-                            with a trading session (London, New York, Asian).
-                          </Typography>
-                        </Alert>
-                      );
-                    } else {
-                      return (
-                        <Alert
-                          severity="success"
-                          icon={
-                            <CheckCircleIcon sx={{ fontSize: 18 }} />
-                          }
-                          sx={{
-                            borderRadius: 1.5,
-                            border: `1px solid ${alpha(
-                              theme.palette.success.main,
-                              0.3,
-                            )}`,
-                            backgroundColor: alpha(
-                              theme.palette.success.main,
-                              0.08,
-                            ),
-                          }}
-                        >
-                          <Typography
-                            sx={{
-                              fontWeight: 700,
-                              fontSize: '0.85rem',
-                              mb: 0.5,
-                            }}
-                          >
-                            Economic events will be fetched
-                          </Typography>
-                          <Typography
-                            sx={{
-                              fontSize: '0.78rem',
-                              color: theme.palette.text.secondary,
-                              lineHeight: 1.5,
-                            }}
-                          >
-                            Trades have pair tags and session information.
-                            Relevant economic events will be automatically
-                            attached during import.
-                          </Typography>
-                        </Alert>
+                        <NoticeStrip
+                          tone="warning"
+                          title="Economic events not available"
+                          body='No pair tags detected. Map a "Pair" column (e.g. EURUSD, GBPJPY) to Tags or Create Tag to attach events.'
+                        />
                       );
                     }
+                    if (!hasSession) {
+                      return (
+                        <NoticeStrip
+                          tone="info"
+                          title="Partial economic events"
+                          body="Pair tags found, no session. Events will only attach to trades that include a session (London / NY / Asian)."
+                        />
+                      );
+                    }
+                    return (
+                      <NoticeStrip
+                        tone="success"
+                        title="Economic events will attach"
+                        body="Pair tags and session info detected. Relevant events will be linked automatically during import."
+                      />
+                    );
                   })()}
 
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 1,
-                    }}
-                  >
-                    <Typography sx={monoLabelSx}>Preview</Typography>
-                    <ImportPreview
-                      previewRows={previewRows}
-                      mappedFields={getMappedFields() as any}
-                      maxRows={10}
-                    />
-                  </Box>
+                  {/* Preview renders its own header strip — no extra label */}
+                  <ImportPreview
+                    previewRows={previewRows}
+                    mappedFields={getMappedFields() as any}
+                    maxRows={10}
+                  />
                 </Box>
               )}
             </>

@@ -29,10 +29,6 @@ const LandingPage: React.FC = () => {
         else setShowLoginDialog(true);
     };
 
-    const handleWatchTour = () => {
-        document.getElementById('calendar')?.scrollIntoView({ behavior: 'smooth' });
-    };
-
     return (
         <>
             <Box sx={{ bgcolor: '#080808', minHeight: '100vh', color: '#f1f5f9', overflowX: 'hidden', position: 'relative' }}>
@@ -88,11 +84,8 @@ const LandingPage: React.FC = () => {
                     }}
                 />
                 <Box sx={{ position: 'relative', zIndex: 1 }}>
-                    <LandingNav
-                        onGetStarted={handleGetStarted}
-                        onLogin={() => setShowLoginDialog(true)}
-                    />
-                    <LandingHero onGetStarted={handleGetStarted} onWatchTour={handleWatchTour} />
+                    <LandingNav onLogin={() => setShowLoginDialog(true)} />
+                    <LandingHero onGetStarted={handleGetStarted} />
                     <LandingBento />
                     <LandingFeatureRows onGetStarted={handleGetStarted} />
                 </Box>

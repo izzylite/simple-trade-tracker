@@ -79,7 +79,7 @@ const NotesSection: React.FC = () => {
                         ...revealSx(head.inView, 80),
                     }}
                 >
-                    Tomorrow&rsquo;s plan, beside today&rsquo;s tape.
+                    All your trading notes, in one place.
                 </Typography>
 
                 <Typography
@@ -94,10 +94,9 @@ const NotesSection: React.FC = () => {
                         ...revealSx(lede.inView, 160),
                     }}
                 >
-                    Pre-market bias, the setups you&rsquo;re hunting, the events you&rsquo;re
-                    sitting out. Post-session, the trades that hit and the ones that broke
-                    your rule. Tag any line, link any fill. The calendar reads back what you
-                    wrote on Monday next time Monday rolls around.
+                    A rich-text journal for game plans, lessons, and rules. Tag them by
+                    topic, set the recurring ones to surface every Monday or before each
+                    FOMC, and Orion reads them when answering you.
                 </Typography>
 
                 {/* Note title block — signals "this is a real journal entry,"

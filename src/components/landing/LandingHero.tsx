@@ -1,12 +1,12 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { Box, Button, Container, Stack, Typography } from '@mui/material';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import EdgeDiscoveryOverlay from './EdgeDiscoveryOverlay';
 
 const ACCENT = '#7c3aed';
 
 interface Props {
     onGetStarted: () => void;
-    onWatchTour: () => void;
 }
 
 const fadeUp = {
@@ -22,10 +22,12 @@ const fadeUp = {
     },
 };
 
-const LandingHero: React.FC<Props> = ({ onGetStarted, onWatchTour }) => {
+const LandingHero: React.FC<Props> = ({ onGetStarted }) => {
+    const heroRef = useRef<HTMLDivElement | null>(null);
     return (
-        <Box sx={{ pt: { xs: 14, md: 20 }, pb: { xs: 8, md: 12 }, position: 'relative' }}>
-            <Container maxWidth={false} sx={{ maxWidth: { xs: 1080, lg: 1280, xl: 1440 }, px: { xs: 3, md: 4, xl: 6 } }}>
+        <Box ref={heroRef} sx={{ pt: { xs: 14, md: 20 }, pb: { xs: 8, md: 12 }, position: 'relative' }}>
+            <EdgeDiscoveryOverlay targetRef={heroRef} />
+            <Container maxWidth={false} sx={{ position: 'relative', zIndex: 1, maxWidth: { xs: 1080, lg: 1280, xl: 1440 }, px: { xs: 3, md: 4, xl: 6 } }}>
                 {/* Early-access badge */}
                 <Box sx={{ display: 'flex', justifyContent: 'center', mb: { xs: 3, md: 4 } }}>
                     <Box
@@ -55,7 +57,7 @@ const LandingHero: React.FC<Props> = ({ onGetStarted, onWatchTour }) => {
                                 bgcolor: ACCENT,
                             }}
                         />
-                        Free in early access · $9/mo at v1.0
+                        Built by traders for traders
                     </Box>
                 </Box>
                 {/* Display headline */}
@@ -118,10 +120,10 @@ const LandingHero: React.FC<Props> = ({ onGetStarted, onWatchTour }) => {
                             textAlign: 'center',
                         }}
                     >
-                        A logbook for traders who keep one open every session. Calendars by
-                        strategy or account. Fills logged into a monthly grid with R, tags,
-                        and screenshots. An assistant that reviews your week the way you
-                        would, if you had time.
+                        Work with a second brain to find and refine your edge — from
+                        tracking your trades to your morning market research. Orion reads
+                        your trades, your notes, the economic calendar, and the news on
+                        your tickers, useful whether you&rsquo;re a year in or professional.
                     </Typography>
                 </Box>
 
@@ -161,29 +163,6 @@ const LandingHero: React.FC<Props> = ({ onGetStarted, onWatchTour }) => {
                         }}
                     >
                         Start your logbook
-                    </Button>
-                    <Button
-                        onClick={onWatchTour}
-                        sx={{
-                            bgcolor: 'transparent',
-                            color: 'rgba(255,255,255,0.55)',
-                            fontWeight: 600,
-                            fontSize: '0.95rem',
-                            px: 2.5,
-                            py: 1.3,
-                            borderRadius: '8px',
-                            border: '1px solid rgba(255,255,255,0.08)',
-                            textTransform: 'none',
-                            letterSpacing: '-0.005em',
-                            transition: 'color 180ms, border-color 180ms, background 180ms',
-                            '&:hover': {
-                                color: '#f1f5f9',
-                                borderColor: 'rgba(255,255,255,0.22)',
-                                bgcolor: 'rgba(255,255,255,0.02)',
-                            },
-                        }}
-                    >
-                        Watch a 60-second tour
                     </Button>
                 </Stack>
             </Container>

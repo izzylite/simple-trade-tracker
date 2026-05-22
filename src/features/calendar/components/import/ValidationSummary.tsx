@@ -1,225 +1,211 @@
 import React from 'react';
 import { formatCount } from 'utils/formatters';
-import {
-  Box,
-  Card,
-  CardContent,
-  Typography,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText,
-  Chip,
-  alpha,
-  LinearProgress
-} from '@mui/material';
-import {
-  CheckCircle,
-  Warning,
-  Error as ErrorIcon,
-  Info,
-  SwapHoriz
-} from '@mui/icons-material';
+import { Box, Typography, alpha, useTheme } from '@mui/material';
 import { ValidationSummary as ValidationSummaryType } from '../../types/import';
+import { useDialogTokens, MONO_FONT } from 'styles/dialogTokens';
 
 interface ValidationSummaryProps {
   summary: ValidationSummaryType;
 }
 
-export const ValidationSummary: React.FC<ValidationSummaryProps> = ({ summary }) => {
-  const {
-    totalRows,
-    validRows,
-    rowsWithWarnings,
-    rowsWithErrors,
-    willImport,
-    conversions
-  } = summary;
+const TNUM = "'tnum' on, 'lnum' on";
 
-  const validPercentage = totalRows > 0 ? (validRows / totalRows) * 100 : 0;
+/**
+ * Compact validation summary — four stat tiles (Valid · Warnings · Errors · Will import)
+ * with a thin progress strip below. Matches the import-dialog style language:
+ * mono numerals, hairline borders, surfaceInset bg, no Card/List chrome.
+ */
+export const ValidationSummary: React.FC<ValidationSummaryProps> = ({ summary }) => {
+  const theme = useTheme();
+  const {
+    violet,
+    violetSoft,
+    violetBorder,
+    surfaceInset,
+    hairline,
+  } = useDialogTokens();
+
+  const { totalRows, validRows, rowsWithWarnings, rowsWithErrors, willImport } = summary;
+  const validPct = totalRows > 0 ? (validRows / totalRows) * 100 : 0;
+
+  const tiles: Array<{
+    label: string;
+    value: number;
+    color: string;
+    bg: string;
+    border: string;
+    emphasis?: boolean;
+  }> = [
+    {
+      label: 'Valid',
+      value: validRows,
+      color: theme.palette.success.main,
+      bg: alpha(theme.palette.success.main, 0.08),
+      border: alpha(theme.palette.success.main, 0.28),
+    },
+    {
+      label: 'Warnings',
+      value: rowsWithWarnings,
+      color:
+        rowsWithWarnings > 0
+          ? theme.palette.warning.main
+          : alpha(theme.palette.text.secondary, 0.55),
+      bg:
+        rowsWithWarnings > 0
+          ? alpha(theme.palette.warning.main, 0.08)
+          : surfaceInset,
+      border:
+        rowsWithWarnings > 0
+          ? alpha(theme.palette.warning.main, 0.28)
+          : hairline,
+    },
+    {
+      label: 'Errors',
+      value: rowsWithErrors,
+      color:
+        rowsWithErrors > 0
+          ? theme.palette.error.main
+          : alpha(theme.palette.text.secondary, 0.55),
+      bg:
+        rowsWithErrors > 0
+          ? alpha(theme.palette.error.main, 0.08)
+          : surfaceInset,
+      border:
+        rowsWithErrors > 0
+          ? alpha(theme.palette.error.main, 0.28)
+          : hairline,
+    },
+    {
+      label: 'Will import',
+      value: willImport,
+      color: violet,
+      bg: violetSoft,
+      border: violetBorder,
+      emphasis: true,
+    },
+  ];
 
   return (
-    <Card
+    <Box
       sx={{
-        bgcolor: 'background.paper',
-        border: '1px solid',
-        borderColor: 'divider'
+        border: `1px solid ${hairline}`,
+        borderRadius: 1.5,
+        overflow: 'hidden',
+        bgcolor: surfaceInset,
       }}
     >
-      <CardContent>
-        <Typography variant="h6" gutterBottom>
-          Validation Summary
-        </Typography>
-
-        <Box sx={{ mb: 3 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-            <Typography variant="body2" color="text.secondary">
-              Valid Rows
-            </Typography>
-            <Typography variant="body2" fontWeight={600}>
-              {formatCount(validRows)} / {formatCount(totalRows)} ({validPercentage.toFixed(0)}%)
-            </Typography>
-          </Box>
-          <LinearProgress
-            variant="determinate"
-            value={validPercentage}
+      {/* Stat tile row */}
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, 1fr)',
+          gap: 0,
+        }}
+      >
+        {tiles.map((t, i) => (
+          <Box
+            key={t.label}
             sx={{
-              height: 8,
-              borderRadius: 1,
-              bgcolor: alpha('#f44336', 0.1),
-              '& .MuiLinearProgress-bar': {
-                bgcolor: validPercentage >= 80 ? 'success.main' : validPercentage >= 50 ? 'warning.main' : 'error.main',
-                borderRadius: 1
-              }
+              px: 1.25,
+              py: 1.25,
+              borderRight: i < tiles.length - 1 ? `1px solid ${hairline}` : 'none',
+              backgroundColor: t.bg,
+              borderTop: `2px solid ${t.border}`,
             }}
-          />
-        </Box>
-
-        <List dense disablePadding>
-          <ListItem disablePadding sx={{ mb: 1 }}>
-            <ListItemIcon sx={{ minWidth: 36 }}>
-              <CheckCircle sx={{ color: 'success.main', fontSize: 20 }} />
-            </ListItemIcon>
-            <ListItemText
-              primary={
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Typography variant="body2">Valid rows</Typography>
-                  <Chip
-                    label={formatCount(validRows)}
-                    size="small"
-                    sx={{
-                      bgcolor: alpha('#4caf50', 0.1),
-                      color: 'success.main',
-                      fontWeight: 600
-                    }}
-                  />
-                </Box>
-              }
-            />
-          </ListItem>
-
-          {rowsWithWarnings > 0 && (
-            <ListItem disablePadding sx={{ mb: 1 }}>
-              <ListItemIcon sx={{ minWidth: 36 }}>
-                <Warning sx={{ color: 'warning.main', fontSize: 20 }} />
-              </ListItemIcon>
-              <ListItemText
-                primary={
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Typography variant="body2">Rows with warnings</Typography>
-                    <Chip
-                      label={formatCount(rowsWithWarnings)}
-                      size="small"
-                      sx={{
-                        bgcolor: alpha('#ff9800', 0.1),
-                        color: 'warning.main',
-                        fontWeight: 600
-                      }}
-                    />
-                  </Box>
-                }
-              />
-            </ListItem>
-          )}
-
-          {rowsWithErrors > 0 && (
-            <ListItem disablePadding sx={{ mb: 1 }}>
-              <ListItemIcon sx={{ minWidth: 36 }}>
-                <ErrorIcon sx={{ color: 'error.main', fontSize: 20 }} />
-              </ListItemIcon>
-              <ListItemText
-                primary={
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Typography variant="body2">Rows with errors</Typography>
-                    <Chip
-                      label={formatCount(rowsWithErrors)}
-                      size="small"
-                      sx={{
-                        bgcolor: alpha('#f44336', 0.1),
-                        color: 'error.main',
-                        fontWeight: 600
-                      }}
-                    />
-                  </Box>
-                }
-              />
-            </ListItem>
-          )}
-
-          {conversions.length > 0 && (
-            <ListItem disablePadding sx={{ mb: 1 }}>
-              <ListItemIcon sx={{ minWidth: 36 }}>
-                <SwapHoriz sx={{ color: 'info.main', fontSize: 20 }} />
-              </ListItemIcon>
-              <ListItemText
-                primary={
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Typography variant="body2">Type conversions</Typography>
-                    <Chip
-                      label={formatCount(conversions.length)}
-                      size="small"
-                      sx={{
-                        bgcolor: alpha('#2196f3', 0.1),
-                        color: 'info.main',
-                        fontWeight: 600
-                      }}
-                    />
-                  </Box>
-                }
-              />
-            </ListItem>
-          )}
-        </List>
-
-        {conversions.length > 0 && (
-          <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-              Conversions:
+          >
+            <Typography
+              sx={{
+                fontFamily: MONO_FONT,
+                fontFeatureSettings: TNUM,
+                fontSize: '1.1rem',
+                fontWeight: 700,
+                color: t.color,
+                lineHeight: 1.1,
+              }}
+            >
+              {formatCount(t.value)}
             </Typography>
-            {conversions.map((conversion, index) => (
-              <Box
-                key={index}
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 1,
-                  mb: 0.5,
-                  p: 0.5,
-                  bgcolor: alpha('#2196f3', 0.05),
-                  borderRadius: 0.5
-                }}
-              >
-                <Info sx={{ fontSize: 16, color: 'info.main' }} />
-                <Typography variant="caption" color="text.secondary">
-                  {formatCount(conversion.affectedRows)} {conversion.field} values: {conversion.fromType} → {conversion.toType}
-                </Typography>
-              </Box>
-            ))}
+            <Typography
+              sx={{
+                mt: 0.25,
+                fontFamily: MONO_FONT,
+                fontSize: '0.6rem',
+                fontWeight: 600,
+                letterSpacing: '0.16em',
+                textTransform: 'uppercase',
+                color: t.emphasis ? violet : alpha(theme.palette.text.secondary, 0.7),
+              }}
+            >
+              {t.label}
+            </Typography>
           </Box>
-        )}
+        ))}
+      </Box>
 
+      {/* Progress strip — thin bar showing valid % */}
+      <Box
+        sx={{
+          height: 3,
+          borderTop: `1px solid ${hairline}`,
+          bgcolor: alpha(theme.palette.error.main, 0.12),
+          position: 'relative',
+          overflow: 'hidden',
+        }}
+      >
         <Box
           sx={{
-            mt: 2,
-            pt: 2,
-            borderTop: '1px solid',
-            borderColor: 'divider',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center'
+            position: 'absolute',
+            inset: 0,
+            right: 'auto',
+            width: `${validPct}%`,
+            bgcolor:
+              validPct >= 80
+                ? theme.palette.success.main
+                : validPct >= 50
+                  ? theme.palette.warning.main
+                  : theme.palette.error.main,
+            transition: 'width 240ms cubic-bezier(.2,.7,.2,1)',
+          }}
+        />
+      </Box>
+
+      {/* Footer caption */}
+      <Box
+        sx={{
+          px: 1.5,
+          py: 0.85,
+          borderTop: `1px solid ${hairline}`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 1,
+        }}
+      >
+        <Typography
+          sx={{
+            fontFamily: MONO_FONT,
+            fontFeatureSettings: TNUM,
+            fontSize: '0.68rem',
+            fontWeight: 500,
+            letterSpacing: '0.08em',
+            color: alpha(theme.palette.text.secondary, 0.85),
           }}
         >
-          <Typography variant="body2" fontWeight={600}>
-            Will import:
-          </Typography>
-          <Chip
-            label={`${formatCount(willImport)} trades`}
-            size="small"
-            color="primary"
-            sx={{ fontWeight: 600 }}
-          />
-        </Box>
-      </CardContent>
-    </Card>
+          {formatCount(validRows)} / {formatCount(totalRows)} rows valid
+        </Typography>
+        <Typography
+          sx={{
+            fontFamily: MONO_FONT,
+            fontFeatureSettings: TNUM,
+            fontSize: '0.68rem',
+            fontWeight: 700,
+            letterSpacing: '0.08em',
+            color: validPct >= 80 ? theme.palette.success.main : theme.palette.warning.main,
+          }}
+        >
+          {validPct.toFixed(0)}%
+        </Typography>
+      </Box>
+    </Box>
   );
 };

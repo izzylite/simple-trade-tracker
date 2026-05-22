@@ -506,7 +506,7 @@ const BriefingsRemindersSection: React.FC = () => {
                                 ...revealSx(head.inView, 80),
                             }}
                         >
-                            Set it once. Hear back when it counts.
+                            A morning brief on the assets you trade.
                         </Typography>
                     </Box>
                     <Typography

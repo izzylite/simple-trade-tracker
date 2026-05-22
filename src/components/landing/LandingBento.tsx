@@ -2,6 +2,7 @@ import React from 'react';
 import { Box } from '@mui/material';
 import { RULE } from 'components/landing/landingTokens';
 import CalendarShowcase from 'components/landing/sections/CalendarShowcase';
+import ImportSection from 'components/landing/sections/ImportSection';
 import PerformanceSection from 'components/landing/sections/PerformanceSection';
 import EventsSection from 'components/landing/sections/EventsSection';
 import NotesSection from 'components/landing/sections/NotesSection';
@@ -10,12 +11,13 @@ import BriefingsRemindersSection from 'components/landing/sections/BriefingsRemi
 
 const LandingBento: React.FC = () => (
     <Box sx={{ bgcolor: '#080808', borderBottom: RULE }}>
+        <ImportSection />
         <CalendarShowcase />
-        <PerformanceSection />
         <EventsSection />
-        <NotesSection />
+         <NotesSection />
         <OrionContextSection />
-        <BriefingsRemindersSection />
+        <BriefingsRemindersSection /> 
+        <PerformanceSection /> 
     </Box>
 );
 

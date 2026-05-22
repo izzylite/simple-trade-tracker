@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Box, Button, Stack, Typography } from '@mui/material';
 
 interface Props {
-    onGetStarted: () => void;
     onLogin: () => void;
 }
 
@@ -11,7 +10,7 @@ const ACCENT = '#7c3aed';
 const ANCHOR_IDS = ['calendar', 'performance', 'events', 'notes', 'orion'] as const;
 type AnchorId = (typeof ANCHOR_IDS)[number];
 
-const LandingNav: React.FC<Props> = ({ onGetStarted, onLogin }) => {
+const LandingNav: React.FC<Props> = ({ onLogin }) => {
     const [scrolled, setScrolled] = useState(false);
     const [activeAnchor, setActiveAnchor] = useState<AnchorId | null>(null);
 
@@ -200,28 +199,6 @@ const LandingNav: React.FC<Props> = ({ onGetStarted, onLogin }) => {
                     }}
                 >
                     Log in
-                </Button>
-                <Button
-                    onClick={onGetStarted}
-                    sx={{
-                        color: '#f1f5f9',
-                        bgcolor: ACCENT,
-                        fontWeight: 600,
-                        fontSize: '0.85rem',
-                        textTransform: 'none',
-                        px: 2,
-                        py: 0.6,
-                        borderRadius: '8px',
-                        boxShadow: 'none',
-                        transition: 'background 180ms, transform 180ms, box-shadow 180ms',
-                        '&:hover': {
-                            bgcolor: '#6d28d9',
-                            transform: 'translateY(-1px)',
-                            boxShadow: '0 10px 24px -8px rgba(124,58,237,0.55)',
-                        },
-                    }}
-                >
-                    Start your logbook
                 </Button>
             </Stack>
         </Box>

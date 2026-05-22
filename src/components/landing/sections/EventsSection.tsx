@@ -241,7 +241,7 @@ const EventsSection: React.FC = () => {
                                 ...revealSx(head.inView, 80),
                             }}
                         >
-                            Know what&rsquo;s about to move price.
+                            The events that move your tickers, pinned to your week.
                         </Typography>
                         <Typography
                             ref={body.ref}

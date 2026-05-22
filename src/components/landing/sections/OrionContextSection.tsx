@@ -14,10 +14,11 @@ import SectionMarker from 'components/landing/sections/SectionMarker';
    Maps to the real Orion tool surface:
      - trade history & user notes via execute_sql (tools.ts:1657)
      - economic_events via execute_sql
-     - get_market_data action="quote" (tools.ts)
+     - get_market_data action="quote"/"candles" (tools.ts)
      - search_web + scrape_url (tools.ts:80-122)
      - search_web type=news, time_range=day → "breaking news"
      - analyze_image (tools.ts:841-868) over chart screenshots
+     - recall_conversations semantic search over ai_conversations
    ──────────────────────────────────────────── */
 
 interface FeedRow {
@@ -44,6 +45,13 @@ const FEEDS: FeedRow[] = [
         color: '#a78bfa',
     },
     {
+        id: 'recall',
+        label: 'Past conversations',
+        body: 'Search across past chats. Pulls the thread where you asked about NFP last month, not the one about gold.',
+        meta: 'recall_conversations · 47 threads',
+        color: '#a78bfa',
+    },
+    {
         id: 'events',
         label: 'Economic events',
         body: 'Pinned to your timezone, filtered by impact.',
@@ -52,8 +60,8 @@ const FEEDS: FeedRow[] = [
     },
     {
         id: 'price',
-        label: 'Market price',
-        body: 'Live prints across forex, futures, indices, commodities, crypto.',
+        label: 'Market data',
+        body: 'Live quotes and historical candles across forex, futures, indices, commodities, crypto.',
         meta: 'ES 5,832 · −0.5% · DXY +0.4% · GC 2,438',
         color: WIN,
     },
@@ -778,7 +786,7 @@ const OrionContextSection: React.FC = () => {
                                 ...revealSx(head.inView, 80),
                             }}
                         >
-                            A trading assistant you can rely on.
+                            An assistant that reads what you&rsquo;ve actually traded.
                         </Typography>
                     </Box>
                     <Typography

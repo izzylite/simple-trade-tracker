@@ -280,7 +280,8 @@ const PerformanceSection: React.FC = () => {
                                 ...revealSx(head.inView, 80),
                             }}
                         >
-                            The numbers your broker won&rsquo;t organise.
+                            Your edge, by tag combo, session, and day &mdash; with the
+                            trends called out.
                         </Typography>
                     </Box>
                     <Typography
@@ -294,10 +295,10 @@ const PerformanceSection: React.FC = () => {
                             ...revealSx(body.inView, 160),
                         }}
                     >
-                        Equity curve, tag analysis, session distribution, expectancy by setup.
-                        The numbers your broker hands you, sliced by what actually moves the
-                        account: setup, session, mistake, emotion. R-multiples, profit factor,
-                        hit rate per tag. No engagement, no streaks, no badges.
+                        Equity curve, win-loss split, and risk-reward over time, sliced
+                        by tag combo, session, and day of week. Tag combos that are
+                        improving and ones starting to slip get flagged automatically,
+                        alongside the economic events that printed when you lost.
                     </Typography>
                 </Box>
 
