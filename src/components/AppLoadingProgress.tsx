@@ -3,25 +3,29 @@ import {
   Box,
   Typography,
   useMediaQuery,
-  alpha,
   keyframes
 } from '@mui/material';
 
-const fadeInUp = keyframes`
-  from {
-    opacity: 0;
-    transform: translateY(16px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+// Restrained fade-in on first paint. Uses the design system's "rail's choice"
+// easing (--easing) and --duration-slow. No translateY: the splash should
+// feel like it is *present*, not arriving.
+const fadeIn = keyframes`
+  from { opacity: 0; }
+  to   { opacity: 1; }
 `;
 
-const shimmer = keyframes`
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-`;
+// Module-level state persists for the lifetime of the page (resets only on a
+// full reload). The splash is rendered from multiple sites in the React tree
+// during boot (App-level Suspense fallback, the isAuthLoading branch in
+// AppContent, HomeRouteResolver, CalendarRoute) — each transition unmounts
+// the old instance and mounts a fresh one at a different tree position. A
+// fresh DOM element restarts the entrance keyframe from opacity:0, which is
+// what the user perceives as the splash "flashing" on reload. Skipping the
+// animation on every mount after the first keeps the visual continuous.
+let hasPlayedFadeIn = false;
+let cachedProgress = 0;
+let cachedLoadingText = 'Loading';
+let cachedDots = '';
 
 const AppLoadingProgress: React.FC = () => {
   const prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)');
@@ -31,18 +35,39 @@ const AppLoadingProgress: React.FC = () => {
     return savedMode ? savedMode === 'dark' : prefersDarkMode;
   }, [prefersDarkMode]);
 
+  // Mirrors the canonical tokens from
+  // .aidesigner/handoff/journotrades-design-system/project/colors_and_type.css
+  // (--bg-page, --fg-primary, --fg-tertiary, --violet-primary, --divider).
+  // Hard-coded here because the splash mounts above the MUI ThemeProvider in
+  // the App-level Suspense fallback path.
   const colors = useMemo(() => ({
     background: isDarkMode ? '#080808' : '#e8edf4',
-    primary: isDarkMode ? '#a78bfa' : '#7c3aed',
-    primaryDark: isDarkMode ? '#8b5cf6' : '#5b21b6',
-    textPrimary: isDarkMode ? '#ffffff' : '#1a2027',
-    textSecondary: isDarkMode ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.45)',
-    trackBg: isDarkMode ? 'rgba(167,139,250,0.12)' : 'rgba(124,58,237,0.1)',
+    fg: isDarkMode ? '#f1f5f9' : '#0f172a',
+    fgTertiary: isDarkMode ? '#64748b' : '#94a3b8',
+    violet: '#7c3aed',
+    divider: isDarkMode ? 'rgba(255,255,255,0.08)' : '#e2e8f0',
   }), [isDarkMode]);
 
-  const [progress, setProgress] = useState(0);
-  const [loadingText, setLoadingText] = useState('Initializing application');
-  const [dots, setDots] = useState('');
+  // First mount of this page lifetime plays the entrance animation; every
+  // subsequent mount skips it so a remount looks like a continuation rather
+  // than a flash.
+  const [shouldAnimate] = useState(() => {
+    if (hasPlayedFadeIn) return false;
+    hasPlayedFadeIn = true;
+    return true;
+  });
+
+  // Initialize from the module cache so progress/text/dots visually continue
+  // across remounts instead of snapping back to their defaults.
+  const [progress, setProgress] = useState(cachedProgress);
+  const [loadingText, setLoadingText] = useState(cachedLoadingText);
+  const [dots, setDots] = useState(cachedDots);
+
+  // Mirror state into the cache so the next mount picks up where this one
+  // left off.
+  useEffect(() => { cachedProgress = progress; }, [progress]);
+  useEffect(() => { cachedLoadingText = loadingText; }, [loadingText]);
+  useEffect(() => { cachedDots = dots; }, [dots]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -62,35 +87,25 @@ const AppLoadingProgress: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (progress < 25) setLoadingText('Initializing application');
-    else if (progress < 50) setLoadingText('Loading components');
-    else if (progress < 75) setLoadingText('Preparing interface');
-    else if (progress < 90) setLoadingText('Finalizing setup');
+    if (progress < 60) setLoadingText('Loading');
+    else if (progress < 90) setLoadingText('Finishing up');
     else setLoadingText('Almost ready');
   }, [progress]);
 
   return (
     <Box
       sx={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 9999,
         display: 'flex',
         flexDirection: 'column',
-        justifyContent: 'center',
         alignItems: 'center',
-        height: '100vh',
-        width: '100vw',
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        zIndex: 9999,
-        overflow: 'hidden',
-        backgroundColor: colors.background,
-        background: isDarkMode
-          ? `radial-gradient(ellipse at 30% 30%, ${alpha(colors.primary, 0.12)} 0%, transparent 55%),
-             radial-gradient(ellipse at 75% 75%, ${alpha(colors.primaryDark, 0.1)} 0%, transparent 55%),
-             ${colors.background}`
-          : `radial-gradient(ellipse at 30% 25%, ${alpha(colors.primary, 0.07)} 0%, transparent 55%),
-             radial-gradient(ellipse at 75% 80%, ${alpha(colors.primaryDark, 0.05)} 0%, transparent 55%),
-             ${colors.background}`,
+        justifyContent: 'center',
+        bgcolor: colors.background,
+        // DM Sans is preloaded from index.html. The fallback chain matches
+        // the design-system --font-sans token.
+        fontFamily: '"DM Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
       }}
     >
       <Box
@@ -98,69 +113,49 @@ const AppLoadingProgress: React.FC = () => {
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          position: 'relative',
-          zIndex: 1,
-          '@media (prefers-reduced-motion: no-preference)': {
-            animation: `${fadeInUp} 0.6s cubic-bezier(0.4, 0, 0.2, 1) both`,
-          },
+          gap: 5, // 40px between wordmark and progress
+          ...(shouldAnimate && {
+            '@media (prefers-reduced-motion: no-preference)': {
+              animation: `${fadeIn} 0.24s cubic-bezier(0.22, 1, 0.36, 1) both`,
+            },
+          }),
         }}
       >
-        {/* Logo */}
-        <Box
-          component="img"
-          src="/android-chrome-192x192.png"
-          alt="JournoTrades"
-          sx={{
-            width: 88,
-            height: 88,
-            borderRadius: '20px',
-            mb: 3.5,
-            filter: isDarkMode
-              ? `drop-shadow(0 8px 24px ${alpha(colors.primary, 0.45)})`
-              : `drop-shadow(0 8px 20px ${alpha(colors.primary, 0.3)})`,
-          }}
-        />
-
-        {/* App name */}
+        {/* Wordmark — display treatment from --type-display
+            (34px / 700 / -0.025em / slate-100). Bumped to 2.5rem at sm+
+            because this is a hero moment. */}
         <Typography
-          variant="h3"
+          component="div"
           sx={{
-            mb: 0.75,
-            fontWeight: 800,
-            textAlign: 'center',
+            fontFamily: 'inherit',
+            fontWeight: 700,
             fontSize: { xs: '2rem', sm: '2.5rem' },
-            letterSpacing: '-0.02em',
-            background: `linear-gradient(135deg, ${colors.primary} 0%, ${colors.primaryDark} 100%)`,
-            backgroundClip: 'text',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
+            letterSpacing: '-0.025em',
+            lineHeight: 1.2,
+            color: colors.fg,
+            userSelect: 'none',
           }}
         >
           JournoTrades
         </Typography>
 
-        {/* Tagline */}
-        <Typography
-          variant="body1"
+        {/* Progress + eyebrow caption */}
+        <Box
           sx={{
-            mb: 4,
-            color: colors.textSecondary,
-            textAlign: 'center',
-            fontSize: { xs: '0.875rem', sm: '0.9375rem' },
-            fontWeight: 500,
-            letterSpacing: '0.03em',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 2, // 16px between bar and caption
           }}
         >
-          Your Trading Journal
-        </Typography>
-
-        {/* Progress bar */}
-        <Box sx={{ width: { xs: 260, sm: 320 } }}>
+          {/* Pill progress on a hairline track. Violet fill is the only
+              saturated color on the surface — the Trader Violet rule. */}
           <Box
             sx={{
-              height: 5,
-              borderRadius: 99,
-              bgcolor: colors.trackBg,
+              width: { xs: 220, sm: 280 },
+              height: 3,
+              borderRadius: 999,
+              bgcolor: colors.divider,
               overflow: 'hidden',
               position: 'relative',
             }}
@@ -172,31 +167,37 @@ const AppLoadingProgress: React.FC = () => {
                 left: 0,
                 height: '100%',
                 width: `${progress}%`,
-                borderRadius: 99,
-                background: `linear-gradient(90deg, ${colors.primary}, ${colors.primaryDark}, ${colors.primary})`,
-                backgroundSize: '200% 100%',
-                transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                boxShadow: `0 0 14px ${alpha(colors.primary, 0.55)}`,
-                '@media (prefers-reduced-motion: no-preference)': {
-                  animation: `${shimmer} 1.8s ease-in-out infinite`,
-                },
+                borderRadius: 999,
+                bgcolor: colors.violet,
+                transition: 'width 0.24s cubic-bezier(0.22, 1, 0.36, 1)',
               }}
             />
           </Box>
 
-          {/* Loading text */}
-          <Box sx={{ mt: 2, minHeight: 20, textAlign: 'center' }}>
+          {/* Eyebrow caption — uppercase tracked label, slate-500. */}
+          <Box sx={{ minHeight: 14, display: 'flex', alignItems: 'center' }}>
             <Typography
-              variant="caption"
+              component="span"
               sx={{
-                color: colors.textSecondary,
-                fontSize: '0.8125rem',
-                fontWeight: 500,
-                letterSpacing: '0.01em',
+                fontFamily: 'inherit',
+                fontSize: '0.6875rem',
+                fontWeight: 600,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+                color: colors.fgTertiary,
+                fontFeatureSettings: "'tnum' on, 'lnum' on",
               }}
             >
               {loadingText}
-              <Box component="span" sx={{ display: 'inline-block', width: 20, textAlign: 'left' }}>
+              <Box
+                component="span"
+                sx={{
+                  display: 'inline-block',
+                  width: 18,
+                  textAlign: 'left',
+                  ml: 0.25,
+                }}
+              >
                 {dots}
               </Box>
             </Typography>
