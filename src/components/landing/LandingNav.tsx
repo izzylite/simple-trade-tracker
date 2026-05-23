@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Box, Button, Stack, Typography } from '@mui/material';
+import { Link as RouterLink } from 'react-router-dom';
 
 interface Props {
     onLogin: () => void;
@@ -180,6 +181,16 @@ const LandingNav: React.FC<Props> = ({ onLogin }) => {
                             {a.label}
                         </Box>
                     ))}
+                    {/* Pricing — route link, not an anchor. Shares the same
+                        underline-on-hover treatment as the anchor links so the
+                        nav reads as one row. */}
+                    <Box
+                        component={RouterLink}
+                        to="/pricing"
+                        sx={linkSx}
+                    >
+                        Pricing
+                    </Box>
                 </Stack>
 
                 <Button

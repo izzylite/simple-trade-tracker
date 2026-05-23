@@ -22,8 +22,9 @@ import {
   BugReport as BugReportIcon
 } from '@mui/icons-material';
 import { useTheme, alpha } from '@mui/material/styles';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link as RouterLink } from 'react-router-dom';
 import { useAuth } from 'contexts/SupabaseAuthContext';
+import { useSubscription } from 'features/billing/hooks/useSubscription';
 import { error } from 'utils/logger';
 import DebugPanel from 'components/common/DebugPanel';
 import NotificationsBell from 'components/notifications/NotificationsBell';
@@ -60,6 +61,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({ onToggleTheme, mode }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, signOut } = useAuth();
+  const { tier, loaded: subscriptionLoaded } = useSubscription();
 
   const [debugPanelOpen, setDebugPanelOpen] = useState(false);
   const [loginDialogOpen, setLoginDialogOpen] = useState(false);
@@ -258,6 +260,33 @@ const AppHeader: React.FC<AppHeaderProps> = ({ onToggleTheme, mode }) => {
             >
               <DiscordIcon fontSize="small" />
             </IconButton>
+
+            {/* Upgrade pill — auth-only, free tier only. Hidden until the
+                subscription state has loaded to avoid a flash on paid users. */}
+            {user && subscriptionLoaded && tier === 'free' && (
+              <Button
+                component={RouterLink}
+                to="/pricing"
+                size="small"
+                variant="outlined"
+                sx={{
+                  px: 1.5,
+                  py: 0.25,
+                  borderRadius: '999px',
+                  fontSize: '0.8125rem',
+                  fontWeight: 600,
+                  textTransform: 'none',
+                  borderColor: alpha(theme.palette.primary.main, 0.4),
+                  color: 'primary.main',
+                  '&:hover': {
+                    borderColor: 'primary.main',
+                    bgcolor: alpha(theme.palette.primary.main, 0.08)
+                  }
+                }}
+              >
+                Upgrade
+              </Button>
+            )}
 
             {/* Notifications — auth only */}
             {user && <NotificationsBell />}
