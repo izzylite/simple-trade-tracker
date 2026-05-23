@@ -60,22 +60,6 @@ export const uploadFile = async (
       }
     }
 
-    // 10 GiB cap (paid tiers). Skip for non-trade-images buckets.
-    if (bucketName === 'trade-images') {
-      const TEN_GIB = 10 * 1024 * 1024 * 1024;
-      const { data: bytesUsed, error: capErr } = await supabase.rpc('user_storage_bytes');
-      if (capErr) {
-        // Fail closed if we can't read the cap — better to block a valid upload
-        // than overshoot the storage budget silently.
-        throw new Error('tier_storage_full');
-      }
-      const used = Number(bytesUsed ?? 0);
-      const incoming = file.size ?? 0;
-      if (used + incoming > TEN_GIB) {
-        throw new Error('tier_storage_full');
-      }
-    }
-
     const { data, error } = await supabase.storage
       .from(bucketName)
       .upload(filePath, file, {
