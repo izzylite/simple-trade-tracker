@@ -145,7 +145,12 @@ export const createCalendar = async (
       user_id: userId
     });
     if (!result.success || !result.data) {
-      throw new Error('Failed to create calendar');
+      // Preserve specific error messages (e.g. 'tier_limit_calendars' from the
+      // CalendarRepository free-tier gate, or the P0001 string surfaced by the
+      // DB trigger on bypass) so callers can render a targeted upgrade nudge
+      // instead of a generic failure.
+      const msg = result.error?.message || 'Failed to create calendar';
+      throw new Error(msg);
     }
     return result.data;
   } catch (error) {

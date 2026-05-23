@@ -68,6 +68,11 @@ const AccountBillingPage = lazy(() => import('pages/AccountBillingPage'));
 // CalendarFormDialog only mounts when user clicks Create. Eager import drags
 // MUI Dialog + form components into main bundle.
 const CalendarFormDialog = lazy(() => import('features/calendar/components/CalendarFormDialog'));
+const CalendarLimitDialog = lazy(() =>
+  import('features/billing/components/CalendarLimitDialog').then((m) => ({
+    default: m.CalendarLimitDialog,
+  })),
+);
 
 const GlobalAIChat = lazy(() => import('features/orion/components/aiChat/GlobalAIChat'));
 const GlobalAIChatFab = lazy(() => import('features/orion/components/aiChat/GlobalAIChatFab'));
@@ -102,6 +107,9 @@ function AppContent() {
   // dialog instance serves every route.
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isCreatingCalendar, setIsCreatingCalendar] = useState(false);
+  // Upgrade nudge shown when a free-tier user trips the 1-calendar cap
+  // (either the CalendarRepository client gate or the DB trigger fallback).
+  const [showCalendarLimitDialog, setShowCalendarLimitDialog] = useState(false);
 
   // Simple feedback snackbar used by the calendars-list panel actions.
   const [snackbar, setSnackbar] = useState<{
@@ -134,7 +142,17 @@ function AppContent() {
       setIsCreateDialogOpen(false);
       navigate(`/calendar/${newCalendar.id}`);
     } catch (err) {
-      logger.error('Error creating calendar from global dialog:', err);
+      // Free-tier cap surfaces as the literal string 'tier_limit_calendars'
+      // from either the client gate in CalendarRepository.create() or the
+      // DB trigger (P0001) on bypass — both flow through the thrown Error's
+      // message. Close the form, show the upgrade nudge.
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes('tier_limit_calendars')) {
+        setIsCreateDialogOpen(false);
+        setShowCalendarLimitDialog(true);
+      } else {
+        logger.error('Error creating calendar from global dialog:', err);
+      }
     } finally {
       setIsCreatingCalendar(false);
     }
@@ -567,6 +585,17 @@ function AppContent() {
             mode="create"
             title="Create Calendar"
             submitButtonText="Create"
+          />
+        </Suspense>
+      )}
+
+      {/* Upgrade nudge — free users get a single calendar; show the pricing
+          CTA when they hit the cap instead of a generic error snackbar. */}
+      {user && showCalendarLimitDialog && (
+        <Suspense fallback={null}>
+          <CalendarLimitDialog
+            open={showCalendarLimitDialog}
+            onClose={() => setShowCalendarLimitDialog(false)}
           />
         </Suspense>
       )}
