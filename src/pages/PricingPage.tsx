@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Container, Typography, ToggleButton, ToggleButtonGroup, Grid } from '@mui/material';
+import { Box, Container, Typography, ToggleButton, ToggleButtonGroup, Grid, Button } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { TIERS, type BillingCycle, type Tier, resolvePaddlePriceId } from 'features/billing/pricing/tierData';
 import { TierCard } from 'features/billing/pricing/TierCard';
 import { ComparisonTable } from 'features/billing/pricing/ComparisonTable';
+import { PricingFAQ } from 'features/billing/pricing/PricingFAQ';
 import { useAuth } from 'contexts/SupabaseAuthContext';
 import { usePaddle } from 'features/billing/paddle/usePaddle';
 
@@ -101,7 +102,16 @@ const PricingPage: React.FC = () => {
 
         <ComparisonTable />
 
-        {/* FAQ + footer band in Task 6 */}
+        <PricingFAQ />
+
+        <Box sx={{ mt: 10, py: 6, textAlign: 'center' }}>
+          <Button variant="contained" size="large" onClick={() => navigate('/')}>
+            Start free — no credit card
+          </Button>
+          <Typography variant="caption" sx={{ display: 'block', mt: 1.5, color: 'text.secondary' }}>
+            Cancel anytime. 14-day refund.
+          </Typography>
+        </Box>
       </Container>
     </Box>
   );
