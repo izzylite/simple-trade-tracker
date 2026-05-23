@@ -33,11 +33,22 @@ export async function checkOrionAccess(userId: string): Promise<TierGateResult> 
 
   const tier = ((sub?.tier as Tier | undefined) ?? 'free');
   const status = sub?.status ?? 'active';
+  const currentPeriodEnd = sub?.current_period_end as string | undefined;
 
-  // Treat past_due and paused like paid — they still have access until period_end
-  // per the spec; Paddle handles dunning. Cancelled is the only revoke state,
-  // and only if past period_end (cancel_at_period_end keeps access until then).
-  const isPaid = PAID_TIERS.has(tier) && (status === 'active' || status === 'trialing' || status === 'past_due');
+  // Access policy:
+  // - active / trialing / past_due: full access (Paddle handles dunning during past_due)
+  // - cancelled: grace access while now < current_period_end (Paddle treats cancel
+  //   as scheduled-at-period-end; we mirror that). Once period_end passes, denied.
+  // - anything else (free, paused, missing row): denied
+  const isWithinPeriod = currentPeriodEnd
+    ? new Date(currentPeriodEnd).getTime() > Date.now()
+    : false;
+  const isPaid = PAID_TIERS.has(tier) && (
+    status === 'active' ||
+    status === 'trialing' ||
+    status === 'past_due' ||
+    (status === 'cancelled' && isWithinPeriod)
+  );
 
   if (!isPaid) {
     return { allowed: false, tier, reason: 'orion_paid_only' };
