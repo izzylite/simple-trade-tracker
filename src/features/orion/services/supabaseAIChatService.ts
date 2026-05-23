@@ -59,7 +59,23 @@ export type SSEEventType =
   | 'citation'
   | 'embedded_data'
   | 'done'
-  | 'error';
+  | 'error'
+  | 'blocked';
+
+/**
+ * Shape of the data carried by a 'blocked' SSE event. Mirrors the JSON body
+ * the edge function emits at index.ts:2531-2541 when checkOrionAccess denies
+ * the request. Tier and budget metadata is optional because the reason field
+ * dictates which fields are populated.
+ */
+export interface AgentBlockedData {
+  blocked: true;
+  reason: 'orion_paid_only' | 'orion_budget_exhausted';
+  tier: 'free' | 'lite' | 'pro' | 'elite';
+  reset_at: string | null;
+  tokens_consumed: number | null;
+  tokens_budget: number | null;
+}
 
 export interface SSEEvent {
   type: SSEEventType;
@@ -213,6 +229,35 @@ class SupabaseAIChatService {
 
       if (!response.body) {
         throw new Error('No response body');
+      }
+
+      // The tier+budget gate (index.ts:2521-2542) short-circuits with
+      // `successResponse({ blocked: true, ... })` — JSON, not SSE. Detect
+      // that here and yield a synthetic 'blocked' event so the streaming
+      // consumer (useAIChat) can surface the upgrade card without seeing
+      // a generic "empty response" no-op.
+      const contentType = response.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        const bodyText = await response.text();
+        try {
+          const parsed = JSON.parse(bodyText);
+          const payload = parsed?.data ?? parsed;
+          if (payload && payload.blocked === true) {
+            yield {
+              type: 'blocked',
+              data: payload as AgentBlockedData,
+            };
+            return;
+          }
+          // JSON that isn't a blocked response — surface as error so the
+          // caller doesn't silently swallow it.
+          throw new Error(parsed?.message || parsed?.error || 'Unexpected JSON response from agent');
+        } catch (jsonErr) {
+          if (jsonErr instanceof SyntaxError) {
+            throw new Error('Malformed JSON response from agent');
+          }
+          throw jsonErr;
+        }
       }
 
       // Process SSE stream

@@ -71,6 +71,21 @@ const labelForToolCall = (name: string, args?: unknown): string => {
   return TOOL_LABELS[name] || name;
 };
 
+/**
+ * Local UI state for a tier/budget-blocked Orion response. Mirrors the
+ * `blocked` payload emitted by ai-trading-agent
+ * (`supabase/functions/ai-trading-agent/index.ts:2531-2541`). Surfaced
+ * via the hook's return so the chat surface can render an upgrade card
+ * instead of an empty assistant bubble.
+ */
+export interface OrionBlockedState {
+  reason: 'orion_paid_only' | 'orion_budget_exhausted';
+  tier: 'free' | 'lite' | 'pro' | 'elite';
+  resetAt: string | null;
+  tokensConsumed: number | null;
+  tokensBudget: number | null;
+}
+
 export interface UseAIChatOptions {
   userId: string | undefined;
   calendar?: Calendar;
@@ -107,6 +122,9 @@ export interface UseAIChatReturn {
   /** Server-published soft limit the UI locks against (alias for gate.softLimit). */
   tokenBudget: number;
   editingMessageId: string | null;
+  /** Set when the agent returns a blocked tier/budget response. Null otherwise.
+   *  Cleared on the next successful send and on conversation switch / new chat. */
+  blockedState: OrionBlockedState | null;
 
   // Actions
   sendMessage: (messageText: string, images?: AttachedImage[], segments?: ChatMessageType['segments']) => Promise<void>;
@@ -192,6 +210,10 @@ export function useAIChat({
   const [gateUsed, setGateUsed] = useState<number>(0);
   const [gateSoftLimit, setGateSoftLimit] = useState<number>(GATE_DEFAULT_SOFT);
   const [_gateHardLimit, setGateHardLimit] = useState<number>(GATE_DEFAULT_HARD);
+  // Set when ai-trading-agent returns a tier/budget-blocked response. Drives
+  // the OrionUpgradeCard in the chat surface. Cleared on any new successful
+  // send, conversation switch, or startNewChat.
+  const [blockedState, setBlockedState] = useState<OrionBlockedState | null>(null);
 
   const tokenUsage = gateUsed;
   const tokenBudget = gateSoftLimit;
@@ -635,6 +657,7 @@ export function useAIChat({
     setCurrentConversationId(null);
     setEditingMessageId(null);
     setGateUsed(0);
+    setBlockedState(null);
     logger.log('Started new conversation (local reset)');
   }, [abortActiveStream]);
 
@@ -657,6 +680,7 @@ export function useAIChat({
     // overwrites gate/messages for the wrong conversation.
     abortActiveStream();
     setEditingMessageId(null);
+    setBlockedState(null);
     setCurrentConversationId(conversation.id);
 
     // Fire-and-forget: bump last_accessed_at so cleanup-stale-ai-conversations
@@ -803,6 +827,9 @@ export function useAIChat({
     if ((!trimmedMessage && (!images || images.length === 0)) || isLoading || !userId) return;
 
     cancelRequestedRef.current = false;
+    // Clear any stale block from a previous denied send. If this attempt is
+    // also blocked, the 'blocked' SSE handler will repopulate it.
+    setBlockedState(null);
 
     // Capture the edit-mode signal before we reset it below — the backend
     // needs it to truncate the persisted messages array. Without this, the
@@ -1066,6 +1093,34 @@ export function useAIChat({
             break;
           }
 
+          case 'blocked': {
+            // Tier/budget gate denied the request. The server never persisted
+            // the user message (gate runs BEFORE appendUserMessage), so to
+            // mirror server state we strip the optimistic user bubble + any
+            // assistant draft. The OrionUpgradeCard renders from blockedState
+            // in its place.
+            const blockedData = event.data as {
+              reason: 'orion_paid_only' | 'orion_budget_exhausted';
+              tier: 'free' | 'lite' | 'pro' | 'elite';
+              reset_at: string | null;
+              tokens_consumed: number | null;
+              tokens_budget: number | null;
+            };
+            setBlockedState({
+              reason: blockedData.reason,
+              tier: blockedData.tier,
+              resetAt: blockedData.reset_at,
+              tokensConsumed: blockedData.tokens_consumed,
+              tokensBudget: blockedData.tokens_budget,
+            });
+            setMessages(prev =>
+              prev.filter(m => m.id !== userMessage.id && m.id !== aiMessageId)
+            );
+            // Skip the post-stream commit — the finally block resets the
+            // loading flags. The OrionUpgradeCard renders from blockedState.
+            return;
+          }
+
           case 'error':
             throw new Error(event.data.error || 'Streaming error');
         }
@@ -1255,6 +1310,7 @@ What would you like to know about your trading?`,
     tokenUsage,
     tokenBudget,
     editingMessageId,
+    blockedState,
 
     // Actions
     sendMessage,
