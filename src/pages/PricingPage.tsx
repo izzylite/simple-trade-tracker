@@ -3,6 +3,7 @@ import { Box, Container, Typography, ToggleButton, ToggleButtonGroup, Grid } fro
 import { useNavigate } from 'react-router-dom';
 import { TIERS, type BillingCycle, type Tier } from 'features/billing/pricing/tierData';
 import { TierCard } from 'features/billing/pricing/TierCard';
+import { ComparisonTable } from 'features/billing/pricing/ComparisonTable';
 
 const PricingPage: React.FC = () => {
   const [cycle, setCycle] = useState<BillingCycle>('monthly');
@@ -53,7 +54,9 @@ const PricingPage: React.FC = () => {
           ))}
         </Grid>
 
-        {/* Comparison table in Task 4, FAQ in Task 6 */}
+        <ComparisonTable />
+
+        {/* FAQ in Task 6 */}
       </Container>
     </Box>
   );
