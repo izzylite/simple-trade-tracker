@@ -58,6 +58,7 @@ const CommunityPage = lazy(() => import('pages/CommunityPage'));
 const PerformancePage = lazy(() => import('pages/PerformancePage'));
 const NotesPage = lazy(() => import('pages/NotesPage'));
 const EconomicEventsPage = lazy(() => import('pages/EconomicEventsPage'));
+const AccountBillingPage = lazy(() => import('pages/AccountBillingPage'));
 // const SupabaseAuthTest = lazy(() => import('components/auth/SupabaseAuthTest')); // Commented out - for testing only
 
 // Global app-level surfaces — lazy so AI chat (markdown/draft-js), trade
@@ -479,6 +480,7 @@ function AppContent() {
                 />
                 <Route path="/about" element={<AboutPage />} />
                 <Route path="/pricing" element={<PricingPage />} />
+                <Route path="/account/billing" element={<AccountBillingPage />} />
               </Route>
             ) : (
               <>
