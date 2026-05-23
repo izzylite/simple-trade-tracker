@@ -8,6 +8,28 @@ import {
 import { verifyPaddleSignature } from './_paddleSignature.ts';
 import { resolveTierFromPriceId } from './_priceTierMap.ts';
 
+type ServiceClient = ReturnType<typeof createServiceClient>;
+
+/**
+ * Returns true if the incoming event is older than the most recent event we've
+ * processed for this subscription/user. Callers should skip stale events.
+ */
+async function isStaleEvent(
+  client: ServiceClient,
+  match: { userId?: string; paddleSubId?: string },
+  incomingOccurredAt: string | null
+): Promise<boolean> {
+  if (!incomingOccurredAt) return false; // can't compare; let it through
+  let query = client.from('subscriptions').select('last_event_occurred_at');
+  if (match.userId) query = query.eq('user_id', match.userId);
+  else if (match.paddleSubId) query = query.eq('paddle_subscription_id', match.paddleSubId);
+  else return false;
+  const { data } = await query.maybeSingle();
+  const existing = (data as { last_event_occurred_at?: string } | null)?.last_event_occurred_at;
+  if (!existing) return false;
+  return new Date(incomingOccurredAt).getTime() < new Date(existing).getTime();
+}
+
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
@@ -30,7 +52,7 @@ Deno.serve(async (req) => {
     return errorResponse('Invalid signature', 401);
   }
 
-  let event: { event_type?: string; data?: Record<string, unknown> };
+  let event: { event_type?: string; data?: Record<string, unknown>; occurred_at?: string };
   try {
     event = JSON.parse(rawBody);
   } catch {
@@ -38,24 +60,26 @@ Deno.serve(async (req) => {
   }
 
   const eventType = event.event_type ?? 'unknown';
+  // Paddle Billing puts occurred_at on the event envelope, not on event.data.
+  const eventOccurredAt: string | null = (event as any).occurred_at ?? null;
   log(`Paddle event received: ${eventType}`, 'info');
 
   const serviceClient = createServiceClient();
 
   if (eventType === 'subscription.created' || eventType === 'subscription.updated') {
-    const result = await handleSubscriptionUpsert(serviceClient, event.data);
+    const result = await handleSubscriptionUpsert(serviceClient, event.data, eventOccurredAt);
     if (!result.ok) return errorResponse(result.reason ?? 'handler failed', 500);
     return successResponse({ event_type: eventType, applied: true });
   }
 
   if (eventType === 'subscription.canceled') {
-    const result = await handleSubscriptionCancelled(serviceClient, event.data);
+    const result = await handleSubscriptionCancelled(serviceClient, event.data, eventOccurredAt);
     if (!result.ok) return errorResponse(result.reason ?? 'handler failed', 500);
     return successResponse({ event_type: eventType, applied: true });
   }
 
   if (eventType === 'transaction.payment_failed') {
-    const result = await handlePaymentFailed(serviceClient, event.data);
+    const result = await handlePaymentFailed(serviceClient, event.data, eventOccurredAt);
     if (!result.ok) return errorResponse(result.reason ?? 'handler failed', 500);
     return successResponse({ event_type: eventType, applied: true });
   }
@@ -64,8 +88,9 @@ Deno.serve(async (req) => {
 });
 
 async function handleSubscriptionUpsert(
-  client: ReturnType<typeof createServiceClient>,
-  data: any
+  client: ServiceClient,
+  data: any,
+  eventOccurredAt: string | null
 ): Promise<{ ok: boolean; reason?: string }> {
   const paddleSubId = data?.id;
   const paddleCustomerId = data?.customer_id;
@@ -93,6 +118,17 @@ async function handleSubscriptionUpsert(
     return { ok: false, reason: 'unknown price id' };
   }
 
+  // Skip stale events: if a newer event has already been applied, ignore this
+  // delivery. We still return ok to stop Paddle's retry loop.
+  if (await isStaleEvent(client, { userId }, eventOccurredAt)) {
+    log('Skipping stale subscription upsert', 'info', {
+      userId,
+      paddleSubId,
+      incomingOccurredAt: eventOccurredAt,
+    });
+    return { ok: true };
+  }
+
   // Paddle uses 'canceled' (one l); we normalise to 'cancelled' (two l).
   const normalisedStatus =
     status === 'canceled' ? 'cancelled' : (status ?? 'active');
@@ -111,6 +147,7 @@ async function handleSubscriptionUpsert(
         current_period_end: currentPeriodEnd,
         cancel_at_period_end:
           scheduledChange?.action === 'cancel' ? true : false,
+        last_event_occurred_at: eventOccurredAt,
       },
       { onConflict: 'user_id' }
     );
@@ -129,12 +166,23 @@ async function handleSubscriptionUpsert(
 }
 
 async function handleSubscriptionCancelled(
-  client: ReturnType<typeof createServiceClient>,
-  data: any
+  client: ServiceClient,
+  data: any,
+  eventOccurredAt: string | null
 ): Promise<{ ok: boolean; reason?: string }> {
   const paddleSubId = data?.id;
   if (!paddleSubId) {
     return { ok: false, reason: 'missing subscription id' };
+  }
+
+  // Skip stale events: a delayed `subscription.updated` from before this
+  // cancellation must not overwrite the cancelled state.
+  if (await isStaleEvent(client, { paddleSubId }, eventOccurredAt)) {
+    log('Skipping stale subscription cancellation', 'info', {
+      paddleSubId,
+      incomingOccurredAt: eventOccurredAt,
+    });
+    return { ok: true };
   }
 
   // Update by paddle_subscription_id — independent of custom_data.user_id which
@@ -144,6 +192,7 @@ async function handleSubscriptionCancelled(
     .update({
       status: 'cancelled',
       cancel_at_period_end: true,
+      last_event_occurred_at: eventOccurredAt,
     })
     .eq('paddle_subscription_id', paddleSubId);
 
@@ -156,8 +205,9 @@ async function handleSubscriptionCancelled(
 }
 
 async function handlePaymentFailed(
-  client: ReturnType<typeof createServiceClient>,
-  data: any
+  client: ServiceClient,
+  data: any,
+  eventOccurredAt: string | null
 ): Promise<{ ok: boolean; reason?: string }> {
   // Paddle transaction events carry subscription_id on the transaction payload.
   const paddleSubId = data?.subscription_id;
@@ -165,9 +215,22 @@ async function handlePaymentFailed(
     // Some payment_failed events are for one-shot transactions; ignore them.
     return { ok: true };
   }
+
+  // Skip stale events.
+  if (await isStaleEvent(client, { paddleSubId }, eventOccurredAt)) {
+    log('Skipping stale payment_failed event', 'info', {
+      paddleSubId,
+      incomingOccurredAt: eventOccurredAt,
+    });
+    return { ok: true };
+  }
+
   const { error } = await client
     .from('subscriptions')
-    .update({ status: 'past_due' })
+    .update({
+      status: 'past_due',
+      last_event_occurred_at: eventOccurredAt,
+    })
     .eq('paddle_subscription_id', paddleSubId);
   if (error) {
     log('Failed to mark subscription past_due', 'error', error);
