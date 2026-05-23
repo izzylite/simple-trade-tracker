@@ -5,10 +5,12 @@
 
 import {
   AbstractBaseRepository,
-  RepositoryConfig
+  RepositoryConfig,
+  RepositoryResult
 } from 'services/repositories/BaseRepository';
 import { Calendar, Trade } from 'features/calendar/types/dualWrite';
 import { logger } from 'utils/logger';
+import { SupabaseErrorCategory } from 'utils/supabaseErrorHandler';
 
 // Supabase imports
 import { supabase } from 'config/supabase';
@@ -121,6 +123,37 @@ export class CalendarRepository extends AbstractBaseRepository<Calendar> {
   // =====================================================
   // SUPABASE OPERATIONS
   // =====================================================
+
+  async create(entity: Omit<Calendar, 'id' | 'created_at' | 'updated_at'>): Promise<RepositoryResult<Calendar>> {
+    // Tier gate (client-side mirror of the DB trigger — gives a clean UX
+    // rather than waiting for the round-trip + Postgres exception).
+    const { data: subRow } = await supabase
+      .from('subscriptions')
+      .select('tier')
+      .eq('user_id', entity.user_id)
+      .maybeSingle();
+
+    if ((subRow?.tier ?? 'free') === 'free') {
+      const { count } = await supabase
+        .from('calendars')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', entity.user_id)
+        .is('deleted_at', null);
+      if ((count ?? 0) >= 1) {
+        return {
+          success: false,
+          error: {
+            message: 'tier_limit_calendars',
+            category: SupabaseErrorCategory.PERMISSION,
+            retryable: false,
+          } as any,
+          timestamp: new Date(),
+        };
+      }
+    }
+
+    return super.create(entity);
+  }
 
   protected async createInSupabase(entity: Omit<Calendar, 'id' | 'created_at' | 'updated_at'>): Promise<Calendar> {
     const now = new Date();
