@@ -37,7 +37,7 @@ import {
 import { rehostChartUrlsInText } from './imageRehost.ts';
 import { validateReferenceIds, hasReferenceTags, type ValidationResult } from './idValidator.ts';
 import { buildSecureSystemPrompt, buildTemporalContext } from "./systemPrompt.ts";
-import { checkOrionAccess } from '../_shared/tierEnforcement.ts';
+import { checkOrionAccess, incrementOrionTokens } from '../_shared/tierEnforcement.ts';
 import { encodeBase64 } from "https://deno.land/std@0.208.0/encoding/base64.ts";
 
 /**
@@ -255,6 +255,41 @@ function logUsageMetadata(
 function finiteOrZero(v: unknown): number {
   const n = Number(v ?? 0);
   return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+/**
+ * Bill the user's monthly Orion token meter for one Gemini round's full
+ * consumption (prompt + output + thoughts). Fire-and-forget via
+ * `EdgeRuntime.waitUntil` per memory `project_edge_fn_waituntil_persist` —
+ * keeps the response fast and survives the 150s wall-clock cutoff that ends
+ * the request early. Called from EVERY site that pushes to `roundUsages` so
+ * every Gemini turn (initial, retry, continuation, synthesis, correction)
+ * gets billed once and only once.
+ */
+function billOrionTokensForRound(
+  userId: string,
+  usage: Record<string, unknown> | undefined
+): void {
+  if (!usage) return;
+  const roundTotalTokens =
+    finiteOrZero(usage.promptTokenCount) +
+    finiteOrZero(usage.candidatesTokenCount) +
+    finiteOrZero(usage.thoughtsTokenCount);
+  if (roundTotalTokens <= 0) return;
+  // @ts-ignore -- EdgeRuntime is Supabase-runtime-global, not in Deno types.
+  EdgeRuntime.waitUntil(
+    incrementOrionTokens(userId, roundTotalTokens)
+      .then((res) => {
+        if (res && res.consumed >= res.budget) {
+          log('Orion budget exhausted post-round; next request will be blocked', 'info', {
+            userId,
+            consumed: res.consumed,
+            budget: res.budget,
+          });
+        }
+      })
+      .catch((err) => log('Token increment failed', 'warn', err))
+  );
 }
 
 function logTurnAudit(
@@ -1215,6 +1250,7 @@ function handleStreamingRequest(
         firstRoundUsage = result.usageMetadata;
         lastUsageMetadata = result.usageMetadata;
         roundUsages.push(result.usageMetadata);
+        billOrionTokensForRound(userId, result.usageMetadata);
       }
 
       // RETRY LOGIC: Handle known Gemini empty content bug
@@ -1277,6 +1313,7 @@ function handleStreamingRequest(
             firstRoundUsage = result.usageMetadata;
             lastUsageMetadata = result.usageMetadata;
             roundUsages.push(result.usageMetadata);
+            billOrionTokensForRound(userId, result.usageMetadata);
           }
 
           if (!result.emptyBug && (result.text || result.functionCall || result.functionCalls)) {
@@ -1486,6 +1523,7 @@ function handleStreamingRequest(
         if (newUsage) {
           lastUsageMetadata = newUsage;
           roundUsages.push(newUsage);
+          billOrionTokensForRound(userId, newUsage);
         }
 
         if (!newFunctionCall && newText) {
@@ -1529,6 +1567,7 @@ function handleStreamingRequest(
           if (synthesisResult.usageMetadata) {
             lastUsageMetadata = synthesisResult.usageMetadata;
             roundUsages.push(synthesisResult.usageMetadata);
+            billOrionTokensForRound(userId, synthesisResult.usageMetadata);
           }
           if (synthesisResult.text) {
             finalText = synthesisResult.text;
@@ -1622,6 +1661,7 @@ function handleStreamingRequest(
             if (result.usageMetadata) {
               lastUsageMetadata = result.usageMetadata;
               roundUsages.push(result.usageMetadata);
+              billOrionTokensForRound(userId, result.usageMetadata);
             }
             correctedText = result.text;
           } catch (error) {
@@ -2108,6 +2148,7 @@ async function handleReminderRequest(req: Request, body: AgentRequest): Promise<
       firstRoundUsage = result.usageMetadata;
       lastUsageMetadata = result.usageMetadata;
       roundUsages.push(result.usageMetadata);
+      billOrionTokensForRound(userId, result.usageMetadata);
     }
 
     const conversationContents: Array<{ role: string; parts: Array<Record<string, unknown>> }> = [
@@ -2180,6 +2221,7 @@ async function handleReminderRequest(req: Request, body: AgentRequest): Promise<
       if (cont.usageMetadata) {
         lastUsageMetadata = cont.usageMetadata;
         roundUsages.push(cont.usageMetadata);
+        billOrionTokensForRound(userId, cont.usageMetadata);
       }
       result = cont.functionCall
         ? { functionCall: cont.functionCall, rawParts: cont.rawParts }
@@ -2202,6 +2244,7 @@ async function handleReminderRequest(req: Request, body: AgentRequest): Promise<
         if (synth.usageMetadata) {
           lastUsageMetadata = synth.usageMetadata;
           roundUsages.push(synth.usageMetadata);
+          billOrionTokensForRound(userId, synth.usageMetadata);
         }
         if (synth.text) finalText = synth.text;
       } catch (synthErr) {
@@ -2700,7 +2743,10 @@ Deno.serve(async (req: Request) => {
     const firstRoundUsage: Record<string, unknown> | undefined = result.usageMetadata;
     let lastUsageMetadata: Record<string, unknown> | undefined = result.usageMetadata;
     const roundUsages: Array<Record<string, unknown>> = [];
-    if (result.usageMetadata) roundUsages.push(result.usageMetadata);
+    if (result.usageMetadata) {
+      roundUsages.push(result.usageMetadata);
+      billOrionTokensForRound(userId, result.usageMetadata);
+    }
 
     const functionCalls: Array<{ name: string; args: unknown; result: string }> = [];
     let finalText = '';
@@ -2811,6 +2857,7 @@ Deno.serve(async (req: Request) => {
       if (newUsage) {
         lastUsageMetadata = newUsage;
         roundUsages.push(newUsage);
+        billOrionTokensForRound(userId, newUsage);
       }
       result = newFunctionCall
         ? { functionCall: newFunctionCall, rawParts: newRawParts }
@@ -2836,6 +2883,7 @@ Deno.serve(async (req: Request) => {
         if (synthesisResult.usageMetadata) {
           lastUsageMetadata = synthesisResult.usageMetadata;
           roundUsages.push(synthesisResult.usageMetadata);
+          billOrionTokensForRound(userId, synthesisResult.usageMetadata);
         }
         if (synthesisResult.text) {
           finalText = synthesisResult.text;
@@ -2923,6 +2971,7 @@ Deno.serve(async (req: Request) => {
           if (result.usageMetadata) {
             lastUsageMetadata = result.usageMetadata;
             roundUsages.push(result.usageMetadata);
+            billOrionTokensForRound(userId, result.usageMetadata);
           }
           correctedText = result.text;
         } catch (error) {
