@@ -48,6 +48,18 @@ Deno.serve(async (req) => {
     return successResponse({ event_type: eventType, applied: true });
   }
 
+  if (eventType === 'subscription.canceled') {
+    const result = await handleSubscriptionCancelled(serviceClient, event.data);
+    if (!result.ok) return errorResponse(result.reason ?? 'handler failed', 500);
+    return successResponse({ event_type: eventType, applied: true });
+  }
+
+  if (eventType === 'transaction.payment_failed') {
+    const result = await handlePaymentFailed(serviceClient, event.data);
+    if (!result.ok) return errorResponse(result.reason ?? 'handler failed', 500);
+    return successResponse({ event_type: eventType, applied: true });
+  }
+
   return successResponse({ event_type: eventType, applied: false }, 'Event ignored');
 });
 
@@ -113,5 +125,54 @@ async function handleSubscriptionUpsert(
     tier: resolved.tier,
     status: normalisedStatus,
   });
+  return { ok: true };
+}
+
+async function handleSubscriptionCancelled(
+  client: ReturnType<typeof createServiceClient>,
+  data: any
+): Promise<{ ok: boolean; reason?: string }> {
+  const paddleSubId = data?.id;
+  if (!paddleSubId) {
+    return { ok: false, reason: 'missing subscription id' };
+  }
+
+  // Update by paddle_subscription_id — independent of custom_data.user_id which
+  // may not be present in cancellation payloads.
+  const { error } = await client
+    .from('subscriptions')
+    .update({
+      status: 'cancelled',
+      cancel_at_period_end: true,
+    })
+    .eq('paddle_subscription_id', paddleSubId);
+
+  if (error) {
+    log('Failed to mark subscription cancelled', 'error', error);
+    return { ok: false, reason: error.message };
+  }
+  log('Subscription cancelled', 'info', { paddleSubId });
+  return { ok: true };
+}
+
+async function handlePaymentFailed(
+  client: ReturnType<typeof createServiceClient>,
+  data: any
+): Promise<{ ok: boolean; reason?: string }> {
+  // Paddle transaction events carry subscription_id on the transaction payload.
+  const paddleSubId = data?.subscription_id;
+  if (!paddleSubId) {
+    // Some payment_failed events are for one-shot transactions; ignore them.
+    return { ok: true };
+  }
+  const { error } = await client
+    .from('subscriptions')
+    .update({ status: 'past_due' })
+    .eq('paddle_subscription_id', paddleSubId);
+  if (error) {
+    log('Failed to mark subscription past_due', 'error', error);
+    return { ok: false, reason: error.message };
+  }
+  log('Subscription marked past_due', 'info', { paddleSubId });
   return { ok: true };
 }
