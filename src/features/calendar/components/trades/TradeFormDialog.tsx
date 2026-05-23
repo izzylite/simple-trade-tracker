@@ -859,6 +859,16 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     } catch (error) {
       logger.error(`Error uploading image ${image.id}:`, error);
 
+      // Tier guard from supabaseStorageService.uploadFile — free user tried
+      // to upload an image. The UI gate in ImageUploader normally prevents
+      // this, but a paid user can lose entitlement mid-session (cancelled
+      // sub past grace period). Surface the upgrade nudge instead of a
+      // generic "upload failed".
+      const errMsg = error instanceof Error ? error.message : String(error);
+      if (errMsg.includes('tier_no_image_uploads')) {
+        showErrorSnackbar('Image uploads are a paid feature — upgrade to attach charts.');
+      }
+
       // Remove failed image from pending (local state)
       setNewTrade(prev => ({
         ...prev!,

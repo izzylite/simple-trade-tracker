@@ -14,6 +14,8 @@ import {
   CloudUploadOutlined,
 } from '@mui/icons-material';
 import { useDialogTokens } from 'styles/dialogTokens';
+import { useNavigate } from 'react-router-dom';
+import { useSubscription } from 'features/billing/hooks/useSubscription';
 
 import { PendingImage, TradeImage } from './TradeForm';
 import ImageGrid, { GridImage, GridPendingImage } from './ImageGrid';
@@ -40,6 +42,17 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { violet, violetSoft, violetSofter, hairline, surfaceInset } =
     useDialogTokens();
+  const navigate = useNavigate();
+  // Tier gate — free users can't upload chart screenshots. We disable the
+  // affordance instead of letting them hit the `tier_no_image_uploads`
+  // error from `supabaseStorageService.uploadFile`. While loading, default
+  // to the existing (paid) behavior to avoid a flash of "disabled" for
+  // paid users on every dialog open.
+  const { isPaid, loaded } = useSubscription();
+  const uploadsBlocked = loaded && !isPaid;
+  const tierTooltip = uploadsBlocked
+    ? 'Image uploads are a paid feature — upgrade to attach charts to your trades.'
+    : '';
 
   // Tracks dragenter/leave depth so nested children flickering doesn't toggle
   // the drop-zone styling off mid-drag.
@@ -54,6 +67,10 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   };
 
   const handleAddImageClick = () => {
+    if (uploadsBlocked) {
+      navigate('/pricing');
+      return;
+    }
     fileInputRef.current?.click();
   };
 
@@ -113,8 +130,10 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   };
 
   // Clipboard paste — captured at document level so the user can paste images
-  // any time the dialog is open (matches the previous behavior).
+  // any time the dialog is open (matches the previous behavior). Skipped
+  // entirely for free users so paste doesn't trigger the tier guard error.
   const handlePaste = useCallback((event: ClipboardEvent) => {
+    if (uploadsBlocked) return;
     const items = event.clipboardData?.items;
     if (!items) return;
 
@@ -132,7 +151,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
       imageFiles.forEach(file => dataTransfer.items.add(file));
       onImageUpload(dataTransfer.files);
     }
-  }, [onImageUpload]);
+  }, [onImageUpload, uploadsBlocked]);
 
   useEffect(() => {
     document.addEventListener('paste', handlePaste);
@@ -171,6 +190,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     e.preventDefault();
     e.stopPropagation();
     setDragDepth(0);
+    if (uploadsBlocked) return;
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       onImageUpload(e.dataTransfer.files);
     }
@@ -262,32 +282,41 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
       {hasImages ? (
         <>
           {/* Compact "Add more" drop zone above the grid. */}
-          <Box
-            onClick={handleAddImageClick}
-            onDragEnter={handleDragEnter}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                handleAddImageClick();
-              }
-            }}
-            sx={{ ...dropZoneSx(true), mb: 1.5 }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <AddPhotoAlternate sx={{ fontSize: 20, color: violet }} />
-              <Typography sx={{ fontSize: '0.88rem', fontWeight: 600, color: violet }}>
-                Add more
+          <Tooltip title={tierTooltip} placement="top">
+            <Box
+              onClick={handleAddImageClick}
+              onDragEnter={uploadsBlocked ? undefined : handleDragEnter}
+              onDragOver={uploadsBlocked ? undefined : handleDragOver}
+              onDragLeave={uploadsBlocked ? undefined : handleDragLeave}
+              onDrop={uploadsBlocked ? undefined : handleDrop}
+              role="button"
+              tabIndex={0}
+              aria-disabled={uploadsBlocked}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  handleAddImageClick();
+                }
+              }}
+              sx={{
+                ...dropZoneSx(true),
+                mb: 1.5,
+                opacity: uploadsBlocked ? 0.55 : 1,
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <AddPhotoAlternate sx={{ fontSize: 20, color: violet }} />
+                <Typography sx={{ fontSize: '0.88rem', fontWeight: 600, color: violet }}>
+                  {uploadsBlocked ? 'Upgrade to attach charts' : 'Add more'}
+                </Typography>
+              </Box>
+              <Typography variant="caption" color="text.secondary">
+                {uploadsBlocked
+                  ? 'Image uploads are a paid feature — click to see plans.'
+                  : 'Drop files, click to browse, or paste (Ctrl+V) · max 1MB each'}
               </Typography>
             </Box>
-            <Typography variant="caption" color="text.secondary">
-              Drop files, click to browse, or paste (Ctrl+V) · max 1MB each
-            </Typography>
-          </Box>
+          </Tooltip>
 
           <ImageGrid
             pendingImages={pendingImages}
@@ -301,55 +330,71 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
       ) : (
         // Empty state — full-height drop zone fills the tab so the dialog
         // stays a consistent height across tabs.
-        <Box
-          onClick={handleAddImageClick}
-          onDragEnter={handleDragEnter}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              handleAddImageClick();
-            }
-          }}
-          sx={dropZoneSx(false)}
-        >
+        <Tooltip title={tierTooltip} placement="top">
           <Box
+            onClick={handleAddImageClick}
+            onDragEnter={uploadsBlocked ? undefined : handleDragEnter}
+            onDragOver={uploadsBlocked ? undefined : handleDragOver}
+            onDragLeave={uploadsBlocked ? undefined : handleDragLeave}
+            onDrop={uploadsBlocked ? undefined : handleDrop}
+            role="button"
+            tabIndex={0}
+            aria-disabled={uploadsBlocked}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handleAddImageClick();
+              }
+            }}
             sx={{
-              width: 56,
-              height: 56,
-              borderRadius: '50%',
-              backgroundColor: violetSoft,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              mb: 0.5,
+              ...dropZoneSx(false),
+              opacity: uploadsBlocked ? 0.55 : 1,
             }}
           >
-            <CloudUploadOutlined sx={{ fontSize: 28, color: violet }} />
+            <Box
+              sx={{
+                width: 56,
+                height: 56,
+                borderRadius: '50%',
+                backgroundColor: violetSoft,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                mb: 0.5,
+              }}
+            >
+              <CloudUploadOutlined sx={{ fontSize: 28, color: violet }} />
+            </Box>
+            <Typography sx={{ fontSize: '1rem', fontWeight: 600 }}>
+              {uploadsBlocked
+                ? 'Charts are a paid feature'
+                : isDragging
+                  ? 'Drop to upload'
+                  : 'Drop screenshots here'}
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ maxWidth: 360 }}>
+              {uploadsBlocked ? (
+                <>Upgrade to attach screenshots and chart images to your trades.</>
+              ) : (
+                <>
+                  Drag &amp; drop, click to browse, or paste with Ctrl+V.
+                  <br />Max 1&nbsp;MB per image.
+                </>
+              )}
+            </Typography>
+            <Button
+              variant="outlined"
+              startIcon={<AddPhotoAlternate />}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleAddImageClick();
+              }}
+              sx={{ mt: 1.5, borderRadius: 1.25, textTransform: 'none' }}
+            >
+              {uploadsBlocked ? 'See plans' : 'Browse files'}
+            </Button>
           </Box>
-          <Typography sx={{ fontSize: '1rem', fontWeight: 600 }}>
-            {isDragging ? 'Drop to upload' : 'Drop screenshots here'}
-          </Typography>
-          <Typography variant="caption" color="text.secondary" sx={{ maxWidth: 360 }}>
-            Drag &amp; drop, click to browse, or paste with Ctrl+V.
-            <br />Max 1&nbsp;MB per image.
-          </Typography>
-          <Button
-            variant="outlined"
-            startIcon={<AddPhotoAlternate />}
-            onClick={(e) => {
-              e.stopPropagation();
-              handleAddImageClick();
-            }}
-            sx={{ mt: 1.5, borderRadius: 1.25, textTransform: 'none' }}
-          >
-            Browse files
-          </Button>
-        </Box>
+        </Tooltip>
       )}
     </Box>
   );

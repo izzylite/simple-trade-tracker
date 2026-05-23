@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   Dialog,
   Button,
@@ -19,6 +19,7 @@ import {
   PhotoLibrary as LibraryIcon,
   ArrowForward as ArrowIcon,
 } from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
 import { uploadFile, getPublicUrl, optimizeImage } from 'services/supabaseStorageService';
 import { supabase } from 'config/supabase';
 import { UnsplashImagePicker } from 'components/heroImage';
@@ -28,6 +29,7 @@ import { scrollbarStyles } from 'styles/scrollbarStyles';
 import { Z_INDEX } from 'styles/zIndex';
 import { dialogProps } from 'styles/dialogStyles';
 import { useDialogTokens, MONO_FONT } from 'styles/dialogTokens';
+import { useSubscription } from 'features/billing/hooks/useSubscription';
 import { v4 as uuidv4 } from 'uuid';
 
 interface ImageUploadDialogProps {
@@ -63,8 +65,23 @@ const ImageUploadDialog: React.FC<ImageUploadDialogProps> = ({
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
+  // Tier gate — free users can't upload to storage. URL + Unsplash tabs
+  // still work since they just embed remote URLs (no `uploadFile` call).
+  // When uploads are blocked we land users on the URL tab and disable the
+  // Upload tab affordance.
+  const { isPaid, loaded } = useSubscription();
+  const uploadsBlocked = loaded && !isPaid;
 
   const [activeTab, setActiveTab] = useState<TabKey>('upload');
+
+  // Once the subscription resolves, kick free users off the Upload tab so
+  // they don't sit on a disabled empty state.
+  useEffect(() => {
+    if (uploadsBlocked && activeTab === 'upload') {
+      setActiveTab('url');
+    }
+  }, [uploadsBlocked, activeTab]);
   const [imageUrl, setImageUrl] = useState('');
   const [altText, setAltText] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -142,7 +159,16 @@ const ImageUploadDialog: React.FC<ImageUploadDialogProps> = ({
       resetState();
       onClose();
     } catch (err: any) {
-      setError(err.message || 'Failed to upload image');
+      const msg = err?.message ?? String(err);
+      // Tier guard from supabaseStorageService.uploadFile — show the
+      // upgrade nudge inline instead of a raw error string. The disabled
+      // Upload tab normally prevents this path, but a paid user can lose
+      // entitlement mid-session.
+      if (msg.includes('tier_no_image_uploads')) {
+        setError('Image uploads are a paid feature — upgrade to attach charts.');
+      } else {
+        setError(msg || 'Failed to upload image');
+      }
       setUploading(false);
     }
   };
@@ -225,6 +251,9 @@ const ImageUploadDialog: React.FC<ImageUploadDialogProps> = ({
     >
       {TABS.map((tab) => {
         const selected = activeTab === tab.key;
+        // Keep the Upload tab clickable when blocked so users land on the
+        // tier nudge inside it — the empty disabled tab would feel broken.
+        const isPaywalled = tab.key === 'upload' && uploadsBlocked;
         return (
           <Box
             key={tab.key}
@@ -246,6 +275,7 @@ const ImageUploadDialog: React.FC<ImageUploadDialogProps> = ({
               transition: 'all 140ms ease',
               backgroundColor: selected ? violet : 'transparent',
               color: selected ? '#fff' : theme.palette.text.secondary,
+              opacity: isPaywalled && !selected ? 0.6 : 1,
               '&:hover': {
                 backgroundColor: selected ? violet : alpha(theme.palette.text.primary, isDark ? 0.06 : 0.05),
                 color: selected ? '#fff' : theme.palette.text.primary,
@@ -309,7 +339,41 @@ const ImageUploadDialog: React.FC<ImageUploadDialogProps> = ({
         {renderTabs()}
 
         {/* Upload */}
-        {activeTab === 'upload' && (
+        {activeTab === 'upload' && uploadsBlocked && (
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 1.25,
+              p: 3,
+              borderRadius: 1.5,
+              border: `1px dashed ${alpha(violet, isDark ? 0.45 : 0.35)}`,
+              backgroundColor: violetSofter,
+              textAlign: 'center',
+            }}
+          >
+            <UploadIcon sx={{ fontSize: 32, color: violet }} />
+            <Typography sx={{ fontSize: '0.95rem', fontWeight: 700 }}>
+              Upload is a paid feature
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ maxWidth: 360 }}>
+              Upgrade to upload your own images. You can still paste a URL or
+              pick from Unsplash on the other tabs.
+            </Typography>
+            <Button
+              variant="contained"
+              onClick={() => {
+                onClose();
+                navigate('/pricing');
+              }}
+              sx={{ ...primaryButtonSx, mt: 0.5 }}
+            >
+              See plans
+            </Button>
+          </Box>
+        )}
+        {activeTab === 'upload' && !uploadsBlocked && (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
             <Box
               role="button"
