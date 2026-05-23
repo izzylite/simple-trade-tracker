@@ -1,9 +1,21 @@
 import React, { useState } from 'react';
-import { Box, Container, Typography, ToggleButton, ToggleButtonGroup } from '@mui/material';
-import type { BillingCycle } from 'features/billing/pricing/tierData';
+import { Box, Container, Typography, ToggleButton, ToggleButtonGroup, Grid } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
+import { TIERS, type BillingCycle, type Tier } from 'features/billing/pricing/tierData';
+import { TierCard } from 'features/billing/pricing/TierCard';
 
 const PricingPage: React.FC = () => {
   const [cycle, setCycle] = useState<BillingCycle>('monthly');
+  const navigate = useNavigate();
+
+  const handleCta = (tierId: Tier) => {
+    if (tierId === 'free') {
+      navigate('/'); // landing page handles signup dialog
+      return;
+    }
+    // Paddle checkout wiring lives in Task 5.
+    console.warn('Paid checkout not yet wired:', tierId, cycle);
+  };
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'custom.pageBackground', py: { xs: 6, md: 10 } }}>
@@ -28,7 +40,20 @@ const PricingPage: React.FC = () => {
           </Typography>
         </Box>
 
-        {/* Tier cards in Task 3 */}
+        <Grid container spacing={3}>
+          {TIERS.map((tier) => (
+            <Grid key={tier.id} size={{ xs: 12, sm: 6, md: 3 }}>
+              <TierCard
+                tier={tier}
+                cycle={cycle}
+                ctaLabel={tier.id === 'free' ? 'Start free' : 'Subscribe'}
+                onCta={() => handleCta(tier.id)}
+              />
+            </Grid>
+          ))}
+        </Grid>
+
+        {/* Comparison table in Task 4, FAQ in Task 6 */}
       </Container>
     </Box>
   );
