@@ -1,0 +1,11 @@
+# Supabase edge function configuration.
+#
+# Functions not listed here use the default (verify_jwt = true).
+#
+# Paddle calls our webhook without an auth header (signed via Paddle-Signature
+# instead), so JWT verification must be disabled for that function. Lock it
+# here so future redeploys via the CLI / dashboard don't silently re-enable
+# JWT verification and break billing webhooks in prod.
+
+[functions.paddle-webhook]
+verify_jwt = false

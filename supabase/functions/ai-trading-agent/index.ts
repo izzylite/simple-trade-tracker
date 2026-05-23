@@ -1999,6 +1999,37 @@ async function handleReminderRequest(req: Request, body: AgentRequest): Promise<
     return errorResponse('Forbidden: reminder ownership mismatch', 403);
   }
 
+  // ---- 3d.5. Tier + budget gate — runs AFTER the atomic claim (so blocked
+  // reminders don't re-fire next minute) but BEFORE any Gemini call, tool
+  // execution, or message append. Without this gate, free users with active
+  // reminders would get full Gemini turns via the cron path, bypassing the
+  // tier enforcement applied to interactive chat. ----
+  const reminderGate = await checkOrionAccess(userId);
+  if (!reminderGate.allowed) {
+    log('Reminder fire denied by tier gate', 'info', {
+      userId,
+      reminderId,
+      tier: reminderGate.tier,
+      reason: reminderGate.reason,
+    });
+    // The reminder claim already succeeded above; the row is now in 'fired'
+    // state so it won't re-fire on the next dispatcher tick. We return a
+    // structured blocked-response that the dispatcher can log without
+    // appending any surprise assistant message to the user's conversation.
+    return successResponse(
+      {
+        blocked: true,
+        reason: reminderGate.reason,
+        tier: reminderGate.tier,
+        reset_at: reminderGate.resetAt ?? null,
+        tokens_consumed: reminderGate.tokensConsumed ?? null,
+        tokens_budget: reminderGate.tokensBudget ?? null,
+        kind: 'reminder',
+      },
+      'Reminder blocked by tier gate'
+    );
+  }
+
   // ---- 3e. Load conversation + check token-budget cap ----
   const { data: convo, error: convoErr } = await serviceClient
     .from('ai_conversations')
