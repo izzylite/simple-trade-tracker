@@ -1,22 +1,67 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Box, Container, Typography, ToggleButton, ToggleButtonGroup, Grid } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
-import { TIERS, type BillingCycle, type Tier } from 'features/billing/pricing/tierData';
+import { TIERS, type BillingCycle, type Tier, resolvePaddlePriceId } from 'features/billing/pricing/tierData';
 import { TierCard } from 'features/billing/pricing/TierCard';
 import { ComparisonTable } from 'features/billing/pricing/ComparisonTable';
+import { useAuth } from 'contexts/SupabaseAuthContext';
+import { usePaddle } from 'features/billing/paddle/usePaddle';
 
 const PricingPage: React.FC = () => {
   const [cycle, setCycle] = useState<BillingCycle>('monthly');
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const paddle = usePaddle();
 
   const handleCta = (tierId: Tier) => {
     if (tierId === 'free') {
-      navigate('/'); // landing page handles signup dialog
+      navigate('/');
       return;
     }
-    // Paddle checkout wiring lives in Task 5.
-    console.warn('Paid checkout not yet wired:', tierId, cycle);
+    if (!user) {
+      // Sign-up first; pricing CTA stores intent and redirects.
+      sessionStorage.setItem('pendingCheckout', JSON.stringify({ tier: tierId, cycle }));
+      navigate('/?intent=signup');
+      return;
+    }
+    if (!paddle) {
+      console.error('Paddle not initialized');
+      return;
+    }
+    const priceId = resolvePaddlePriceId(tierId, cycle);
+    if (!priceId) {
+      console.error('Missing Paddle price id for', tierId, cycle);
+      return;
+    }
+    paddle.Checkout.open({
+      items: [{ priceId, quantity: 1 }],
+      customer: user.email ? { email: user.email } : undefined,
+      customData: { user_id: user.id },
+      settings: {
+        successUrl: `${window.location.origin}/account/billing?status=success`,
+      },
+    });
   };
+
+  // Pending-checkout flow: a user clicked Subscribe while logged out → we
+  // stashed intent in sessionStorage and redirected to landing for sign-up.
+  // After they sign in and land back on /pricing, pop the intent and open
+  // checkout automatically.
+  useEffect(() => {
+    if (!user || !paddle) return;
+    const pendingRaw = sessionStorage.getItem('pendingCheckout');
+    if (!pendingRaw) return;
+    try {
+      const pending = JSON.parse(pendingRaw) as { tier: Tier; cycle: BillingCycle };
+      sessionStorage.removeItem('pendingCheckout');
+      setCycle(pending.cycle);
+      // Defer to next tick so cycle state lands before checkout opens.
+      setTimeout(() => handleCta(pending.tier), 0);
+    } catch {
+      sessionStorage.removeItem('pendingCheckout');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, paddle]);
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'custom.pageBackground', py: { xs: 6, md: 10 } }}>
@@ -56,7 +101,7 @@ const PricingPage: React.FC = () => {
 
         <ComparisonTable />
 
-        {/* FAQ in Task 6 */}
+        {/* FAQ + footer band in Task 6 */}
       </Container>
     </Box>
   );

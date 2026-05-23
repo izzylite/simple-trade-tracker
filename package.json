@@ -9,6 +9,7 @@
     "@mui/icons-material": "^7.0.1",
     "@mui/material": "^7.0.1",
     "@mui/x-date-pickers": "^7.28.3",
+    "@paddle/paddle-js": "^1.6.4",
     "@supabase/supabase-js": "^2.77.0",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
