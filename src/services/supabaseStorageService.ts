@@ -32,6 +32,34 @@ export const uploadFile = async (
       upsert = false
     } = options;
 
+    // Free-tier guard — fail fast before the upload starts. Only applies to
+    // user-uploaded image buckets; the storage.objects INSERT policy enforces
+    // this server-side, this is the client-side mirror so we surface a clear
+    // error instead of a generic RLS rejection. Mirrors
+    // supabase/functions/_shared/tierEnforcement.ts.
+    if (bucketName === 'trade-images') {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: subRow } = await supabase
+          .from('subscriptions')
+          .select('tier, status, current_period_end')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        const tier = subRow?.tier ?? 'free';
+        const status = subRow?.status ?? 'active';
+        const hasGrace =
+          status === 'cancelled' &&
+          !!subRow?.current_period_end &&
+          new Date(subRow.current_period_end as unknown as string).getTime() > Date.now();
+        const isPaid =
+          ['lite', 'pro', 'elite'].includes(tier) &&
+          (['active', 'trialing', 'past_due'].includes(status) || hasGrace);
+        if (!isPaid) {
+          throw new Error('tier_no_image_uploads');
+        }
+      }
+    }
+
     const { data, error } = await supabase.storage
       .from(bucketName)
       .upload(filePath, file, {
