@@ -37,6 +37,7 @@ import {
 import { rehostChartUrlsInText } from './imageRehost.ts';
 import { validateReferenceIds, hasReferenceTags, type ValidationResult } from './idValidator.ts';
 import { buildSecureSystemPrompt, buildTemporalContext } from "./systemPrompt.ts";
+import { checkOrionAccess } from '../_shared/tierEnforcement.ts';
 import { encodeBase64 } from "https://deno.land/std@0.208.0/encoding/base64.ts";
 
 /**
@@ -2440,6 +2441,29 @@ Deno.serve(async (req: Request) => {
       return new Response(
         JSON.stringify({ success: false, error: 'Missing required fields: message or images, and userId' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Tier + budget gate — runs before any Gemini call. Free users and budget-
+    // exhausted paid users are rejected with a structured error the UI renders
+    // as an upgrade prompt.
+    const gate = await checkOrionAccess(userId);
+    if (!gate.allowed) {
+      log('Orion request denied by tier gate', 'info', {
+        userId,
+        tier: gate.tier,
+        reason: gate.reason,
+      });
+      return successResponse(
+        {
+          blocked: true,
+          reason: gate.reason,
+          tier: gate.tier,
+          reset_at: gate.resetAt ?? null,
+          tokens_consumed: gate.tokensConsumed ?? null,
+          tokens_budget: gate.tokensBudget ?? null,
+        },
+        'Orion access blocked'
       );
     }
 
