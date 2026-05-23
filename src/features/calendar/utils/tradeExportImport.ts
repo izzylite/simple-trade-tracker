@@ -2,10 +2,7 @@ import { Trade } from '../types/dualWrite';
 import { format, parse } from 'date-fns';
 import { error, warn } from 'utils/logger';
 import { formatTagsWithCapitalizedGroups } from 'utils/tagColors';
-
-// Lazy-load xlsx (~600KB) only when an .xlsx export/import is actually invoked.
-// CSV path bypasses this entirely.
-const loadXLSX = () => import('xlsx');
+import { loadXLSX } from './loadXLSX';
 
 // Helper function to prepare trade data for export
 const prepareTradeDataForExport = (trades: Trade[], initial_balance: number = 0) => {

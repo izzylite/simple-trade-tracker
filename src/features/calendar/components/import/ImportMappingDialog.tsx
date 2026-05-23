@@ -46,8 +46,7 @@ import {
 } from '../../utils/importMappingStorage';
 import BaseDialog from 'components/common/BaseDialog';
 import { useDialogTokens, MONO_FONT } from 'styles/dialogTokens';
-// Lazy-load xlsx (~600KB) only when an .xlsx file is actually parsed.
-const loadXLSX = () => import('xlsx');
+import { loadXLSX } from '../../utils/loadXLSX';
 
 interface ImportMappingDialogProps {
   open: boolean;
@@ -183,7 +182,13 @@ export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
   const [previewRows, setPreviewRows] = useState<ImportPreviewRow[]>([]);
   const [validationSummary, setValidationSummary] =
     useState<ValidationSummaryType | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
+  // Initial true when a file is already present so the first commit after
+  // mount already renders the parse spinner. Without this, the dialog body
+  // flashes empty for one render until the parseFile useEffect fires
+  // setIsProcessing(true) — and for fast parses that flash IS the entire
+  // pre-parse window, making the dialog look like it only opens after
+  // parsing finishes.
+  const [isProcessing, setIsProcessing] = useState<boolean>(() => Boolean(file));
   const [error, setError] = useState<string | null>(null);
   const [showTemplateManager, setShowTemplateManager] = useState(false);
   const [saveTemplateName, setSaveTemplateName] = useState('');

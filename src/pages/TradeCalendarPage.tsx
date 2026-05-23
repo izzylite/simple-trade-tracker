@@ -143,10 +143,13 @@ import StatsDrawer from 'features/performance/components/StatsDrawer';
 
 // Lazy-load: ImportMappingDialog pulls xlsx + multi-step wizard. Only mount
 // when the user actually opens the import flow.
+// Loader is extracted so we can warm the chunk on More-menu open — by the
+// time the user picks a file the dialog renders without a chunk-download
+// gap (which is otherwise invisible under Suspense fallback={null}).
+const loadImportDialogChunk = () =>
+  import('features/calendar/components/import/ImportMappingDialog');
 const ImportMappingDialog = React.lazy(() =>
-  import('features/calendar/components/import/ImportMappingDialog').then((m) => ({
-    default: m.ImportMappingDialog,
-  }))
+  loadImportDialogChunk().then((m) => ({ default: m.ImportMappingDialog })),
 );
 
 interface TradeCalendarProps {
@@ -1477,10 +1480,26 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
     setImportFile(null);
   };
 
-  const handleHeaderExport = (fileFormat: 'xlsx' | 'csv') => {
-    if (trades.length === 0) return;
-    void exportTrades(trades, accountBalance, fileFormat);
+  const handleHeaderExport = async (fileFormat: 'xlsx' | 'csv') => {
     setMoreMenuAnchor(null);
+    if (!calendarId) return;
+    // `trades` in scope is the calendar-grid's visible-month subset
+    // (useCalendarTrades pages by month). Fetch the full dataset directly
+    // so the export captures every trade, not just what's on screen.
+    try {
+      setLoading(true, 'exporting');
+      const allTrades = await calendarService.getAllTrades(calendarId);
+      if (allTrades.length === 0) {
+        showSnackbar('No trades to export.', 'warning');
+        return;
+      }
+      await exportTrades(allTrades, accountBalance, fileFormat);
+    } catch (err) {
+      logger.error('Failed to export trades:', err);
+      showSnackbar('Failed to export trades. Please try again.', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const breadcrumbRightContent = (
@@ -1530,7 +1549,13 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
       <Tooltip title="Import / Export trades">
         <IconButton
           size="small"
-          onClick={(e) => setMoreMenuAnchor(e.currentTarget)}
+          onClick={(e) => {
+            // Warm the import-dialog chunk in parallel with the user
+            // reading the menu, so picking a file doesn't pause on a
+            // chunk download under the invisible Suspense fallback.
+            loadImportDialogChunk();
+            setMoreMenuAnchor(e.currentTarget);
+          }}
           sx={{ color: 'text.secondary', '&:hover': { color: 'text.primary' } }}
         >
           <MoreVertIcon fontSize="small" />

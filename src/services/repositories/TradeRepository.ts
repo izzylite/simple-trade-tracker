@@ -145,22 +145,46 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
   }
 
   async findByCalendarId(calendarId: string): Promise<Trade[]> {
+    // PostgREST caps a single response at 1000 rows by default (cloud
+    // Supabase max_rows). Page through with .range() until exhausted so
+    // every caller (export, initial calendar mount, dynamic-risk recalc,
+    // duplicate-calendar) gets the full dataset at scale instead of being
+    // silently truncated to the first 1000 trades.
+    const PAGE_SIZE = 1000;
+    const MAX_PAGES = 200; // hard safety stop (>200k trades on one calendar)
+    const all: Trade[] = [];
+
     try {
-      const { data, error } = await supabase
-        .from('trades')
-        .select('*')
-        .eq('calendar_id', calendarId);
+      for (let page = 0; page < MAX_PAGES; page++) {
+        const from = page * PAGE_SIZE;
+        const to = from + PAGE_SIZE - 1;
 
-      if (error) {
-        logger.error('Error finding trades by calendar ID:', error);
-        return [];
+        const { data, error } = await supabase
+          .from('trades')
+          .select('*')
+          .eq('calendar_id', calendarId)
+          // Stable order required so paging doesn't miss/duplicate rows
+          // when inserts land mid-pagination.
+          .order('created_at', { ascending: true })
+          .order('id', { ascending: true })
+          .range(from, to);
+
+        if (error) {
+          logger.error('Error finding trades by calendar ID:', error);
+          return all;
+        }
+        if (!data || data.length === 0) break;
+
+        for (const row of data) all.push(transformSupabaseTrade(row));
+
+        if (data.length < PAGE_SIZE) break;
       }
-
-      return data ? data.map(item => transformSupabaseTrade(item)) : [];
     } catch (error) {
       logger.error('Error finding trades by calendar ID:', error);
-      return [];
+      return all;
     }
+
+    return all;
   }
 
   /**
