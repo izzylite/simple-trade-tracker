@@ -45,6 +45,7 @@ import { useCalendarsListPanel } from 'features/calendar/contexts/CalendarsListP
 // Lazy load page components from pages directory
 const LandingPage = lazy(() => import('pages/LandingPage'));
 const AboutPage = lazy(() => import('pages/AboutPage'));
+const PricingPage = lazy(() => import('pages/PricingPage'));
 const TradeCalendar = lazy(() => import('pages/TradeCalendarPage').then(module => ({ default: module.TradeCalendar })));
 const SharedTradePage = lazy(() => import('pages/SharedTradePage'));
 const SharedCalendarPage = lazy(() => import('pages/SharedCalendarPage'));
@@ -477,11 +478,13 @@ function AppContent() {
                   }
                 />
                 <Route path="/about" element={<AboutPage />} />
+                <Route path="/pricing" element={<PricingPage />} />
               </Route>
             ) : (
               <>
                 <Route path="/" element={<LandingPage />} />
                 <Route path="/about" element={<AboutPage />} />
+                <Route path="/pricing" element={<PricingPage />} />
               </>
             )}
             <Route
