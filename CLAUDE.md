@@ -320,6 +320,26 @@ note `project_recall_conversations_summary_tier_deferred.md`.
 - **Cross-pillar imports are allowed** but should be sparing. Use absolute paths (`features/notes/types/note`) for them.
 - **Extract shared logic within components too.** When 2+ event handlers, style objects, or render patterns repeat the same structure with different parameters, extract a reusable helper function or constant immediately — don't duplicate then refactor later. Example: a `togglePanel(viewId, drawerSetter)` instead of repeating the same panel open/close logic for every button.
 
+### Vendor Source Lookup (opensrc)
+
+When library behaviour is surprising and docs aren't pinning it down, read the actual source via [opensrc](https://github.com/vercel-labs/opensrc) (installed globally). `opensrc path <pkg>` returns a cached unminified source tree you can `Grep`/`Read` inside.
+
+**Reach for opensrc — don't guess — when working with:**
+- **Draft.js** — unmaintained, sparse docs; the source is the spec. Any time `RichTextEditor`, decorators, entities, `EditorState`, `ContentState`, or selection behave unexpectedly: `opensrc path draft-js` then grep there.
+- **MUI v7** — `sx` resolution, theme merging, `Drawer`/`Dialog` focus traps, transition timing, ripple internals. Docs cover the API; source explains the why.
+- **Recharts** — animation, tooltip positioning, custom shape rendering, axis tick logic.
+- **Supabase JS SDK** — realtime channel resub behaviour, `postgres_changes` filter parsing, retry/backoff edges.
+- **Edge function deps (Deno / esm.sh)** — when you can't `npm ls` to find a local copy.
+
+**For canonical docs (React, Next.js, Supabase API surface), prefer Context7 first** — it's faster than reading source for documented behaviour. opensrc is for *undocumented* or *misdocumented* behaviour, not for replacing docs.
+
+Usage example:
+```bash
+opensrc path draft-js
+# returns: C:\Users\Izzy\.opensrc\repos\github.com\facebook\draft-js\0.11.7
+# then: Grep pattern "convertFromHTML" path <that-path>/src
+```
+
 ### UI/UX Preferences
 - Rounded tab styling and curved cards
 - Tooltips for calculations and complex UI elements
