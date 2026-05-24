@@ -27,7 +27,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: 'How do I cancel?',
-    a: 'From your Account → Billing page, click "Manage subscription" and cancel through the Paddle portal. Your access continues until the end of the current billing period.',
+    a: 'After signing in, open Account → Billing, click "Manage subscription", and cancel through the Paddle portal. Your access continues until the end of the current billing period.',
   },
   {
     q: 'Where is my data stored?',

@@ -39,10 +39,16 @@ const GROUPS: Group[] = [
     ],
   },
   {
-    heading: 'Notes & Events',
+    heading: 'Notes',
     rows: [
       { label: 'Notes', free: 'Unlimited', lite: 'Unlimited', pro: 'Unlimited', elite: 'Unlimited' },
-      { label: 'Economic Events (pin/watch/notify)', free: yes, lite: yes, pro: yes, elite: yes },
+    ],
+  },
+  {
+    heading: 'Economic Events',
+    rows: [
+      { label: 'Pin events', free: yes, lite: yes, pro: yes, elite: yes },
+      { label: 'Event notifications', free: yes, lite: yes, pro: yes, elite: yes },
     ],
   },
   {
@@ -56,6 +62,13 @@ const GROUPS: Group[] = [
     rows: [
       { label: 'Share links (calendars, notes, trades)', free: yes, lite: yes, pro: yes, elite: yes },
       { label: 'Import / Export', free: yes, lite: yes, pro: yes, elite: yes },
+    ],
+  },
+  {
+    heading: 'Support',
+    rows: [
+      { label: 'Community support', free: yes, lite: yes, pro: yes, elite: yes },
+      { label: 'Priority support', free: no, lite: no, pro: yes, elite: yes },
     ],
   },
 ];

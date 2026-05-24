@@ -18,6 +18,7 @@ import {
   Add as AddIcon,
   InfoOutlined as AboutIcon,
   WorkspacePremium as UpgradeIcon,
+  ReceiptLong as BillingIcon,
 } from '@mui/icons-material';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { SELECTED_CALENDAR_STORAGE_KEY } from 'features/calendar/contexts/SelectedCalendarContext';
@@ -101,6 +102,9 @@ const SideNav: React.FC<SideNavProps> = ({
   // Upgrade affordance only shown to authenticated free-tier users; gated on
   // subscriptionLoaded to avoid a flash for paid users on first paint.
   const showUpgrade = !!user && subscriptionLoaded && tier === 'free';
+  // Billing affordance is the mirror of Upgrade — only paid users need an
+  // in-app shortcut to /account/billing. Same `loaded` gate to avoid flash.
+  const showBilling = !!user && subscriptionLoaded && tier !== 'free';
 
   const navItems: NavItem[] = useMemo(
     () => [
@@ -324,6 +328,19 @@ const SideNav: React.FC<SideNavProps> = ({
             <UpgradeIcon />,
             () => handleNavigate('/pricing'),
             { active: location.pathname === '/pricing', preloadPath: '/pricing' }
+          )}
+        {/* Billing — paid-tier-only shortcut to /account/billing. Same
+            utility-tier slot as Upgrade so the affordance position stays
+            stable as users transition between free and paid. */}
+        {showBilling &&
+          renderItem(
+            'Billing',
+            <BillingIcon />,
+            () => handleNavigate('/account/billing'),
+            {
+              active: location.pathname.startsWith('/account/billing'),
+              preloadPath: '/account/billing',
+            }
           )}
         {UTILITY_ITEMS.map((item) =>
           renderItem(
