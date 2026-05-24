@@ -17,12 +17,14 @@ import {
   EventNote as EventsIcon,
   Add as AddIcon,
   InfoOutlined as AboutIcon,
+  WorkspacePremium as UpgradeIcon,
 } from '@mui/icons-material';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { SELECTED_CALENDAR_STORAGE_KEY } from 'features/calendar/contexts/SelectedCalendarContext';
 import { preloadRoute } from 'utils/routePreload';
 import { useAuth } from 'contexts/SupabaseAuthContext';
 import { useCalendars } from 'features/calendar/hooks/useCalendars';
+import { useSubscription } from 'features/billing/hooks/useSubscription';
 import type { Calendar } from 'features/calendar/types/dualWrite';
 
 export const SIDE_NAV_WIDTH = 92;
@@ -95,6 +97,10 @@ const SideNav: React.FC<SideNavProps> = ({
   const isLgUp = useMediaQuery(theme.breakpoints.up('lg'));
   const { user } = useAuth();
   const { calendars } = useCalendars(user?.uid);
+  const { tier, loaded: subscriptionLoaded } = useSubscription();
+  // Upgrade affordance only shown to authenticated free-tier users; gated on
+  // subscriptionLoaded to avoid a flash for paid users on first paint.
+  const showUpgrade = !!user && subscriptionLoaded && tier === 'free';
 
   const navItems: NavItem[] = useMemo(
     () => [
@@ -308,6 +314,17 @@ const SideNav: React.FC<SideNavProps> = ({
         }}
       />
       <Stack spacing={0.25} sx={{ py: 1, px: 1, pb: 1.5 }}>
+        {/* Upgrade — free-tier-only nav item. Sits in the utility tier so it
+            reads as a peer of About without competing with the primary
+            pillars; the same icon-over-label treatment keeps it visually
+            consistent with the rest of the rail. */}
+        {showUpgrade &&
+          renderItem(
+            'Upgrade',
+            <UpgradeIcon />,
+            () => handleNavigate('/pricing'),
+            { active: location.pathname === '/pricing', preloadPath: '/pricing' }
+          )}
         {UTILITY_ITEMS.map((item) =>
           renderItem(
             item.label,
