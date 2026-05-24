@@ -93,7 +93,14 @@ export function useOrionUsage(): UseOrionUsageReturn {
       return;
     }
     let cancelled = false;
-    (async () => {
+    // Race protection: on refresh-triggered fetches (refreshTick > 0), wait
+    // ~1500ms so the server's `EdgeRuntime.waitUntil(incrementOrionTokens(...))`
+    // has time to commit before we re-query. Without this delay the ring
+    // re-reads stale `tokens_consumed` ~500ms after the stream ends and
+    // appears to "ignore" the just-finished message. First-mount fetch is
+    // immediate so the initial render is not throttled.
+    const delayMs = refreshTick === 0 ? 0 : 1500;
+    const timer = setTimeout(() => { (async () => {
       // 1. Read subscription tier + period end to determine paid status and
       //    the fallback budget when no usage row exists yet.
       const { data: sub } = await supabase
@@ -163,9 +170,10 @@ export function useOrionUsage(): UseOrionUsageReturn {
         periodEnd: fallbackPeriodEnd,
       });
       setLoaded(true);
-    })();
+    })(); }, delayMs);
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
   }, [user, refreshTick]);
 
