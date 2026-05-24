@@ -201,6 +201,7 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
     isAtContextLimit,
     tokenUsage,
     tokenBudget,
+    blockedState,
     sendMessage,
     cancelRequest,
     setInputForEdit,
@@ -594,6 +595,7 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
               isAtContextLimit={isAtContextLimit}
               tokenUsage={tokenUsage}
               tokenBudget={tokenBudget}
+              blockedState={blockedState}
               sendMessage={sendMessage}
               cancelRequest={cancelRequest}
               setInputForEdit={setInputForEdit}

@@ -52,6 +52,7 @@ import Shimmer from 'components/Shimmer';
 import OrionMark from 'features/orion/components/aiChat/OrionMark';
 import { useOrionExpression } from 'features/orion/hooks/useOrionExpression';
 import AIChatInterface, { QuestionTemplate } from 'features/orion/components/aiChat/AIChatInterface';
+import type { OrionBlockedState } from 'features/orion/hooks/useAIChat';
 
 // Same width tier as NoteViewerPanel — keeps the slide-in slot
 // consistent when both panels share the right rail (mutex: one open at
@@ -67,6 +68,7 @@ interface AIChatBundle {
   isAtContextLimit: boolean;
   tokenUsage: number;
   tokenBudget: number;
+  blockedState: OrionBlockedState | null;
   sendMessage: (text: string, images?: AttachedImage[], segments?: ChatMessageType['segments']) => Promise<void>;
   cancelRequest: () => void;
   setInputForEdit: (messageId: string) => { content: string; images?: AttachedImage[]; segments?: ChatMessageType['segments'] } | null;

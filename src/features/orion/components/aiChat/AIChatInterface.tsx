@@ -48,6 +48,8 @@ import { logger } from 'utils/logger';
 import { compressImageToDataUrl } from 'utils/fileValidation';
 import * as notesService from 'features/notes/services/notesService';
 import { expandMentionsForSend, stripReferencedBlocks } from 'features/orion/utils/chatMentions';
+import { OrionUpgradeCard } from 'features/billing/components/OrionUpgradeCard';
+import type { OrionBlockedState } from 'features/orion/hooks/useAIChat';
 
 // Image limit for AI agent requests (must match backend MAX_IMAGES_PER_REQUEST)
 const MAX_IMAGES = 4;
@@ -114,6 +116,13 @@ export interface AIChatInterfaceProps {
   tokenUsage: number;
   /** Effective token budget for the current conversation. */
   tokenBudget: number;
+  /**
+   * Non-null when the most recent send was rejected by the ai-trading-agent
+   * edge function because the user is on a non-paid tier or has exhausted
+   * their Orion token budget. Renders <OrionUpgradeCard /> in place of the
+   * empty assistant reply.
+   */
+  blockedState: OrionBlockedState | null;
 
   // Actions from useAIChat hook
   sendMessage: (messageText: string, images?: AttachedImage[], segments?: ChatMessageType['segments']) => Promise<void>;
@@ -173,6 +182,7 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
   isAtContextLimit,
   tokenUsage,
   tokenBudget,
+  blockedState,
   sendMessage,
   cancelRequest,
   setInputForEdit,
@@ -854,6 +864,20 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
             </Box>
           );
         })}
+
+        {/* Tier/budget block card: rendered when the ai-trading-agent edge
+            function rejected the most recent send because the user is on a
+            non-paid tier or has exhausted their Orion token budget. Sits in
+            the scroll container so it scrolls with the messages and visually
+            replaces the empty assistant reply. */}
+        {blockedState && (
+          <OrionUpgradeCard
+            reason={blockedState.reason}
+            resetAt={blockedState.resetAt}
+            tokensConsumed={blockedState.tokensConsumed}
+            tokensBudget={blockedState.tokensBudget}
+          />
+        )}
 
         {/* Cross-session reminder cards: rendered after the message list at
             the chronologically-most-recent end. Each card represents a
