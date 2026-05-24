@@ -5,7 +5,8 @@
  */
 
 import React, { useRef, useEffect, useCallback, useMemo, useState, forwardRef, useImperativeHandle } from 'react';
-import OrionIcon from 'features/orion/components/aiChat/OrionIcon';
+import OrionMark from 'features/orion/components/aiChat/OrionMark';
+import { useOrionExpression } from 'features/orion/hooks/useOrionExpression';
 import {
   Box,
   IconButton,
@@ -211,6 +212,9 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
     destructiveButtonSx,
     iconAvatarSx,
   } = tokens;
+  const orionExpression = useOrionExpression(isLoading, messages.length, {
+    toolStatus: toolExecutionStatus,
+  });
   const notificationsCtx = useNotificationsOptional();
   const crossSessionCards = useMemo(
     () =>
@@ -881,7 +885,13 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
               mb: 1,
             }}>
               <Box sx={{ ...iconAvatarSx, width: 44, height: 44, borderRadius: 1.5 }}>
-                <OrionIcon size={24} />
+                <OrionMark
+                  size={24}
+                  state={orionExpression.state}
+                  runId={orionExpression.runId}
+                  color={violet}
+                  catchColor={violetSoft}
+                />
               </Box>
               <Typography
                 component="span"

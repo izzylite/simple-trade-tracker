@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Orion — animated icon states</title>
+<style>
+  :root{
+    --bg:#fafafa; --surface:#ffffff; --fg:#111111; --muted:#6b6b6b;
+    --border:#e5e5e5; --accent:#2f6feb;
+    --font-display:"Inter",-apple-system,system-ui,sans-serif;
+    --font-mono:ui-monospace,"JetBrains Mono",monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{background:var(--bg);color:var(--fg);font-family:var(--font-display);min-height:100vh;padding:48px 24px;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1240px;margin:0 auto}
+  .intro{display:flex;align-items:end;justify-content:space-between;gap:24px;flex-wrap:wrap;margin-bottom:32px}
+  .intro h1{font-size:24px;font-weight:600;letter-spacing:-0.01em;margin:0 0 4px;line-height:1.2}
+  .intro p{margin:0;color:var(--muted);font-size:13px;max-width:60ch;line-height:1.55}
+  .intro .meta{font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+  .states{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+  @media (max-width:880px){.states{grid-template-columns:1fr}}
+  .state-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:28px;display:flex;flex-direction:column;gap:20px}
+  .state-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .state-name{font-size:16px;font-weight:600;letter-spacing:-0.01em;margin:0}
+  .state-trigger{font-family:var(--font-mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+  .state-desc{font-size:13px;color:var(--muted);line-height:1.55;margin:-8px 0 0;max-width:48ch}
+  .row{display:flex;align-items:center;gap:32px;flex-wrap:wrap}
+  .cell{display:flex;flex-direction:column;align-items:center;gap:10px}
+  .cell .label{font-family:var(--font-mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+  .cell svg{display:block;overflow:visible}
+  .ring{fill:none;stroke:var(--accent);stroke-width:4}
+  .pupil{fill:var(--accent)}
+  .catch{fill:#ffffff}
+
+  /* ─────────── State 1 · Quick snap (intro / done) ─────────── */
+  .s1 .ring-top,.s1 .ring-bot,.s1 .eye-blink,.s1 .eye-grp{transform-box:fill-box;transform-origin:center}
+  .s1 .ring-top{animation:s1-top 5.4s cubic-bezier(.3,0,.7,1) infinite}
+  .s1 .ring-bot{animation:s1-bot 5.4s cubic-bezier(.3,0,.7,1) infinite}
+  .s1 .eye-blink{animation:s1-blink 5.4s ease-in-out infinite}
+  .s1 .eye-grp{animation:s1-pupil 5.4s cubic-bezier(.3,0,.7,1) infinite}
+  @keyframes s1-blink{0%,16%,26%,100%{transform:scaleY(1)}19%,23%{transform:scaleY(.05)}}
+  @keyframes s1-top{0%,30%{opacity:1;transform:scale(1)}36%,68%{opacity:0;transform:scale(.9)}76%,100%{opacity:1;transform:scale(1)}}
+  @keyframes s1-bot{0%,30%{transform:translateY(0)}36%,68%{transform:translateY(-5px)}76%,100%{transform:translateY(0)}}
+  @keyframes s1-pupil{0%,30%{transform:scale(1);opacity:1}36%,68%{transform:scale(0);opacity:0}76%,100%{transform:scale(1);opacity:1}}
+
+  /* ─────────── State 2 · Looking around (thinking) ─────────── */
+  .s2 .eye-blink,.s2 .eye-grp{transform-box:fill-box;transform-origin:center}
+  .s2 .eye-blink{animation:s2-blink 5.4s ease-in-out infinite}
+  .s2 .eye-grp{animation:s2-look 5.4s cubic-bezier(.4,0,.2,1) infinite}
+  @keyframes s2-look{
+    0%,6%   {transform:translate(0,0)}
+    10%,22% {transform:translate(7px,0)}
+    26%,30% {transform:translate(0,0)}
+    34%,46% {transform:translate(-7px,0)}
+    50%,54% {transform:translate(0,0)}
+    58%,68% {transform:translate(0,-6px)}
+    72%,76% {transform:translate(0,0)}
+    80%,90% {transform:translate(0,6px)}
+    94%,100%{transform:translate(0,0)}
+  }
+  @keyframes s2-blink{
+    0%,26%,30%,50%,54%,72%,76%,94%,100%{transform:scaleY(1)}
+    28%,52%,74%,96%{transform:scaleY(.05)}
+  }
+
+  /* ─────────── State 3 · Focus (lock-on / msg received) ─────────── */
+  .s3 .eye-grp{transform-box:fill-box;transform-origin:center;animation:s3-focus 2.4s cubic-bezier(.5,0,.3,1) infinite}
+  @keyframes s3-focus{
+    0%,20%   {transform:scale(1)}
+    35%,42%  {transform:scale(1.5)}
+    55%,62%  {transform:scale(0.55)}
+    78%,100% {transform:scale(1)}
+  }
+
+  /* ─────────── State 4 · Wink (success / acknowledge) ─────────── */
+  .s4 .ring-top,.s4 .ring-bot,.s4 .eye-blink,.s4 .eye-grp{transform-box:fill-box;transform-origin:center}
+  .s4 .eye-blink{animation:s4-blink 3.6s ease-in-out infinite}
+  .s4 .ring-top{animation:s4-top 3.6s cubic-bezier(.3,0,.7,1) infinite}
+  .s4 .ring-bot{animation:s4-bot 3.6s cubic-bezier(.3,0,.7,1) infinite}
+  .s4 .eye-grp{animation:s4-pupil 3.6s cubic-bezier(.3,0,.7,1) infinite}
+  @keyframes s4-blink{0%,10%,22%,100%{transform:scaleY(1)}14%,18%{transform:scaleY(.05)}}
+  @keyframes s4-top{0%,24%{opacity:1;transform:scale(1)}30%,48%{opacity:0;transform:scale(.9)}56%,100%{opacity:1;transform:scale(1)}}
+  @keyframes s4-bot{0%,24%{transform:translateY(0)}30%,48%{transform:translateY(-5px)}56%,100%{transform:translateY(0)}}
+  @keyframes s4-pupil{0%,24%{transform:scale(1);opacity:1}30%,48%{transform:scale(0);opacity:0}56%,100%{transform:scale(1);opacity:1}}
+
+  /* ─────────── State 5 · Pulse (background work) ─────────── */
+  .s5 .ripple{fill:none;stroke:var(--accent);stroke-width:2;transform-box:fill-box;transform-origin:center;opacity:0}
+  .s5 .ripple-a{animation:s5-ripple 2.6s ease-out infinite}
+  .s5 .ripple-b{animation:s5-ripple 2.6s ease-out infinite;animation-delay:1.3s}
+  @keyframes s5-ripple{
+    0%   {transform:scale(.7);opacity:.55}
+    80%  {transform:scale(1.55);opacity:0}
+    100% {transform:scale(1.55);opacity:0}
+  }
+
+  /* ─────────── State 6 · Sleep / dim (offline / idle) ─────────── */
+  .s6 .ring-top,.s6 .ring-bot{opacity:.4}
+  .s6 .eye-blink{transform-box:fill-box;transform-origin:center;transform:scaleY(.06)}
+  .s6 .eye-grp{transform-box:fill-box;transform-origin:center;animation:s6-breath 3.4s ease-in-out infinite}
+  @keyframes s6-breath{0%,100%{opacity:.6}50%{opacity:.95}}
+
+  /* ─────────── State 7 · Alert (needs attention) ─────────── */
+  .s7 .ring-top,.s7 .ring-bot,.s7 .eye-blink{transform-box:fill-box;transform-origin:center}
+  .s7 .ring-top,.s7 .ring-bot{animation:s7-ring 3s ease-in-out infinite}
+  .s7 .eye-blink{animation:s7-blink 3s ease-in-out infinite}
+  @keyframes s7-ring{
+    0%,8%   {stroke-width:4;opacity:1}
+    12%,18% {stroke-width:6;opacity:1}
+    22%,28% {stroke-width:4;opacity:1}
+    32%,38% {stroke-width:6;opacity:1}
+    42%,100%{stroke-width:4;opacity:1}
+  }
+  @keyframes s7-blink{
+    0%,6%,16%,26%,36%,100% {transform:scaleY(1)}
+    10%,20%,30%            {transform:scaleY(.05)}
+  }
+
+  /* ─────────── State 8 · Searching (figure-8) ─────────── */
+  .s8 .eye-grp{transform-box:fill-box;transform-origin:center;animation:s8-fig8 3.6s ease-in-out infinite}
+  @keyframes s8-fig8{
+    0%   {transform:translate(0,0)}
+    12%  {transform:translate(6px,-4px)}
+    25%  {transform:translate(0,0)}
+    37%  {transform:translate(-6px,4px)}
+    50%  {transform:translate(0,0)}
+    62%  {transform:translate(-6px,-4px)}
+    75%  {transform:translate(0,0)}
+    87%  {transform:translate(6px,4px)}
+    100% {transform:translate(0,0)}
+  }
+
+  @media (prefers-reduced-motion:reduce){
+    .s1 *,.s2 *,.s3 *,.s4 *,.s5 *,.s6 *,.s7 *,.s8 *{animation:none!important}
+    .s6 .ring-top,.s6 .ring-bot{opacity:.4}
+    .s6 .eye-blink{transform:scaleY(.06)}
+  }
+  .caption{font-family:var(--font-mono);font-size:11px;color:var(--muted);letter-spacing:.06em;text-align:center;margin-top:40px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="intro">
+    <div>
+      <h1>Orion — animation states</h1>
+      <p>Eight states sharing one mark. The iris and ring stay constant; what changes is what they do.</p>
+    </div>
+    <div class="meta">cobalt #2F6FEB · 64×64</div>
+  </header>
+
+  <div class="states">
+
+    <!-- State 1 — Quick snap -->
+    <section class="state-card">
+      <header class="state-head"><h2 class="state-name">01 · Quick snap</h2><span class="state-trigger">on intro · done</span></header>
+      <p class="state-desc">Blink, then iris reshapes into a smile and snaps back. One-shot on app load and on task complete.</p>
+      <div class="row">
+        <div class="cell"><svg class="s1" width="24" height="24" viewBox="0 0 64 64"><path class="ring ring-top" d="M8 32 A24 24 0 0 1 56 32"/><path class="ring ring-bot" d="M8 32 A24 24 0 0 0 56 32" stroke-linecap="round"/><g class="eye-blink"><g class="eye-grp"><circle class="pupil" cx="32" cy="32" r="8"/><circle class="catch" cx="28.5" cy="28.5" r="2"/></g></g></svg><span class="label">24 px</span></div>
+        <div class="cell"><svg class="s1" width="40" height="40" viewBox="0 0 64 64"><path class="ring ring-top" d="M8 32 A24 24 0 0 1 56 32"/><path class="ring ring-bot" d="M8 32 A24 24 0 0 0 56 32" stroke-linecap="round"/><g class="eye-blink"><g class="eye-grp"><circle class="pupil" cx="32" cy="32" r="8"/><circle class="catch" cx="28.5" cy="28.5" r="2"/></g></g></svg><span class="label">40 px</span></div>
+        <div class="cell"><svg class="s1" width="96" height="96" viewBox="0 0 64 64"><path class="ring ring-top" d="M8 32 A24 24 0 0 1 56 32"/><path class="ring ring-bot" d="M8 32 A24 24 0 0 0 56 32" stroke-linecap="round"/><g class="eye-blink"><g class="eye-grp"><circle class="pupil" cx="32" cy="32" r="8"/><circle class="catch" cx="28.5" cy="28.5" r="2"/></g></g></svg><span class="label">96 px</span></div>
+      </div>
+    </section>
+
+    <!-- State 2 — Looking -->
+    <section class="state-card">
+      <header class="state-head"><h2 class="state-name">02 · Looking</h2><span class="state-trigger">thinking · running</span></header>
+      <p class="state-desc">Iris stays whole. Pupil scans right → left → up → down with a small blink between each saccade.</p>
+      <div class="row">
+        <div class="cell"><svg class="s2" width="24" height="24" viewBox="0 0 64 64"><path class="ring" d="M8 32 A24 24 0 0 1 56 32"/><path class="ring" d="M8 32 A24 24 0 0 0 56 32" stroke-linecap="round"/><g class="eye-blink"><g class="eye-grp"><circle class="pupil" cx="32" cy="32" r="8"/><circle class="catch" cx="28.5" cy="28.5" r="2"/></g></g></svg><span class="label">24 px</span></div>
+        <div class="cell"><svg class="s2" width="40" height="40" viewBox="0 0 64 64"><path class="ring" d="M8 32 A24 24 0 0 1 56 32"/><path class="ring" d="M8 32 A24 24 0 0 0 56 32" stroke-linecap="round"/><g class="eye-blink"><g class="eye-grp"><circle class="pupil" cx="32" cy="32" r="8"/><circle class="catch" cx="28.5" cy="28.5" r="2"/></g></g></svg><span class="label">40 px</span></div>
+        <div class="cell"><svg class="s2" width="96" height="96" viewBox="0 0 64 64"><path class="ring" d="M8 32 A24 24 0 0 1 56 32"/><path class="ring" d="M8 32 A24 24 0 0 0 56 32" stroke-linecap="round"/><g class="eye-blink"><g class="eye-grp"><circle class="pupil" cx="32" cy="32" r="8"/><circle class="catch" cx="28.5" cy="28.5" r="2"/></g></g></svg><span class="label">96 px</span></div>
+      </div>
+    </section>
+
+    <!-- State 3 — Focus -->
+    <section class="state-card">
+      <header class="state-head"><h2 class="state-name">03 · Focus</h2><span class="state-trigger">message received · lock-on</span></header>
+      <p class="state-desc">Pupil dilates quickly then constricts smaller than rest, then settles. Reads as "I heard you" — fires the moment a user sends.</p>
+      <div class="row">
+        <div class="cell"><svg class="s3" width="24" height="24" viewBox="0 0 64 64"><path class="ring" d="M8 32 A24 24 0 0 1 56 32"/><path class="ring" d="M8 32 A24 24 0 0 0 56 32" stroke-linecap="round"/><g class="eye-grp"><circle class="pupil" cx="32" cy="32" r="8"/><circle class="catch" cx="28.5" cy="28.5" r="2"/></g></svg><span class="label">24 px</span></div>
+        <div class="cell"><svg class="s3" width="40" height="40" viewBox="0 0 64 64"><path class="ring" d="M8 32 A24 24 0 0 1 56 32"/><path class="ring" d="M8 32 A24 24 0 0 0 56 32" stroke-linecap="round"/><g class="eye-grp"><circle class="pupil" cx="32" cy="32" r="8"/><circle class="catch" cx="28.5" cy="28.5" r="2"/></g></svg><span class="label">40 px</span></div>
+        <div class="cell"><svg class="s3" width="96" height="96" viewBox="0 0 64 64"><path class="ring" d="M8 32 A24 24 0 0 1 56 32"/><path class="ring" d="M8 32 A24 24 0 0 0 56 32" stroke-linecap="round"/><g class="eye-grp"><circle class="pupil" cx="32" cy="32" r="8"/><circle class="catch" cx="28.5" cy="28.5" r="2"/></g></svg><span class="label">96 px</span></div>
+      </div>
+    </section>
+
+    <!-- State 4 — Wink -->
+    <section class="state-card">
+      <header class="state-head"><h2 class="state-name">04 · Wink</h2><span class="state-trigger">confirm · small success</span></header>
+      <p class="state-desc">Single fast blink, then a quick smile flash. Lighter than Quick snap — for small acknowledgments (copied, saved, sent).</p>
+      <div class="row">
+        <div class="cell"><svg class="s4" width="24" height="24" viewBox="0 0 64 64"><path class="ring ring-top" d="M8 32 A24 24 0 0 1 56 32"/><path class="ring ring-bot" d="M8 32 A24 24 0 0 0 56 32" stroke-linecap="round"/><g class="eye-blink"><g class="eye-grp"><circle class="pupil" cx="32" cy="32" r="8"/><circle class="catch" cx="28.5" cy="28.5" r="2"/></g></g></svg><span class="label">24 px</span></div>
+        <div class="cell"><svg class="s4" width="40" height="40" viewBox="0 0 64 64"><path class="ring ring-top" d="M8 32 A24 24 0 0 1 56 32"/><path class="ring ring-bot" d="M8 32 A24 24 0 0 0 56 32" stroke-linecap="round"/><g class="eye-blink"><g class="eye-grp"><circle class="pupil" cx="32" cy="32" r="8"/><circle class="catch" cx="28.5" cy="28.5" r="2"/></g></g></svg><span class="label">40 px</span></div>
+        <div class="cell"><svg class="s4" width="96" height="96" viewBox="0 0 64 64"><path class="ring ring-top" d="M8 32 A24 24 0 0 1 56 32"/><path class="ring ring-bot" d="M8 32 A24 24 0 0 0 56 32" stroke-linecap="round"/><g class="eye-blink"><g class="eye-grp"><circle class="pupil" cx="32" cy="32" r="8"/><circle class="catch" cx="28.5" cy="28.5" r="2"/></g></g></svg><span class="label">96 px</span></div>
+      </div>
+    </section>
+
+    <!-- State 5 — Pulse -->
+    <section class="state-card">
+      <header class="state-head"><h2 class="state-name">05 · Pulse</h2><span class="state-trigger">background work · silent</span></header>
+      <p class="state-desc">Two concentric ripples emit outward from the iris and fade. Background task running silently — visually quieter than Looking.</p>
+      <div class="row">
+        <div class="cell"><svg class="s5" width="24" height="24" viewBox="0 0 64 64"><circle class="ripple ripple-a" cx="32" cy="32" r="22"/><circle class="ripple ripple-b" cx="32" cy="32" r="22"/><path class="ring" d="M8 32 A24 24 0 0 1 56 32"/><path class="ring" d="M8 32 A24 24 0 0 0 56 32" stroke-linecap="round"/><circle class="pupil" cx="32" cy="32" r="8"/><circle class="catch" cx="28.5" cy="28.5" r="2"/></svg><span class="label">24 px</span></div>
+        <div class="cell"><svg class="s5" width="40" height="40" viewBox="0 0 64 64"><circle class="ripple ripple-a" cx="32" cy="32" r="22"/><circle class="ripple ripple-b" cx="32" cy="32" r="22"/><path class="ring" d="M8 32 A24 24 0 0 1 56 32"/><path class="ring" d="M8 32 A24 24 0 0 0 56 32" stroke-linecap="round"/><circle class="pupil" cx="32" cy="32" r="8"/><circle class="catch" cx="28.5" cy="28.5" r="2"/></svg><span class="label">40 px</span></div>
+        <div class="cell"><svg class="s5" width="96" height="96" viewBox="0 0 64 64"><circle class="ripple ripple-a" cx="32" cy="32" r="22"/><circle class="ripple ripple-b" cx="32" cy="32" r="22"/><path class="ring" d="M8 32 A24 24 0 0 1 56 32"/><path class="ring" d="M8 32 A24 24 0 0 0 56 32" stroke-linecap="round"/><circle class="pupil" cx="32" cy="32" r="8"/><circle class="catch" cx="28.5" cy="28.5" r="2"/></svg><span class="label">96 px</span></div>
+      </div>
+    </section>
+
+    <!-- State 6 — Sleep -->
+    <section class="state-card">
+      <header class="state-head"><h2 class="state-name">06 · Sleep</h2><span class="state-trigger">offline · idle</span></header>
+      <p class="state-desc">Eye closed to a thin line, ring dims to 40%, pupil pulses on a slow breath. Disconnected / paused.</p>
+      <div class="row">
+        <div class="cell"><svg class="s6" width="24" height="24" viewBox="0 0 64 64"><path class="ring ring-top" d="M8 32 A24 24 0 0 1 56 32"/><path class="ring ring-bot" d="M8 32 A24 24 0 0 0 56 32" stroke-linecap="round"/><g class="eye-blink"><g class="eye-grp"><circle class="pupil" cx="32" cy="32" r="8"/></g></g></svg><span class="label">24 px</span></div>
+        <div class="cell"><svg class="s6" width="40" height="40" viewBox="0 0 64 64"><path class="ring ring-top" d="M8 32 A24 24 0 0 1 56 32"/><path class="ring ring-bot" d="M8 32 A24 24 0 0 0 56 32" stroke-linecap="round"/><g class="eye-blink"><g class="eye-grp"><circle class="pupil" cx="32" cy="32" r="8"/></g></g></svg><span class="label">40 px</span></div>
+        <div class="cell"><svg class="s6" width="96" height="96" viewBox="0 0 64 64"><path class="ring ring-top" d="M8 32 A24 24 0 0 1 56 32"/><path class="ring ring-bot" d="M8 32 A24 24 0 0 0 56 32" stroke-linecap="round"/><g class="eye-blink"><g class="eye-grp"><circle class="pupil" cx="32" cy="32" r="8"/></g></g></svg><span class="label">96 px</span></div>
+      </div>
+    </section>
+
+    <!-- State 7 — Alert -->
+    <section class="state-card">
+      <header class="state-head"><h2 class="state-name">07 · Alert</h2><span class="state-trigger">needs attention</span></header>
+      <p class="state-desc">Double blink with the ring thickening on each beat. Notification or task waiting on user input.</p>
+      <div class="row">
+        <div class="cell"><svg class="s7" width="24" height="24" viewBox="0 0 64 64"><path class="ring ring-top" d="M8 32 A24 24 0 0 1 56 32"/><path class="ring ring-bot" d="M8 32 A24 24 0 0 0 56 32" stroke-linecap="round"/><g class="eye-blink"><g class="eye-grp"><circle class="pupil" cx="32" cy="32" r="8"/><circle class="catch" cx="28.5" cy="28.5" r="2"/></g></g></svg><span class="label">24 px</span></div>
+        <div class="cell"><svg class="s7" width="40" height="40" viewBox="0 0 64 64"><path class="ring ring-top" d="M8 32 A24 24 0 0 1 56 32"/><path class="ring ring-bot" d="M8 32 A24 24 0 0 0 56 32" stroke-linecap="round"/><g class="eye-blink"><g class="eye-grp"><circle class="pupil" cx="32" cy="32" r="8"/><circle class="catch" cx="28.5" cy="28.5" r="2"/></g></g></svg><span class="label">40 px</span></div>
+        <div class="cell"><svg class="s7" width="96" height="96" viewBox="0 0 64 64"><path class="ring ring-top" d="M8 32 A24 24 0 0 1 56 32"/><path class="ring ring-bot" d="M8 32 A24 24 0 0 0 56 32" stroke-linecap="round"/><g class="eye-blink"><g class="eye-grp"><circle class="pupil" cx="32" cy="32" r="8"/><circle class="catch" cx="28.5" cy="28.5" r="2"/></g></g></svg><span class="label">96 px</span></div>
+      </div>
+    </section>
+
+    <!-- State 8 — Searching -->
+    <section class="state-card">
+      <header class="state-head"><h2 class="state-name">08 · Searching</h2><span class="state-trigger">disambiguating · checking</span></header>
+      <p class="state-desc">Pupil traces a small figure-8 in a continuous loop. "Let me check" — distinct from Looking's clean cardinal scans.</p>
+      <div class="row">
+        <div class="cell"><svg class="s8" width="24" height="24" viewBox="0 0 64 64"><path class="ring" d="M8 32 A24 24 0 0 1 56 32"/><path class="ring" d="M8 32 A24 24 0 0 0 56 32" stroke-linecap="round"/><g class="eye-grp"><circle class="pupil" cx="32" cy="32" r="8"/><circle class="catch" cx="28.5" cy="28.5" r="2"/></g></svg><span class="label">24 px</span></div>
+        <div class="cell"><svg class="s8" width="40" height="40" viewBox="0 0 64 64"><path class="ring" d="M8 32 A24 24 0 0 1 56 32"/><path class="ring" d="M8 32 A24 24 0 0 0 56 32" stroke-linecap="round"/><g class="eye-grp"><circle class="pupil" cx="32" cy="32" r="8"/><circle class="catch" cx="28.5" cy="28.5" r="2"/></g></svg><span class="label">40 px</span></div>
+        <div class="cell"><svg class="s8" width="96" height="96" viewBox="0 0 64 64"><path class="ring" d="M8 32 A24 24 0 0 1 56 32"/><path class="ring" d="M8 32 A24 24 0 0 0 56 32" stroke-linecap="round"/><g class="eye-grp"><circle class="pupil" cx="32" cy="32" r="8"/><circle class="catch" cx="28.5" cy="28.5" r="2"/></g></svg><span class="label">96 px</span></div>
+      </div>
+    </section>
+
+  </div>
+  <div class="caption">Orion — 8 states · one shared mark · cobalt #2F6FEB</div>
+</div>
+</body>
+</html>

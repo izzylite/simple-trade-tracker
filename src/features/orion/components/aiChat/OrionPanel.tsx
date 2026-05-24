@@ -49,7 +49,8 @@ import { Note } from 'features/notes/types/note';
 import { scrollbarStyles } from 'styles/scrollbarStyles';
 import { Z_INDEX } from 'styles/zIndex';
 import Shimmer from 'components/Shimmer';
-import OrionIcon from 'features/orion/components/aiChat/OrionIcon';
+import OrionMark from 'features/orion/components/aiChat/OrionMark';
+import { useOrionExpression } from 'features/orion/hooks/useOrionExpression';
 import AIChatInterface, { QuestionTemplate } from 'features/orion/components/aiChat/AIChatInterface';
 
 // Same width tier as NoteViewerPanel — keeps the slide-in slot
@@ -124,6 +125,11 @@ const OrionPanel: React.FC<OrionPanelProps> = ({
   onNoteClick,
 }) => {
   const theme = useTheme();
+  const orionExpression = useOrionExpression(
+    aiChat.isLoading,
+    aiChat.messages.length,
+    { toolStatus: aiChat.toolExecutionStatus },
+  );
 
   const handleNewChat = useCallback(async () => {
     await aiChat.startNewChat();
@@ -185,7 +191,11 @@ const OrionPanel: React.FC<OrionPanelProps> = ({
             alignItems="center"
             sx={{ flex: 1, minWidth: 0 }}
           >
-            <OrionIcon size={20} />
+            <OrionMark
+              size={20}
+              state={orionExpression.state}
+              runId={orionExpression.runId}
+            />
             <Typography variant="h6" noWrap>
               {showHistory ? 'History' : 'Ask Orion'}
             </Typography>

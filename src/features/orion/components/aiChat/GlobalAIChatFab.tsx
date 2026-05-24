@@ -1,10 +1,10 @@
 import React from 'react';
 import { Badge, Box, Fab, Tooltip, alpha, useTheme } from '@mui/material';
-import { SmartToy as AIIcon } from '@mui/icons-material';
 import { useLocation } from 'react-router-dom';
 import { useAuthState } from 'contexts/AuthStateContext';
 import { useAIChat } from 'features/orion/contexts/AIChatContext';
 import { useAnyPanelOpen } from 'contexts/PanelMutexContext';
+import OrionMark from 'features/orion/components/aiChat/OrionMark';
 
 /**
  * Floating "Open Orion" button mounted once at App level. Shows on every
@@ -86,7 +86,18 @@ const GlobalAIChatFab: React.FC = () => {
               },
             }}
           >
-            <AIIcon />
+            {/* OrionMark inherits color from the Fab's contrast text token.
+                The catch dot is set to the Fab background so the iris reads
+                as a punched-through eye against the violet field. Switches
+                to the `alert` state — double-blink + ring thickening — when
+                an Orion task is unread, complementing the outer box-shadow
+                pulse already on the Fab. */}
+            <OrionMark
+              size={32}
+              state={hasUnread ? 'alert' : 'idle'}
+              color="currentColor"
+              catchColor={theme.palette.secondary.main}
+            />
           </Badge>
         </Fab>
       </Tooltip>

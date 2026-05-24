@@ -6,7 +6,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import OrionIcon from 'features/orion/components/aiChat/OrionIcon';
+import OrionMark from 'features/orion/components/aiChat/OrionMark';
+import { useOrionExpression } from 'features/orion/hooks/useOrionExpression';
 import {
   Box,
   IconButton,
@@ -123,6 +124,36 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
     autoSaveConversation: true,
   });
   const effectiveChatState = sharedChatState ?? internalChatState;
+  // Fire a wink one-shot every time the user lands on the Tasks tab WITH
+  // at least one existing task. Keyed by an incrementing counter that the
+  // expression hook watches for changes — re-selecting Tasks (away →
+  // Tasks → away → Tasks) re-fires; toggling tasks count while already on
+  // the tab does not (the user is already looking at the list).
+  const [tasksWinkKey, setTasksWinkKey] = useState(0);
+  const prevActiveTabRef = React.useRef(activeTab);
+  useEffect(() => {
+    const prevTab = prevActiveTabRef.current;
+    prevActiveTabRef.current = activeTab;
+    if (
+      prevTab !== 1 &&
+      activeTab === 1 &&
+      (aiTasks?.tasks?.length ?? 0) > 0
+    ) {
+      setTasksWinkKey((k) => k + 1);
+    }
+  }, [activeTab, aiTasks?.tasks?.length]);
+
+  const orionExpression = useOrionExpression(
+    effectiveChatState.isLoading,
+    effectiveChatState.messages.length,
+    {
+      toolStatus: effectiveChatState.toolExecutionStatus,
+      // Tab switches count as activity — proves the user is present and
+      // resets the idle→sleep timer.
+      activitySignal: activeTab,
+      pulse: { state: 'wink', key: tasksWinkKey },
+    },
+  );
   const conversationRepoRef = React.useRef(new ConversationRepository());
   const [scrollToMessageId, setScrollToMessageId] = useState<string | null>(null);
   // When a notification deep-link lands, capture where the user was before
@@ -333,7 +364,9 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
               flexShrink: 0,
             }}
           >
-            {/* Violet icon avatar wrapping OrionIcon */}
+            {/* Violet icon avatar — OrionMark inherits color from the
+                container's `color` token, so the ring/iris read as violet
+                against the soft-violet tile. */}
             <Box
               sx={{
                 width: 36,
@@ -349,7 +382,13 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
                 overflow: 'hidden',
               }}
             >
-              <OrionIcon size={26} />
+              <OrionMark
+                size={26}
+                state={orionExpression.state}
+                runId={orionExpression.runId}
+                color={violet}
+                catchColor={violetSoft}
+              />
             </Box>
 
             <Box sx={{ flex: 1, minWidth: 0 }}>

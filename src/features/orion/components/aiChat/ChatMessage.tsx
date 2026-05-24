@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import OrionIcon from 'features/orion/components/aiChat/OrionIcon';
+import OrionMark from 'features/orion/components/aiChat/OrionMark';
 import {
   Box,
   Paper,
@@ -298,9 +298,11 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
           }
         }}
       >
-        {/* Orion avatar */}
+        {/* Orion avatar — stays resting; a column of blinking eyes down
+            the scrollback would be hostile. The animated states live on
+            the drawer/panel header instead. */}
         <Tooltip title="Orion" placement="left">
-          <OrionIcon size={26} sx={{ mt: 0.25 }} />
+          <OrionMark size={26} state="resting" sx={{ mt: 0.25 }} />
         </Tooltip>
 
         {/* Content — no bubble, flows on background */}
