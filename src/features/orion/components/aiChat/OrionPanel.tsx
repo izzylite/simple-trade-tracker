@@ -53,6 +53,7 @@ import OrionMark from 'features/orion/components/aiChat/OrionMark';
 import { useOrionExpression } from 'features/orion/hooks/useOrionExpression';
 import AIChatInterface, { QuestionTemplate } from 'features/orion/components/aiChat/AIChatInterface';
 import type { OrionBlockedState } from 'features/orion/hooks/useAIChat';
+import { OrionUsageRing } from 'features/billing/components/OrionUsageRing';
 
 // Same width tier as NoteViewerPanel — keeps the slide-in slot
 // consistent when both panels share the right rail (mutex: one open at
@@ -247,6 +248,8 @@ const OrionPanel: React.FC<OrionPanelProps> = ({
               )}
             </IconButton>
           </Tooltip>
+
+          <OrionUsageRing refreshTrigger={aiChat.messages.length} />
 
           <IconButton size="small" onClick={onClose}>
             <CloseIcon />
