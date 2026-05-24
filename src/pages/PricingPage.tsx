@@ -14,14 +14,14 @@ const PricingPage: React.FC = () => {
   const { user } = useAuth();
   const paddle = usePaddle();
 
-  const handleCta = (tierId: Tier) => {
+  const handleCta = (tierId: Tier, ctaCycle: BillingCycle = cycle) => {
     if (tierId === 'free') {
       navigate('/');
       return;
     }
     if (!user) {
       // Sign-up first; pricing CTA stores intent and redirects.
-      sessionStorage.setItem('pendingCheckout', JSON.stringify({ tier: tierId, cycle }));
+      sessionStorage.setItem('pendingCheckout', JSON.stringify({ tier: tierId, cycle: ctaCycle }));
       navigate('/?intent=signup');
       return;
     }
@@ -29,9 +29,9 @@ const PricingPage: React.FC = () => {
       console.error('Paddle not initialized');
       return;
     }
-    const priceId = resolvePaddlePriceId(tierId, cycle);
+    const priceId = resolvePaddlePriceId(tierId, ctaCycle);
     if (!priceId) {
-      console.error('Missing Paddle price id for', tierId, cycle);
+      console.error('Missing Paddle price id for', tierId, ctaCycle);
       return;
     }
     paddle.Checkout.open({
@@ -56,8 +56,7 @@ const PricingPage: React.FC = () => {
       const pending = JSON.parse(pendingRaw) as { tier: Tier; cycle: BillingCycle };
       sessionStorage.removeItem('pendingCheckout');
       setCycle(pending.cycle);
-      // Defer to next tick so cycle state lands before checkout opens.
-      setTimeout(() => handleCta(pending.tier), 0);
+      handleCta(pending.tier, pending.cycle);
     } catch {
       sessionStorage.removeItem('pendingCheckout');
     }
