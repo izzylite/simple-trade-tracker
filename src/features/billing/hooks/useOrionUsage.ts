@@ -7,7 +7,9 @@
  * ring before their first Orion message of the period (the usage row is only
  * created lazily on first increment).
  *
- * Tier → budget mirrors `increment_orion_tokens` SQL RPC (Plan A Task 1):
+ * Tier → budget is read from the `public.tier_budgets` table — same row set
+ * the `increment_orion_tokens` SQL RPC consumes (single source of truth).
+ * Current values:
  *  - free  → 0      (hide ring)
  *  - lite  → 500K
  *  - pro   → 2.5M
@@ -47,15 +49,34 @@ export interface UseOrionUsageReturn {
   refresh: () => void;
 }
 
-// Mirrors increment_orion_tokens SQL RPC (Plan A Task 1).
-const TIER_BUDGETS: Record<string, number> = {
-  free: 0,
-  lite: 500_000,
-  pro: 2_500_000,
-  elite: 12_500_000,
-};
-
 const PAID_TIERS = new Set(['lite', 'pro', 'elite']);
+
+// Tier → budget is sourced from the `public.tier_budgets` table (same row set
+// the `increment_orion_tokens` RPC reads). Cached at module scope so the
+// 4-row lookup is fetched at most once per app lifetime.
+let tierBudgetsCache: Record<string, number> | null = null;
+let tierBudgetsInFlight: Promise<Record<string, number>> | null = null;
+
+async function getTierBudgets(): Promise<Record<string, number>> {
+  if (tierBudgetsCache) return tierBudgetsCache;
+  if (tierBudgetsInFlight) return tierBudgetsInFlight;
+  tierBudgetsInFlight = (async () => {
+    const { data, error } = await supabase
+      .from('tier_budgets')
+      .select('tier, tokens_budget');
+    if (error || !data) {
+      tierBudgetsInFlight = null;
+      return {};
+    }
+    const map = Object.fromEntries(
+      data.map((r) => [r.tier as string, Number(r.tokens_budget)])
+    );
+    tierBudgetsCache = map;
+    tierBudgetsInFlight = null;
+    return map;
+  })();
+  return tierBudgetsInFlight;
+}
 
 export function useOrionUsage(): UseOrionUsageReturn {
   const { user } = useAuth();
@@ -123,7 +144,9 @@ export function useOrionUsage(): UseOrionUsageReturn {
 
       // 3. No row yet: derive budget from tier, consumed=0, periodEnd from
       //    subscription.current_period_end (fallback +30d hedge if missing).
-      const tierBudget = TIER_BUDGETS[tier] ?? 0;
+      const budgets = await getTierBudgets();
+      if (cancelled) return;
+      const tierBudget = budgets[tier] ?? 0;
       if (tierBudget <= 0) {
         setUsage(null);
         setLoaded(true);
