@@ -22,6 +22,7 @@ const AccountBillingPage: React.FC = () => {
   const [sub, setSub] = useState<SubRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [opening, setOpening] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const justPurchased = searchParams.get('status') === 'success';
 
   useEffect(() => {
@@ -45,11 +46,12 @@ const AccountBillingPage: React.FC = () => {
   }, [user, navigate]);
 
   const handleManage = async () => {
+    setError(null);
     setOpening(true);
     try {
       const { data, error } = await supabase.functions.invoke('paddle-portal-session');
       if (error || !data?.url) {
-        alert('Could not open billing portal. Please try again.');
+        setError('Could not open billing portal. Please try again.');
         return;
       }
       window.open(data.url, '_blank', 'noopener');
@@ -69,6 +71,12 @@ const AccountBillingPage: React.FC = () => {
   return (
     <Container maxWidth="md" sx={{ py: 6 }}>
       <Typography variant="h4" sx={{ fontWeight: 600, mb: 3 }}>Billing</Typography>
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
 
       {justPurchased && (
         <Alert severity="success" sx={{ mb: 3 }}>
