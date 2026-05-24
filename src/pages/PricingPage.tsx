@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Container, Typography, ToggleButton, ToggleButtonGroup, Grid, Button } from '@mui/material';
+import { Box, Container, Typography, ToggleButton, ToggleButtonGroup, Grid, Button, Snackbar, Alert } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { TIERS, type BillingCycle, type Tier, resolvePaddlePriceId } from 'features/billing/pricing/tierData';
 import { TierCard } from 'features/billing/pricing/TierCard';
@@ -10,6 +10,7 @@ import { usePaddle } from 'features/billing/paddle/usePaddle';
 
 const PricingPage: React.FC = () => {
   const [cycle, setCycle] = useState<BillingCycle>('monthly');
+  const [ctaError, setCtaError] = useState<string | null>(null);
   const navigate = useNavigate();
   const { user } = useAuth();
   const paddle = usePaddle();
@@ -27,11 +28,13 @@ const PricingPage: React.FC = () => {
     }
     if (!paddle) {
       console.error('Paddle not initialized');
+      setCtaError('Checkout is unavailable right now. Please try again in a moment.');
       return;
     }
     const priceId = resolvePaddlePriceId(tierId, ctaCycle);
     if (!priceId) {
       console.error('Missing Paddle price id for', tierId, ctaCycle);
+      setCtaError(`The ${tierId} plan is not configured yet. Please contact support.`);
       return;
     }
     paddle.Checkout.open({
@@ -112,6 +115,16 @@ const PricingPage: React.FC = () => {
           </Typography>
         </Box>
       </Container>
+      <Snackbar
+        open={!!ctaError}
+        autoHideDuration={6000}
+        onClose={() => setCtaError(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity="warning" onClose={() => setCtaError(null)} variant="filled">
+          {ctaError}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };
