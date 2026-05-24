@@ -1,21 +1,28 @@
 /**
  * useOrionUsage
  *
- * Reads the current user's Orion token usage for the active billing period
- * from `public.orion_usage_periods` (Plan A). Used to drive the circular
- * usage progress ring in the AI chat header.
+ * Reads the current user's Orion token usage for the active billing period.
+ * Prefers the live `public.orion_usage_periods` row when present; otherwise
+ * derives the budget from the subscription tier so paid users see a 0%-filled
+ * ring before their first Orion message of the period (the usage row is only
+ * created lazily on first increment).
+ *
+ * Tier → budget mirrors `increment_orion_tokens` SQL RPC (Plan A Task 1):
+ *  - free  → 0      (hide ring)
+ *  - lite  → 500K
+ *  - pro   → 2.5M
+ *  - elite → 12.5M
  *
  * Returns `usage = null` when:
  *  - the user is signed out
- *  - the user is on the free tier (no row created)
- *  - the user is on a paid tier but hasn't sent their first Orion message
- *    this billing period yet (row created lazily)
- *  - the row's `tokens_budget` is 0 (treat as "no budget to show")
+ *  - the user is on the free tier (no budget to show)
+ *  - the user's subscription status isn't paid (active/trialing/past_due, or
+ *    cancelled-within-grace) — matches `_shared/tierEnforcement.ts` semantics
+ *  - the resolved budget is 0
  *
- * Caller is responsible for hiding the UI in those cases — this hook does
- * not differentiate "loaded with no row" from "still loading", so consumers
- * should check `usage` alone for visibility and `loaded` only when they
- * need to distinguish the initial-fetch state (e.g. shimmer).
+ * Caller is responsible for hiding the UI in those cases. Consumers should
+ * check `usage` alone for visibility and `loaded` only when they need to
+ * distinguish the initial-fetch state (e.g. shimmer).
  *
  * Refetch model: `refresh()` increments an internal tick that re-runs the
  * effect. Callers re-fetch after each Orion message round completes so the
@@ -40,6 +47,16 @@ export interface UseOrionUsageReturn {
   refresh: () => void;
 }
 
+// Mirrors increment_orion_tokens SQL RPC (Plan A Task 1).
+const TIER_BUDGETS: Record<string, number> = {
+  free: 0,
+  lite: 500_000,
+  pro: 2_500_000,
+  elite: 12_500_000,
+};
+
+const PAID_TIERS = new Set(['lite', 'pro', 'elite']);
+
 export function useOrionUsage(): UseOrionUsageReturn {
   const { user } = useAuth();
   const [usage, setUsage] = useState<OrionUsage | null>(null);
@@ -56,23 +73,72 @@ export function useOrionUsage(): UseOrionUsageReturn {
     }
     let cancelled = false;
     (async () => {
-      const { data } = await supabase
+      // 1. Read subscription tier + period end to determine paid status and
+      //    the fallback budget when no usage row exists yet.
+      const { data: sub } = await supabase
+        .from('subscriptions')
+        .select('tier, status, current_period_end')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      const tier = (sub?.tier ?? 'free') as string;
+      const status = (sub?.status ?? 'active') as string;
+      const isWithinGrace =
+        status === 'cancelled' &&
+        !!sub?.current_period_end &&
+        new Date(sub.current_period_end as unknown as string).getTime() > Date.now();
+      const isPaid =
+        PAID_TIERS.has(tier) &&
+        (['active', 'trialing', 'past_due'].includes(status) || isWithinGrace);
+
+      if (!isPaid) {
+        setUsage(null);
+        setLoaded(true);
+        return;
+      }
+
+      // 2. Read the most-recent usage row (may not exist yet — lazy-created
+      //    on first Orion message increment).
+      const { data: row } = await supabase
         .from('orion_usage_periods')
         .select('tokens_consumed, tokens_budget, period_end')
-        .eq('user_id', user.uid)
+        .eq('user_id', user.id)
         .order('period_end', { ascending: false })
         .limit(1)
         .maybeSingle();
+
       if (cancelled) return;
-      if (data && Number(data.tokens_budget) > 0) {
+
+      if (row && Number(row.tokens_budget) > 0) {
         setUsage({
-          consumed: Number(data.tokens_consumed),
-          budget: Number(data.tokens_budget),
-          periodEnd: data.period_end as string,
+          consumed: Number(row.tokens_consumed),
+          budget: Number(row.tokens_budget),
+          periodEnd: row.period_end as string,
         });
-      } else {
-        setUsage(null);
+        setLoaded(true);
+        return;
       }
+
+      // 3. No row yet: derive budget from tier, consumed=0, periodEnd from
+      //    subscription.current_period_end (fallback +30d hedge if missing).
+      const tierBudget = TIER_BUDGETS[tier] ?? 0;
+      if (tierBudget <= 0) {
+        setUsage(null);
+        setLoaded(true);
+        return;
+      }
+
+      const fallbackPeriodEnd =
+        (sub?.current_period_end as string | undefined) ??
+        new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+      setUsage({
+        consumed: 0,
+        budget: tierBudget,
+        periodEnd: fallbackPeriodEnd,
+      });
       setLoaded(true);
     })();
     return () => {
