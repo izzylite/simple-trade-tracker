@@ -15,7 +15,7 @@ import {
 } from '@mui/icons-material';
 import { useDialogTokens } from 'styles/dialogTokens';
 import { useNavigate } from 'react-router-dom';
-import { useSubscription } from 'features/billing/hooks/useSubscription';
+import { useSubscription } from 'features/billing/contexts/SubscriptionContext';
 
 import { PendingImage, TradeImage } from './TradeForm';
 import ImageGrid, { GridImage, GridPendingImage } from './ImageGrid';

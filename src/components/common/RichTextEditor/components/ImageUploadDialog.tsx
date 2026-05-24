@@ -29,7 +29,7 @@ import { scrollbarStyles } from 'styles/scrollbarStyles';
 import { Z_INDEX } from 'styles/zIndex';
 import { dialogProps } from 'styles/dialogStyles';
 import { useDialogTokens, MONO_FONT } from 'styles/dialogTokens';
-import { useSubscription } from 'features/billing/hooks/useSubscription';
+import { useSubscription } from 'features/billing/contexts/SubscriptionContext';
 import { v4 as uuidv4 } from 'uuid';
 
 interface ImageUploadDialogProps {

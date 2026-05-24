@@ -39,6 +39,7 @@ import { AIChatProvider } from 'features/orion/contexts/AIChatContext';
 import { TradeViewerProvider } from 'features/calendar/contexts/TradeViewerContext';
 import { TradeOperationsProvider } from 'features/calendar/contexts/TradeOperationsContext';
 import { EventNotificationsProvider } from 'features/events/contexts/EventNotificationsContext';
+import { SubscriptionProvider } from 'features/billing/contexts/SubscriptionContext';
 import { PanelMutexProvider, usePanelMutexSlot } from 'contexts/PanelMutexContext';
 import { useCalendarsListPanel } from 'features/calendar/contexts/CalendarsListPanelContext';
 
@@ -708,20 +709,22 @@ function App() {
   return (
     <AuthProvider>
       <AuthStateProvider>
-        <UserPinnedEventsProvider>
-          <NotificationsProvider>
-            <TradeSyncProvider>
-              <LocalizationProvider dateAdapter={AdapterDateFns}>
-                <Router>
-                  <ScrollToTop />
-                  <Suspense fallback={<LoadingFallback />}>
-                    <AppContent />
-                  </Suspense>
-                </Router>
-              </LocalizationProvider>
-            </TradeSyncProvider>
-          </NotificationsProvider>
-        </UserPinnedEventsProvider>
+        <SubscriptionProvider>
+          <UserPinnedEventsProvider>
+            <NotificationsProvider>
+              <TradeSyncProvider>
+                <LocalizationProvider dateAdapter={AdapterDateFns}>
+                  <Router>
+                    <ScrollToTop />
+                    <Suspense fallback={<LoadingFallback />}>
+                      <AppContent />
+                    </Suspense>
+                  </Router>
+                </LocalizationProvider>
+              </TradeSyncProvider>
+            </NotificationsProvider>
+          </UserPinnedEventsProvider>
+        </SubscriptionProvider>
       </AuthStateProvider>
     </AuthProvider>
   );

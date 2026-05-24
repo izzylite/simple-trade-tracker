@@ -24,7 +24,7 @@ import { SELECTED_CALENDAR_STORAGE_KEY } from 'features/calendar/contexts/Select
 import { preloadRoute } from 'utils/routePreload';
 import { useAuth } from 'contexts/SupabaseAuthContext';
 import { useCalendars } from 'features/calendar/hooks/useCalendars';
-import { useSubscription } from 'features/billing/hooks/useSubscription';
+import { useSubscription } from 'features/billing/contexts/SubscriptionContext';
 import type { Calendar } from 'features/calendar/types/dualWrite';
 
 export const SIDE_NAV_WIDTH = 92;

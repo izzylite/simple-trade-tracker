@@ -26,6 +26,12 @@
  * check `usage` alone for visibility and `loaded` only when they need to
  * distinguish the initial-fetch state (e.g. shimmer).
  *
+ * Subscription read: piggybacks on `SubscriptionContext` so the
+ * `subscriptions` row is fetched once per session (not once per Orion-aware
+ * surface). Realtime updates from Paddle webhooks also propagate through
+ * the context — when tier flips mid-session, the next refresh tick reads
+ * the new tier without re-querying.
+ *
  * Refetch model: `refresh()` increments an internal tick that re-runs the
  * effect. Callers re-fetch after each Orion message round completes so the
  * ring ticks down in near-real-time (the edge function increments
@@ -36,6 +42,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from 'config/supabase';
 import { useAuth } from 'contexts/SupabaseAuthContext';
+import { useSubscription } from 'features/billing/contexts/SubscriptionContext';
 
 export interface OrionUsage {
   consumed: number;
@@ -48,8 +55,6 @@ export interface UseOrionUsageReturn {
   loaded: boolean;
   refresh: () => void;
 }
-
-const PAID_TIERS = new Set(['lite', 'pro', 'elite']);
 
 // Tier → budget is sourced from the `public.tier_budgets` table (same row set
 // the `increment_orion_tokens` RPC reads). Cached at module scope so the
@@ -80,6 +85,15 @@ async function getTierBudgets(): Promise<Record<string, number>> {
 
 export function useOrionUsage(): UseOrionUsageReturn {
   const { user } = useAuth();
+  // Read tier + paid status from the lifted subscription context — no
+  // duplicate `subscriptions` query, and Paddle webhook → realtime keeps
+  // both this and any sibling consumer in sync.
+  const {
+    tier,
+    currentPeriodEnd,
+    isPaid,
+    loaded: subscriptionLoaded,
+  } = useSubscription();
   const [usage, setUsage] = useState<OrionUsage | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
@@ -92,6 +106,17 @@ export function useOrionUsage(): UseOrionUsageReturn {
       setLoaded(true);
       return;
     }
+    // Wait for the subscription context's first fetch so we don't render
+    // the "free → hide" branch for a frame on paid users.
+    if (!subscriptionLoaded) {
+      return;
+    }
+    if (!isPaid) {
+      setUsage(null);
+      setLoaded(true);
+      return;
+    }
+
     let cancelled = false;
     // Race protection: on refresh-triggered fetches (refreshTick > 0), wait
     // ~1500ms so the server's `EdgeRuntime.waitUntil(incrementOrionTokens(...))`
@@ -101,34 +126,8 @@ export function useOrionUsage(): UseOrionUsageReturn {
     // immediate so the initial render is not throttled.
     const delayMs = refreshTick === 0 ? 0 : 1500;
     const timer = setTimeout(() => { (async () => {
-      // 1. Read subscription tier + period end to determine paid status and
-      //    the fallback budget when no usage row exists yet.
-      const { data: sub } = await supabase
-        .from('subscriptions')
-        .select('tier, status, current_period_end')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (cancelled) return;
-
-      const tier = (sub?.tier ?? 'free') as string;
-      const status = (sub?.status ?? 'active') as string;
-      const isWithinGrace =
-        status === 'cancelled' &&
-        !!sub?.current_period_end &&
-        new Date(sub.current_period_end as unknown as string).getTime() > Date.now();
-      const isPaid =
-        PAID_TIERS.has(tier) &&
-        (['active', 'trialing', 'past_due'].includes(status) || isWithinGrace);
-
-      if (!isPaid) {
-        setUsage(null);
-        setLoaded(true);
-        return;
-      }
-
-      // 2. Read the most-recent usage row (may not exist yet — lazy-created
-      //    on first Orion message increment).
+      // Read the most-recent usage row (may not exist yet — lazy-created
+      // on first Orion message increment).
       const { data: row } = await supabase
         .from('orion_usage_periods')
         .select('tokens_consumed, tokens_budget, period_end')
@@ -149,8 +148,8 @@ export function useOrionUsage(): UseOrionUsageReturn {
         return;
       }
 
-      // 3. No row yet: derive budget from tier, consumed=0, periodEnd from
-      //    subscription.current_period_end (fallback +30d hedge if missing).
+      // No row yet: derive budget from tier, consumed=0, periodEnd from
+      // subscription.current_period_end (fallback +30d hedge if missing).
       const budgets = await getTierBudgets();
       if (cancelled) return;
       const tierBudget = budgets[tier] ?? 0;
@@ -161,7 +160,7 @@ export function useOrionUsage(): UseOrionUsageReturn {
       }
 
       const fallbackPeriodEnd =
-        (sub?.current_period_end as string | undefined) ??
+        currentPeriodEnd ??
         new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
       setUsage({
@@ -175,7 +174,7 @@ export function useOrionUsage(): UseOrionUsageReturn {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [user, refreshTick]);
+  }, [user, refreshTick, tier, currentPeriodEnd, isPaid, subscriptionLoaded]);
 
   return { usage, loaded, refresh };
 }
