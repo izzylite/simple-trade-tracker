@@ -2520,22 +2520,25 @@ Deno.serve(async (req: Request) => {
 
     // Tier + budget gate — runs before any Gemini call. Free users and budget-
     // exhausted paid users are rejected with a structured error the UI renders
-    // as an upgrade prompt.
-    const gate = await checkOrionAccess(userId);
-    if (!gate.allowed) {
+    // as an upgrade prompt. Named `tierGate` to avoid colliding with the
+    // pre-existing `gate: ConversationGate` declared later in this same
+    // function (a flat-scope `const gate` clash that Deno's parser rejects
+    // at boot even though tsc happens not to flag it).
+    const tierGate = await checkOrionAccess(userId);
+    if (!tierGate.allowed) {
       log('Orion request denied by tier gate', 'info', {
         userId,
-        tier: gate.tier,
-        reason: gate.reason,
+        tier: tierGate.tier,
+        reason: tierGate.reason,
       });
       return successResponse(
         {
           blocked: true,
-          reason: gate.reason,
-          tier: gate.tier,
-          reset_at: gate.resetAt ?? null,
-          tokens_consumed: gate.tokensConsumed ?? null,
-          tokens_budget: gate.tokensBudget ?? null,
+          reason: tierGate.reason,
+          tier: tierGate.tier,
+          reset_at: tierGate.resetAt ?? null,
+          tokens_consumed: tierGate.tokensConsumed ?? null,
+          tokens_budget: tierGate.tokensBudget ?? null,
         },
         'Orion access blocked'
       );
