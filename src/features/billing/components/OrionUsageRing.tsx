@@ -27,6 +27,8 @@ import {
   IconButton,
   Tooltip,
   Typography,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useOrionUsage } from 'features/billing/hooks/useOrionUsage';
@@ -51,6 +53,9 @@ interface Props {
 export const OrionUsageRing: React.FC<Props> = ({ refreshTrigger }) => {
   const { usage, refresh } = useOrionUsage();
   const navigate = useNavigate();
+  const theme = useTheme();
+  const isXs = useMediaQuery(theme.breakpoints.down('sm'));
+  const ringSize = isXs ? 22 : 28;
 
   React.useEffect(() => {
     if (refreshTrigger !== undefined) refresh();
@@ -88,8 +93,8 @@ export const OrionUsageRing: React.FC<Props> = ({ refreshTrigger }) => {
         aria-label={`Orion usage ${Math.round(clampedPct)}%`}
         sx={{
           position: 'relative',
-          width: 36,
-          height: 36,
+          width: { xs: 30, sm: 36 },
+          height: { xs: 30, sm: 36 },
           display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -98,14 +103,14 @@ export const OrionUsageRing: React.FC<Props> = ({ refreshTrigger }) => {
         <CircularProgress
           variant="determinate"
           value={100}
-          size={28}
+          size={ringSize}
           thickness={4}
           sx={{ color: 'action.disabledBackground', position: 'absolute' }}
         />
         <CircularProgress
           variant="determinate"
           value={clampedPct}
-          size={28}
+          size={ringSize}
           thickness={4}
           color={color}
           sx={{ position: 'absolute' }}
