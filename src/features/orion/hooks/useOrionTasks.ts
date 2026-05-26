@@ -7,7 +7,6 @@ import type {
   AITasksBundle,
   OrionTask,
   OrionTaskResult,
-  TaskType,
   TaskConfig,
 } from 'features/orion/types/orionTask';
 
@@ -90,12 +89,11 @@ export function useOrionTasks(userId: string | undefined, calendarId?: string): 
   }, [userId, writeCache]);
 
   const createTask = useCallback(
-    async (taskType: TaskType, config: TaskConfig) => {
+    async (config: TaskConfig) => {
       if (!userId || !calendarId) return;
       const task = await orionTaskService.createTask(
         userId,
         calendarId,
-        taskType,
         config
       );
       setTasks((prev) => [task, ...prev]);

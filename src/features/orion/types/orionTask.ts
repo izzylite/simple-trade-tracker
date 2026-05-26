@@ -1,16 +1,8 @@
-export type TaskType =
-  | 'market_research'
-  | 'daily_analysis'
-  | 'weekly_review'
-  | 'monthly_rollup';
+export type TaskType = 'market_research';
 
 export type TaskStatus = 'active' | 'paused' | 'disabled';
 
 export type Significance = 'low' | 'medium' | 'high';
-
-export type TradingSession = 'asia' | 'london' | 'ny_am' | 'ny_pm';
-
-export type CoachingTone = 'tough_love' | 'blunt_analyst' | 'supportive_mentor';
 
 /**
  * Supported sweep cadences (minutes). Sub-hourly options were removed because
@@ -56,35 +48,7 @@ export interface MarketResearchConfig {
   watchlist_symbols: string[];
 }
 
-export interface DailyAnalysisConfig {
-  /** Wall-clock run time (HH:MM) interpreted in `timezone`. Field kept as
-   *  `run_time_utc` for backward compatibility with existing rows. */
-  run_time_utc: string;
-  /** IANA timezone name (e.g. "Europe/London"). Defaults to "UTC" on legacy rows. */
-  timezone: string;
-  tone: CoachingTone;
-}
-
-export interface WeeklyReviewConfig {
-  run_day: number;
-  run_time_utc: string;
-  timezone: string;
-  comparison_weeks: number;
-  tone: CoachingTone;
-}
-
-export interface MonthlyRollupConfig {
-  run_time_utc: string;
-  timezone: string;
-  comparison_months: number;
-  tone: CoachingTone;
-}
-
-export type TaskConfig =
-  | MarketResearchConfig
-  | DailyAnalysisConfig
-  | WeeklyReviewConfig
-  | MonthlyRollupConfig;
+export type TaskConfig = MarketResearchConfig;
 
 export interface OrionTask {
   id: string;
@@ -102,15 +66,6 @@ export interface OrionTask {
   consecutive_failures: number;
 }
 
-/** Returns the IANA timezone the browser reports, falling back to UTC. */
-export function detectBrowserTimezone(): string {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-  } catch {
-    return 'UTC';
-  }
-}
-
 /**
  * Bundle of state and actions exposed by `useOrionTasks`. Passed around as a
  * single `aiTasks` prop so consumers don't have to thread 13 individual props.
@@ -122,7 +77,7 @@ export interface AITasksBundle {
   loading: boolean;
   hasMore: boolean;
   loadingMore: boolean;
-  createTask: (taskType: TaskType, config: TaskConfig) => Promise<OrionTask | undefined>;
+  createTask: (config: TaskConfig) => Promise<OrionTask | undefined>;
   updateTask: (
     taskId: string,
     updates: { status?: OrionTask['status']; config?: TaskConfig }
@@ -155,18 +110,12 @@ export interface OrionTaskResult {
 
 export const TASK_TYPE_LABELS: Record<TaskType, string> = {
   market_research: 'Market Research',
-  daily_analysis: 'Daily Analysis',
-  weekly_review: 'Weekly Review',
-  monthly_rollup: 'Monthly Rollup',
 };
 
 // Per-task accent color used for chips, card headers, and any task-scoped
 // visual. Picked from Material's 400-level palette so it reads on both themes.
 export const TASK_TYPE_COLORS: Record<TaskType, string> = {
   market_research: '#7C4DFF', // purple
-  daily_analysis: '#29B6F6',  // cyan
-  weekly_review: '#66BB6A',   // green
-  monthly_rollup: '#EC407A',  // pink
 };
 
 /**
@@ -188,7 +137,7 @@ const MARKET_RESEARCH_STARTER_QUERIES = [
   'US Treasury yields bond market today',
 ];
 
-export function buildDefaultConfigs(timezone: string): Record<TaskType, TaskConfig> {
+export function buildDefaultConfigs(): Record<TaskType, TaskConfig> {
   return {
     market_research: {
       markets: ['forex'],
@@ -196,24 +145,6 @@ export function buildDefaultConfigs(timezone: string): Record<TaskType, TaskConf
       min_significance: 'high',
       macro_queries: [...MARKET_RESEARCH_STARTER_QUERIES],
       watchlist_symbols: [],
-    },
-    daily_analysis: {
-      run_time_utc: '21:00',
-      timezone,
-      tone: 'tough_love',
-    },
-    weekly_review: {
-      run_day: 6,
-      run_time_utc: '09:00',
-      timezone,
-      comparison_weeks: 4,
-      tone: 'tough_love',
-    },
-    monthly_rollup: {
-      run_time_utc: '21:00',
-      timezone,
-      comparison_months: 3,
-      tone: 'tough_love',
     },
   };
 }

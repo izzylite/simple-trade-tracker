@@ -3,7 +3,6 @@ import { logger } from 'utils/logger';
 import type {
   OrionTask,
   OrionTaskResult,
-  TaskType,
   TaskStatus,
   TaskConfig,
 } from 'features/orion/types/orionTask';
@@ -31,7 +30,6 @@ export const orionTaskService = {
   async createTask(
     userId: string,
     calendarId: string,
-    taskType: TaskType,
     config: TaskConfig
   ): Promise<OrionTask> {
     const { data, error } = await supabase
@@ -39,7 +37,7 @@ export const orionTaskService = {
       .insert({
         user_id: userId,
         calendar_id: calendarId,
-        task_type: taskType,
+        task_type: 'market_research',
         config,
       })
       .select()
