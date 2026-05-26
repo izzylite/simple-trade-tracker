@@ -289,12 +289,20 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
         sx={{
           flex: 1,
           overflow: 'auto',
+          // Empty state centers within the available height; once results
+          // exist, the scroll region returns to top-aligned (the result feed
+          // would otherwise float-center awkwardly as it grows).
+          ...(tasks.length === 0 && {
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }),
           ...scrollbarStyles(theme),
         }}
       >
         {/* No task yet — empty state */}
         {tasks.length === 0 ? (
-          <Box sx={{ px: 2, py: 2.5 }}>
+          <Box sx={{ px: 2, py: 2.5, width: '100%' }}>
             <Box
               sx={{
                 backgroundColor: surfaceInset,
