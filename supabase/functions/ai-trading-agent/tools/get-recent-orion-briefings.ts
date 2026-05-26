@@ -26,7 +26,8 @@ export const getRecentOrionBriefingsTool: GeminiFunctionDeclaration = {
     `Call this whenever the user references a briefing or alert you sent (past, just-delivered, or implicit). ` +
     `When the user references a briefing AND asks a market question, call this FIRST — do not paraphrase the briefing from the user's wording. ` +
     `Results include title, significance, plain-text body, timestamp, source URLs. ` +
-    `Chain scrape_url on source URLs for deeper context.`,
+    `Chain scrape_url on source URLs for deeper context. ` +
+    `Do NOT call for general market questions — use search_web or get_market_data instead.`,
   parameters: {
     type: "object",
     properties: {
