@@ -131,13 +131,23 @@ async function markTaskFailure(
     return;
   }
   const next = (data?.consecutive_failures ?? 0) + 1;
+  // Auto-disable after 10 consecutive failures. Matches the custom-tools webhook
+  // pattern. Persistent failures here usually mean (a) the user's Gemini key is
+  // dead, (b) the watchlist resolves to nothing, or (c) the news provider is
+  // down — none of which a retry will fix without user intervention. The
+  // disabled status flips the UI pill to DISABLED so the user sees the state
+  // without us having to surface raw error JSON.
+  const shouldDisable = next >= 10;
+  const updatePayload: Record<string, unknown> = {
+    last_error: truncated,
+    last_error_at: new Date().toISOString(),
+    consecutive_failures: next,
+  };
+  if (shouldDisable) updatePayload.status = 'disabled';
+
   const { error: updateErr } = await serviceClient
     .from('orion_tasks')
-    .update({
-      last_error: truncated,
-      last_error_at: new Date().toISOString(),
-      consecutive_failures: next,
-    })
+    .update(updatePayload)
     .eq('id', taskId);
   if (updateErr) log('Failed to persist failure state', 'warn', updateErr);
 }
