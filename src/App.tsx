@@ -47,6 +47,9 @@ import { useCalendarsListPanel } from 'features/calendar/contexts/CalendarsListP
 const LandingPage = lazy(() => import('pages/LandingPage'));
 const AboutPage = lazy(() => import('pages/AboutPage'));
 const PricingPage = lazy(() => import('pages/PricingPage'));
+const TermsPage = lazy(() => import('pages/legal/TermsPage'));
+const PrivacyPage = lazy(() => import('pages/legal/PrivacyPage'));
+const RefundPage = lazy(() => import('pages/legal/RefundPage'));
 const TradeCalendar = lazy(() => import('pages/TradeCalendarPage').then(module => ({ default: module.TradeCalendar })));
 const SharedTradePage = lazy(() => import('pages/SharedTradePage'));
 const SharedCalendarPage = lazy(() => import('pages/SharedCalendarPage'));
@@ -499,6 +502,9 @@ function AppContent() {
                 />
                 <Route path="/about" element={<AboutPage />} />
                 <Route path="/pricing" element={<PricingPage />} />
+                <Route path="/terms" element={<TermsPage />} />
+                <Route path="/privacy" element={<PrivacyPage />} />
+                <Route path="/refunds" element={<RefundPage />} />
                 <Route path="/account/billing" element={<AccountBillingPage />} />
               </Route>
             ) : (
@@ -506,6 +512,9 @@ function AppContent() {
                 <Route path="/" element={<LandingPage />} />
                 <Route path="/about" element={<AboutPage />} />
                 <Route path="/pricing" element={<PricingPage />} />
+                <Route path="/terms" element={<TermsPage />} />
+                <Route path="/privacy" element={<PrivacyPage />} />
+                <Route path="/refunds" element={<RefundPage />} />
               </>
             )}
             <Route
