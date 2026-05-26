@@ -9,7 +9,7 @@ import SectionMarker from 'components/landing/sections/SectionMarker';
    Maps to two real surfaces:
      1. Market Research — a single recurring catalyst monitor (the
         sole Orion task type). User-configured in
-        MarketResearchSettingsPanel; results land as TaskResultCards
+        MarketResearchSettingsDialog; results land as TaskResultCards
         in the inbox with significance dot, HTML body, citations,
         and tool-usage chips.
      2. Reminders — one-shot future Orion turns set from chat via the

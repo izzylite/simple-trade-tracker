@@ -128,7 +128,12 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
 
   const togglePause = async () => {
     if (!mrTask || !onUpdateTask) return;
-    const nextStatus: OrionTask['status'] = mrTask.status === 'paused' ? 'active' : 'paused';
+    // 'active' → 'paused' is a manual pause. 'paused' and 'disabled' (auto-
+    // disabled after 10 consecutive failures) both flip back to 'active' so
+    // the user has a single button for "turn it back on" regardless of how
+    // it got turned off.
+    const nextStatus: OrionTask['status'] =
+      mrTask.status === 'active' ? 'paused' : 'active';
     await onUpdateTask(mrTask.id, { status: nextStatus });
   };
 
@@ -250,16 +255,24 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
                 <EditIcon sx={{ fontSize: 15 }} />
               </IconButton>
             </Tooltip>
-            <Tooltip title={mrTask.status === 'paused' ? 'Resume' : 'Pause'}>
+            <Tooltip
+              title={
+                mrTask.status === 'paused'
+                  ? 'Resume'
+                  : mrTask.status === 'disabled'
+                    ? 'Re-enable'
+                    : 'Pause'
+              }
+            >
               <IconButton
                 size="small"
                 onClick={togglePause}
                 sx={{ ...ghostButtonSx, p: 0.6, borderRadius: 1 }}
               >
-                {mrTask.status === 'paused' ? (
-                  <PlayArrowIcon sx={{ fontSize: 15 }} />
-                ) : (
+                {mrTask.status === 'active' ? (
                   <PauseIcon sx={{ fontSize: 15 }} />
+                ) : (
+                  <PlayArrowIcon sx={{ fontSize: 15 }} />
                 )}
               </IconButton>
             </Tooltip>
@@ -305,9 +318,6 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
           <Box sx={{ px: 2, py: 2.5, width: '100%' }}>
             <Box
               sx={{
-                backgroundColor: surfaceInset,
-                border: `1px dashed ${alpha(violet, 0.35)}`,
-                borderRadius: 1.5,
                 px: 2,
                 py: 3.5,
                 display: 'flex',
@@ -480,7 +490,15 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
         existingTask={mrTask}
         onSave={async (config) => {
           if (mrTask) {
-            await onUpdateTask?.(mrTask.id, { config });
+            // If the task was auto-disabled (10 consecutive failures), an
+            // edited config usually means the user has fixed the root cause —
+            // flip status back to 'active' so they don't also have to click
+            // Re-enable afterwards.
+            const updates: { status?: OrionTask['status']; config: TaskConfig } =
+              mrTask.status === 'disabled'
+                ? { status: 'active', config }
+                : { config };
+            await onUpdateTask?.(mrTask.id, updates);
           } else {
             await onCreateTask(config);
           }

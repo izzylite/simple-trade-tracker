@@ -4,7 +4,7 @@
 // the inline mount competed with the result-feed scroll region for vertical
 // space.
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Autocomplete,
   Box,
@@ -140,12 +140,18 @@ const MarketResearchSettingsDialog: React.FC<MarketResearchSettingsDialogProps> 
   const [catalog, setCatalog] = useState<MacroQueryEntry[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
 
-  // Re-hydrate when the dialog opens with a different existingTask. Without
-  // this, switching from "edit task A" → close → "edit task B" would show A's
-  // stale config. Also handles the create → edit transition (open with a task
-  // that wasn't there on mount).
+  // Re-hydrate on the open→true transition only. We deliberately do NOT
+  // depend on `existingTask` reference identity: if a realtime postgres_changes
+  // UPDATE fires mid-edit (e.g. the dispatcher just finished a successful run
+  // and zeroed `consecutive_failures`), React's parent will pass a fresh
+  // existingTask object — re-hydrating on that would silently wipe the user's
+  // in-progress form edits. The `wasOpen` ref captures the previous open value
+  // so we only fire the effect on the false→true edge.
+  const wasOpen = useRef(open);
   useEffect(() => {
-    if (!open) return;
+    const isOpenEdge = open && !wasOpen.current;
+    wasOpen.current = open;
+    if (!isOpenEdge) return;
     setConfig(
       hydrateMarketResearchConfig(
         existingTask
@@ -153,7 +159,10 @@ const MarketResearchSettingsDialog: React.FC<MarketResearchSettingsDialogProps> 
           : {},
       ),
     );
-  }, [open, existingTask]);
+    // existingTask is read at the open-transition; subsequent realtime updates
+    // to the task while the dialog is open are intentionally ignored.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   useEffect(() => {
     let cancelled = false;
