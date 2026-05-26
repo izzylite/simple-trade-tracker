@@ -273,7 +273,7 @@ const AboutPage: React.FC = () => {
           aria-label="More links"
           sx={{
             display: 'grid',
-            gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, minmax(0, 1fr))' },
+            gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' },
             columnGap: 4,
             rowGap: 3,
             mb: { xs: 5, sm: 6 },
@@ -316,26 +316,6 @@ const AboutPage: React.FC = () => {
               <UtilityLink label="Discord" href={DISCORD_URL} external />
             </Stack>
           </Box>
-          <Box>
-            <Typography
-              component="h2"
-              sx={{
-                fontSize: '0.6875rem',
-                fontWeight: 600,
-                letterSpacing: '0.08em',
-                textTransform: 'uppercase',
-                color: theme.palette.text.secondary,
-                mb: 1.5,
-              }}
-            >
-              Legal
-            </Typography>
-            <Stack spacing={0.25} alignItems="center">
-              <UtilityLink label="Terms" href="/terms" />
-              <UtilityLink label="Privacy" href="/privacy" />
-              <UtilityLink label="Refunds" href="/refunds" />
-            </Stack>
-          </Box>
         </Box>
 
         {/* Footer line */}
@@ -356,6 +336,60 @@ const AboutPage: React.FC = () => {
           >
             JournoTrades · v{APP_VERSION} · © {new Date().getFullYear()}
           </Typography>
+          <Stack
+            direction="row"
+            spacing={1.25}
+            justifyContent="center"
+            alignItems="center"
+            sx={{ mt: 0.75, flexWrap: 'wrap', rowGap: 0.5 }}
+            divider={
+              <Box
+                component="span"
+                aria-hidden
+                sx={{
+                  color: theme.palette.text.disabled,
+                  fontSize: '0.75rem',
+                  lineHeight: 1,
+                }}
+              >
+                ·
+              </Box>
+            }
+          >
+            <Link
+              href="/terms"
+              sx={{
+                fontSize: '0.75rem',
+                color: theme.palette.text.secondary,
+                textDecoration: 'none',
+                '&:hover': { color: theme.palette.primary.main, textDecoration: 'underline', textUnderlineOffset: '3px' },
+              }}
+            >
+              Terms
+            </Link>
+            <Link
+              href="/privacy"
+              sx={{
+                fontSize: '0.75rem',
+                color: theme.palette.text.secondary,
+                textDecoration: 'none',
+                '&:hover': { color: theme.palette.primary.main, textDecoration: 'underline', textUnderlineOffset: '3px' },
+              }}
+            >
+              Privacy
+            </Link>
+            <Link
+              href="/refunds"
+              sx={{
+                fontSize: '0.75rem',
+                color: theme.palette.text.secondary,
+                textDecoration: 'none',
+                '&:hover': { color: theme.palette.primary.main, textDecoration: 'underline', textUnderlineOffset: '3px' },
+              }}
+            >
+              Refunds
+            </Link>
+          </Stack>
           <Typography
             sx={{
               mt: 0.75,
