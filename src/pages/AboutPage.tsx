@@ -273,7 +273,7 @@ const AboutPage: React.FC = () => {
           aria-label="More links"
           sx={{
             display: 'grid',
-            gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' },
+            gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, minmax(0, 1fr))' },
             columnGap: 4,
             rowGap: 3,
             mb: { xs: 5, sm: 6 },
@@ -314,6 +314,26 @@ const AboutPage: React.FC = () => {
             </Typography>
             <Stack spacing={0.25} alignItems="center">
               <UtilityLink label="Discord" href={DISCORD_URL} external />
+            </Stack>
+          </Box>
+          <Box>
+            <Typography
+              component="h2"
+              sx={{
+                fontSize: '0.6875rem',
+                fontWeight: 600,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                color: theme.palette.text.secondary,
+                mb: 1.5,
+              }}
+            >
+              Legal
+            </Typography>
+            <Stack spacing={0.25} alignItems="center">
+              <UtilityLink label="Terms" href="/terms" />
+              <UtilityLink label="Privacy" href="/privacy" />
+              <UtilityLink label="Refunds" href="/refunds" />
             </Stack>
           </Box>
         </Box>
