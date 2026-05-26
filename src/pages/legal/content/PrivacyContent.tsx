@@ -8,6 +8,14 @@ const PrivacyContent: React.FC = () => (
       with, and the rights you have over it. We aim to describe our practices in plain English, not
       legalese.
     </Typography>
+    <Typography variant="body1">
+      JournoTrades is operated from the Federal Republic of Nigeria. This policy is governed by the
+      Nigeria Data Protection Act 2023 ("NDPA"), supervised by the Nigeria Data Protection
+      Commission ("NDPC"). If you live in the European Union, the United Kingdom, or another region
+      with its own data protection law, the rights granted by that law (such as the EU and UK
+      GDPRs, and the California Consumer Privacy Act) apply to you in addition to the rights
+      described here, and we honour them.
+    </Typography>
 
     <Typography variant="h3">1. What we collect</Typography>
     <Typography variant="body1">
@@ -88,7 +96,8 @@ const PrivacyContent: React.FC = () => (
 
     <Typography variant="h3">8. Your rights</Typography>
     <Typography variant="body1">
-      Subject to applicable law (including the UK GDPR, EU GDPR, and CCPA), you have the right to:
+      Subject to applicable law (the NDPA in Nigeria, and the EU GDPR, UK GDPR, and CCPA where they
+      apply to you), you have the right to:
     </Typography>
     <ul>
       <li><Typography variant="body1" component="span">Access a copy of the data we hold about you.</Typography></li>
@@ -96,7 +105,7 @@ const PrivacyContent: React.FC = () => (
       <li><Typography variant="body1" component="span">Correct inaccurate or incomplete data.</Typography></li>
       <li><Typography variant="body1" component="span">Delete your account and the data tied to it.</Typography></li>
       <li><Typography variant="body1" component="span">Object to or restrict certain processing, or withdraw consent where processing relies on consent.</Typography></li>
-      <li><Typography variant="body1" component="span">Lodge a complaint with your local data protection authority (e.g. the UK ICO).</Typography></li>
+      <li><Typography variant="body1" component="span">Lodge a complaint with the Nigeria Data Protection Commission (NDPC), or with your local data protection authority if you live outside Nigeria — for example, the UK Information Commissioner's Office (ICO) for UK residents, or your national supervisory authority in the EU.</Typography></li>
     </ul>
     <Typography variant="body1">
       To exercise any of these rights, email{' '}
@@ -106,9 +115,14 @@ const PrivacyContent: React.FC = () => (
 
     <Typography variant="h3">9. International transfers</Typography>
     <Typography variant="body1">
-      Some of our sub-processors operate globally. Where data is transferred outside the country
-      you live in, the transfer relies on the safeguards required by applicable law (such as the
-      UK International Data Transfer Agreement or EU Standard Contractual Clauses).
+      Most of our sub-processors operate outside Nigeria. Notably, Supabase hosts your data in the
+      European Union (AWS Europe region). Where we transfer data outside Nigeria, we rely on the
+      safeguards permitted by Section 41 of the NDPA: contractual safeguards with the recipient
+      (such as the EU Standard Contractual Clauses or equivalent terms), and, where required, your
+      informed consent to the transfer when you create your account. For EU and UK users whose
+      data flows are also subject to the EU GDPR or UK GDPR, we rely on the UK International Data
+      Transfer Agreement, EU Standard Contractual Clauses, or other safeguards required by those
+      frameworks.
     </Typography>
 
     <Typography variant="h3">10. Security</Typography>

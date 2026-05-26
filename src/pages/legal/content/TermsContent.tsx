@@ -12,9 +12,11 @@ const TermsContent: React.FC = () => (
     <Typography variant="h3">1. What JournoTrades is</Typography>
     <Typography variant="body1">
       JournoTrades is a trading journal with an AI assistant ("Orion") that helps you log trades,
-      analyze your performance, track economic events, and write notes. JournoTrades is not a
-      broker, exchange, custodian, investment adviser, or regulated financial institution.
-      Nothing on JournoTrades is an offer to buy or sell any security, currency, or asset.
+      analyze your performance, track economic events, and write notes. The Service is operated
+      from the Federal Republic of Nigeria by JournoTrades, a business registered in Nigeria.
+      JournoTrades is not a broker, exchange, custodian, investment adviser, or regulated financial
+      institution. Nothing on JournoTrades is an offer to buy or sell any security, currency, or
+      asset.
     </Typography>
 
     <Typography variant="h3">2. Accounts</Typography>
@@ -99,7 +101,7 @@ const TermsContent: React.FC = () => (
       data, or trading losses, arising out of or related to your use of the Service. Our aggregate
       liability for any claim arising out of these Terms or the Service is limited to the amount
       you paid us in the twelve months immediately before the event giving rise to the claim, or
-      GBP 50, whichever is greater. Nothing in these Terms limits liability that cannot lawfully be
+      USD 50, whichever is greater. Nothing in these Terms limits liability that cannot lawfully be
       limited (including liability for death, personal injury caused by negligence, or fraud).
     </Typography>
 
@@ -112,9 +114,11 @@ const TermsContent: React.FC = () => (
 
     <Typography variant="h3">13. Governing law</Typography>
     <Typography variant="body1">
-      These Terms are governed by the laws of England &amp; Wales. Any dispute arising out of or
-      relating to these Terms or the Service is subject to the exclusive jurisdiction of the courts
-      of England &amp; Wales.
+      These Terms are governed by the laws of the Federal Republic of Nigeria. Any dispute arising
+      out of or relating to these Terms or the Service is subject to the exclusive jurisdiction of
+      the courts of Lagos State, Nigeria. If you live in the European Union, the United Kingdom, or
+      another region whose consumer protection laws give you mandatory rights that cannot be waived
+      by contract, those rights are not affected by this section.
     </Typography>
 
     <Typography variant="h3">14. Contact</Typography>
