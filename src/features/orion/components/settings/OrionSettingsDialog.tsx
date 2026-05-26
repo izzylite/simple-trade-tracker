@@ -21,9 +21,10 @@ const OrionSettingsDialog: React.FC<Props> = ({ open, onClose }) => {
       hideFooterCancelButton
     >
       <Stack spacing={3}>
+         <CustomToolsSection />
+         <Divider />
         <SystemToolsSection />
-        <Divider />
-        <CustomToolsSection />
+        
       </Stack>
     </BaseDialog>
   );
