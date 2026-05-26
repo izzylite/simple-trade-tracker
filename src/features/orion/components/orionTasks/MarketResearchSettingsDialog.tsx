@@ -39,6 +39,7 @@ import {
 } from 'features/orion/data/macroQueryCatalog';
 import { getMacroQueryCatalog } from 'features/orion/services/macroQueryCatalogService';
 import { useDialogTokens, MONO_FONT } from 'styles/dialogTokens';
+import { Z_INDEX } from 'styles/zIndex';
 import { logger } from 'utils/logger';
 
 // ---------------------------------------------------------------------------
@@ -271,6 +272,7 @@ const MarketResearchSettingsDialog: React.FC<MarketResearchSettingsDialogProps> 
             isOptionEqualToValue={(a, b) => a.symbol === b.symbol}
             value={YAHOO_SYMBOL_CATALOG.filter((o) => config.watchlist_symbols.includes(o.symbol))}
             onChange={(_, v) => updateWatchlistSymbols(v.map((o) => o.symbol))}
+            slotProps={{ popper: { sx: { zIndex: Z_INDEX.DIALOG_POPUP } } }}
             renderTags={(value, getTagProps) =>
               value.map((opt, i) => (
                 <Chip
@@ -320,6 +322,7 @@ const MarketResearchSettingsDialog: React.FC<MarketResearchSettingsDialogProps> 
             getOptionDisabled={(opt) => atMacroLimit && !(config.macro_queries ?? []).includes(opt.query)}
             value={selectedMacroEntries}
             onChange={(_, v) => setConfig({ ...config, macro_queries: v.slice(0, MAX_MACRO_QUERIES).map((e) => e.query) })}
+            slotProps={{ popper: { sx: { zIndex: Z_INDEX.DIALOG_POPUP } } }}
             loadingText={
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 1 }}>
                 <CircularProgress size={14} />
