@@ -7,10 +7,10 @@ import SectionMarker from 'components/landing/sections/SectionMarker';
 /* ─────────────────────────────────────────────
    Orion · Briefings + Reminders
    Maps to two real surfaces:
-     1. Orion Tasks — 4 fixed recurring digests (market_research,
-        daily_analysis, weekly_review, monthly_rollup). User-created
-        in CreateTaskDialog; results land as TaskResultCards in the
-        inbox with type chip, significance dot, HTML body, citations,
+     1. Market Research — a single recurring catalyst monitor (the
+        sole Orion task type). User-configured in
+        MarketResearchSettingsPanel; results land as TaskResultCards
+        in the inbox with significance dot, HTML body, citations,
         and tool-usage chips.
      2. Reminders — one-shot future Orion turns set from chat via the
         `set_reminder` tool. Fire back into the same conversation as

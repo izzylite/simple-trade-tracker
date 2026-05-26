@@ -8,29 +8,30 @@ import {
   CircularProgress,
 } from '@mui/material';
 import {
-  Add as AddIcon,
   Delete as DeleteIcon,
   DoneAll as DoneAllIcon,
   Edit as EditIcon,
   WarningAmber as WarningIcon,
-  AssignmentOutlined as AssignmentIcon,
   ExpandMore as ExpandMoreIcon,
+  Pause as PauseIcon,
+  PlayArrow as PlayArrowIcon,
+  ManageSearch as ManageSearchIcon,
 } from '@mui/icons-material';
 import { IconButton, Tooltip } from '@mui/material';
 import { format, isToday, isYesterday } from 'date-fns';
 import { scrollbarStyles } from 'styles/scrollbarStyles';
-import { useDialogTokens, MONO_FONT } from 'styles/dialogTokens';
+import { useDialogTokens } from 'styles/dialogTokens';
 import EconomicEventShimmer from 'features/events/components/EconomicEventShimmer';
 import ConfirmationDialog from 'components/common/ConfirmationDialog';
 import TaskResultCard from 'features/orion/components/orionTasks/TaskResultCard';
-import CreateTaskDialog from 'features/orion/components/orionTasks/CreateTaskDialog';
+import MarketResearchSettingsPanel from 'features/orion/components/orionTasks/MarketResearchSettingsPanel';
 import type {
   OrionTask,
   OrionTaskResult,
-  TaskType,
   TaskConfig,
+  MarketResearchConfig,
 } from 'features/orion/types/orionTask';
-import { TASK_TYPE_LABELS, TASK_TYPE_COLORS } from 'features/orion/types/orionTask';
+import { formatFrequencyLabel } from 'features/orion/components/orionTasks/marketResearchHelpers';
 import type { Calendar, Trade } from 'features/calendar/types/dualWrite';
 import type { TradeOperationsProps } from 'features/calendar/types/tradeOperations';
 
@@ -42,13 +43,10 @@ interface OrionTasksContentProps {
   hasMore?: boolean;
   loadingMore?: boolean;
   onLoadMore?: () => void;
-  onCreateTask: (
-    taskType: TaskType,
-    config: TaskConfig
-  ) => Promise<OrionTask | undefined>;
+  onCreateTask: (config: TaskConfig) => Promise<OrionTask | undefined>;
   onUpdateTask?: (
     taskId: string,
-    updates: { config?: TaskConfig }
+    updates: { status?: OrionTask['status']; config?: TaskConfig }
   ) => Promise<OrionTask | undefined>;
   onDeleteTask: (taskId: string) => Promise<void>;
   onMarkRead: (resultId: string) => Promise<void>;
@@ -111,19 +109,14 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
     monoSectionLabelSx,
     primaryButtonSx,
     ghostButtonSx,
-    chipStyle,
   } = useDialogTokens();
 
-  const [createOpen, setCreateOpen] = useState(false);
-  const [editingTask, setEditingTask] = useState<OrionTask | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [pendingDeleteTaskId, setPendingDeleteTaskId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [filterTaskType, setFilterTaskType] = useState<TaskType | null>(null);
 
-  const pendingDeleteTask = useMemo(
-    () => tasks.find((t) => t.id === pendingDeleteTaskId) || null,
-    [tasks, pendingDeleteTaskId]
-  );
+  // The unique-index in the DB guarantees at most one MR task per user.
+  const mrTask = tasks[0] ?? null;
 
   const handleConfirmDelete = async () => {
     if (!pendingDeleteTaskId) return;
@@ -136,37 +129,15 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
     }
   };
 
-  const existingTaskTypes = useMemo(
-    () => tasks.map((t) => t.task_type),
-    [tasks]
-  );
-
-  const allTaskTypesUsed = useMemo(
-    () =>
-      (Object.keys(TASK_TYPE_LABELS) as TaskType[]).every((t) =>
-        existingTaskTypes.includes(t)
-      ),
-    [existingTaskTypes]
-  );
-
-  const filterableTaskTypes = useMemo(
-    () => tasks.map((t) => t.task_type),
-    [tasks]
-  );
-
-  const selectedTask = useMemo(
-    () => tasks.find((t) => t.task_type === filterTaskType) ?? null,
-    [tasks, filterTaskType]
-  );
-
-  const filteredResults = useMemo(
-    () => (filterTaskType ? results.filter((r) => r.task_type === filterTaskType) : results),
-    [results, filterTaskType]
-  );
+  const togglePause = async () => {
+    if (!mrTask || !onUpdateTask) return;
+    const nextStatus: OrionTask['status'] = mrTask.status === 'paused' ? 'active' : 'paused';
+    await onUpdateTask(mrTask.id, { status: nextStatus });
+  };
 
   const groupedResults = useMemo(() => {
     const groups: Record<string, OrionTaskResult[]> = {};
-    for (const r of filteredResults) {
+    for (const r of results) {
       const key = r.group_date;
       if (!groups[key]) groups[key] = [];
       groups[key].push(r);
@@ -174,9 +145,7 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
     return Object.entries(groups).sort(
       ([a], [b]) => new Date(b).getTime() - new Date(a).getTime()
     );
-  }, [filteredResults]);
-
-  const activeTasksCount = tasks.filter((t) => t.status === 'active').length;
+  }, [results]);
 
   if (loading) {
     return <EconomicEventShimmer count={6} />;
@@ -191,49 +160,49 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
         overflow: 'hidden',
       }}
     >
-      {/* Sticky top bar — mono section label + count pill + actions */}
-      <Box
-        sx={{
-          px: 2,
-          pt: 1.75,
-          pb: 1.25,
-          borderBottom: `1px solid ${hairline}`,
-          backgroundColor: 'background.paper',
-          zIndex: 1,
-        }}
-      >
+      {/* Status strip — only shown when MR task exists */}
+      {mrTask && (
         <Box
           sx={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            gap: 1,
+            px: 2,
+            py: 1.25,
+            borderBottom: `1px solid ${hairline}`,
+            backgroundColor: 'background.paper',
           }}
         >
           <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
             <Typography component="span" sx={monoSectionLabelSx}>
-              Active Tasks
+              MARKET RESEARCH
             </Typography>
             <Box
               component="span"
               sx={{
-                fontFamily: MONO_FONT,
-                fontSize: '0.66rem',
-                fontWeight: 700,
-                letterSpacing: '0.06em',
-                color: violet,
-                backgroundColor: violetSofter,
-                border: `1px solid ${violetBorder}`,
-                borderRadius: 999,
-                px: 0.85,
+                ...monoLabelSx,
+                fontSize: '0.62rem',
+                px: 0.75,
                 py: 0.15,
-                lineHeight: 1.4,
-                minWidth: 22,
-                textAlign: 'center',
+                borderRadius: 999,
+                backgroundColor:
+                  mrTask.status === 'active'
+                    ? violetSofter
+                    : alpha(theme.palette.text.secondary, 0.08),
+                color: mrTask.status === 'active' ? violet : 'text.secondary',
+                border: `1px solid ${mrTask.status === 'active' ? violetBorder : hairline}`,
               }}
             >
-              {activeTasksCount}
+              {mrTask.status.toUpperCase()}
             </Box>
+            {(mrTask.consecutive_failures ?? 0) > 0 && (
+              <Tooltip title={mrTask.last_error ?? 'Recent failure'}>
+                <WarningIcon sx={{ fontSize: 14, color: theme.palette.warning.main }} />
+              </Tooltip>
+            )}
+            <Typography variant="caption" color="text.secondary">
+              every {formatFrequencyLabel((mrTask.config as MarketResearchConfig).frequency_minutes)}
+            </Typography>
           </Box>
 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -242,34 +211,54 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
                 <IconButton
                   size="small"
                   onClick={() => onMarkAllRead()}
-                  sx={{
-                    ...ghostButtonSx,
-                    p: 0.6,
-                    borderRadius: 1,
-                  }}
+                  sx={{ ...ghostButtonSx, p: 0.6, borderRadius: 1 }}
                 >
                   <DoneAllIcon sx={{ fontSize: 16 }} />
                 </IconButton>
               </Tooltip>
             )}
-            <Button
-              size="small"
-              startIcon={<AddIcon sx={{ fontSize: 16 }} />}
-              onClick={() => setCreateOpen(true)}
-              disabled={allTaskTypesUsed}
-              sx={{
-                ...primaryButtonSx,
-                fontSize: '0.78rem',
-                px: 1.25,
-                py: 0.4,
-                minHeight: 0,
-              }}
-            >
-              New Task
-            </Button>
+            <Tooltip title="Edit Market Research">
+              <IconButton
+                size="small"
+                onClick={() => setSettingsOpen(true)}
+                sx={{ ...ghostButtonSx, p: 0.6, borderRadius: 1 }}
+              >
+                <EditIcon sx={{ fontSize: 15 }} />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title={mrTask.status === 'paused' ? 'Resume' : 'Pause'}>
+              <IconButton
+                size="small"
+                onClick={togglePause}
+                sx={{ ...ghostButtonSx, p: 0.6, borderRadius: 1 }}
+              >
+                {mrTask.status === 'paused' ? (
+                  <PlayArrowIcon sx={{ fontSize: 15 }} />
+                ) : (
+                  <PauseIcon sx={{ fontSize: 15 }} />
+                )}
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Delete Market Research">
+              <IconButton
+                size="small"
+                onClick={() => setPendingDeleteTaskId(mrTask.id)}
+                sx={{
+                  ...ghostButtonSx,
+                  p: 0.6,
+                  borderRadius: 1,
+                  '&:hover': {
+                    backgroundColor: alpha(theme.palette.error.main, 0.1),
+                    color: theme.palette.error.main,
+                  },
+                }}
+              >
+                <DeleteIcon sx={{ fontSize: 15 }} />
+              </IconButton>
+            </Tooltip>
           </Box>
         </Box>
-      </Box>
+      )}
 
       {/* Scroll region */}
       <Box
@@ -279,121 +268,24 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
           ...scrollbarStyles(theme),
         }}
       >
-        {/* Filter row — chip-segmented bar */}
-        {tasks.length === 0 ? null : (
-          <Box
-            sx={{
-              px: 2,
-              py: 1.25,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 0.75,
-              borderBottom: `1px solid ${hairline}`,
-              backgroundColor: 'background.paper',
+        {/* Inline settings panel — create or edit */}
+        {settingsOpen && (
+          <MarketResearchSettingsPanel
+            existingTask={mrTask}
+            onSave={async (config) => {
+              if (mrTask) {
+                await onUpdateTask?.(mrTask.id, { config });
+              } else {
+                await onCreateTask(config);
+              }
+              setSettingsOpen(false);
             }}
-          >
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 0.5,
-                flex: 1,
-                minWidth: 0,
-                overflowX: 'auto',
-                ...scrollbarStyles(theme),
-                '&::-webkit-scrollbar': { height: 0 },
-                scrollbarWidth: 'none',
-              }}
-            >
-              <Box
-                component="span"
-                onClick={() => setFilterTaskType(null)}
-                sx={chipStyle(filterTaskType === null)}
-              >
-                All
-              </Box>
-              {filterableTaskTypes.map((type) => {
-                const task = tasks.find((t) => t.task_type === type)!;
-                const hasFailures = (task.consecutive_failures ?? 0) > 0;
-                const color = TASK_TYPE_COLORS[type];
-                const selected = filterTaskType === type;
-                return (
-                  <Box
-                    key={type}
-                    component="span"
-                    onClick={() =>
-                      setFilterTaskType(selected ? null : type)
-                    }
-                    sx={chipStyle(selected)}
-                  >
-                    <Box
-                      sx={{
-                        width: 7,
-                        height: 7,
-                        borderRadius: '50%',
-                        backgroundColor: color,
-                        flexShrink: 0,
-                      }}
-                    />
-                    <span style={{ whiteSpace: 'nowrap' }}>
-                      {TASK_TYPE_LABELS[type]}
-                    </span>
-                    {hasFailures && (
-                      <WarningIcon
-                        sx={{
-                          fontSize: 13,
-                          color: theme.palette.warning.main,
-                          ml: 0.25,
-                        }}
-                      />
-                    )}
-                  </Box>
-                );
-              })}
-            </Box>
-
-            {/* Edit / delete for the selected task — ghost icon buttons */}
-            {selectedTask && (
-              <Box sx={{ display: 'flex', gap: 0.25, flexShrink: 0, pl: 0.5 }}>
-                {onUpdateTask && (
-                  <Tooltip title={`Edit ${TASK_TYPE_LABELS[selectedTask.task_type]}`}>
-                    <IconButton
-                      size="small"
-                      onClick={() => setEditingTask(selectedTask)}
-                      sx={{
-                        ...ghostButtonSx,
-                        p: 0.6,
-                        borderRadius: 1,
-                      }}
-                    >
-                      <EditIcon sx={{ fontSize: 15 }} />
-                    </IconButton>
-                  </Tooltip>
-                )}
-                <Tooltip title={`Delete ${TASK_TYPE_LABELS[selectedTask.task_type]}`}>
-                  <IconButton
-                    size="small"
-                    onClick={() => setPendingDeleteTaskId(selectedTask.id)}
-                    sx={{
-                      ...ghostButtonSx,
-                      p: 0.6,
-                      borderRadius: 1,
-                      '&:hover': {
-                        backgroundColor: alpha(theme.palette.error.main, 0.1),
-                        color: theme.palette.error.main,
-                      },
-                    }}
-                  >
-                    <DeleteIcon sx={{ fontSize: 15 }} />
-                  </IconButton>
-                </Tooltip>
-              </Box>
-            )}
-          </Box>
+            onCancel={() => setSettingsOpen(false)}
+          />
         )}
 
-        {/* Tasks empty state — dashed inset card */}
-        {tasks.length === 0 ? (
+        {/* No task yet — empty state */}
+        {tasks.length === 0 && !settingsOpen ? (
           <Box sx={{ px: 2, py: 2.5 }}>
             <Box
               sx={{
@@ -421,7 +313,7 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
                   justifyContent: 'center',
                 }}
               >
-                <AssignmentIcon sx={{ fontSize: 22 }} />
+                <ManageSearchIcon sx={{ fontSize: 22 }} />
               </Box>
               <Typography
                 sx={{
@@ -431,7 +323,7 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
                   mt: 0.5,
                 }}
               >
-                No tasks yet
+                Set up Market Research
               </Typography>
               <Typography
                 variant="caption"
@@ -442,13 +334,28 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
                   maxWidth: 280,
                 }}
               >
-                Create a task and Orion will run it on schedule, then post results here.
+                Orion sweeps live news on your schedule and posts briefings here when
+                a market-moving catalyst is detected.
               </Typography>
+              <Button
+                size="small"
+                onClick={() => setSettingsOpen(true)}
+                sx={{
+                  ...primaryButtonSx,
+                  mt: 0.5,
+                  fontSize: '0.78rem',
+                  px: 1.5,
+                  py: 0.5,
+                  minHeight: 0,
+                }}
+              >
+                Set up Market Research
+              </Button>
             </Box>
           </Box>
-        ) : (
+        ) : tasks.length > 0 ? (
           <Box sx={{ p: 2, pt: 1.5 }}>
-            {filteredResults.length === 0 ? (
+            {results.length === 0 ? (
               <Box
                 sx={{
                   backgroundColor: surfaceInset,
@@ -466,16 +373,14 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
                   variant="caption"
                   sx={{ color: 'text.secondary', display: 'block', mt: 0.75 }}
                 >
-                  Results will appear here as Orion completes tasks
+                  Results will appear here as Orion detects market-moving catalysts
                 </Typography>
               </Box>
             ) : (
               <>
                 {groupedResults.map(([date, dateResults]) => (
                   <Box key={date} sx={{ mb: 2 }}>
-                    {/* Sticky mono uppercase date label — borderBottom so
-                        content scrolling underneath reads as deliberately
-                        capped, not visually clipped. */}
+                    {/* Sticky mono uppercase date label */}
                     <Box
                       sx={{
                         position: 'sticky',
@@ -487,7 +392,7 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
                         gap: 1,
                         px: 1,
                         py: 0.75,
-                        mb: 1
+                        mb: 1,
                       }}
                     >
                       <Typography
@@ -516,7 +421,7 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
                     ))}
                   </Box>
                 ))}
-                {hasMore && !filterTaskType && (
+                {hasMore && (
                   <Box sx={{ display: 'flex', justifyContent: 'center', pb: 1 }}>
                     <Button
                       size="small"
@@ -550,39 +455,13 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
               </>
             )}
           </Box>
-        )}
+        ) : null}
       </Box>
-
-      <CreateTaskDialog
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
-        onCreate={onCreateTask}
-        existingTaskTypes={existingTaskTypes}
-      />
-
-      <CreateTaskDialog
-        open={!!editingTask}
-        onClose={() => setEditingTask(null)}
-        onCreate={async () => undefined}
-        existingTaskTypes={[]}
-        editingTask={editingTask}
-        onSave={
-          onUpdateTask
-            ? async (taskId, config) => {
-                await onUpdateTask(taskId, { config });
-              }
-            : undefined
-        }
-      />
 
       <ConfirmationDialog
         open={!!pendingDeleteTaskId}
-        title="Delete Task?"
-        message={
-          pendingDeleteTask
-            ? `Are you sure you want to delete the "${TASK_TYPE_LABELS[pendingDeleteTask.task_type]}" task? Orion will stop running it.`
-            : ''
-        }
+        title="Delete Market Research?"
+        message="Delete this Market Research task? Orion will stop posting briefings. Past results remain in your history."
         confirmText="Delete"
         confirmColor="error"
         isSubmitting={isDeleting}

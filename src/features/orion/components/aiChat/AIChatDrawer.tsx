@@ -21,7 +21,6 @@ import {
 import {
   Close as CloseIcon,
   ChatBubbleOutline as ChatIcon,
-  AssignmentOutlined as TasksIcon,
   AddComment as NewChatIcon,
   History as HistoryIcon,
   Alarm as AlarmIcon,
@@ -71,10 +70,10 @@ interface AIChatDrawerProps {
   pendingDeepLink?: { conversationId: string; messageId?: string } | null;
   onDeepLinkConsumed?: () => void;
   /**
-   * One-shot tab switch request (0 = Chat, 1 = Tasks). Used by callers that
-   * need the drawer to land on a specific tab — e.g. a task notification
-   * click should drop the user on the Tasks tab regardless of which tab was
-   * last active. Caller clears via `onTabRequestConsumed`.
+   * One-shot tab switch request (0 = Chat, 1 = Market Research). Used by callers
+   * that need the drawer to land on a specific tab — e.g. a task notification
+   * click should drop the user on the Market Research tab regardless of which tab
+   * was last active. Caller clears via `onTabRequestConsumed`.
    */
   requestActiveTab?: number | null;
   onTabRequestConsumed?: () => void;
@@ -491,7 +490,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
             >
               {([
                 { label: 'Chat', icon: <ChatIcon sx={{ fontSize: 14 }} />, badge: 0 },
-                { label: 'Tasks', icon: <TasksIcon sx={{ fontSize: 14 }} />, badge: aiTasks?.unreadCount ?? 0 },
+                { label: 'Market Research', icon: <ManageSearchIcon sx={{ fontSize: 14 }} />, badge: aiTasks?.unreadCount ?? 0 },
               ] as const).map((tab, idx) => {
                 const selected = activeTab === idx;
                 return (
