@@ -13,8 +13,11 @@ const TASK_TYPE_LABELS: Record<string, string> = {
 
 function prettyTaskType(taskType: string): string {
   if (TASK_TYPE_LABELS[taskType]) return TASK_TYPE_LABELS[taskType];
-  // Fallback: snake_case → Title Case so unknown task types still read
-  // cleanly without the server having to ship a complete label map.
+  // Defensive fallback: the enum currently has only `market_research`, so this
+  // branch is unreachable at runtime. Kept because (a) the dispatcher consumes
+  // task_type from log payloads where a stale/malformed value is possible, and
+  // (b) adding a future scalable task type should not require updating this
+  // function just to get a readable label in logs.
   return taskType
     .split('_')
     .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : ''))

@@ -18,8 +18,10 @@ export interface TaskResult {
   metadata: Record<string, unknown>;
 }
 
-// Handler may return null to signal "no surprise detected, skip result write."
-// The dispatcher treats null as a successful no-op run.
+// Handler may return null to suppress storage — used by market_research when
+// a sweep finishes below the user-configured significance threshold so the
+// user isn't spammed on quiet intervals. The dispatcher treats null as a
+// successful no-op run.
 export type TaskHandler = (
   task: OrionTask,
   supabase: SupabaseClient
