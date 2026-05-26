@@ -1,10 +1,10 @@
 /**
- * get_recent_orion_briefings — retrieve briefings already sent to the user
- * (market_research / daily_analysis / weekly_review / monthly_rollup).
+ * get_recent_orion_briefings — retrieve Market Research briefings already sent
+ * to the user.
  *
- * Filters: task_type, instrument (currency code OR catalog symbol resolved
- * through INSTRUMENT_CATALOG), date range (since_hours / since_date /
- * until_date), and a sanity cap on limit.
+ * Filters: instrument (currency code OR catalog symbol resolved through
+ * INSTRUMENT_CATALOG), date range (since_hours / since_date / until_date),
+ * and a sanity cap on limit.
  */
 
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -22,24 +22,18 @@ import type { GeminiFunctionDeclaration, ToolContext } from "./types.ts";
 export const getRecentOrionBriefingsTool: GeminiFunctionDeclaration = {
   name: "get_recent_orion_briefings",
   description:
-    `Retrieve Orion task briefings already sent to this user (market_research / daily_analysis / weekly_review / monthly_rollup). Call this whenever the user references a briefing or alert you sent (past, just-delivered, or implicit). When the user references a briefing AND asks a market question, call this FIRST — do not paraphrase the briefing from the user's wording. Results include title, significance, task type, plain-text body, timestamp, source URLs. Chain scrape_url on source URLs for deeper context. See TIER 4 BRIEFING ALIASES in the system prompt for the instrument alias table.`,
+    `Retrieve Market Research briefings already sent to this user. ` +
+    `Call this whenever the user references a briefing or alert you sent (past, just-delivered, or implicit). ` +
+    `When the user references a briefing AND asks a market question, call this FIRST — do not paraphrase the briefing from the user's wording. ` +
+    `Results include title, significance, plain-text body, timestamp, source URLs. ` +
+    `Chain scrape_url on source URLs for deeper context.`,
   parameters: {
     type: "object",
     properties: {
-      task_type: {
-        type: "string",
-        enum: [
-          "market_research",
-          "daily_analysis",
-          "weekly_review",
-          "monthly_rollup",
-        ],
-        description: "Optional filter by briefing type.",
-      },
       instrument: {
         type: "string",
         description:
-          'Optional. Only applies to market_research (daily/weekly/monthly lack instrument metadata). Accepts: 3-letter currency code, natural name ("gold", "EUR/USD"), catalog symbol, or alias (see TIER 4 BRIEFING ALIASES). Case-insensitive.',
+          'Optional. Accepts: 3-letter currency code, natural name ("gold", "EUR/USD"), catalog symbol. Case-insensitive.',
       },
       since_hours: {
         type: "number",
@@ -68,7 +62,6 @@ export const getRecentOrionBriefingsTool: GeminiFunctionDeclaration = {
 async function getRecentOrionBriefings(
   supabase: SupabaseClient,
   userId: string,
-  taskType?: string,
   sinceHours: number = 72,
   limit: number = 10,
   sinceDate?: string,
@@ -125,11 +118,10 @@ async function getRecentOrionBriefings(
       .order("created_at", { ascending: false })
       .limit(boundedLimit);
 
+    query = query.eq("task_type", "market_research");
+
     if (untilDate) {
       query = query.lt("created_at", new Date(untilDate).toISOString());
-    }
-    if (taskType) {
-      query = query.eq("task_type", taskType);
     }
     if (filterMode === "currency" && normalizedCurrency) {
       query = query.filter(
@@ -179,9 +171,7 @@ async function getRecentOrionBriefings(
           .join(", ");
         return `No market research briefings found covering "${instrument}" ${rangeDesc}. Recognized as: ${matchSummary}. The user may not have had this instrument in their watchlist when briefings ran — try widening the date range or omitting the instrument filter.`;
       }
-      return `No Orion briefings found ${rangeDesc}${
-        taskType ? ` for task type "${taskType}"` : ""
-      }.`;
+      return `No Market Research briefings found ${rangeDesc}.`;
     }
 
     interface BriefingCitation {
@@ -242,9 +232,6 @@ export async function executeGetRecentOrionBriefings(
   if (!supabase) return "Supabase client not available for Orion briefings lookup";
   const userId = context.userId || "";
   if (!userId) return "User ID not available in context";
-  const taskType = typeof args.task_type === "string"
-    ? args.task_type
-    : undefined;
   const sinceHours = typeof args.since_hours === "number"
     ? args.since_hours
     : 72;
@@ -261,7 +248,6 @@ export async function executeGetRecentOrionBriefings(
   return await getRecentOrionBriefings(
     supabase,
     userId,
-    taskType,
     sinceHours,
     limit,
     sinceDate,

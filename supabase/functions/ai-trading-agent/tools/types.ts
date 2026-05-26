@@ -2,7 +2,7 @@
  * Shared types for all tool implementations.
  *
  * `tools.ts` re-exports these for stable external imports
- * (briefing-agent.ts, index.ts).
+ * (market-research.ts, index.ts).
  */
 
 import type { MemoryOp } from "../../_shared/memory/index.ts";
@@ -10,7 +10,7 @@ import type { MemoryOp } from "../../_shared/memory/index.ts";
 /**
  * Per-call context passed by edge-function entrypoints into the tool
  * dispatcher. The chat function passes the user's id + calendar (memory
- * is read-write); briefing-agent passes the same plus a restricted
+ * is read-write); market-research passes the same plus a restricted
  * `allowedMemoryOps` set so unattended jobs can't do destructive edits
  * without user-in-the-loop signal.
  */

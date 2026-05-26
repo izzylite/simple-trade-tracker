@@ -1,7 +1,7 @@
 /**
  * update_memory — thin pass-through to `_shared/memory/operations.updateMemory`.
  * Validation, op gating, and Jaccard matching all live in the shared module
- * so chat + briefing-agent + future callers share one implementation.
+ * so chat + market-research + future callers share one implementation.
  */
 
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -78,7 +78,7 @@ export async function executeUpdateMemory(
       ? args.target_text
       : undefined,
     new_text: typeof args.new_text === "string" ? args.new_text : undefined,
-    // Chat function = full ops. briefing-agent overrides via context.
+    // Chat function = full ops. market-research overrides via context.
     allowedOps: context.allowedMemoryOps,
   });
 }
