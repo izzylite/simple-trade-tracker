@@ -9,9 +9,6 @@ import type { OrionTask, TaskResult } from './types.ts';
 
 const TASK_TYPE_LABELS: Record<string, string> = {
   market_research: 'Market Research',
-  daily_analysis: 'Daily Analysis',
-  weekly_review: 'Weekly Review',
-  monthly_rollup: 'Monthly Rollup',
 };
 
 function prettyTaskType(taskType: string): string {

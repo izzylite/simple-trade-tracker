@@ -18,9 +18,8 @@ export interface TaskResult {
   metadata: Record<string, unknown>;
 }
 
-// Handlers may return `null` to suppress storage — used by market_research
-// when a sweep finishes below the configured significance threshold so the
-// user isn't spammed on quiet intervals.
+// Handler may return null to signal "no surprise detected, skip result write."
+// The dispatcher treats null as a successful no-op run.
 export type TaskHandler = (
   task: OrionTask,
   supabase: SupabaseClient
@@ -44,22 +43,3 @@ export interface MarketResearchConfig {
   watchlist_symbols?: string[];
 }
 
-export type OrionTone = 'tough_love' | 'blunt_analyst' | 'supportive_mentor';
-
-export interface DailyAnalysisConfig {
-  run_time_utc: string;
-  tone: OrionTone;
-}
-
-export interface WeeklyReviewConfig {
-  run_day: number;
-  run_time_utc: string;
-  comparison_weeks: number;
-  tone: OrionTone;
-}
-
-export interface MonthlyRollupConfig {
-  run_time_utc: string;
-  comparison_months: number;
-  tone: OrionTone;
-}
