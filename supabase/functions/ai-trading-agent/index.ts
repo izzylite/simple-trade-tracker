@@ -21,6 +21,26 @@ import {
   executeCustomTool,
   CUSTOM_TOOL_NAMES
 } from './tools.ts';
+import {
+  loadUserWebhookTools,
+  dispatchWebhookTool,
+  isWebhookTool,
+} from '../_shared/customTools/runtime.ts';
+
+/**
+ * Scrub webhook-tool results out of any functionCalls[] before it ships to
+ * the FE in SSE/JSON metadata. The result string is the fenced webhook body
+ * — attacker-controlled content. FE today only reads name/label, but
+ * leaving the body in transit is one debug-dump or one eager render away
+ * from stored-XSS-via-webhook. Belt-and-braces.
+ */
+function scrubWebhookResults(
+  calls: Array<{ name: string; args: unknown; result: string }>,
+): Array<{ name: string; args: unknown; result: string | null }> {
+  return calls.map((c) =>
+    isWebhookTool(c.name) ? { ...c, result: null } : c,
+  );
+}
 import { fetchEmbeddedData, type EmbeddedData } from './embedDataFetcher.ts';
 import {
   appendUserMessage,
@@ -1387,6 +1407,13 @@ function handleStreamingRequest(
                   calendarId: _calendarId,
                   conversationId
                 }, supabaseClient)
+                : isWebhookTool(call.name)
+                ? await dispatchWebhookTool({
+                  userId,
+                  registeredName: call.name,
+                  args: call.args,
+                  conversationId: conversationId ?? null,
+                })
                 : await callMCPTool(projectRef, supabaseAccessToken, call.name, call.args);
               return { call, result, success: true };
             } catch (error) {
@@ -1462,7 +1489,7 @@ function handleStreamingRequest(
 
           let functionResult: string;
 
-          // Execute tool (custom or MCP)
+          // Execute tool (custom or MCP or user-defined webhook)
           const supabaseClient = createServiceClient();
           if (CUSTOM_TOOL_NAMES.has(call.name)) {
             functionResult = await executeCustomTool(call.name, call.args, {
@@ -1470,6 +1497,13 @@ function handleStreamingRequest(
                   calendarId: _calendarId,
                   conversationId
                 }, supabaseClient);
+          } else if (isWebhookTool(call.name)) {
+            functionResult = await dispatchWebhookTool({
+              userId,
+              registeredName: call.name,
+              args: call.args,
+              conversationId: conversationId ?? null,
+            });
           } else {
             functionResult = await callMCPTool(projectRef, supabaseAccessToken, call.name, call.args);
           }
@@ -1838,7 +1872,7 @@ function handleStreamingRequest(
         messageHtml,
         gate: gateForDone,
         metadata: {
-          functionCalls,
+          functionCalls: scrubWebhookResults(functionCalls),
           model: MODEL,
           timestamp: new Date().toISOString(),
           turnCount
@@ -2171,7 +2205,8 @@ async function handleReminderRequest(req: Request, body: AgentRequest): Promise<
       ['execute_sql', 'list_tables']
     );
     const customTools = getAllCustomTools();
-    const allTools = [...geminiMcpTools, ...customTools];
+    const userWebhookTools = await loadUserWebhookTools(userId);
+    const allTools = [...geminiMcpTools, ...customTools, ...userWebhookTools];
 
     // Initial call.
     let result = await callGemini(googleApiKey, systemPrompt, userTurnMessage, conversationHistory, allTools);
@@ -2231,6 +2266,13 @@ async function handleReminderRequest(req: Request, body: AgentRequest): Promise<
           { userId, calendarId, conversationId },
           serviceClient
         );
+      } else if (isWebhookTool(call.name)) {
+        functionResult = await dispatchWebhookTool({
+          userId,
+          registeredName: call.name,
+          args: call.args,
+          conversationId: conversationId ?? null,
+        });
       } else {
         functionResult = await callMCPTool(projectRef, supabaseAccessToken, call.name, call.args);
       }
@@ -2680,9 +2722,10 @@ Deno.serve(async (req: Request) => {
     ]);
     log(`Using ${geminiMcpTools.length} MCP tools (filtered)`, 'info');
 
-    // Combine all tools (MCP + Custom)
+    // Combine all tools (MCP + Custom + per-user webhook tools)
     const customTools = getAllCustomTools();
-    const allTools = [...geminiMcpTools, ...customTools];
+    const userWebhookTools = await loadUserWebhookTools(userId);
+    const allTools = [...geminiMcpTools, ...customTools, ...userWebhookTools];
 
     // Pre-fetch focused trade data so the AI has full context from turn 0
     const preloadedTrade = focusedTradeId
@@ -2843,7 +2886,7 @@ Deno.serve(async (req: Request) => {
 
       let functionResult: string;
 
-      // Check if it's a custom tool (from tools.ts)
+      // Check if it's a custom tool (from tools.ts), a user webhook, or MCP
       const supabaseClient = createServiceClient();
       if (CUSTOM_TOOL_NAMES.has(call.name)) {
         // Execute custom tool
@@ -2852,6 +2895,14 @@ Deno.serve(async (req: Request) => {
                   calendarId,
                   conversationId
                 }, supabaseClient);
+        functionCalls.push({ name: call.name, args: call.args, result: functionResult });
+      } else if (isWebhookTool(call.name)) {
+        functionResult = await dispatchWebhookTool({
+          userId,
+          registeredName: call.name,
+          args: call.args,
+          conversationId: conversationId ?? null,
+        });
         functionCalls.push({ name: call.name, args: call.args, result: functionResult });
       } else {
         // Execute MCP tool via HTTP
@@ -3063,7 +3114,7 @@ Deno.serve(async (req: Request) => {
       embeddedEvents: Object.keys(embeddedEvents).length > 0 ? embeddedEvents : undefined,
       embeddedNotes: Object.keys(embeddedNotes).length > 0 ? embeddedNotes : undefined,
       metadata: {
-        functionCalls,
+        functionCalls: scrubWebhookResults(functionCalls),
         model: MODEL,
         timestamp: new Date().toISOString(),
         // Initial-call token accounting — exposes implicit-cache behavior.

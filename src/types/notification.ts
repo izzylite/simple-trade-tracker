@@ -1,4 +1,7 @@
-export type NotificationType = 'reminder_fired' | 'orion_task_result';
+export type NotificationType =
+  | 'reminder_fired'
+  | 'orion_task_result'
+  | 'orion_custom_tool_disabled';
 
 export interface ReminderFiredPayload {
   calendarId: string | null;
@@ -22,9 +25,17 @@ export interface OrionTaskResultPayload {
   preview: string;
 }
 
+export interface OrionCustomToolDisabledPayload {
+  preview: string;
+  tool_id: string;
+  tool_name: string;
+  reason: string;
+}
+
 export type NotificationPayload =
   | ReminderFiredPayload
   | OrionTaskResultPayload
+  | OrionCustomToolDisabledPayload
   | Record<string, unknown>;
 
 export interface AppNotification {
@@ -52,4 +63,12 @@ export function isOrionTaskResultPayload(
   if (notification.type !== 'orion_task_result') return false;
   const p = notification.payload as Partial<OrionTaskResultPayload>;
   return typeof p?.taskId === 'string' && typeof p?.resultId === 'string';
+}
+
+export function isOrionCustomToolDisabledPayload(
+  notification: AppNotification
+): notification is AppNotification & { payload: OrionCustomToolDisabledPayload } {
+  if (notification.type !== 'orion_custom_tool_disabled') return false;
+  const p = notification.payload as Partial<OrionCustomToolDisabledPayload>;
+  return typeof p?.tool_id === 'string' && typeof p?.tool_name === 'string';
 }

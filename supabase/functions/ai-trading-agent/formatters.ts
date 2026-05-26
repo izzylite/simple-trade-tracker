@@ -3,167 +3,7 @@
  * Parse agent output and structure for frontend consumption
  */
 
-import type { AgentResponse, Trade, Calendar, EconomicEvent, ToolCall, Citation } from './types.ts';
-
-/**
- * Database row from MCP SQL query
- */
-interface DatabaseRow {
-  // Common fields
-  id?: string;
-  user_id?: string;
-  created_at?: string | Date;
-  updated_at?: string | Date;
-
-  // Trade-specific fields
-  trade_type?: string;
-  trade_date?: string | Date;
-  calendar_id?: string;
-  amount?: number;
-
-  // Calendar-specific fields
-  account_balance?: number;
-  max_daily_drawdown?: number;
-  name?: string;
-
-  // Economic event fields
-  currency?: string;
-  impact?: string;
-  time_utc?: string;
-  event?: string;
-
-  // Allow any other fields from database
-  [key: string]: unknown;
-}
-
-/**
- * Extract data from database rows (MCP SQL results)
- * Intelligently determines if rows are trades, calendars, or events based on fields
- */
-function extractDataFromRows(
-  rows: DatabaseRow[],
-  trades: Trade[],
-  calendars: Calendar[],
-  economicEvents: EconomicEvent[]
-): void {
-  if (!rows || rows.length === 0) return;
-
-  rows.forEach((row: DatabaseRow) => {
-    // Determine row type by checking distinctive fields
-    if (row.trade_type && row.trade_date) {
-      // This is a trade
-      trades.push(row as unknown as Trade);
-    } else if (row.account_balance !== undefined && row.max_daily_drawdown !== undefined) {
-      // This is a calendar
-      calendars.push(row as unknown as Calendar);
-    } else if (row.currency && row.impact && row.time_utc) {
-      // This is an economic event
-      economicEvents.push(row as unknown as EconomicEvent);
-    }
-    // If none match, skip (might be aggregated stats, etc.)
-  });
-}
-
-/**
- * Parse agent response and extract structured data
- */
-export function formatAgentResponse(
-  response: any,
-  model: string
-): AgentResponse {
-  try {
-    const finalOutput = response.finalOutput || '';
-    const toolCalls: ToolCall[] = [];
-
-    // Extract trades, calendars, and economic events from tool results
-    const trades: Trade[] = [];
-    const calendars: Calendar[] = [];
-    const economicEvents: EconomicEvent[] = [];
-
-    // Process tool calls if available
-    if (response.toolCalls && Array.isArray(response.toolCalls)) {
-      response.toolCalls.forEach((toolCall: any) => {
-        const call: ToolCall = {
-          name: toolCall.name,
-          args: toolCall.args || {},
-          result: toolCall.result,
-        };
-
-        toolCalls.push(call);
-
-        // Handle MCP SQL query results (from Supabase MCP)
-        // MCP returns: { rows: [...], rowCount: N }
-        if (toolCall.result && Array.isArray(toolCall.result)) {
-          // Some MCP responses may be direct arrays
-          const rows = toolCall.result;
-          extractDataFromRows(rows, trades, calendars, economicEvents);
-        } else if (toolCall.result?.rows && Array.isArray(toolCall.result.rows)) {
-          // Standard MCP format: { rows: [...], rowCount: N }
-          const rows = toolCall.result.rows;
-          extractDataFromRows(rows, trades, calendars, economicEvents);
-        } else if (toolCall.result?.data) {
-          // Legacy format support (from specific tools, not MCP)
-          const data = toolCall.result.data;
-
-          // Extract trades
-          if (data.trades && Array.isArray(data.trades)) {
-            trades.push(...data.trades);
-          }
-
-          // Extract calendar
-          if (data.calendar) {
-            calendars.push(data.calendar);
-          }
-
-          // Extract economic events
-          if (data.events && Array.isArray(data.events)) {
-            economicEvents.push(...data.events);
-          }
-        }
-      });
-    }
-
-    // Deduplicate trades by ID
-    const uniqueTrades = Array.from(
-      new Map(trades.map((trade) => [trade.id, trade])).values()
-    );
-
-    // Deduplicate calendars by ID
-    const uniqueCalendars = Array.from(
-      new Map(calendars.map((calendar) => [calendar.id, calendar])).values()
-    );
-
-    // Deduplicate events by ID
-    const uniqueEvents = Array.from(
-      new Map(economicEvents.map((event) => [event.id, event])).values()
-    );
-
-    return {
-      success: true,
-      message: finalOutput,
-      trades: uniqueTrades.length > 0 ? uniqueTrades : undefined,
-      calendars: uniqueCalendars.length > 0 ? uniqueCalendars : undefined,
-      economicEvents: uniqueEvents.length > 0 ? uniqueEvents : undefined,
-      metadata: {
-        functionCalls: toolCalls,
-        tokenUsage: response.usage?.totalTokens,
-        model,
-        timestamp: new Date().toISOString(),
-      },
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: 'I encountered an error processing the response. Please try again.',
-      metadata: {
-        functionCalls: [],
-        model,
-        timestamp: new Date().toISOString(),
-      },
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
-  }
-}
+import type { AgentResponse, ToolCall, Citation } from './types.ts';
 
 /**
  * Classify a provider error and produce a user-friendly markdown message.
@@ -339,6 +179,12 @@ export function extractCitations(toolCalls: ToolCall[]): Citation[] {
   const seenUrls = new Set<string>();
 
   toolCalls.forEach((toolCall, index) => {
+    // SECURITY: webhook tool results are attacker-controlled content wrapped
+    // in <custom_tool_data trust="untrusted"> fences. If we extract URLs
+    // from those bodies, a malicious webhook can plant arbitrary clickable
+    // citations into the assistant's reply — exactly the leak the fence is
+    // meant to prevent. Skip user_tool_* entirely.
+    if (toolCall.name?.startsWith('user_tool_')) return;
     const urls = extractUrlsFromToolResult(toolCall.result);
 
     urls.forEach((url) => {

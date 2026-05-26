@@ -287,6 +287,66 @@ implementation plan (~1-2 weeks), and the 10 critical red-team fixes that must
 not be skipped (cosine threshold + numeric guard, fingerprint title drift,
 explicit-vs-implicit caching, currency canonicalization, etc.).
 
+### Custom Tools via Webhook (Orion elite feature) — SHIPPED 2026-05-25/26 + HARDENED 2026-05-26
+
+**Doc:** `.planning/architecture/custom-tools-webhook.md` (has authoritative "Post-ship hardening" section)
+**Designed:** 2026-05-24 — **Shipped:** 2026-05-25 → 2026-05-26 (Phases 1–5) — **Hardened:** 2026-05-26 (security/UX review applied)
+**Tier gate:** `elite` only, enforced at registration (edge function, uncached) AND runtime (loadUserWebhookTools, 60s tier cache with 5s negative TTL).
+
+**What's live:** elite-tier users register webhook-backed tools via a settings
+gear in the Orion drawer header. The wizard runs **inline inside the expanded
+settings card** (4-step create / 2-step edit; not a separate dialog). Gemini
+drafts name/description/args from a natural-language description; user reviews
+(JSON schemas tucked behind an "Advanced" disclosure); system fires 3 HMAC-signed
+test calls and gates save on speed/size/shape/audit. Orion sees the tool as
+`user_tool_<name>` and dispatches HMAC-signed POSTs at runtime with 5s timeout
++ 256KB streaming cap + `redirect: "manual"` (SSRF defense — 3xx is rejected).
+Responses wrapped in `<custom_tool_data trust="untrusted">` fence; `fence()`
+substring-escapes `</custom_tool_data` to prevent injected close-tags. System
+prompt has a dedicated `## Untrusted Webhook Data — Fence Rules` section
+(protocol rules — delimiter, trust-attr, nested tags — plus content patterns
+covering blatant / polite / authority-keyed / action-keyed injection +
+multi-turn carryover). Failures increment per-tool counters via atomic SQL RPC
+with early-return guard for already-disabled tools; 10 consecutive failures
+auto-disable + insert notification (deduped to 1/24h per tool). Per-conversation
+runtime rate limit caps any one tool at 20 calls (in-process Map). Per-user
+`test_tool` action is **Postgres-rate-limited** at 5 fires/60s (durable; the
+in-process counter is per-isolate and bypassable). Aggregate `success_count` +
+`failure_count` columns on the row replaced the per-call log table. Each tool
+card has a **Test button** that fires the saved webhook once and shows a
+6-second flash chip. Notification click on auto-disable deep-links to
+`/assistant?openOrionSettings=1&customToolId=<id>` → `AIChatDrawer` opens
+settings dialog automatically.
+
+**Key implementation files:**
+- DB: `supabase/migrations/20260525*_custom_tools*.sql` + `20260526*_custom_tools_fixes.sql` (trigger scope + CHECK + early-return guard) + `20260526*_drop_call_log_add_aggregate_counters.sql` + `20260526*_custom_tools_disable_notification_24h_dedup.sql` + `20260526*_custom_tool_test_tool_rate_limit.sql`
+- Backend edge fn: `supabase/functions/custom-tools-register/` (actions: draft_schema / audit / test_fire / save / edit / list / delete / set_enabled / test_tool — `get_call_log` removed)
+- Shared runtime: `supabase/functions/_shared/customTools/` (runtime, signing, urlValidator, types) + `_shared/crypto.ts`
+- Runtime hooks: `ai-trading-agent/index.ts` (4 dispatch + 2 catalog sites + `scrubWebhookResults`), `systemPrompt.ts` (one-line GUARDRAILS bullet + dedicated `## Untrusted Webhook Data` section + Tools Available #16), `formatters.ts` (`extractCitations` skips `user_tool_*`)
+- Frontend: `src/features/orion/components/settings/` — `OrionSettingsDialog`, `CustomToolsSection`, `CustomToolCard`, `CustomToolFormPanel` (inline, not a dialog), `StepRail` / `DescribeStep` / `ReviewStep` / `SecretRevealBox` / `StageGates` / `VerifyStep` / `WebhookDocsAccordion` / `GateChip` / `customToolFormHelpers`, plus `services/customToolsService.ts` + `types/customTool.ts`
+- Entry point: gear icon in `AIChatDrawer` header between `OrionUsageRing` and `CloseIcon`
+
+**Frozen decisions still in force:**
+- Elite tier only (the "tier-3" of the design doc)
+- `user_tool_` namespace prefix; tool cap 5 per user
+- No registration without passing test-fire
+- Gemini-drafted schema + mandatory user review
+- Failure handling = inline mention via tool-result + auto-disable after 10 consecutive failures (with disable-notification 24h dedup)
+- Read-only flag drives caching, not trust
+- No retry on webhook failure; no replay protection on outbound payloads (idempotency key is deterministic per logical call)
+- No registration-time injection scanning (runtime fence is the defense; `fence()` substring-escapes injected close-tags)
+- No user-declared output schema
+- No DNS resolution (`Deno.resolveDns` unsupported in Supabase Edge) — literal-IP/hostname blocklists + `redirect: "manual"` are the SSRF defense
+
+**Open question resolutions (locked during build):**
+tool cap=5, auto-disable threshold=10, speed gates <800ms/2.5s, idempotency key = stable SHA-256 over (conv_id, tool_id, args) truncated to 128 bits, per-user test_tool rate limit = 5/60s (Postgres-backed). Aggregate counters on row; per-call log dropped.
+
+**Latent watchouts captured in memory:**
+- `Deno.resolveDns` doesn't work in Supabase Edge Functions — hangs ~10s → 502 (memory: `project_deno_resolvedns_unsupported_in_supabase`)
+- Gemini `responseSchema` rejects open-ended `type:"object"` fields → same ~9s hang → emit as JSON-encoded string (memory: `project_gemini_response_schema_generic_object_workaround`)
+- `custom_tools.updated_at` trigger is scoped to user-facing edits ONLY (name/description/args_schema/webhook_url/is_read_only/registered_name/baseline_sample). Internal counter writes (last_success_at, success_count, failure_count, etc.) must NOT bump it or the read-only cache key invalidates on every success
+- `tsc` passes but Deno boot rejects const-collision in long handlers (memory: `project_tsc_passes_deno_rejects_const_collision`)
+
 ### Semantic Recall for `recall_conversations` — SHIPPED 2026-05-19/20
 
 Embedding-based semantic recall over past conversations (`gemini-embedding-2`,

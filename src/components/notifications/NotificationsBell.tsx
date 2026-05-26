@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useNotifications } from 'contexts/NotificationsContext';
 import {
   AppNotification,
+  isOrionCustomToolDisabledPayload,
   isOrionTaskResultPayload,
   isReminderFiredPayload,
 } from 'types/notification';
@@ -40,6 +41,16 @@ const NotificationsBell: React.FC = () => {
         if (n.payload.calendarId) params.set('calendarId', n.payload.calendarId);
         params.set('conversationId', n.payload.conversationId);
         if (n.payload.messageId) params.set('messageId', n.payload.messageId);
+        navigate(`/assistant?${params.toString()}`);
+        return;
+      }
+
+      if (isOrionCustomToolDisabledPayload(n)) {
+        // Land on /assistant with hints OrionSettingsDialog consumes on mount
+        // to auto-open the settings dialog with the auto-disabled tool focused.
+        const params = new URLSearchParams();
+        params.set('openOrionSettings', '1');
+        params.set('customToolId', n.payload.tool_id);
         navigate(`/assistant?${params.toString()}`);
         return;
       }

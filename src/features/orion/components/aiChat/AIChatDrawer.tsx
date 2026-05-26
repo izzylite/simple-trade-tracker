@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import OrionMark from 'features/orion/components/aiChat/OrionMark';
 import { useOrionExpression } from 'features/orion/hooks/useOrionExpression';
 import {
@@ -25,6 +26,7 @@ import {
   History as HistoryIcon,
   Alarm as AlarmIcon,
   ArrowBack as ArrowBackIcon,
+  Tune as SettingsIcon,
 } from '@mui/icons-material';
 import ManageSearchIcon from '@mui/icons-material/ManageSearch';
 import { format } from 'date-fns';
@@ -40,6 +42,7 @@ import { ConversationRepository } from 'services/repositories/ConversationReposi
 import { logger } from 'utils/logger';
 import { TabPanel } from 'components/common/RoundedTabs';
 import OrionTasksContent from 'features/orion/components/orionTasks/OrionTasksContent';
+import OrionSettingsDialog from 'features/orion/components/settings/OrionSettingsDialog';
 import type { AITasksBundle, OrionTaskResult } from 'features/orion/types/orionTask';
 import { TASK_TYPE_LABELS } from 'features/orion/types/orionTask';
 import { useAuth } from 'contexts/SupabaseAuthContext';
@@ -114,6 +117,21 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   const [showHistoryView, setShowHistoryView] = useState(false);
   const [showRemindersView, setShowRemindersView] = useState(false);
   const [showMemoryLogsView, setShowMemoryLogsView] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  // ?openOrionSettings=1 fallback — bell click on an `orion_custom_tool_disabled`
+  // notification lands here. Open the settings dialog then strip the param so
+  // refresh doesn't re-trigger. customToolId is consumed by CustomToolsSection
+  // for focus (deferred — v1 just opens the dialog).
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get('openOrionSettings') !== '1') return;
+    setSettingsOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('openOrionSettings');
+    next.delete('customToolId');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   // Fallback chat state lives at the drawer level so it survives tab switches
   // (AIChatContent unmounts when activeTab changes). Callers that already manage
@@ -426,6 +444,16 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
 
             <OrionUsageRing refreshTrigger={effectiveChatState.messages.length} />
 
+            <Tooltip title="Orion settings">
+              <IconButton
+                size="small"
+                onClick={() => setSettingsOpen(true)}
+                sx={{ color: theme.palette.text.secondary }}
+              >
+                <SettingsIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+
             <Tooltip title="Close">
               <IconButton
                 size="small"
@@ -696,6 +724,11 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
           </Box>
         </Box>
       </Box>
+
+      <OrionSettingsDialog
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+      />
     </>
   );
 };

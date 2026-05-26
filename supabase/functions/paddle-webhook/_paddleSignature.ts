@@ -4,24 +4,11 @@
  *
  * Spec: https://developer.paddle.com/webhooks/signature-verification
  */
+import { constantTimeEquals, hmacSha256Hex } from '../_shared/crypto.ts';
+
 export interface PaddleSignatureCheck {
   ok: boolean;
   reason?: string;
-}
-
-function constantTimeEquals(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let mismatch = 0;
-  for (let i = 0; i < a.length; i++) {
-    mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-  return mismatch === 0;
-}
-
-function hexFromBytes(bytes: ArrayBuffer): string {
-  return Array.from(new Uint8Array(bytes))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
 }
 
 export async function verifyPaddleSignature(
@@ -50,18 +37,7 @@ export async function verifyPaddleSignature(
     return { ok: false, reason: `signature too old (${Math.round(ageSeconds)}s)` };
   }
 
-  const encoder = new TextEncoder();
-  const keyData = encoder.encode(secret);
-  const key = await crypto.subtle.importKey(
-    'raw',
-    keyData,
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-  const expected = hexFromBytes(
-    await crypto.subtle.sign('HMAC', key, encoder.encode(`${ts}:${rawBody}`))
-  );
+  const expected = await hmacSha256Hex(secret, `${ts}:${rawBody}`);
 
   return constantTimeEquals(expected, h1)
     ? { ok: true }

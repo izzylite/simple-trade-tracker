@@ -13,6 +13,7 @@
  */
 
 import { createServiceClient, log } from '../_shared/supabase.ts';
+import { bytesToHex } from '../_shared/crypto.ts';
 
 const REHOST_HOSTS = new Set(['quickchart.io']);
 const MAX_BYTES = 5 * 1024 * 1024; // matches bucket file_size_limit
@@ -88,10 +89,7 @@ async function rehostOneUrl(
 
     // Short content hash for cache-busting + idempotency on retries.
     const hashBuf = await crypto.subtle.digest('SHA-1', buf);
-    const hex = [...new Uint8Array(hashBuf)]
-      .map((b) => b.toString(16).padStart(2, '0'))
-      .join('')
-      .slice(0, 12);
+    const hex = bytesToHex(hashBuf).slice(0, 12);
 
     const path =
       `${ctx.userId}/${ctx.conversationId}/${ctx.messageId}-${hex}.${ext}`;

@@ -68,7 +68,11 @@ const labelForToolCall = (name: string, args?: unknown): string => {
       ? (args as Record<string, unknown>).action as string
       : undefined;
   if (action && TOOL_LABELS[`${name}:${action}`]) return TOOL_LABELS[`${name}:${action}`];
-  return TOOL_LABELS[name] || name;
+  if (TOOL_LABELS[name]) return TOOL_LABELS[name];
+  // User-defined webhook tools — strip the internal `user_tool_` namespace
+  // prefix (kept in sync with _shared/toolLabels.ts).
+  if (name.startsWith('user_tool_')) return name.slice('user_tool_'.length);
+  return name;
 };
 
 /**
@@ -932,7 +936,10 @@ export function useAIChat({
       let toolCallsInProgress: string[] = [];
       const toolCallHistory: Array<{ name: string; label: string }> = [];
       const toolLabelByName = new Map<string, string>();
-      const labelOf = (name: string) => toolLabelByName.get(name) || TOOL_LABELS[name] || name;
+      const labelOf = (name: string) =>
+        toolLabelByName.get(name)
+        || TOOL_LABELS[name]
+        || (name.startsWith('user_tool_') ? name.slice('user_tool_'.length) : name);
 
       // Title hint is only meaningful on the very first send of a new
       // conversation (the backend's upsert uses `ignoreDuplicates: true`,

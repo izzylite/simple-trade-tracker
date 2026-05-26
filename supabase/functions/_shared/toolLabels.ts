@@ -61,7 +61,12 @@ export function labelForToolCall(
   if (action && ORION_TOOL_LABELS[`${name}:${action}`]) {
     return ORION_TOOL_LABELS[`${name}:${action}`];
   }
-  return ORION_TOOL_LABELS[name] ?? name;
+  if (ORION_TOOL_LABELS[name]) return ORION_TOOL_LABELS[name];
+  // User-defined webhook tools — strip the internal `user_tool_` namespace
+  // prefix so chats show e.g. `get_unusual_options_flow`, not the raw
+  // registered_name. Server-side and client-side label maps stay in sync.
+  if (name.startsWith('user_tool_')) return name.slice('user_tool_'.length);
+  return name;
 }
 
 export interface ToolCallSummary {

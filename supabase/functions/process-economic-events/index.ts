@@ -6,6 +6,7 @@
  * and stores them in the PostgreSQL database
  */
  
+import { bytesToHex } from '../_shared/crypto.ts'
 import {
   createServiceClient,
   errorResponse,
@@ -194,8 +195,7 @@ async function generateEventId(currency: string, eventName: string, country: str
   const uniqueString = `${currency}-${eventName}-${country}-${impact}`.toLowerCase()
   const data = new TextEncoder().encode(uniqueString)
   const digest = await crypto.subtle.digest('SHA-256', data)
-  const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('')
-  return hex.substring(0, 20)
+  return bytesToHex(digest).substring(0, 20)
 }
 
 function extractRelevantRowsHTML(html: string): string {
