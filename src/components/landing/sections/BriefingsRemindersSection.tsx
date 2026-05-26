@@ -520,11 +520,12 @@ const BriefingsRemindersSection: React.FC = () => {
                             ...revealSx(body.inView, 160),
                         }}
                     >
-                        Schedule a market research run before the open. A daily analysis of
-                        yesterday&rsquo;s tape. A weekly review on Sunday in the tone you
-                        choose. Each one lands in the inbox with sources and the tools it
-                        used. Tell Orion in chat to ping you 30 min before FOMC, and the
-                        message comes back into the same thread when the time hits.
+                        Set up market research and Orion sweeps the news for catalysts
+                        on your watchlist. When something market-moving clears your
+                        significance threshold, a briefing lands in the inbox with the
+                        impact breakdown, sources, and the tools it used. Tell Orion in
+                        chat to ping you 30 min before FOMC, and the message comes back
+                        into the same thread when the time hits.
                     </Typography>
                 </Box>
 
