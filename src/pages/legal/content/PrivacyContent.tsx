@@ -57,7 +57,7 @@ const PrivacyContent: React.FC = () => (
       <li><Typography variant="body1" component="span"><strong>Paddle</strong> — Merchant of Record for subscriptions. Holds payment data, calculates tax, and sends billing receipts.</Typography></li>
       <li><Typography variant="body1" component="span"><strong>Resend</strong> — sends transactional email (invites, reminders, account notifications).</Typography></li>
       <li><Typography variant="body1" component="span"><strong>Serper</strong> and <strong>Tavily</strong> — web search providers used by Orion. Receive search queries derived from your requests, not raw conversation history.</Typography></li>
-      <li><Typography variant="body1" component="span"><strong>Twelve Data</strong> and <strong>Yahoo Finance</strong> — price and historical-candle feeds. Receive ticker symbols only; no user identity.</Typography></li>
+      <li><Typography variant="body1" component="span"><strong>Twelve Data</strong>, <strong>Yahoo Finance</strong>, and <strong>Frankfurter</strong> — price, historical-candle, and forex feeds. Receive ticker or currency codes only; no user identity.</Typography></li>
       <li><Typography variant="body1" component="span"><strong>QuickChart</strong> — renders chart images requested by Orion. Receives chart data structures, which may include values derived from your trades when you ask Orion to chart your performance.</Typography></li>
     </ul>
     <Typography variant="body1">
