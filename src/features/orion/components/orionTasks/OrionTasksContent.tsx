@@ -23,7 +23,7 @@ import { useDialogTokens } from 'styles/dialogTokens';
 import EconomicEventShimmer from 'features/events/components/EconomicEventShimmer';
 import ConfirmationDialog from 'components/common/ConfirmationDialog';
 import TaskResultCard from 'features/orion/components/orionTasks/TaskResultCard';
-import MarketResearchSettingsPanel from 'features/orion/components/orionTasks/MarketResearchSettingsPanel';
+import MarketResearchSettingsDialog from 'features/orion/components/orionTasks/MarketResearchSettingsDialog';
 import type {
   OrionTask,
   OrionTaskResult,
@@ -185,13 +185,48 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
                 backgroundColor:
                   mrTask.status === 'active'
                     ? violetSofter
-                    : alpha(theme.palette.text.secondary, 0.08),
-                color: mrTask.status === 'active' ? violet : 'text.secondary',
-                border: `1px solid ${mrTask.status === 'active' ? violetBorder : hairline}`,
+                    : mrTask.status === 'disabled'
+                      ? alpha(theme.palette.error.main, 0.12)
+                      : alpha(theme.palette.text.secondary, 0.08),
+                color:
+                  mrTask.status === 'active'
+                    ? violet
+                    : mrTask.status === 'disabled'
+                      ? theme.palette.error.main
+                      : 'text.secondary',
+                border: `1px solid ${
+                  mrTask.status === 'active'
+                    ? violetBorder
+                    : mrTask.status === 'disabled'
+                      ? alpha(theme.palette.error.main, 0.35)
+                      : hairline
+                }`,
               }}
             >
               {mrTask.status.toUpperCase()}
             </Box>
+            {/* Threshold-gated failure summary. Stays hidden for 1-2 transient
+                blips (Gemini 503s etc.) and surfaces only when failures
+                accumulate. Once we hit 10 the server auto-disables and the
+                status pill above flips to DISABLED, so this indicator is the
+                bridge between "all green" and "fully off". */}
+            {(mrTask.consecutive_failures ?? 0) >= 3 && mrTask.status !== 'disabled' && (
+              <Tooltip
+                title={
+                  mrTask.last_error_at
+                    ? `${mrTask.consecutive_failures} runs failed. Last at ${format(new Date(mrTask.last_error_at), 'MMM d, h:mm a')}.`
+                    : `${mrTask.consecutive_failures} runs failed.`
+                }
+              >
+                <Typography
+                  component="span"
+                  variant="caption"
+                  sx={{ color: theme.palette.warning.main, fontSize: '0.7rem', cursor: 'help' }}
+                >
+                  {mrTask.consecutive_failures} runs failed
+                </Typography>
+              </Tooltip>
+            )}
           </Box>
 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -257,24 +292,8 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
           ...scrollbarStyles(theme),
         }}
       >
-        {/* Inline settings panel — create or edit */}
-        {settingsOpen && (
-          <MarketResearchSettingsPanel
-            existingTask={mrTask}
-            onSave={async (config) => {
-              if (mrTask) {
-                await onUpdateTask?.(mrTask.id, { config });
-              } else {
-                await onCreateTask(config);
-              }
-              setSettingsOpen(false);
-            }}
-            onCancel={() => setSettingsOpen(false)}
-          />
-        )}
-
         {/* No task yet — empty state */}
-        {tasks.length === 0 && !settingsOpen ? (
+        {tasks.length === 0 ? (
           <Box sx={{ px: 2, py: 2.5 }}>
             <Box
               sx={{
@@ -446,6 +465,19 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
           </Box>
         ) : null}
       </Box>
+
+      <MarketResearchSettingsDialog
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        existingTask={mrTask}
+        onSave={async (config) => {
+          if (mrTask) {
+            await onUpdateTask?.(mrTask.id, { config });
+          } else {
+            await onCreateTask(config);
+          }
+        }}
+      />
 
       <ConfirmationDialog
         open={!!pendingDeleteTaskId}

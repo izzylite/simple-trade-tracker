@@ -1,22 +1,23 @@
-// Inline settings panel for Market Research task creation and editing.
-// Rendered directly inside a parent settings card — not in a separate dialog.
-// Mirrors the visual/interaction pattern of CustomToolFormPanel.
+// Modal dialog for Market Research task creation and editing. Replaces the
+// inline panel — the dialog overlay was preferred over inline expansion
+// because the form is dense (5 fields, autocompletes with large catalogs) and
+// the inline mount competed with the result-feed scroll region for vertical
+// space.
 
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Autocomplete,
   Box,
-  Button,
   Chip,
   CircularProgress,
-  IconButton,
   TextField,
   Typography,
   alpha,
   useTheme,
 } from '@mui/material';
-import { Close as CloseIcon } from '@mui/icons-material';
+import { ManageSearch as ManageSearchIcon } from '@mui/icons-material';
 
+import BaseDialog from 'components/common/BaseDialog';
 import type {
   AlertFrequency,
   AlertMinSignificance,
@@ -44,10 +45,11 @@ import { logger } from 'utils/logger';
 // Types
 // ---------------------------------------------------------------------------
 
-interface MarketResearchSettingsPanelProps {
+interface MarketResearchSettingsDialogProps {
+  open: boolean;
+  onClose: () => void;
   existingTask: OrionTask | null;
   onSave: (config: MarketResearchConfig) => Promise<void>;
-  onCancel: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -113,16 +115,17 @@ function pruneOrphanedMacros(
 // Main component
 // ---------------------------------------------------------------------------
 
-const MarketResearchSettingsPanel: React.FC<MarketResearchSettingsPanelProps> = ({
+const MarketResearchSettingsDialog: React.FC<MarketResearchSettingsDialogProps> = ({
+  open,
+  onClose,
   existingTask,
   onSave,
-  onCancel,
 }) => {
   const theme = useTheme();
   const {
     violet, violetSoft, violetBorder,
     hairline, surfaceInset,
-    monoLabelSx, chipStyle, primaryButtonSx, ghostButtonSx, inputSx,
+    chipStyle, inputSx,
   } = useDialogTokens();
 
   const isEditMode = existingTask !== null;
@@ -135,6 +138,21 @@ const MarketResearchSettingsPanel: React.FC<MarketResearchSettingsPanelProps> = 
   const [saving, setSaving] = useState(false);
   const [catalog, setCatalog] = useState<MacroQueryEntry[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
+
+  // Re-hydrate when the dialog opens with a different existingTask. Without
+  // this, switching from "edit task A" → close → "edit task B" would show A's
+  // stale config. Also handles the create → edit transition (open with a task
+  // that wasn't there on mount).
+  useEffect(() => {
+    if (!open) return;
+    setConfig(
+      hydrateMarketResearchConfig(
+        existingTask
+          ? (existingTask.config as unknown as Record<string, unknown>)
+          : {},
+      ),
+    );
+  }, [open, existingTask]);
 
   useEffect(() => {
     let cancelled = false;
@@ -187,23 +205,27 @@ const MarketResearchSettingsPanel: React.FC<MarketResearchSettingsPanelProps> = 
   const handleSave = async () => {
     if (!canSave || saving) return;
     setSaving(true);
-    try { await onSave(config); } finally { setSaving(false); }
+    try {
+      await onSave(config);
+      onClose();
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
-    <Box sx={{ m: 2, border: `1px solid ${violetBorder}`, backgroundColor: surfaceInset, borderRadius: 1.5, overflow: 'hidden' }}>
-      {/* Header */}
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2, py: 1.25, borderBottom: `1px solid ${hairline}` }}>
-        <Typography sx={{ ...monoLabelSx, color: violet, fontSize: '0.72rem' }}>
-          {isEditMode ? 'Edit Market Research' : 'Set Up Market Research'}
-        </Typography>
-        <IconButton size="small" onClick={onCancel} sx={{ color: 'text.secondary', p: 0.5 }} aria-label="Close panel">
-          <CloseIcon sx={{ fontSize: 16 }} />
-        </IconButton>
-      </Box>
-
-      {/* Body */}
-      <Box sx={{ px: 2, py: 2, display: 'flex', flexDirection: 'column', gap: 2.5, overflowY: 'auto' }}>
+    <BaseDialog
+      open={open}
+      onClose={onClose}
+      maxWidth="sm"
+      fullWidth
+      title={isEditMode ? 'Edit Market Research' : 'Set Up Market Research'}
+      headerIcon={<ManageSearchIcon sx={{ fontSize: 20 }} />}
+      primaryButtonText={isEditMode ? 'Save' : 'Set Up'}
+      primaryButtonAction={handleSave}
+      isSubmitting={saving}
+    >
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
 
         {/* Markets */}
         <FieldGroup label="Markets">
@@ -344,16 +366,8 @@ const MarketResearchSettingsPanel: React.FC<MarketResearchSettingsPanelProps> = 
         </FieldGroup>
 
       </Box>
-
-      {/* Sticky footer */}
-      <Box sx={{ position: 'sticky', bottom: 0, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 1, px: 2, py: 1.25, borderTop: `1px solid ${hairline}`, backgroundColor: 'background.paper' }}>
-        <Button onClick={onCancel} disabled={saving} sx={ghostButtonSx}>Cancel</Button>
-        <Button onClick={handleSave} disabled={!canSave || saving} variant="contained" sx={primaryButtonSx}>
-          {saving ? 'Saving…' : isEditMode ? 'Save' : 'Set Up'}
-        </Button>
-      </Box>
-    </Box>
+    </BaseDialog>
   );
 };
 
-export default MarketResearchSettingsPanel;
+export default MarketResearchSettingsDialog;
