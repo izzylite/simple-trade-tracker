@@ -142,24 +142,20 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
     autoSaveConversation: true,
   });
   const effectiveChatState = sharedChatState ?? internalChatState;
-  // Fire a wink one-shot every time the user lands on the Tasks tab WITH
-  // at least one existing task. Keyed by an incrementing counter that the
-  // expression hook watches for changes — re-selecting Tasks (away →
-  // Tasks → away → Tasks) re-fires; toggling tasks count while already on
-  // the tab does not (the user is already looking at the list).
-  const [tasksWinkKey, setTasksWinkKey] = useState(0);
+  // Fire a pulse (alert ring) one-shot every time the user lands on the
+  // Market Research tab. Keyed by an incrementing counter that the expression
+  // hook watches for changes — re-selecting Market Research (away → MR →
+  // away → MR) re-fires. Fires regardless of whether a task exists so the
+  // pulse also draws attention to the empty state on first visit.
+  const [marketResearchPulseKey, setMarketResearchPulseKey] = useState(0);
   const prevActiveTabRef = React.useRef(activeTab);
   useEffect(() => {
     const prevTab = prevActiveTabRef.current;
     prevActiveTabRef.current = activeTab;
-    if (
-      prevTab !== 1 &&
-      activeTab === 1 &&
-      (aiTasks?.tasks?.length ?? 0) > 0
-    ) {
-      setTasksWinkKey((k) => k + 1);
+    if (prevTab !== 1 && activeTab === 1) {
+      setMarketResearchPulseKey((k) => k + 1);
     }
-  }, [activeTab, aiTasks?.tasks?.length]);
+  }, [activeTab]);
 
   const orionExpression = useOrionExpression(
     effectiveChatState.isLoading,
@@ -169,7 +165,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
       // Tab switches count as activity — proves the user is present and
       // resets the idle→sleep timer.
       activitySignal: activeTab,
-      pulse: { state: 'wink', key: tasksWinkKey },
+      pulse: { state: 'alert', key: marketResearchPulseKey },
     },
   );
   const conversationRepoRef = React.useRef(new ConversationRepository());
