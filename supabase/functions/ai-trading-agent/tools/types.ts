@@ -1,24 +1,21 @@
 /**
- * Shared types for all tool implementations.
- *
- * `tools.ts` re-exports these for stable external imports
- * (market-research.ts, index.ts).
+ * Shared types for all tool implementations. Consumed by `tools.ts` and the
+ * chat dispatcher in `index.ts`.
  */
 
 import type { MemoryOp } from "../../_shared/memory/index.ts";
 
 /**
- * Per-call context passed by edge-function entrypoints into the tool
- * dispatcher. The chat function passes the user's id + calendar (memory
- * is read-write); market-research passes the same plus a restricted
- * `allowedMemoryOps` set so unattended jobs can't do destructive edits
- * without user-in-the-loop signal.
+ * Per-call context passed by the edge-function entrypoint into the tool
+ * dispatcher. `allowedMemoryOps`, when set, restricts which memory ops the
+ * update_memory / apply_rule_change tools will accept; when undefined, all
+ * ops are permitted. Currently always undefined in production paths — the
+ * field is the future hook for restricted/unattended callers.
  */
 export interface ToolContext {
   userId?: string;
   calendarId?: string;
   conversationId?: string;
-  // When omitted, updateMemory defaults to all ops permitted.
   allowedMemoryOps?: Set<MemoryOp>;
 }
 

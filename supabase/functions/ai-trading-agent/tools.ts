@@ -4,7 +4,7 @@
  * Thin orchestration layer. Each tool's definition + implementation lives in
  * its own file under `./tools/` — this module re-exports the public surface
  * (`getAllCustomTools`, `executeCustomTool`, `CUSTOM_TOOL_NAMES`) consumed by
- * index.ts and run-orion-task/market-research.ts.
+ * `index.ts` (the chat dispatcher).
  *
  * When changing a tool's behaviour, edit `tools/<name>.ts` (description and
  * implementation are co-located there). When adding a new tool, register it

@@ -108,7 +108,7 @@ async function getRecentOrionBriefings(
     let query = supabase
       .from("orion_task_results")
       .select(
-        "id, task_type, significance, metadata, content_plain, created_at",
+        "id, significance, metadata, content_plain, created_at",
       )
       .eq("user_id", userId)
       // Drop search-outage rows (current + legacy serper outage flag).
@@ -118,6 +118,10 @@ async function getRecentOrionBriefings(
       .order("created_at", { ascending: false })
       .limit(boundedLimit);
 
+    // Belt-and-braces: keep this tool scoped to market_research even if a
+    // future migration widens the orion_task_type enum. The 2026-05-26
+    // collapse already constrains the column to a single value, so this
+    // is currently redundant — kept for forward compatibility.
     query = query.eq("task_type", "market_research");
 
     if (untilDate) {
@@ -208,15 +212,18 @@ async function getRecentOrionBriefings(
         : "";
 
       return (
-        `[${i + 1}] ${r.created_at} | ${r.task_type} | ${sig}\n` +
+        `[${i + 1}] ${r.created_at} | ${sig}\n` +
         `    Title: ${title}\n` +
         `    ${body}${sourcesBlock}`
       );
     });
 
-    return `Found ${rows.length} Orion briefing${
+    const headerRange = sinceDate
+      ? `between ${sinceDate}${untilDate ? ` and ${untilDate}` : " and now"}`
+      : `in the last ${sinceHours}h`;
+    return `Found ${rows.length} Market Research briefing${
       rows.length === 1 ? "" : "s"
-    } in the last ${sinceHours}h:\n\n${lines.join("\n\n")}`;
+    } ${headerRange}:\n\n${lines.join("\n\n")}`;
   } catch (error) {
     return `Failed to fetch briefings: ${
       error instanceof Error ? error.message : "Unknown"
