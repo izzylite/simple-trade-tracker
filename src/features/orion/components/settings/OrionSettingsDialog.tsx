@@ -1,7 +1,8 @@
 import React from 'react';
-import { Box } from '@mui/material';
+import { Box, Divider, Stack } from '@mui/material';
 import BaseDialog from 'components/common/BaseDialog';
 import CustomToolsSection from './CustomToolsSection';
+import SystemToolsSection from './SystemToolsSection';
 
 interface Props {
   open: boolean;
@@ -14,14 +15,16 @@ const OrionSettingsDialog: React.FC<Props> = ({ open, onClose }) => {
       open={open}
       onClose={onClose}
       title="Orion settings"
-      subtitle="Customize how Orion works for you"
+      subtitle="See what Orion can do and wire in your own webhooks"
       maxWidth="sm"
       fullWidth
       hideFooterCancelButton
     >
-      <Box>
+      <Stack spacing={3}>
+        <SystemToolsSection />
+        <Divider />
         <CustomToolsSection />
-      </Box>
+      </Stack>
     </BaseDialog>
   );
 };
