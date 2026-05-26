@@ -7,6 +7,7 @@ import LandingNav from 'components/landing/LandingNav';
 import LandingHero from 'components/landing/LandingHero';
 import LandingBento from 'components/landing/LandingBento';
 import LandingFeatureRows from 'components/landing/LandingFeatureRows';
+import LandingFooter from 'components/landing/LandingFooter';
 import { useSpotlight } from 'components/landing/landingHooks';
 
 const LandingPage: React.FC = () => {
@@ -88,6 +89,7 @@ const LandingPage: React.FC = () => {
                     <LandingHero onGetStarted={handleGetStarted} />
                     <LandingBento />
                     <LandingFeatureRows onGetStarted={handleGetStarted} />
+                    <LandingFooter />
                 </Box>
             </Box>
             <LoginDialog
