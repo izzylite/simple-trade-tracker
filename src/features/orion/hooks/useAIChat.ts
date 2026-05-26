@@ -665,6 +665,35 @@ export function useAIChat({
     logger.log('Started new conversation (local reset)');
   }, [abortActiveStream]);
 
+  // Auto-reset the active chat session when the user switches calendars.
+  // Without this, opening Orion after a calendar switch shows messages from
+  // the previous calendar's conversation — the conversation list reloads
+  // correctly (see AIChatContent's loadConversations effect) but the active
+  // messages + currentConversationId in this hook persist. Scope this to
+  // calendar-scoped instances only: trade-scoped chats stay open across
+  // calendar swaps (the parent trade pins the context), and user-level
+  // instances (saveAsUserLevel) intentionally span calendars.
+  //
+  // The ref starts as `undefined` to distinguish "haven't seen any value
+  // yet" (initial mount, no reset) from `null` (no calendar selected).
+  const lastCalendarIdRef = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    if (saveAsUserLevel || trade?.id) {
+      // These scopes ignore calendar changes — record but don't reset.
+      lastCalendarIdRef.current = calendar?.id ?? null;
+      return;
+    }
+    const currentId = calendar?.id ?? null;
+    if (lastCalendarIdRef.current === undefined) {
+      // First render — record baseline, don't reset.
+      lastCalendarIdRef.current = currentId;
+      return;
+    }
+    if (lastCalendarIdRef.current === currentId) return;
+    lastCalendarIdRef.current = currentId;
+    void startNewChat();
+  }, [calendar?.id, saveAsUserLevel, trade?.id, startNewChat]);
+
   /**
    * Select a conversation from history.
    *
