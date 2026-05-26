@@ -11,7 +11,6 @@ import {
   Delete as DeleteIcon,
   DoneAll as DoneAllIcon,
   Edit as EditIcon,
-  WarningAmber as WarningIcon,
   ExpandMore as ExpandMoreIcon,
   Pause as PauseIcon,
   PlayArrow as PlayArrowIcon,
@@ -29,9 +28,7 @@ import type {
   OrionTask,
   OrionTaskResult,
   TaskConfig,
-  MarketResearchConfig,
 } from 'features/orion/types/orionTask';
-import { formatFrequencyLabel } from 'features/orion/components/orionTasks/marketResearchHelpers';
 import type { Calendar, Trade } from 'features/calendar/types/dualWrite';
 import type { TradeOperationsProps } from 'features/calendar/types/tradeOperations';
 
@@ -195,14 +192,6 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
             >
               {mrTask.status.toUpperCase()}
             </Box>
-            {(mrTask.consecutive_failures ?? 0) > 0 && (
-              <Tooltip title={mrTask.last_error ?? 'Recent failure'}>
-                <WarningIcon sx={{ fontSize: 14, color: theme.palette.warning.main }} />
-              </Tooltip>
-            )}
-            <Typography variant="caption" color="text.secondary">
-              every {formatFrequencyLabel((mrTask.config as MarketResearchConfig).frequency_minutes)}
-            </Typography>
           </Box>
 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
