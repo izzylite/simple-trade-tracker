@@ -18,8 +18,17 @@ const formatLastUpdated = (iso: string): string => {
 };
 
 const LegalPage: React.FC<LegalPageProps> = ({ title, lastUpdated, children }) => (
-  <Box sx={{ minHeight: '100vh', bgcolor: 'custom.pageBackground', py: { xs: 6, md: 10 } }}>
-    <Container maxWidth="md">
+  <Box
+    sx={{
+      // Shell locks non-landing routes to 100vh with overflow:hidden and adds
+      // pt:8 (64px) for the fixed AppHeader. We own our own scroll container
+      // sized to the visible area below that header.
+      height: 'calc(100vh - 64px)',
+      overflowY: 'auto',
+      bgcolor: 'custom.pageBackground',
+    }}
+  >
+    <Container maxWidth="md" sx={{ py: { xs: 6, md: 10 } }}>
       <Typography variant="h2" sx={{ fontWeight: 600, mb: 1 }}>
         {title}
       </Typography>
