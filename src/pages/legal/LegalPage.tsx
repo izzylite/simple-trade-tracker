@@ -8,12 +8,14 @@ interface LegalPageProps {
   children: React.ReactNode;
 }
 
-const formatLastUpdated = (iso: string): string =>
-  new Date(iso).toLocaleDateString('en-US', {
+const formatLastUpdated = (iso: string): string => {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
   });
+};
 
 const LegalPage: React.FC<LegalPageProps> = ({ title, lastUpdated, children }) => (
   <Box sx={{ minHeight: '100vh', bgcolor: 'custom.pageBackground', py: { xs: 6, md: 10 } }}>
