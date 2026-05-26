@@ -566,15 +566,27 @@ export async function updateMemory(
     // -------- 6. Build content + compact if oversized --------
     const updatedContent = buildMemoryContent(nextSections);
     let finalContent = updatedContent;
-    let compactionAuditEntry: { dropped: number; before: string; after: string } | null = null;
+    let compactionAuditEntry: { before: string; after: string } | null = null;
     if (updatedContent.length >= MEMORY_SIZE_COMPACT_CHARS) {
-      const { sections: compacted, dropped } = compactSections(nextSections);
+      const { sections: compacted, dropped, droppedBySection } = compactSections(nextSections);
       if (dropped > 0) {
         finalContent = buildMemoryContent(compacted);
+        // Render dropped bullets as a per-section markdown list. This goes
+        // into the audit row's before_text so a user investigating
+        // "Orion forgot X" can find the exact wording that was pruned.
+        // The audit table is capped at 100 rows per (user, calendar), so
+        // even worst-case (every row a fat COMPACT) stays bounded.
+        const droppedBlocks: string[] = [];
+        for (const key of MEMORY_SECTION_ORDER) {
+          const bullets = droppedBySection[key];
+          if (bullets.length === 0) continue;
+          droppedBlocks.push(
+            `${key} (${bullets.length} dropped):\n${bullets.map((b) => `- ${b}`).join("\n")}`,
+          );
+        }
         compactionAuditEntry = {
-          dropped,
-          before: `${updatedContent.length} chars`,
-          after: `${finalContent.length} chars`,
+          before: droppedBlocks.join("\n\n"),
+          after: `Compacted ${updatedContent.length} → ${finalContent.length} chars (${dropped} bullets dropped)`,
         };
         log(
           `[updateMemory] Compacted: dropped ${dropped} low-score bullets (${updatedContent.length} → ${finalContent.length} chars)`,

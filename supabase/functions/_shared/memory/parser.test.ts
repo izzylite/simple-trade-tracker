@@ -226,12 +226,25 @@ Deno.test("compact: over cap drops lowest-scoring per section", () => {
     ACTIVE_FOCUS: [],
   };
 
-  const { sections: out, dropped } = compactSections(sections);
+  const { sections: out, dropped, droppedBySection } = compactSections(sections);
   assertEquals(dropped, 5, "expected to drop 30 - 25 = 5 items");
   assertEquals(out.PERFORMANCE_PATTERNS.length, 25);
   // Every retained item should be a "fresh high" — those score strictly higher.
   const survivors = out.PERFORMANCE_PATTERNS.filter((s) => s.startsWith("fresh high"));
   assertEquals(survivors.length, 15, "all 15 fresh-high items should survive");
+  // The dropped bullets must be returned so operations.ts can preserve them
+  // in the audit log's before_text. Otherwise forensic recovery is impossible.
+  assertEquals(
+    droppedBySection.PERFORMANCE_PATTERNS.length,
+    5,
+    "5 lowest-score bullets should appear in droppedBySection",
+  );
+  for (const text of droppedBySection.PERFORMANCE_PATTERNS) {
+    assert(text.startsWith("stale low"), `expected stale-low bullet, got: ${text}`);
+  }
+  // Untouched sections should have empty drop lists, not be missing.
+  assertEquals(droppedBySection.TRADER_PROFILE, []);
+  assertEquals(droppedBySection.ACTIVE_FOCUS, []);
 });
 
 Deno.test("compact: ACTIVE_FOCUS exempt even when over cap", () => {

@@ -364,14 +364,28 @@ export function scoreInsight(insight: string): number {
  *   2. Keep top MEMORY_PER_SECTION_CAP per section.
  *   3. ACTIVE_FOCUS is left untouched (replace-only section, user-driven).
  *
- * Returns the compacted sections plus a count of dropped bullets so the
- * caller can log.
+ * Returns the compacted sections, a total count of dropped bullets, and the
+ * dropped bullets themselves keyed by section so the caller can preserve
+ * them in the audit log for forensic recovery ("Orion forgot the thing
+ * I told it in February").
  */
 export function compactSections(
   sections: Record<MemorySection, string[]>,
-): { sections: Record<MemorySection, string[]>; dropped: number } {
+): {
+  sections: Record<MemorySection, string[]>;
+  dropped: number;
+  droppedBySection: Record<MemorySection, string[]>;
+} {
   let dropped = 0;
   const out: Record<MemorySection, string[]> = {
+    TRADER_PROFILE: [],
+    PERFORMANCE_PATTERNS: [],
+    STRATEGY_PREFERENCES: [],
+    PSYCHOLOGICAL_PATTERNS: [],
+    LESSONS_LEARNED: [],
+    ACTIVE_FOCUS: [],
+  };
+  const droppedBySection: Record<MemorySection, string[]> = {
     TRADER_PROFILE: [],
     PERFORMANCE_PATTERNS: [],
     STRATEGY_PREFERENCES: [],
@@ -390,8 +404,9 @@ export function compactSections(
       .map((text) => ({ text, score: scoreInsight(text) }))
       .sort((a, b) => b.score - a.score);
     out[key] = sorted.slice(0, MEMORY_PER_SECTION_CAP).map((x) => x.text);
+    droppedBySection[key] = sorted.slice(MEMORY_PER_SECTION_CAP).map((x) => x.text);
     dropped += items.length - out[key].length;
   }
 
-  return { sections: out, dropped };
+  return { sections: out, dropped, droppedBySection };
 }
