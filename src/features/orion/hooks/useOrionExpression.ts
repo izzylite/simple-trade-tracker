@@ -94,6 +94,11 @@ export function useOrionExpression(
   const prevLoadingRef = useRef(isLoading);
   const prevCountRef = useRef(messageCount);
   const prevPulseKeyRef = useRef(pulse?.key);
+  // Live mirror of toolStatus so the focus-beat timeout reads the CURRENT
+  // value when it fires (FOCUS_MS later), not the empty string captured in
+  // its closure at send time. Updated every render below.
+  const toolStatusRef = useRef(toolStatus);
+  toolStatusRef.current = toolStatus;
   // Single timeout slot for one-shot → fallback transitions. Activity
   // bumps reset it; new one-shots clear and reschedule.
   const oneShotTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -148,12 +153,17 @@ export function useOrionExpression(
       if (oneShotTimeoutRef.current) clearTimeout(oneShotTimeoutRef.current);
       setExpression(({ runId }) => ({ state: 'focus', runId: runId + 1 }));
       oneShotTimeoutRef.current = setTimeout(() => {
-        if (prevLoadingRef.current) {
-          const next: OrionState = isSearchingTool(toolStatus)
+        if (!prevLoadingRef.current) return;
+        setExpression((curr) => {
+          // If a search tool already promoted us out of focus mid-beat (see
+          // the tool-swap effect below), don't clobber it. Only settle the
+          // focus beat into a long-form state when we're still in focus.
+          if (curr.state !== 'focus') return curr;
+          const next: OrionState = isSearchingTool(toolStatusRef.current)
             ? 'searching'
             : 'looking';
-          setExpression(({ runId }) => ({ state: next, runId: runId + 1 }));
-        }
+          return { state: next, runId: curr.runId + 1 };
+        });
       }, FOCUS_MS);
       return;
     }
@@ -176,12 +186,25 @@ export function useOrionExpression(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading, messageCount]);
 
-  // Mid-loop tool swap: while the agent loop is running and the current
-  // state is the long-form looking/searching pair, flip to match toolStatus.
-  // No-op during one-shots (focus / snap / wink) so they finish cleanly.
+  // Mid-loop tool swap: while the agent loop is running, keep the mark in
+  // sync with the active tool.
+  //   - From the long-form looking/searching pair: flip freely to match.
+  //   - From the focus beat: ONLY a search tool interrupts early, promoting
+  //     straight to `searching` so the sweep starts the moment the search
+  //     does. Without this, the focus→looking timeout (which reads a stale,
+  //     send-time toolStatus) settles on `looking` and the searching
+  //     animation never plays for fast single-search turns. Non-search tools
+  //     leave the focus beat alone — the focus timeout settles them to
+  //     `looking` when it fires.
+  // No-op during the other one-shots (snap / wink / alert) so they finish.
   useEffect(() => {
     if (!isLoading) return;
     setExpression((curr) => {
+      if (curr.state === 'focus') {
+        return isSearchingTool(toolStatus)
+          ? { state: 'searching', runId: curr.runId + 1 }
+          : curr;
+      }
       if (curr.state !== 'looking' && curr.state !== 'searching') return curr;
       const next: OrionState = isSearchingTool(toolStatus)
         ? 'searching'
