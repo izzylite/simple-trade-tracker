@@ -11,6 +11,7 @@ import {
 } from '@mui/material';
 import { useNotifications } from 'contexts/NotificationsContext';
 import { isDarkMode } from 'utils/themeMode';
+import { getShadow } from 'styles/designTokens';
 import { AppNotification } from 'types/notification';
 import { scrollbarStyles } from 'styles/scrollbarStyles';
 import NotificationRow from 'components/notifications/NotificationRow';
@@ -76,10 +77,7 @@ const NotificationsPopover: React.FC<NotificationsPopoverProps> = ({
                 !isDarkMode(theme)
                   ? `1px solid ${theme.palette.divider}`
                   : 'none',
-              boxShadow:
-                isDarkMode(theme)
-                  ? '0 4px 16px rgba(0,0,0,0.4)'
-                  : '0 4px 12px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.04)',
+              boxShadow: getShadow(theme, 'lg'),
               overflow: 'hidden',
               display: 'flex',
               flexDirection: 'column',

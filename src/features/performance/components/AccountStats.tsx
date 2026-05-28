@@ -33,8 +33,7 @@ import {
 } from '@mui/icons-material';
 import { Trade } from 'features/calendar/types/dualWrite';
 import { DynamicRiskSettings } from 'features/calendar/utils/dynamicRiskUtils';
-import { EYEBROW_SX, TNUM, getInsetSurface, getCardShellSx } from 'styles/designTokens';
-import { isDarkMode } from 'utils/themeMode';
+import { EYEBROW_SX, TNUM, getInsetSurface, getCardShellSx, getHairline, getShadow } from 'styles/designTokens';
 
 interface AccountStatsProps {
   balance: number;
@@ -61,7 +60,6 @@ const AccountStats: React.FC<AccountStatsProps> = ({
   max_daily_drawdown,
 }) => {
   const theme = useTheme();
-  const isDark = isDarkMode(theme);
 
   const profitPercentage =
     trades.length > 0 && balance > 0 ? (totalProfit / balance) * 100 : 0;
@@ -81,7 +79,7 @@ const AccountStats: React.FC<AccountStatsProps> = ({
 
   const totalAccountValue = balance + totalProfit;
 
-  const hairline = isDark ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
+  const hairline = getHairline(theme);
   const surfaceInset = getInsetSurface(theme);
 
   // PnL color signals — green/red/neutral
@@ -118,9 +116,7 @@ const AccountStats: React.FC<AccountStatsProps> = ({
         flexDirection: 'column',
         gap: 1.25,
         p: 1.75,
-        boxShadow: isDark
-          ? '0 2px 8px rgba(0,0,0,0.3)'
-          : '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)',
+        boxShadow: getShadow(theme, 'md'),
       }}
     >
       {/* ── Title + balance ─────────────────────────────────────────── */}

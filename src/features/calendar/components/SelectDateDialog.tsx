@@ -24,6 +24,7 @@ import { Trade, YearStats } from '../types/dualWrite';
 import TargetBadge from './TargetBadge';
 import { BaseDialog } from 'components/common';
 import { useDialogTokens, MONO_FONT } from 'styles/dialogTokens';
+import { getInsetHoverSurface } from 'styles/designTokens';
 
 interface SelectDateDialogProps {
   open: boolean;
@@ -68,7 +69,7 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
     hairline,
     monoLabelSx,
   } = useDialogTokens();
-  const surfaceInsetHover = isDark ? 'rgba(255,255,255,0.06)' : alpha(theme.palette.text.primary, 0.05);
+  const surfaceInsetHover = getInsetHoverSurface(theme);
 
   React.useEffect(() => {
     if (initialDate) {

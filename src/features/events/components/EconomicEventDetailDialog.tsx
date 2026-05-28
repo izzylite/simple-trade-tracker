@@ -31,6 +31,7 @@ import { EconomicEvent } from 'features/events/types/economicCalendar';
 import { Trade } from 'features/calendar/types/dualWrite';
 import { BaseDialog } from 'components/common';
 import { useDialogTokens, MONO_FONT } from 'styles/dialogTokens';
+import { getInsetHoverSurface } from 'styles/designTokens';
 import TradeList from 'features/calendar/components/trades/TradeList';
 import { cleanEventNameForPinning, eventMatchV1 } from 'features/events/utils/eventNameUtils';
 import { useUserPinnedEvents } from 'features/events/contexts/UserPinnedEventsContext';
@@ -117,7 +118,7 @@ const EconomicEventDetailDialog: React.FC<EconomicEventDetailDialogProps> = ({
   const hasInitialLoad = useRef(false);
 
   // ── design tokens (additional local) ──────────────────────────────────
-  const surfaceInsetHover = isDark ? 'rgba(255,255,255,0.06)' : alpha(theme.palette.text.primary, 0.05);
+  const surfaceInsetHover = getInsetHoverSurface(theme);
 
   // Determine which trading session this event falls under
   const eventSession = useMemo(

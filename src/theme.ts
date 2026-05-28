@@ -1,4 +1,5 @@
 import { createTheme, alpha } from '@mui/material/styles';
+import { SHADOWS } from 'styles/designTokens';
 
 // Design tokens — sourced from DESIGN.md
 const palette = {
@@ -21,21 +22,6 @@ const palette = {
   },
 };
 
-const shadows = {
-  dark: {
-    sm: '0 1px 2px rgba(0,0,0,0.3)',
-    md: '0 2px 8px rgba(0,0,0,0.3)',
-    lg: '0 4px 16px rgba(0,0,0,0.4)',
-    xl: '0 8px 24px rgba(0,0,0,0.5)',
-  },
-  light: {
-    sm: '0 1px 2px rgba(0,0,0,0.05)',
-    md: '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)',
-    lg: '0 4px 12px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.04)',
-    xl: '0 8px 24px rgba(0,0,0,0.1)',
-  },
-};
-
 export function getScrollbarColors(mode: 'light' | 'dark') {
   const isDark = mode === 'dark';
   return {
@@ -46,7 +32,7 @@ export function getScrollbarColors(mode: 'light' | 'dark') {
 
 export function createAppTheme(mode: 'light' | 'dark') {
   const isDark = mode === 'dark';
-  const s = isDark ? shadows.dark : shadows.light;
+  const s = isDark ? SHADOWS.dark : SHADOWS.light;
   const scrollbar = getScrollbarColors(mode);
 
   // DESIGN.md: dark uses 12% / 18% violet tints; light uses 10% / 16%.

@@ -29,6 +29,7 @@ import {
   getTagGroup,
 } from 'utils/tagColors';
 import { isDarkMode } from 'utils/themeMode';
+import { getHairline, getShadow } from 'styles/designTokens';
 
 interface TradeCardProps {
   trade: Trade;
@@ -93,10 +94,8 @@ const TradeCard: React.FC<TradeCardProps> = ({
   const hasImages = showImages && imageCount > 0;
 
   // ── Tokens ────────────────────────────────────────────────────────────
-  const hairline = isDark ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
-  const restingShadow = isDark
-    ? '0 2px 8px rgba(0,0,0,0.30)'
-    : '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)';
+  const hairline = getHairline(theme);
+  const restingShadow = getShadow(theme, 'md');
 
   const metaItemSx = {
     display: 'inline-flex',

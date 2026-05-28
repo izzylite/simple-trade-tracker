@@ -4,7 +4,10 @@
  * Re-exports the canonical sx primitives that every redesigned component uses:
  * - EYEBROW_SX: uppercase neutral label (the 0.6875rem / 600 / 0.05em pattern)
  * - TNUM: tabular-numeric font-feature string
+ * - SHADOWS / getShadow(theme, size): the mode-aware elevation scale
  * - getInsetSurface(theme): the 3%-tinted surface used inside outer cards
+ * - getInsetHoverSurface(theme): the slightly-deeper hover variant of the above
+ * - getHairline(theme): the 8%-white / divider hairline used across cards & dialogs
  * - getInsetTileSx(theme): the canonical 10px inset tile
  * - getCardShellSx(theme, radius): the canonical outer card shell
  *
@@ -14,6 +17,34 @@
 
 import { Theme, alpha } from '@mui/material/styles';
 import { isDarkMode } from 'utils/themeMode';
+
+/**
+ * The mode-aware elevation scale. Sourced here so `theme.ts` (which builds the
+ * MUI theme) and component sx (`getShadow(theme, ...)`) read from a single
+ * table — eliminates the inline-string duplication that previously copied the
+ * 80-char `lg`/`md` strings across ~7 files.
+ */
+export const SHADOWS = {
+  dark: {
+    sm: '0 1px 2px rgba(0,0,0,0.3)',
+    md: '0 2px 8px rgba(0,0,0,0.3)',
+    lg: '0 4px 16px rgba(0,0,0,0.4)',
+    xl: '0 8px 24px rgba(0,0,0,0.5)',
+  },
+  light: {
+    sm: '0 1px 2px rgba(0,0,0,0.05)',
+    md: '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)',
+    lg: '0 4px 12px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.04)',
+    xl: '0 8px 24px rgba(0,0,0,0.1)',
+  },
+} as const;
+
+export type ShadowSize = keyof typeof SHADOWS['dark'];
+
+/** Mode-aware elevation string. Prefer over inlining the literal shadow value. */
+export function getShadow(theme: Theme, size: ShadowSize): string {
+  return SHADOWS[isDarkMode(theme) ? 'dark' : 'light'][size];
+}
 
 /** Tabular-figure font-feature string. Use wherever numbers stack. */
 export const TNUM = "'tnum' on, 'lnum' on";
@@ -52,6 +83,26 @@ export function getInsetSurface(theme: Theme): string {
   return isDarkMode(theme)
     ? 'rgba(255,255,255,0.03)'
     : alpha(theme.palette.text.primary, 0.03);
+}
+
+/**
+ * Deeper variant of `getInsetSurface` used on hover/active states inside
+ * dialogs — 6% white in dark, 5% text in light. Pair with `getInsetSurface`
+ * for the rest state.
+ */
+export function getInsetHoverSurface(theme: Theme): string {
+  return isDarkMode(theme)
+    ? 'rgba(255,255,255,0.06)'
+    : alpha(theme.palette.text.primary, 0.05);
+}
+
+/**
+ * Canonical hairline color — the 8%-white-in-dark / `palette.divider`-in-light
+ * value that draws card edges, dialog borders, and inset-tile rules. Same
+ * computation that was previously redeclared inline in 6 files.
+ */
+export function getHairline(theme: Theme): string {
+  return isDarkMode(theme) ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
 }
 
 /**

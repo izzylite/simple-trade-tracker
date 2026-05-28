@@ -15,6 +15,7 @@ import { useMemo } from 'react';
 import { alpha, useTheme } from '@mui/material';
 import type { Theme } from '@mui/material/styles';
 import { isDarkMode } from 'utils/themeMode';
+import { getHairline, getInsetSurface } from 'styles/designTokens';
 
 export const MONO_FONT = "'JetBrains Mono', ui-monospace, monospace";
 
@@ -62,8 +63,8 @@ function buildTokens(theme: Theme, accentOverride?: string): DialogTokens {
   const accentSoft = alpha(accent, isDark ? 0.18 : 0.14);
   const accentSofter = alpha(accent, isDark ? 0.12 : 0.10);
   const accentBorder = alpha(accent, isDark ? 0.35 : 0.28);
-  const surfaceInset = isDark ? 'rgba(255,255,255,0.03)' : alpha(theme.palette.text.primary, 0.03);
-  const hairline = isDark ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
+  const surfaceInset = getInsetSurface(theme);
+  const hairline = getHairline(theme);
   const footerBg = isDark ? 'rgba(255,255,255,0.02)' : alpha(theme.palette.text.primary, 0.02);
 
   const paperSx = {

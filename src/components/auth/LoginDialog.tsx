@@ -36,6 +36,7 @@ import { isDarkMode } from 'utils/themeMode';
 import { dialogProps } from 'styles/dialogStyles';
 import { scrollbarStyles } from 'styles/scrollbarStyles';
 import { useDialogTokens } from 'styles/dialogTokens';
+import { getHairline } from 'styles/designTokens';
 
 interface LoginDialogProps {
   open: boolean;
@@ -921,7 +922,7 @@ const LoginDialog: React.FC<LoginDialogProps> = ({
   const theme = useTheme();
   const isDark = isDarkMode(theme);
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  const hairline = isDark ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
+  const hairline = getHairline(theme);
 
   return (
     <Dialog

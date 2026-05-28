@@ -3,6 +3,7 @@ import { Box, Popover, useTheme } from '@mui/material';
 import { format, addMonths, addQuarters, addYears, startOfQuarter, startOfYear, startOfMonth } from 'date-fns';
 import { TimePeriod } from 'features/performance/components/PerformanceCharts';
 import { isDarkMode } from 'utils/themeMode';
+import { getShadow } from 'styles/designTokens';
 
 interface PeriodPickerProps {
   period: TimePeriod;
@@ -253,9 +254,7 @@ const PeriodPicker: React.FC<PeriodPickerProps> = ({ period, value, onChange }) 
               bgcolor: theme.palette.background.paper,
               border: `1px solid ${theme.palette.divider}`,
               borderRadius: '12px',
-              boxShadow: isDark
-                ? '0 4px 16px rgba(0,0,0,0.40)'
-                : '0 4px 12px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.04)',
+              boxShadow: getShadow(theme, 'lg'),
               minWidth: 220,
               p: 1.25,
             },

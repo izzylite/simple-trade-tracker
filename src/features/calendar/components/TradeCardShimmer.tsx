@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, useTheme } from '@mui/material';
 import Shimmer from 'components/Shimmer';
-import { isDarkMode } from 'utils/themeMode';
+import { getHairline, getShadow } from 'styles/designTokens';
 
 interface TradeCardShimmerProps {
   /** Number of shimmer cards to display */
@@ -19,11 +19,8 @@ const TradeCardShimmer: React.FC<TradeCardShimmerProps> = ({
   containerSx = {},
 }) => {
   const theme = useTheme();
-  const isDark = isDarkMode(theme);
-  const hairline = isDark ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
-  const restingShadow = isDark
-    ? '0 2px 8px rgba(0,0,0,0.30)'
-    : '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)';
+  const hairline = getHairline(theme);
+  const restingShadow = getShadow(theme, 'md');
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25, ...containerSx }}>

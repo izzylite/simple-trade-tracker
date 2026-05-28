@@ -18,7 +18,7 @@ import {
   TrendingUp as TrendingUpIcon,
   TrendingDown as TrendingDownIcon,
 } from '@mui/icons-material';
-import { isDarkMode } from 'utils/themeMode';
+import { getShadow } from 'styles/designTokens';
 
 export interface CalendarSelectorItem {
   id: string;
@@ -159,10 +159,7 @@ const CalendarSelectorBar: React.FC<CalendarSelectorBarProps> = ({
               maxWidth: 380,
               maxHeight: 420,
               borderRadius: 1.5,
-              boxShadow:
-                isDarkMode(theme)
-                  ? '0 4px 16px rgba(0,0,0,0.4)'
-                  : '0 4px 12px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.04)',
+              boxShadow: getShadow(theme, 'lg'),
             },
           },
         }}
