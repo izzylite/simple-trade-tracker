@@ -1,0 +1,226 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>App icon — Momentum · production package</title>
+<style>
+  :root {
+    --bg: #fafafa;
+    --surface: #ffffff;
+    --fg: #111111;
+    --muted: #6b6b6b;
+    --border: #e5e5e5;
+    --accent: #2f6feb;
+    --font-display: "Inter", -apple-system, system-ui, sans-serif;
+    --font-body: "Inter", -apple-system, system-ui, sans-serif;
+    --font-mono: ui-monospace, "JetBrains Mono", "SF Mono", monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); font-family: var(--font-body); -webkit-font-smoothing: antialiased; }
+  body { padding: 64px 48px 96px; }
+  .container { max-width: 1180px; margin: 0 auto; }
+  .head { display: grid; grid-template-columns: 1.6fr 1fr; gap: 56px; align-items: end; margin-bottom: 64px; }
+  @media (max-width: 820px) { .head { grid-template-columns: 1fr; gap: 32px; } }
+  .eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin: 0 0 12px; }
+  h1 { font-family: var(--font-display); font-size: 48px; font-weight: 600; letter-spacing: -0.025em; line-height: 1.05; margin: 0 0 16px; }
+  .lede { font-size: 16px; color: var(--muted); max-width: 56ch; line-height: 1.6; margin: 0; }
+  .specs { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px 24px; font-size: 13px; }
+  .specs dt { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 2px; }
+  .specs dd { margin: 0 0 6px; font-weight: 500; color: var(--fg); }
+  .section-head { margin: 72px 0 24px; padding-bottom: 14px; border-bottom: 1px solid var(--border); display: flex; align-items: baseline; gap: 18px; justify-content: space-between; }
+  .section-head h2 { font-family: var(--font-display); font-size: 22px; font-weight: 600; letter-spacing: -0.01em; margin: 0; }
+  .section-head .hint { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+  .master { display: grid; grid-template-columns: auto 1fr; gap: 56px; align-items: center; padding: 8px 0; }
+  @media (max-width: 720px) { .master { grid-template-columns: 1fr; gap: 32px; } }
+  .icon-frame { width: 360px; height: 360px; border-radius: 22.37%; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 24px 60px rgba(15, 25, 50, 0.18); flex-shrink: 0; }
+  .icon-frame svg { display: block; width: 100%; height: 100%; }
+  .master-meta p { margin: 0 0 12px; line-height: 1.65; color: var(--muted); max-width: 48ch; }
+  .master-meta .filerow { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: #fff; border: 1px solid var(--border); border-radius: 8px; font-family: var(--font-mono); font-size: 12px; color: var(--fg); margin-top: 18px; max-width: 360px; }
+  .master-meta .filerow span:first-child { color: var(--accent); }
+  .sizes { display: flex; align-items: flex-end; gap: 32px; padding: 24px 0; flex-wrap: wrap; }
+  .size-item { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .size-item .ico { border-radius: 22.37%; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.06); }
+  .size-item .label { font-family: var(--font-mono); font-size: 11px; color: var(--muted); letter-spacing: 0.06em; }
+  .size-item.s-1024 .ico { width: 220px; height: 220px; }
+  .size-item.s-512  .ico { width: 128px; height: 128px; }
+  .size-item.s-256  .ico { width: 80px;  height: 80px; }
+  .size-item.s-128  .ico { width: 56px;  height: 56px; }
+  .size-item.s-64   .ico { width: 40px;  height: 40px; }
+  .size-item.s-32   .ico { width: 32px;  height: 32px; border-radius: 18%; }
+  .size-item.s-16   .ico { width: 16px;  height: 16px; border-radius: 14%; }
+  .variants { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+  @media (max-width: 820px) { .variants { grid-template-columns: 1fr; } }
+  .variant-card { background: #fff; border: 1px solid var(--border); border-radius: 16px; padding: 28px; display: flex; flex-direction: column; gap: 18px; }
+  .variant-card .ico { width: 144px; height: 144px; border-radius: 22.37%; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 12px 28px rgba(0,0,0,0.08); align-self: flex-start; }
+  .variant-card h3 { font-family: var(--font-display); font-size: 17px; font-weight: 600; letter-spacing: -0.01em; margin: 0; }
+  .variant-card p { margin: 0; color: var(--muted); font-size: 13.5px; line-height: 1.55; }
+  .variant-card .tag { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+  .context-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+  @media (max-width: 820px) { .context-grid { grid-template-columns: 1fr; } }
+  .phone { aspect-ratio: 9 / 19.5; max-width: 340px; width: 100%; margin: 0 auto; border-radius: 48px; padding: 56px 22px 32px; background: radial-gradient(120% 80% at 50% 0%, rgba(47,111,235,0.35), transparent 55%), radial-gradient(100% 70% at 100% 100%, rgba(180,80,255,0.25), transparent 60%), linear-gradient(180deg, #0c1326, #050912); color: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.1), 0 30px 60px rgba(0,0,0,0.25), inset 0 0 0 1px rgba(255,255,255,0.06); position: relative; }
+  .phone .notch { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); width: 110px; height: 32px; background: #000; border-radius: 16px; }
+  .phone .status { display: flex; justify-content: space-between; font-size: 14px; font-weight: 600; padding: 0 8px; margin-bottom: 22px; }
+  .phone .apps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px 14px; }
+  .phone .app { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .phone .app .ico { width: 56px; height: 56px; border-radius: 14px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,0.2); }
+  .phone .app .ico.placeholder { background: linear-gradient(135deg, rgba(255,255,255,0.18), rgba(255,255,255,0.06)); }
+  .phone .app .ico.ours { box-shadow: 0 1px 2px rgba(0,0,0,0.25), 0 6px 16px rgba(47,111,235,0.4); }
+  .phone .app .ico svg { display: block; width: 100%; height: 100%; }
+  .phone .app .name { font-size: 11px; color: rgba(255,255,255,0.9); text-shadow: 0 1px 2px rgba(0,0,0,0.6); }
+  .phone .dock { margin-top: 24px; background: rgba(255,255,255,0.08); backdrop-filter: blur(20px); border-radius: 24px; padding: 14px; display: flex; justify-content: space-around; }
+  .phone .dock .ico { width: 52px; height: 52px; border-radius: 13px; overflow: hidden; }
+  .phone .dock .ico.placeholder { background: linear-gradient(135deg, rgba(255,255,255,0.18), rgba(255,255,255,0.06)); }
+  .phone .dock .ico svg { display: block; width: 100%; height: 100%; }
+  .mac { background: radial-gradient(80% 60% at 20% 0%, rgba(47,111,235,0.25), transparent 60%), radial-gradient(80% 60% at 80% 80%, rgba(20,200,180,0.15), transparent 60%), linear-gradient(160deg, #0e1422, #0a0e18); border-radius: 16px; padding: 24px 24px 32px; color: #fff; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05); display: flex; flex-direction: column; justify-content: flex-end; min-height: 320px; }
+  .mac .dock-host { display: flex; justify-content: center; }
+  .mac .dock { background: rgba(255,255,255,0.12); backdrop-filter: blur(28px); border-radius: 22px; padding: 10px 14px; display: flex; gap: 10px; align-items: end; box-shadow: 0 6px 20px rgba(0,0,0,0.3), inset 0 0 0 1px rgba(255,255,255,0.1); }
+  .mac .dock .app { width: 58px; height: 58px; border-radius: 13px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,0.3); }
+  .mac .dock .app.ours { width: 66px; height: 66px; border-radius: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.3), 0 10px 20px rgba(47,111,235,0.4); }
+  .mac .dock .app.placeholder { background: linear-gradient(135deg, rgba(255,255,255,0.18), rgba(255,255,255,0.06)); }
+  .mac .dock .app svg { display: block; width: 100%; height: 100%; }
+  .mac .caption { color: rgba(255,255,255,0.6); font-size: 12px; font-family: var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 16px; }
+  .favicon { display: flex; align-items: center; gap: 24px; padding: 18px 20px; background: #fff; border: 1px solid var(--border); border-radius: 14px; flex-wrap: wrap; }
+  .favicon .browser-tab { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; font-size: 13px; color: var(--fg); max-width: 280px; }
+  .favicon .browser-tab .ico { width: 16px; height: 16px; border-radius: 3px; overflow: hidden; flex-shrink: 0; }
+  .favicon .browser-tab .ico svg { display: block; width: 100%; height: 100%; }
+  .footer { margin-top: 80px; padding-top: 24px; border-top: 1px solid var(--border); font-size: 13px; color: var(--muted); display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+<div class="container">
+  <header class="head">
+    <div>
+      <p class="eyebrow">App icon · Momentum · production v1</p>
+      <h1>The market, climbing.</h1>
+      <p class="lede">A diagonal cobalt gradient across a 5&times;5 grid — direction baked into the mark itself. Dark ink anchors the lower-left, brightest cobalt flares from the upper-right. Reads as <em>chart up and to the right</em> without a single line or arrow.</p>
+    </div>
+    <dl class="specs">
+      <div><dt>Master</dt><dd>1024 &times; 1024 SVG</dd></div>
+      <div><dt>Format</dt><dd>Vector · zero raster assets</dd></div>
+      <div><dt>Palette</dt><dd>Cobalt ramp on ink #0b0d12</dd></div>
+      <div><dt>Grid</dt><dd>5&times;5 · 192px tile · 16px gap</dd></div>
+      <div><dt>Min legible</dt><dd>32&thinsp;px favicon</dd></div>
+      <div><dt>OS mask</dt><dd>iOS / Android squircle ready</dd></div>
+    </dl>
+  </header>
+
+  <div class="section-head"><h2>1024&thinsp;&times;&thinsp;1024 master</h2><span class="hint">app-icon-momentum.svg</span></div>
+  <div class="master">
+    <div class="icon-frame" id="masterFrame"></div>
+    <div class="master-meta">
+      <p>Drop this single SVG into your build pipeline — every iOS, Android, macOS, web, and favicon variant rasterizes from this one source at the size your platform demands. No raster touch-ups required.</p>
+      <p>The bottom-left corner intentionally stays nearly black so the icon retains weight against light home screens; the top-right pale cobalt provides the spark that makes it readable against dark backgrounds.</p>
+      <div class="filerow"><span>SVG</span><span>app-icon-momentum.svg</span></div>
+    </div>
+  </div>
+
+  <div class="section-head"><h2>Size matrix</h2><span class="hint">Down to 16&thinsp;px</span></div>
+  <div class="sizes" id="sizes"></div>
+
+  <div class="section-head"><h2>Adaptive variants</h2><span class="hint">For different surfaces</span></div>
+  <div class="variants" id="variants"></div>
+
+  <div class="section-head"><h2>On real surfaces</h2><span class="hint">iOS home · macOS dock · favicon</span></div>
+  <div class="context-grid">
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="status"><span>9:41</span><span>5G</span></div>
+      <div class="apps">
+        <div class="app"><div class="ico placeholder"></div><div class="name">Mail</div></div>
+        <div class="app"><div class="ico ours" id="phoneIco"></div><div class="name">Orion</div></div>
+        <div class="app"><div class="ico placeholder"></div><div class="name">Calendar</div></div>
+        <div class="app"><div class="ico placeholder"></div><div class="name">Notes</div></div>
+        <div class="app"><div class="ico placeholder"></div><div class="name">Photos</div></div>
+        <div class="app"><div class="ico placeholder"></div><div class="name">Maps</div></div>
+        <div class="app"><div class="ico placeholder"></div><div class="name">Wallet</div></div>
+        <div class="app"><div class="ico placeholder"></div><div class="name">Settings</div></div>
+      </div>
+      <div class="dock">
+        <div class="ico placeholder"></div>
+        <div class="ico placeholder"></div>
+        <div class="ico" id="phoneDockIco"></div>
+        <div class="ico placeholder"></div>
+      </div>
+    </div>
+    <div class="mac">
+      <p class="caption">macOS Sonoma dock</p>
+      <div class="dock-host">
+        <div class="dock">
+          <div class="app placeholder"></div>
+          <div class="app placeholder"></div>
+          <div class="app placeholder"></div>
+          <div class="app ours" id="macIco"></div>
+          <div class="app placeholder"></div>
+          <div class="app placeholder"></div>
+          <div class="app placeholder"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-head"><h2>Browser tab</h2><span class="hint">16&thinsp;px favicon</span></div>
+  <div class="favicon">
+    <div class="browser-tab"><div class="ico" id="fav16"></div><span>Orion &mdash; Trading journal</span></div>
+    <div class="browser-tab"><div class="ico" id="fav16b" style="width:32px;height:32px;border-radius:6px;"></div><span>Retina · 32&thinsp;px tab</span></div>
+  </div>
+
+  <footer class="footer">
+    <span>Production package &middot; Momentum &middot; v1</span>
+    <span>Next: pick a number to blend (e.g. Momentum + 06 Premium) or sign off &rarr; export raster set</span>
+  </footer>
+</div>
+
+<script>
+  const RAMP_DARK  = ['#14171d', '#1a2845', '#1f3a73', '#2f6feb', '#5a8eff', '#7daaff', '#b5d0ff'];
+  const RAMP_LIGHT = ['#eef3ff', '#bcd0ff', '#7daaff', '#3d7bff', '#1d4ed8', '#1e40af', '#1e3a8a'];
+
+  function momentumSVG({ bg, ramp, canvas = 128, gridSize = 5, gap = 2 }) {
+    const usable = canvas - (gridSize - 1) * gap;
+    const tile = usable / gridSize;
+    let cells = '';
+    for (let r = 0; r < gridSize; r++) {
+      for (let c = 0; c < gridSize; c++) {
+        const x = c * (tile + gap);
+        const y = r * (tile + gap);
+        const t = (c + (gridSize - 1 - r)) / (2 * (gridSize - 1));
+        const idx = Math.round(t * (ramp.length - 1));
+        cells += `<rect x="${x}" y="${y}" width="${tile}" height="${tile}" fill="${ramp[idx]}"/>`;
+      }
+    }
+    return `<svg viewBox="0 0 ${canvas} ${canvas}" xmlns="http://www.w3.org/2000/svg"><rect width="${canvas}" height="${canvas}" fill="${bg}"/>${cells}</svg>`;
+  }
+
+  const dark  = momentumSVG({ bg: '#0b0d12', ramp: RAMP_DARK });
+  const light = momentumSVG({ bg: '#ffffff', ramp: RAMP_LIGHT });
+  const mono  = momentumSVG({ bg: '#2f6feb', ramp: ['#1d4ed8','#1d4ed8','#2058c8','#2f6feb','#5a8eff','#7daaff','#b5d0ff'] });
+
+  document.getElementById('masterFrame').innerHTML = dark;
+
+  const sizes = [
+    { cls: 's-1024', label: '1024' },
+    { cls: 's-512',  label: '512' },
+    { cls: 's-256',  label: '256' },
+    { cls: 's-128',  label: '128' },
+    { cls: 's-64',   label: '64' },
+    { cls: 's-32',   label: '32' },
+    { cls: 's-16',   label: '16' },
+  ];
+  document.getElementById('sizes').innerHTML = sizes.map(s => `<div class="size-item ${s.cls}"><div class="ico">${dark}</div><div class="label">${s.label}px</div></div>`).join('');
+
+  const variants = [
+    { tag: 'Default · Dark',  title: 'Momentum · Ink',  desc: 'The hero variant. Ships as the App Store and home-screen icon. Cobalt ramp on near-black anchors against both light and dark wallpapers.', svg: dark },
+    { tag: 'Light surface',   title: 'Momentum · Paper', desc: 'For light-mode application chrome — about page hero, settings header, marketing favicons on a white nav. Cobalt-tinted ramp on white.', svg: light },
+    { tag: 'Monochrome',      title: 'Momentum · Solid', desc: 'For tinted surfaces (iOS tinted icons, single-color print, watch face, monochrome OS theme). Single-hue cobalt with subtle internal step.', svg: mono },
+  ];
+  document.getElementById('variants').innerHTML = variants.map(v => `<div class="variant-card"><div class="ico">${v.svg}</div><span class="tag">${v.tag}</span><h3>${v.title}</h3><p>${v.desc}</p></div>`).join('');
+
+  document.getElementById('phoneIco').innerHTML     = dark;
+  document.getElementById('phoneDockIco').innerHTML = dark;
+  document.getElementById('macIco').innerHTML       = dark;
+  document.getElementById('fav16').innerHTML        = dark;
+  document.getElementById('fav16b').innerHTML       = dark;
+</script>
+</body>
+</html>

@@ -78,46 +78,88 @@
     ],
     "coverageThreshold": {
       "src/utils/formatters.ts": {
-        "statements": 90, "branches": 90, "functions": 100, "lines": 90
+        "statements": 90,
+        "branches": 90,
+        "functions": 100,
+        "lines": 90
       },
       "src/utils/tagColors.ts": {
-        "statements": 95, "branches": 85, "functions": 100, "lines": 95
+        "statements": 95,
+        "branches": 85,
+        "functions": 100,
+        "lines": 95
       },
       "src/utils/fileValidation.ts": {
-        "statements": 50, "branches": 60, "functions": 40, "lines": 52
+        "statements": 50,
+        "branches": 60,
+        "functions": 40,
+        "lines": 52
       },
       "src/utils/sessionTimeUtils.ts": {
-        "statements": 78, "branches": 70, "functions": 78, "lines": 78
+        "statements": 78,
+        "branches": 70,
+        "functions": 78,
+        "lines": 78
       },
       "src/features/performance/utils/chartDataUtils.ts": {
-        "statements": 55, "branches": 48, "functions": 58, "lines": 55
+        "statements": 55,
+        "branches": 48,
+        "functions": 58,
+        "lines": 55
       },
       "src/features/performance/services/tagPatternService.ts": {
-        "statements": 72, "branches": 58, "functions": 78, "lines": 74
+        "statements": 72,
+        "branches": 58,
+        "functions": 78,
+        "lines": 74
       },
       "src/features/calendar/utils/dynamicRiskUtils.ts": {
-        "statements": 88, "branches": 78, "functions": 100, "lines": 90
+        "statements": 88,
+        "branches": 78,
+        "functions": 100,
+        "lines": 90
       },
       "src/features/calendar/utils/statsUtils.ts": {
-        "statements": 90, "branches": 82, "functions": 100, "lines": 92
+        "statements": 90,
+        "branches": 82,
+        "functions": 100,
+        "lines": 92
       },
       "src/features/orion/utils/chatMentions.ts": {
-        "statements": 95, "branches": 92, "functions": 100, "lines": 96
+        "statements": 95,
+        "branches": 92,
+        "functions": 100,
+        "lines": 96
       },
       "src/utils/supabaseErrorHandler.ts": {
-        "statements": 78, "branches": 78, "functions": 100, "lines": 78
+        "statements": 78,
+        "branches": 78,
+        "functions": 100,
+        "lines": 78
       },
       "src/services/repositories/BaseRepository.ts": {
-        "statements": 62, "branches": 52, "functions": 75, "lines": 64
+        "statements": 62,
+        "branches": 52,
+        "functions": 75,
+        "lines": 64
       },
       "src/services/repositories/TradeRepository.ts": {
-        "statements": 9, "branches": 7, "functions": 15, "lines": 9
+        "statements": 9,
+        "branches": 7,
+        "functions": 15,
+        "lines": 9
       },
       "src/services/repositories/CalendarRepository.ts": {
-        "statements": 27, "branches": 30, "functions": 42, "lines": 27
+        "statements": 27,
+        "branches": 30,
+        "functions": 42,
+        "lines": 27
       },
       "src/services/repositories/NoteRepository.ts": {
-        "statements": 17, "branches": 20, "functions": 25, "lines": 17
+        "statements": 17,
+        "branches": 20,
+        "functions": 25,
+        "lines": 17
       }
     }
   },
@@ -139,6 +181,8 @@
     "cheerio": "^1.1.0",
     "cross-env": "^7.0.3",
     "gh-pages": "^6.3.0",
+    "png-to-ico": "^3.0.1",
+    "sharp": "^0.34.5",
     "source-map-explorer": "^2.5.3",
     "ts-node": "^10.9.2"
   }
