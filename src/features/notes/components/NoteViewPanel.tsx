@@ -28,6 +28,7 @@ import RichTextViewer from 'components/common/RichTextEditor/RichTextViewer';
 import { scrollbarStyles } from 'styles/scrollbarStyles';
 import { getSharedTrade } from 'features/calendar/services/sharingService';
 import { logger } from 'utils/logger';
+import { isDarkMode } from 'utils/themeMode';
 import TradeGalleryDialog from 'features/calendar/components/TradeGalleryDialog';
 import ImageZoomDialog, { ImageZoomProp } from 'features/calendar/components/ImageZoomDialog';
 
@@ -47,7 +48,7 @@ const NoteViewPanel: React.FC<NoteViewPanelProps> = ({
   onArchive,
 }) => {
   const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
+  const isDark = isDarkMode(theme);
 
   // Inline trade preview — replaces the default /shared/{id} navigation
   // when the user clicks a trade embed inside a note's body.

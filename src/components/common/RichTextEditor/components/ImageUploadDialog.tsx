@@ -25,6 +25,7 @@ import { supabase } from 'config/supabase';
 import { UnsplashImagePicker } from 'components/heroImage';
 import { UnsplashImage } from 'services/unsplashCache';
 import { FILE_SIZE_LIMITS, formatFileSize } from 'utils/fileValidation';
+import { isDarkMode } from 'utils/themeMode';
 import { scrollbarStyles } from 'styles/scrollbarStyles';
 import { Z_INDEX } from 'styles/zIndex';
 import { dialogProps } from 'styles/dialogStyles';
@@ -63,7 +64,7 @@ const ImageUploadDialog: React.FC<ImageUploadDialogProps> = ({
   onImageInsert,
 }) => {
   const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
+  const isDark = isDarkMode(theme);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   // Tier gate — free users can't upload to storage. URL + Unsplash tabs

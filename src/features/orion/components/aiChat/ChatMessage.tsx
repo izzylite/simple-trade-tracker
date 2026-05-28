@@ -38,6 +38,7 @@ import { EconomicEvent } from 'features/events/types/economicCalendar';
 import { format } from 'date-fns';
 import { logger } from 'utils/logger';
 import { getTagChipStyles } from 'utils/tagColors';
+import { isDarkMode } from 'utils/themeMode';
 import ImageZoomDialog, { ImageZoomProp } from 'features/calendar/components/ImageZoomDialog';
 
 interface ChatMessageProps {
@@ -75,7 +76,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   };
   const isUser = message.role === 'user';
   const isAssistant = message.role === 'assistant';
-  const isDark = theme.palette.mode === 'dark';
+  const isDark = isDarkMode(theme);
 
   // Streamed messages arrive with embeddedTrades/Events/Notes inline, but
   // persisted messages reload from DB without them — chips would render empty.

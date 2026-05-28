@@ -47,6 +47,7 @@ import { TASK_TYPE_LABELS } from 'features/orion/types/orionTask';
 import { useAuth } from 'contexts/SupabaseAuthContext';
 import { createNote } from 'features/notes/services/notesService';
 import { OrionUsageRing } from 'features/billing/components/OrionUsageRing';
+import { isDarkMode } from 'utils/themeMode';
 
 const ORION_NOTE_NS = 'a7f3d5e2-1b4c-5890-9e12-f3c4d5b6a7e8';
 
@@ -316,7 +317,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: theme.palette.mode === 'dark'
+          backgroundColor: isDarkMode(theme)
             ? 'rgba(0,0,0,0.6)'
             : 'rgba(0,0,0,0.3)',
           zIndex: Z_INDEX.AI_DRAWER_BACKDROP,

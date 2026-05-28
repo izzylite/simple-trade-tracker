@@ -10,6 +10,7 @@ import {
 import { Trade } from 'features/calendar/types/dualWrite';
 import { TimePeriod } from 'features/performance/utils/chartDataUtils';
 import { formatValue } from 'utils/formatters';
+import { isDarkMode } from 'utils/themeMode';
 
 interface PnLHeatmapProps {
   trades: Trade[];
@@ -63,7 +64,7 @@ const PnLHeatmap: React.FC<PnLHeatmapProps> = ({
 }) => {
   const theme = useTheme();
   const isXs = useMediaQuery(theme.breakpoints.down('sm'));
-  const isDark = theme.palette.mode === 'dark';
+  const isDark = isDarkMode(theme);
 
   const cellSize = isXs ? CELL_SIZE_XS : CELL_SIZE;
   const cellGap = isXs ? CELL_GAP_XS : CELL_GAP;

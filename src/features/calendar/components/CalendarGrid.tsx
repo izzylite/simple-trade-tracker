@@ -1,5 +1,6 @@
 import { Box } from '@mui/material';
 import { styled } from '@mui/material/styles';
+import { isDarkMode } from 'utils/themeMode';
 
 export const CalendarGrid = styled(Box)(({ theme }) => ({
   display: 'grid',
@@ -34,7 +35,7 @@ export const WeekdayHeader = styled(Box)(({ theme }) => ({
   color: theme.palette.text.secondary,
   fontSize: '0.875rem',
   fontWeight: 500,
-  border: theme.palette.mode === 'light' ? '1px solid #cbd5e1' : `1px solid ${theme.palette.divider}`,
+  border: !isDarkMode(theme) ? '1px solid #cbd5e1' : `1px solid ${theme.palette.divider}`,
   backgroundColor: theme.palette.background.default,
   borderRadius: theme.shape.borderRadius,
 })); 

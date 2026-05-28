@@ -1,5 +1,6 @@
 import React from 'react';
 import { Theme } from '@mui/material/styles';
+import { isDarkMode } from 'utils/themeMode';
 
 /**
  * Create custom style map for colors
@@ -15,7 +16,7 @@ export const createStyleMap = (
   TEXT_COLORS.forEach(color => {
     if (color.color !== 'default') {
       // Use softer white (#CCCCCC) for dark mode, pure white for light mode
-      const finalColor = color.color === '#FFFFFF' && theme.palette.mode === 'dark'
+      const finalColor = color.color === '#FFFFFF' && isDarkMode(theme)
         ? '#CCCCCC'
         : color.color;
       styleMap[`TEXT_COLOR_${color.color.replace('#', '')}`] = { color: finalColor };
@@ -28,7 +29,7 @@ export const createStyleMap = (
       // For dark background colors, use white text for better contrast
       // In light theme, all background colors are dark, so text should be light
       // In dark theme, we can keep the same approach since the backgrounds are still dark
-      const textColor = theme.palette.mode === 'light' ? '#FFFFFF' : '#FFFFFF';
+      const textColor = !isDarkMode(theme) ? '#FFFFFF' : '#FFFFFF';
 
       styleMap[`BG_COLOR_${color.color.replace('#', '')}`] = {
         backgroundColor: color.color,

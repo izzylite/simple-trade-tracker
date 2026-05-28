@@ -34,6 +34,7 @@ import {
 } from 'types/notification';
 import { useNotifications } from 'contexts/NotificationsContext';
 import { formatNotificationTime } from 'components/notifications/timeAgo';
+import { isDarkMode } from 'utils/themeMode';
 
 interface CrossSessionReminderBatchCardProps {
   // Sorted descending by created_at (newest first). All share batchId.
@@ -59,7 +60,7 @@ const CrossSessionReminderBatchCard: React.FC<
 
   const latest = notifications[0];
   const count = notifications.length;
-  const isDark = theme.palette.mode === 'dark';
+  const isDark = isDarkMode(theme);
 
   const openNotification = useCallback(
     (n: AppNotification) => {

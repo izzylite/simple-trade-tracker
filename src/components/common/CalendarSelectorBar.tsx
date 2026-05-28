@@ -18,6 +18,7 @@ import {
   TrendingUp as TrendingUpIcon,
   TrendingDown as TrendingDownIcon,
 } from '@mui/icons-material';
+import { isDarkMode } from 'utils/themeMode';
 
 export interface CalendarSelectorItem {
   id: string;
@@ -159,7 +160,7 @@ const CalendarSelectorBar: React.FC<CalendarSelectorBarProps> = ({
               maxHeight: 420,
               borderRadius: 1.5,
               boxShadow:
-                theme.palette.mode === 'dark'
+                isDarkMode(theme)
                   ? '0 4px 16px rgba(0,0,0,0.4)'
                   : '0 4px 12px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.04)',
             },

@@ -14,6 +14,7 @@
 import { useMemo } from 'react';
 import { alpha, useTheme } from '@mui/material';
 import type { Theme } from '@mui/material/styles';
+import { isDarkMode } from 'utils/themeMode';
 
 export const MONO_FONT = "'JetBrains Mono', ui-monospace, monospace";
 
@@ -53,7 +54,7 @@ export interface DialogTokens {
 }
 
 function buildTokens(theme: Theme, accentOverride?: string): DialogTokens {
-  const isDark = theme.palette.mode === 'dark';
+  const isDark = isDarkMode(theme);
   const accent = accentOverride ?? theme.palette.primary.main;
   const accentDark = accentOverride
     ? theme.palette.augmentColor({ color: { main: accent } }).dark

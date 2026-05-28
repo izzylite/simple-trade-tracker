@@ -33,6 +33,7 @@ import { EYEBROW_SX, TNUM, getInsetSurface } from 'styles/designTokens';
 import CardShell from 'components/common/CardShell';
 import StatTile from 'components/common/StatTile';
 import CompareBar from 'components/common/CompareBar';
+import { isDarkMode } from 'utils/themeMode';
 
 interface MonthlyStatsProps {
   trades: Trade[];
@@ -79,7 +80,7 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
   const navigate = useNavigate();
   const { setCalendarId } = useSelectedCalendar();
   const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
+  const isDark = isDarkMode(theme);
 
   const hairline = isDark ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
   const surfaceInset = getInsetSurface(theme);

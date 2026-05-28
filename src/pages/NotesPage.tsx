@@ -17,6 +17,7 @@ import { useSelectedCalendar } from 'features/calendar/contexts/SelectedCalendar
 import { useNotes } from 'features/notes/hooks/useNotes';
 import { CalendarRepository } from 'services/repositories/CalendarRepository';
 import { logger } from 'utils/logger';
+import { isDarkMode } from 'utils/themeMode';
 import * as notesService from 'features/notes/services/notesService';
 
 import NoteListPanel, {
@@ -247,7 +248,7 @@ const NotesPage: React.FC = () => {
         }}
       >
         {/* Creator toggle: My Notes / Orion */}
-        <Box sx={{ display: 'flex', gap: 0.5, p: 0.5, bgcolor: alpha(theme.palette.common.white, theme.palette.mode === 'dark' ? 0.03 : 0.6), borderRadius: '999px', border: `1px solid ${theme.palette.divider}` }}>
+        <Box sx={{ display: 'flex', gap: 0.5, p: 0.5, bgcolor: alpha(theme.palette.common.white, isDarkMode(theme) ? 0.03 : 0.6), borderRadius: '999px', border: `1px solid ${theme.palette.divider}` }}>
           {(['me', 'assistant'] as const).map(c => {
             const active = creator === c;
             return (

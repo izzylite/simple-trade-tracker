@@ -43,6 +43,7 @@ import { useRecentColors } from 'components/common/RichTextEditor/hooks/useRecen
 import { handleToolbarInteraction } from 'components/common/RichTextEditor/utils/styleUtils';
 import { getCurrentBlockType } from 'components/common/RichTextEditor/utils/editorActions';
 import { getCurrentLink } from 'components/common/RichTextEditor/utils/linkUtils';
+import { isDarkMode } from 'utils/themeMode';
 import {
   CALLOUT_VARIANTS,
   CALLOUT_LABELS,
@@ -269,7 +270,7 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
               backgroundColor: theme.palette.background.paper,
               borderRadius: '12px',
               border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
-              boxShadow: theme.palette.mode === 'dark'
+              boxShadow: isDarkMode(theme)
                 ? `0 8px 32px ${alpha('#000000', 0.4)}, 0 2px 8px ${alpha('#000000', 0.2)}`
                 : `0 8px 32px ${alpha(theme.palette.primary.main, 0.15)}, 0 2px 8px ${alpha('#000000', 0.1)}`,
               mt: 0.5,
@@ -475,7 +476,7 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
               backgroundColor: theme.palette.background.paper,
               borderRadius: '12px',
               border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
-              boxShadow: theme.palette.mode === 'dark'
+              boxShadow: isDarkMode(theme)
                 ? `0 8px 32px ${alpha('#000000', 0.4)}, 0 2px 8px ${alpha('#000000', 0.2)}`
                 : `0 8px 32px ${alpha(theme.palette.primary.main, 0.15)}, 0 2px 8px ${alpha('#000000', 0.1)}`,
               mt: 1,
@@ -539,7 +540,7 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
               backgroundColor: theme.palette.background.paper,
               borderRadius: '12px',
               border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
-              boxShadow: theme.palette.mode === 'dark'
+              boxShadow: isDarkMode(theme)
                 ? `0 8px 32px ${alpha('#000000', 0.4)}, 0 2px 8px ${alpha('#000000', 0.2)}`
                 : `0 8px 32px ${alpha(theme.palette.primary.main, 0.15)}, 0 2px 8px ${alpha('#000000', 0.1)}`,
               mt: 1,
@@ -903,7 +904,7 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
               overflow: 'hidden',
               backgroundColor: theme.palette.background.paper,
               border: `1px solid ${theme.palette.divider}`,
-              boxShadow: theme.palette.mode === 'dark'
+              boxShadow: isDarkMode(theme)
                 ? '0 4px 16px rgba(0,0,0,0.4)'
                 : '0 4px 12px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.06)',
               animation: 'floatingToolbarFadeIn 0.15s ease-out forwards',

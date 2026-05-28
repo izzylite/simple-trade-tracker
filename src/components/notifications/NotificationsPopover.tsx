@@ -10,6 +10,7 @@ import {
   useMediaQuery,
 } from '@mui/material';
 import { useNotifications } from 'contexts/NotificationsContext';
+import { isDarkMode } from 'utils/themeMode';
 import { AppNotification } from 'types/notification';
 import { scrollbarStyles } from 'styles/scrollbarStyles';
 import NotificationRow from 'components/notifications/NotificationRow';
@@ -72,11 +73,11 @@ const NotificationsPopover: React.FC<NotificationsPopoverProps> = ({
               backgroundColor: 'background.paper',
               borderRadius: 1.5,
               border:
-                theme.palette.mode === 'light'
+                !isDarkMode(theme)
                   ? `1px solid ${theme.palette.divider}`
                   : 'none',
               boxShadow:
-                theme.palette.mode === 'dark'
+                isDarkMode(theme)
                   ? '0 4px 16px rgba(0,0,0,0.4)'
                   : '0 4px 12px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.04)',
               overflow: 'hidden',

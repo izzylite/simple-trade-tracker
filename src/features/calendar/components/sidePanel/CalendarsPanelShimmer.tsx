@@ -17,6 +17,7 @@
 import React from 'react';
 import { Box, Stack, alpha, useTheme } from '@mui/material';
 import Shimmer from 'components/Shimmer';
+import { isDarkMode } from 'utils/themeMode';
 
 const CalendarsPanelShimmer: React.FC = () => {
   const theme = useTheme();
@@ -31,11 +32,11 @@ const CalendarsPanelShimmer: React.FC = () => {
           p: 1.75,
           borderRadius: '4px',
           bgcolor:
-            theme.palette.mode === 'dark'
+            isDarkMode(theme)
               ? surface
               : alpha(theme.palette.background.paper, 0.7),
           border: `1px solid ${
-            theme.palette.mode === 'dark' ? divider : theme.palette.divider
+            isDarkMode(theme) ? divider : theme.palette.divider
           }`,
         }}
       >
@@ -92,11 +93,11 @@ const CalendarsPanelShimmer: React.FC = () => {
         sx={{
           borderRadius: '4px',
           bgcolor:
-            theme.palette.mode === 'dark'
+            isDarkMode(theme)
               ? surface
               : alpha(theme.palette.background.paper, 0.7),
           border: `1px solid ${
-            theme.palette.mode === 'dark' ? divider : theme.palette.divider
+            isDarkMode(theme) ? divider : theme.palette.divider
           }`,
           overflow: 'hidden',
         }}

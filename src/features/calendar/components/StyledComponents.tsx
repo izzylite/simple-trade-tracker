@@ -1,6 +1,7 @@
 import { styled, alpha } from '@mui/material/styles';
 import { Paper, Box, Typography, Button, IconButton, Chip, DialogTitle, DialogContent, DialogActions } from '@mui/material';
 import { MONO_FONT, TNUM } from 'styles/designTokens';
+import { isDarkMode } from 'utils/themeMode';
 
 export type DayStatus = 'win' | 'loss' | 'neutral' | 'breakeven';
 
@@ -12,7 +13,7 @@ export const StyledCalendarDay = styled(Box, {
   $isCurrentDay: boolean,
   $dayStatus: DayStatus;
 }>(({ theme, $isCurrentMonth, $isCurrentDay, $dayStatus }) => {
-  const isDark = theme.palette.mode === 'dark';
+  const isDark = isDarkMode(theme);
   const winBg = isDark
     ? alpha(theme.palette.success.main, 0.12)
     : alpha(theme.palette.success.main, 0.15);
@@ -80,7 +81,7 @@ export const CalendarCell = styled(Box)(({ theme }) => ({
   borderRadius: `${theme.palette.custom.radius.md}px`,
   overflow: 'hidden',
   backgroundColor: 'transparent',
-  border: theme.palette.mode === 'light' ? `1px solid ${theme.palette.divider}` : 'none',
+  border: !isDarkMode(theme) ? `1px solid ${theme.palette.divider}` : 'none',
 }));
 
 export const WeekdayHeader = styled(Box)(({ theme }) => ({
@@ -136,11 +137,11 @@ export const TradeCount = styled(Typography)(({ theme }) => ({
 
 // Action button styled component
 export const ActionButton = styled(IconButton)(({ theme }) => ({
-  backgroundColor: theme.palette.mode === 'dark'
+  backgroundColor: isDarkMode(theme)
     ? alpha(theme.palette.common.white, 0.1)
     : alpha(theme.palette.common.black, 0.05),
   '&:hover': {
-    backgroundColor: theme.palette.mode === 'dark'
+    backgroundColor: isDarkMode(theme)
       ? alpha(theme.palette.common.white, 0.2)
       : alpha(theme.palette.common.black, 0.1),
   },
@@ -196,7 +197,7 @@ export const StatItem = styled(Box)(({ theme }) => ({
   alignItems: 'center',
   padding: theme.spacing(1),
   borderRadius: `${theme.palette.custom.radius.md}px`,
-  backgroundColor: theme.palette.mode === 'dark'
+  backgroundColor: isDarkMode(theme)
     ? 'rgba(255,255,255,0.03)'
     : alpha(theme.palette.text.primary, 0.03),
   border: `1px solid ${theme.palette.divider}`,
@@ -275,7 +276,7 @@ export const FormField = styled(Box)(({ theme }) => ({
 export const TradeListItem = styled(Box, {
   shouldForwardProp: (prop) => prop !== '$type'
 })<{ $type?: 'win' | 'loss' | 'breakeven' }>(({ theme, $type }) => {
-  const isDark = theme.palette.mode === 'dark';
+  const isDark = isDarkMode(theme);
 
   const restingShadow = isDark
     ? '0 1px 2px rgba(0,0,0,0.45), 0 6px 14px rgba(0,0,0,0.32), 0 2px 4px rgba(0,0,0,0.20)'
@@ -443,7 +444,7 @@ export const MonthlyStatsGrid = styled(Box)(({ theme }) => ({
 // Monthly stat item styled component
 export const MonthlyStatItem = styled(Box)(({ theme }) => ({
   padding: theme.spacing(1.5),
-  backgroundColor: theme.palette.mode === 'dark'
+  backgroundColor: isDarkMode(theme)
     ? 'rgba(255,255,255,0.03)'
     : alpha(theme.palette.text.primary, 0.03),
   borderRadius: `${theme.palette.custom.radius.md}px`,

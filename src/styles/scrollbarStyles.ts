@@ -1,4 +1,5 @@
 import { Theme } from '@mui/material/styles';
+import { isDarkMode } from 'utils/themeMode';
 
 /**
  * Creates consistent scrollbar styles for use throughout the application.
@@ -19,12 +20,12 @@ export const scrollbarStyles = (theme: Theme) => ({
     background: 'transparent'
   },
   '&::-webkit-scrollbar-thumb': {
-    background: theme.palette.mode === 'dark'
+    background: isDarkMode(theme)
       ? 'rgba(148, 163, 184, 0.3)'
       : 'rgba(100, 116, 139, 0.3)',
     borderRadius: '4px',
     '&:hover': {
-      background: theme.palette.mode === 'dark'
+      background: isDarkMode(theme)
         ? 'rgba(148, 163, 184, 0.5)'
         : 'rgba(100, 116, 139, 0.5)'
     }

@@ -13,6 +13,7 @@
  */
 
 import { Theme, alpha } from '@mui/material/styles';
+import { isDarkMode } from 'utils/themeMode';
 
 /** Tabular-figure font-feature string. Use wherever numbers stack. */
 export const TNUM = "'tnum' on, 'lnum' on";
@@ -48,7 +49,7 @@ export const EYEBROW_SX = {
  * in light mode (3% text). Always reads as "this is nested content".
  */
 export function getInsetSurface(theme: Theme): string {
-  return theme.palette.mode === 'dark'
+  return isDarkMode(theme)
     ? 'rgba(255,255,255,0.03)'
     : alpha(theme.palette.text.primary, 0.03);
 }

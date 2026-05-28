@@ -30,6 +30,7 @@ import type { Trade } from 'features/calendar/types/trade';
 import type { EconomicEvent } from 'features/events/types/economicCalendar';
 import type { Note } from 'features/notes/types/note';
 import { getTagChipStyles } from 'utils/tagColors';
+import { isDarkMode } from 'utils/themeMode';
 
 // Convert inline reference tags to placeholder <span> elements that survive
 // DOMPurify and can host React chips via createPortal. Spans render as
@@ -433,7 +434,7 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
             maxWidth: '100%',
             height: 'auto',
             minHeight: 100,
-            backgroundColor: theme.palette.mode === 'dark'
+            backgroundColor: isDarkMode(theme)
               ? alpha(theme.palette.background.paper, 0.8)
               : alpha(theme.palette.grey[100], 0.8),
             maxHeight: '300px',

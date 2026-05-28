@@ -34,6 +34,7 @@ import { TagsDisplay } from 'components/common';
 import { TradeImage } from './trades/TradeForm';
 import RichTextEditor from 'components/common/RichTextEditor';
 import { logger } from 'utils/logger';
+import { isDarkMode } from 'utils/themeMode';
 import ShareButton from './sharing/ShareButton';
 import { TradeOperationsProps } from '../types/tradeOperations';
 import { Z_INDEX } from 'styles/zIndex';
@@ -667,8 +668,8 @@ const TradeDetailExpanded: React.FC<TradeDetailExpandedProps> = ({
                                         cursor: isImageLoading(image, loadingImages) ? 'default' : 'pointer',
                                         ...(isImageLoading(image, loadingImages) && {
                                           background: (theme) => {
-                                            const baseColor = theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)';
-                                            const shimmerColor = theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)';
+                                            const baseColor = isDarkMode(theme) ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)';
+                                            const shimmerColor = isDarkMode(theme) ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)';
                                             return `linear-gradient(90deg, ${baseColor} 25%, ${shimmerColor} 50%, ${baseColor} 75%)`;
                                           },
                                           backgroundSize: '200% 100%',

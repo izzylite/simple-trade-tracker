@@ -46,6 +46,7 @@ import {
   getInsetSurface,
   getCardShellSx,
 } from 'styles/designTokens';
+import { isDarkMode } from 'utils/themeMode';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -367,7 +368,7 @@ const FocusedCalendarCard: React.FC<FocusedCalendarCardProps> = ({
       : theme.palette.error.main;
 
   const curve = useMemo(() => buildEquityCurve(calendar), [calendar]);
-  const isLight = theme.palette.mode === 'light';
+  const isLight = !isDarkMode(theme);
   const insetSurface = getInsetSurface(theme);
   const divider = theme.palette.divider;
 
@@ -1168,7 +1169,7 @@ const CalendarsListContent: React.FC<CalendarsListContentProps> = ({
   );
 
   const insetSurface = getInsetSurface(theme);
-  const isDark = theme.palette.mode === 'dark';
+  const isDark = isDarkMode(theme);
 
   const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
     setTabIndex(newValue);

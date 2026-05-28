@@ -20,6 +20,7 @@ import {
   alpha,
   Chip
 } from '@mui/material';
+import { isDarkMode } from 'utils/themeMode';
 
 interface MarkdownRendererProps {
   content: string;
@@ -44,7 +45,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
               my: 2,
               maxWidth: '100%',
               overflow: 'auto',
-              backgroundColor: theme.palette.mode === 'dark' ? 'grey.900' : 'grey.50',
+              backgroundColor: isDarkMode(theme) ? 'grey.900' : 'grey.50',
               border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
               borderRadius: 2
             }}
@@ -57,7 +58,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
         thead: ({ children }) => (
           <TableHead
             sx={{
-              backgroundColor: theme.palette.mode === 'dark'
+              backgroundColor: isDarkMode(theme)
                 ? alpha(theme.palette.primary.main, 0.15)
                 : alpha(theme.palette.primary.main, 0.08)
             }}
@@ -106,7 +107,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
                 sx={{
                   p: 2,
                   my: 1,
-                  backgroundColor: theme.palette.mode === 'dark' ? 'grey.900' : 'grey.50',
+                  backgroundColor: isDarkMode(theme) ? 'grey.900' : 'grey.50',
                   fontFamily: 'monospace',
                   fontSize: '0.875rem',
                   overflow: 'auto'

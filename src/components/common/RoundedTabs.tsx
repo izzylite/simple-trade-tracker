@@ -6,6 +6,7 @@ import {
   useTheme
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
+import { isDarkMode } from 'utils/themeMode';
 
 export interface TabItem {
   label: string;
@@ -137,10 +138,10 @@ const RoundedTabs: React.FC<RoundedTabsProps> = ({
 
     // Default contained variant
     return {
-      backgroundColor: theme.palette.mode === 'light'
+      backgroundColor: !isDarkMode(theme)
         ? '#e2e8f0'
         : alpha(theme.palette.background.paper, 0.4),
-      border: theme.palette.mode === 'light' ? '1px solid #e2e8f0' : 'none',
+      border: !isDarkMode(theme) ? '1px solid #e2e8f0' : 'none',
       '& .MuiTab-root': {
         '&.Mui-selected': {
           backgroundColor: theme.palette.primary.main,

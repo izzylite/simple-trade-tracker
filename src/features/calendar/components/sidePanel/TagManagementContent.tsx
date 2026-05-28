@@ -45,6 +45,7 @@ import {
 } from 'utils/tagColors';
 import { Calendar } from '../../types/calendar';
 import { useTagsPanelState } from '../../contexts/TagsPanelStateContext';
+import { isDarkMode } from 'utils/themeMode';
 
 export interface TagManagementContentProps {
   allTags: string[];
@@ -303,7 +304,7 @@ const TagManagementContent: React.FC<TagManagementContentProps> = ({
   }, [filteredTags]);
 
   const groupEntries = Object.entries(groupedTags);
-  const isDark = theme.palette.mode === 'dark';
+  const isDark = isDarkMode(theme);
 
   // Coverage metrics — how much of the user's vocabulary has definitions.
   // The kit is "coverage-first": this is the panel's hero KPI.

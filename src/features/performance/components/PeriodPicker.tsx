@@ -2,6 +2,7 @@ import React, { useMemo, useRef, useState } from 'react';
 import { Box, Popover, useTheme } from '@mui/material';
 import { format, addMonths, addQuarters, addYears, startOfQuarter, startOfYear, startOfMonth } from 'date-fns';
 import { TimePeriod } from 'features/performance/components/PerformanceCharts';
+import { isDarkMode } from 'utils/themeMode';
 
 interface PeriodPickerProps {
   period: TimePeriod;
@@ -80,7 +81,7 @@ const ArrowBtn: React.FC<{ disabled?: boolean; onClick: (e: React.MouseEvent) =>
 
 const PeriodPicker: React.FC<PeriodPickerProps> = ({ period, value, onChange }) => {
   const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
+  const isDark = isDarkMode(theme);
   const anchorRef = useRef<HTMLDivElement | null>(null);
   const [open, setOpen] = useState(false);
   // year shown in the popover (independent of value while browsing)

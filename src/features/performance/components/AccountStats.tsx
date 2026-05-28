@@ -34,6 +34,7 @@ import {
 import { Trade } from 'features/calendar/types/dualWrite';
 import { DynamicRiskSettings } from 'features/calendar/utils/dynamicRiskUtils';
 import { EYEBROW_SX, TNUM, getInsetSurface, getCardShellSx } from 'styles/designTokens';
+import { isDarkMode } from 'utils/themeMode';
 
 interface AccountStatsProps {
   balance: number;
@@ -60,7 +61,7 @@ const AccountStats: React.FC<AccountStatsProps> = ({
   max_daily_drawdown,
 }) => {
   const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
+  const isDark = isDarkMode(theme);
 
   const profitPercentage =
     trades.length > 0 && balance > 0 ? (totalProfit / balance) * 100 : 0;

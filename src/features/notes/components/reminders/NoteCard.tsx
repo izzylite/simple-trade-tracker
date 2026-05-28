@@ -24,6 +24,7 @@ import {
   blueGrey,
 } from '@mui/material/colors';
 import { Note } from 'features/notes/types/note';
+import { isDarkMode } from 'utils/themeMode';
 
 interface NoteCardProps {
   note: Note;
@@ -87,7 +88,7 @@ const getColorMap = (theme: Theme): Record<string, string> => ({
 const NoteCard: React.FC<NoteCardProps> = ({ note, index, totalCards, isHovered, hasAnimated }) => {
   const theme = useTheme();
   const colorMap = getColorMap(theme);
-  const isDark = theme.palette.mode === 'dark';
+  const isDark = isDarkMode(theme);
 
   // Use note color for full background, default to a neutral dark color
   const baseColor = note.color ? colorMap[note.color] || theme.palette.grey[700] : theme.palette.grey[700];

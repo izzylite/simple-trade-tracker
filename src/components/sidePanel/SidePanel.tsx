@@ -3,6 +3,7 @@ import React from 'react';
 import { Box, alpha, useTheme } from '@mui/material';
 import { useSidePanel, SidePanelView } from 'contexts/SidePanelContext';
 import SidePanelHeader from 'components/sidePanel/SidePanelHeader';
+import { isDarkMode } from 'utils/themeMode';
 
 interface ViewConfig {
   title: string;
@@ -53,7 +54,7 @@ const SidePanel: React.FC<SidePanelProps> = ({ renderView }) => {
             height: '100%',
             minWidth: PANEL_WIDTH,
             overflow: 'hidden',
-            bgcolor: theme.palette.mode === 'dark'
+            bgcolor: isDarkMode(theme)
               ? alpha(theme.palette.background.paper, 0.4)
               : alpha(theme.palette.background.paper, 0.7),
           }}

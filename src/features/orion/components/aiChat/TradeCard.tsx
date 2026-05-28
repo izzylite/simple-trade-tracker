@@ -28,6 +28,7 @@ import {
   isGroupedTag,
   getTagGroup,
 } from 'utils/tagColors';
+import { isDarkMode } from 'utils/themeMode';
 
 interface TradeCardProps {
   trade: Trade;
@@ -55,7 +56,7 @@ const TradeCard: React.FC<TradeCardProps> = ({
   showImages = false,
 }) => {
   const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
+  const isDark = isDarkMode(theme);
   const interactive = !!onClick;
 
   // ── Trade-type signal (color, icon glyph) ─────────────────────────────

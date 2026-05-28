@@ -47,6 +47,7 @@ import {
 } from 'features/notes/types/note';
 import { scrollbarStyles } from 'styles/scrollbarStyles';
 import { getTagDisplayLabel } from 'features/notes/components/NoteEditorDialogTags';
+import { isDarkMode } from 'utils/themeMode';
 
 /** Lifecycle tab — mutually exclusive, drives useNotes activeTab. */
 export type NotesTab = 'all' | 'pinned' | 'archived';
@@ -179,7 +180,7 @@ interface TabsCompactProps {
 
 const TabsCompact: React.FC<TabsCompactProps> = ({ tab, onTabChange, counts }) => {
   const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
+  const isDark = isDarkMode(theme);
 
   return (
     <Box
@@ -397,7 +398,7 @@ const InlineNoteRow: React.FC<InlineNoteRowProps> = ({
   tab,
 }) => {
   const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
+  const isDark = isDarkMode(theme);
 
   const primaryTag = useMemo(() => getPrimaryTag(note), [note]);
   const primaryColor = primaryTag ? getTagColor(primaryTag) : FALLBACK_TAG_COLOR;
@@ -646,7 +647,7 @@ const NoteListPanel: React.FC<NoteListPanelProps> = ({
   disableExpand = false,
 }) => {
   const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
+  const isDark = isDarkMode(theme);
 
   const [expandedIdInternal, setExpandedIdInternal] = useState<string | null>(null);
   const isControlled = expandedIdProp !== undefined && onExpandedIdChange !== undefined;

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, alpha, useTheme } from '@mui/material';
+import { isDarkMode } from 'utils/themeMode';
 
 interface AnimatedBackgroundProps {
   children?: React.ReactNode;
@@ -11,7 +12,7 @@ interface AnimatedBackgroundProps {
  */
 const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({ children }) => {
   const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
+  const isDark = isDarkMode(theme);
 
   return (
     <>

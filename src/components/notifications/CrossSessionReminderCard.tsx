@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { AppNotification, isReminderFiredPayload } from 'types/notification';
 import { useNotifications } from 'contexts/NotificationsContext';
 import { formatNotificationTime } from 'components/notifications/timeAgo';
+import { isDarkMode } from 'utils/themeMode';
 
 interface CrossSessionReminderCardProps {
   notification: AppNotification;
@@ -41,7 +42,7 @@ const CrossSessionReminderCard: React.FC<CrossSessionReminderCardProps> = ({
   if (!isReminderFiredPayload(notification)) return null;
 
   const preview = notification.payload.preview ?? '';
-  const isDark = theme.palette.mode === 'dark';
+  const isDark = isDarkMode(theme);
 
   return (
     <Box

@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { formatCount } from 'utils/formatters';
+import { isDarkMode } from 'utils/themeMode';
 import { MONO_FONT, TNUM } from 'styles/designTokens';
 import {
   Box,
@@ -178,7 +179,7 @@ const TradeTagsDisplay: React.FC<{ tags: string[] }> = React.memo(({ tags }) => 
             size="small"
             sx={{
               height: '20px',
-              backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)',
+              backgroundColor: isDarkMode(theme) ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)',
               color: 'text.secondary',
               fontWeight: 600,
               border: '1px dashed',
@@ -433,14 +434,14 @@ const TradeList: React.FC<TradeListProps> = ({
                       opacity: 0.7,
                       border: '1px dashed',
                       borderColor: 'divider',
-                      backgroundColor: theme => theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)'
+                      backgroundColor: theme => isDarkMode(theme) ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)'
                     }),
                     ...(isTradeBeingDeleted(trade.id) && {
                       opacity: 0.6,
                       pointerEvents: 'none'
                     }),
                     ...(enableBulkSelection && isTradeSelected(trade.id) && {
-                      backgroundColor: theme => theme.palette.mode === 'dark'
+                      backgroundColor: theme => isDarkMode(theme)
                         ? 'rgba(144, 202, 249, 0.08)'
                         : 'rgba(25, 118, 210, 0.08)',
                       borderColor: 'primary.main'
@@ -561,7 +562,7 @@ const TradeList: React.FC<TradeListProps> = ({
                                 fontSize: '0.7rem',
                                 color: 'text.secondary',
                                 fontWeight: 500,
-                                bgcolor: theme => theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)',
+                                bgcolor: theme => isDarkMode(theme) ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)',
                                 px: 0.5,
                                 py: 0.2,
                                 borderRadius: 0.5
@@ -588,7 +589,7 @@ const TradeList: React.FC<TradeListProps> = ({
                                 fontSize: '0.7rem',
                                 color: 'text.secondary',
                                 fontWeight: 500,
-                                bgcolor: theme => theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)',
+                                bgcolor: theme => isDarkMode(theme) ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)',
                                 px: 0.5,
                                 py: 0.2,
                                 borderRadius: 0.5
@@ -695,7 +696,7 @@ const TradeList: React.FC<TradeListProps> = ({
                   color: 'text.secondary',
                   '&:hover': {
                     borderColor: 'primary.main',
-                    backgroundColor: theme => theme.palette.mode === 'dark'
+                    backgroundColor: theme => isDarkMode(theme)
                       ? 'rgba(144, 202, 249, 0.08)'
                       : 'rgba(25, 118, 210, 0.08)',
                     color: 'primary.main'

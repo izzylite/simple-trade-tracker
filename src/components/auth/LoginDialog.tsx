@@ -32,6 +32,7 @@ import {
 import { useAuth } from 'contexts/SupabaseAuthContext';
 import { inviteService } from 'features/calendar/services/inviteService';
 import { logger } from 'utils/logger';
+import { isDarkMode } from 'utils/themeMode';
 import { dialogProps } from 'styles/dialogStyles';
 import { scrollbarStyles } from 'styles/scrollbarStyles';
 import { useDialogTokens } from 'styles/dialogTokens';
@@ -59,7 +60,7 @@ export const LoginPromptContent: React.FC<LoginPromptContentProps> = ({
   onAfterSignIn,
 }) => {
   const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
+  const isDark = isDarkMode(theme);
   const { signInWithGoogle, signInWithEmail, signUpWithEmail, requestPasswordReset } = useAuth();
 
   // Step management
@@ -918,7 +919,7 @@ const LoginDialog: React.FC<LoginDialogProps> = ({
   subtitle = 'Sign in to continue to JournoTrades',
 }) => {
   const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
+  const isDark = isDarkMode(theme);
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const hairline = isDark ? 'rgba(255,255,255,0.08)' : theme.palette.divider;
 

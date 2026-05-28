@@ -25,6 +25,7 @@ import { Note } from 'features/notes/types/note';
 import { Calendar } from 'features/calendar/types/calendar';
 import NotesBottomSheet from 'features/notes/components/reminders/NotesBottomSheet';
 import { useUserPinnedEvents } from 'features/events/contexts/UserPinnedEventsContext';
+import { isDarkMode } from 'utils/themeMode';
 
 export interface StickyReminderCardsProps {
   notes: Note[];
@@ -160,7 +161,7 @@ const StickyReminderCards: React.FC<StickyReminderCardsProps> = ({
             border: `1px solid ${alpha(frontColor, 0.3)}`,
             cursor: 'pointer',
             // Deeper, layered shadow — lifts the card above the panel surface.
-            boxShadow: theme.palette.mode === 'dark'
+            boxShadow: isDarkMode(theme)
               ? `0 1px 2px ${alpha('#000', 0.4)}, 0 8px 20px ${alpha('#000', 0.45)}, 0 16px 40px ${alpha(frontColor, 0.18)}`
               : `0 1px 2px ${alpha(frontColor, 0.18)}, 0 8px 20px ${alpha(frontColor, 0.22)}, 0 16px 40px ${alpha(frontColor, 0.14)}`,
             opacity: dismissingId === frontNote.id ? 0 : 1,

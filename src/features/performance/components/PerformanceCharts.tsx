@@ -28,6 +28,7 @@ import RiskRewardChart from 'features/performance/components/charts/RiskRewardCh
 import EconomicEventCorrelationAnalysis from 'features/events/components/charts/EconomicEventCorrelationAnalysis';
 import { useTradeSyncContextOptional } from 'features/calendar/contexts/TradeSyncContext';
 import { normalizeTradeDates } from 'features/calendar/utils/tradeUtils';
+import { isDarkMode } from 'utils/themeMode';
 
 // Type definition needed for module-level constants
 export type TimePeriod = 'month' | 'quarter' | 'ytd' | 'year' | 'all';
@@ -818,7 +819,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            bgcolor: theme.palette.mode === 'dark' ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0.02)',
+            bgcolor: isDarkMode(theme) ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0.02)',
             borderRadius: 2,
             border: `1px solid ${theme.palette.divider}`
           }}

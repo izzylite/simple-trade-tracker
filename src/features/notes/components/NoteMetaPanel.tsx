@@ -25,6 +25,7 @@ import { scrollbarStyles } from 'styles/scrollbarStyles';
 import type { TradeChipData } from 'components/common/RichTextEditor/utils/tradeEntityUtils';
 import { getSharedTrade } from 'features/calendar/services/sharingService';
 import { logger } from 'utils/logger';
+import { isDarkMode } from 'utils/themeMode';
 import TradeGalleryDialog from 'features/calendar/components/TradeGalleryDialog';
 import ImageZoomDialog, { ImageZoomProp } from 'features/calendar/components/ImageZoomDialog';
 import { EYEBROW_SX, TNUM, getInsetTileSx } from 'styles/designTokens';
@@ -195,7 +196,7 @@ const ReminderCardStack: React.FC<ReminderCardStackProps> = ({ notes, onSelect }
         height: 200,
         border: `1px solid ${alpha(frontColor, 0.3)}`,
         cursor: 'pointer',
-        boxShadow: theme.palette.mode === 'dark'
+        boxShadow: isDarkMode(theme)
           ? `0 1px 2px ${alpha(theme.palette.common.black, 0.4)}, 0 8px 20px ${alpha(theme.palette.common.black, 0.45)}, 0 16px 40px ${alpha(frontColor, 0.18)}`
           : `0 1px 2px ${alpha(frontColor, 0.18)}, 0 8px 20px ${alpha(frontColor, 0.22)}, 0 16px 40px ${alpha(frontColor, 0.14)}`,
         opacity: dismissingId === front.id ? 0 : 1,

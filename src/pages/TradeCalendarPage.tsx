@@ -65,6 +65,7 @@ import {
   isToday
 } from 'date-fns';
 import { formatCurrency, formatCount } from 'utils/formatters';
+import { isDarkMode } from 'utils/themeMode';
 import { Trade } from 'features/calendar/types/trade';
 import DayDialog from 'features/calendar/components/trades/DayDialog';
 import SelectDateDialog from 'features/calendar/components/SelectDateDialog';
@@ -245,7 +246,7 @@ const WeeklyPnL: React.FC<WeeklyPnLProps> = React.memo(({
     </Box>
   ) : '';
 
-  const isDark = theme.palette.mode === 'dark';
+  const isDark = isDarkMode(theme);
   const winBg = isDark ? 'rgba(34,197,94,0.12)' : 'rgba(22,163,74,0.08)';
   const lossBg = isDark ? 'rgba(239,68,68,0.10)' : 'rgba(220,38,38,0.08)';
   const cellBg = netAmount > 0 ? winBg : netAmount < 0 ? lossBg : 'background.paper';

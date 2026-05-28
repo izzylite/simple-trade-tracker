@@ -6,6 +6,7 @@
 import React from 'react';
 import { Box, alpha, useTheme, keyframes } from '@mui/material';
 import { Add as AddIcon } from '@mui/icons-material';
+import { isDarkMode } from 'utils/themeMode';
 
 interface PlaceholderNoteCardProps {
   index: number;
@@ -49,7 +50,7 @@ const PlaceholderNoteCard: React.FC<PlaceholderNoteCardProps> = ({
   hasAnimated,
 }) => {
   const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
+  const isDark = isDarkMode(theme);
 
   // Use a neutral grey color for placeholder cards
   const baseColor = theme.palette.grey[isDark ? 700 : 400];

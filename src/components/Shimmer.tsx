@@ -1,5 +1,6 @@
 import { Box, useTheme, alpha } from '@mui/material';
 import { keyframes } from '@mui/system';
+import { isDarkMode } from 'utils/themeMode';
 
 const shimmer = keyframes`
   0% {
@@ -47,19 +48,18 @@ const Shimmer = ({
     };
 
     const values = intensityValues[intensity];
-    const mode = theme.palette.mode;
 
     return {
-      baseColor: mode === 'dark'
+      baseColor: isDarkMode(theme)
         ? `rgba(255, 255, 255, ${values.dark.base})`
         : `rgba(0, 0, 0, ${values.light.base})`,
-      shimmerColor: mode === 'dark'
+      shimmerColor: isDarkMode(theme)
         ? `rgba(255, 255, 255, ${values.dark.shimmer})`
         : `rgba(0, 0, 0, ${values.light.shimmer})`,
       // Use neutral greys for tint to avoid blueish hue in dark mode
       primaryTint: alpha(
-        theme.palette.mode === 'dark' ? theme.palette.grey[700] : theme.palette.grey[300],
-        mode === 'dark' ? 0.25 : 0.2
+        isDarkMode(theme) ? theme.palette.grey[700] : theme.palette.grey[300],
+        isDarkMode(theme) ? 0.25 : 0.2
       )
     };
   };
@@ -81,9 +81,9 @@ const Shimmer = ({
         };
       case 'pulse':
         const pulse = keyframes`
-          0% { opacity: ${theme.palette.mode === 'dark' ? 0.5 : 0.6}; }
-          50% { opacity: ${theme.palette.mode === 'dark' ? 0.8 : 0.9}; }
-          100% { opacity: ${theme.palette.mode === 'dark' ? 0.5 : 0.6}; }
+          0% { opacity: ${isDarkMode(theme) ? 0.5 : 0.6}; }
+          50% { opacity: ${isDarkMode(theme) ? 0.8 : 0.9}; }
+          100% { opacity: ${isDarkMode(theme) ? 0.5 : 0.6}; }
         `;
         return {
           background: `linear-gradient(135deg, ${baseColor} 0%, ${primaryTint} 100%)`,

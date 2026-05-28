@@ -41,6 +41,7 @@ import {
   filterTagsByGroup
 } from 'utils/tagColors';
 import { SelectInput } from 'components/common';
+import { isDarkMode } from 'utils/themeMode';
 import { scrollbarStyles } from 'styles/scrollbarStyles';
 import { dialogProps } from 'styles/dialogStyles';
 import { Z_INDEX } from 'styles/zIndex';
@@ -73,7 +74,7 @@ const SearchContent: React.FC<SearchContentProps> = ({
   onTagsChange,
 }) => {
   const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
+  const isDark = isDarkMode(theme);
   const subtleBg = alpha(isDark ? '#fff' : '#000', 0.03);
   const baseTradeOperations = useTradeOperations();
   const tradeViewer = useTradeViewer();
