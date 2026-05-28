@@ -13,7 +13,7 @@ import FAQDrawer from 'components/faq/FAQDrawer';
 // Bumped manually per release. CRA does not expose npm_package_version, and
 // importing package.json from outside `src` falls outside the tsconfig include.
 const APP_VERSION = '0.1.0';
-const DISCORD_URL = 'https://discord.gg/9Dt2fNVpr';
+const DISCORD_URL = 'https://discord.gg/tAYGUXsnJr';
 
 interface TourRowProps {
   label: string;

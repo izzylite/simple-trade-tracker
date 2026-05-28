@@ -13,7 +13,7 @@ import {
 import {
   Home as HomeIcon,
   BarChart as PerformanceIcon,
-  Notes as NotesIcon,
+  StickyNote2 as NotesIcon,
   EventNote as EventsIcon,
   Add as AddIcon,
   InfoOutlined as AboutIcon,

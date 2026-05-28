@@ -3,7 +3,7 @@
  * Supports grouped tags in format "Group:Tag" (e.g., "Strategy:Volume")
  */
 
-import { alpha } from '@mui/material/styles';
+import { alpha, lighten, darken } from '@mui/material/styles';
 import { Theme } from '@mui/material';
 
 // Predefined color palette for better visual consistency
@@ -126,23 +126,35 @@ export const getTagColor = (tag: string): string => {
 };
 
 /**
- * Gets tag chip styles for consistent appearance across the app
+ * Gets tag chip styles for consistent appearance across the app.
+ *
+ * New-concept chip style: a soft color tint behind a saturated, legible
+ * label — never the old heavy solid fill. Mirrors the design-system `.chip`
+ * win/loss pattern (`background: rgba(color, ~0.16); color: <bright color>`)
+ * defined in `.aidesigner/.../colors_and_type.css`. The label is brightened
+ * in dark mode / slightly deepened in light mode so the muted base palette
+ * stays readable on its own tint. Radius / font-size / weight come from the
+ * global `MuiChip` theme override (6px · 0.75rem · 500), so this only owns
+ * the per-tag color treatment.
+ *
  * @param tag The tag name
  * @param theme The current theme
  * @returns Style object for the tag chip
  */
 export const getTagChipStyles = (tag: string, theme: Theme) => {
   const color = getTagColor(tag);
+  const isDark = theme?.palette?.mode === 'dark';
+  const labelColor = isDark ? lighten(color, 0.5) : darken(color, 0.05);
   return {
-    backgroundColor: alpha(color, 0.8),
-    color: alpha("#ffffff", 0.8),
+    backgroundColor: alpha(color, isDark ? 0.18 : 0.12),
+    color: labelColor,
     fontWeight: 500,
     '& .MuiChip-deleteIcon': {
-      color: '#ffffff',
+      color: alpha(labelColor, 0.7),
       '&:hover': {
-        color: alpha('#ffffff', 0.8)
-      }
-    }
+        color: labelColor,
+      },
+    },
   };
 };
 

@@ -28,6 +28,7 @@ import { error } from 'utils/logger';
 import DebugPanel from 'components/common/DebugPanel';
 import NotificationsBell from 'components/notifications/NotificationsBell';
 import HeaderCalendarSelector from 'components/common/HeaderCalendarSelector';
+import { isDarkMode } from 'utils/themeMode';
 
 // Login dialog opens only on user action; lazy keeps auth UI out of main bundle.
 const LoginDialog = lazy(() => import('components/auth/LoginDialog'));
@@ -110,7 +111,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({ onToggleTheme, mode }) => {
           borderBottom: 1,
           borderColor: 'divider',
           boxShadow: (theme) =>
-            theme.palette.mode === 'dark'
+            isDarkMode(theme)
               ? '0 1px 2px rgba(0,0,0,0.3)'
               : '0 1px 2px rgba(0,0,0,0.05)',
         }}
@@ -201,7 +202,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({ onToggleTheme, mode }) => {
                           ? (theme) =>
                             alpha(
                               theme.palette.primary.main,
-                              theme.palette.mode === 'dark' ? 0.12 : 0.08
+                              isDarkMode(theme) ? 0.12 : 0.08
                             )
                           : 'transparent',
                         textTransform: 'none',
@@ -211,7 +212,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({ onToggleTheme, mode }) => {
                             ? (theme) =>
                               alpha(
                                 theme.palette.primary.main,
-                                theme.palette.mode === 'dark' ? 0.18 : 0.12
+                                isDarkMode(theme) ? 0.18 : 0.12
                               )
                             : alpha(theme.palette.action.hover, 0.08),
                           color: 'text.primary'
@@ -244,7 +245,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({ onToggleTheme, mode }) => {
             {/* Discord */}
             <IconButton
               component="a"
-              href="https://discord.gg/9Dt2fNVpr"
+              href="https://discord.gg/tAYGUXsnJr"
               target="_blank"
               rel="noopener noreferrer"
               size="small"

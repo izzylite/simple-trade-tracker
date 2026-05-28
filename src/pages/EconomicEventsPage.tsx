@@ -56,6 +56,7 @@ import { usePanelMutexSlot } from 'contexts/PanelMutexContext';
 import SidePanel from 'components/sidePanel/SidePanel';
 import { Currency, EconomicEvent, ImpactLevel } from 'features/events/types/economicCalendar';
 import { isEventPinned } from 'features/events/utils/eventNameUtils';
+import { isDarkMode } from 'utils/themeMode';
 import { PinnedEvent } from 'features/calendar/types/dualWrite';
 import EconomicEventRow, {
   ImpactBars,
@@ -153,7 +154,7 @@ const formatRelativeTime = (timeUtc: string, now: Date): string => {
 const EconomicEventsPageInner: React.FC = () => {
   const theme = useTheme();
   const isLargeScreen = useMediaQuery(theme.breakpoints.up('lg'));
-  const { pushPanel, currentView, setOpen, isOpen: isPanelOpen } = useSidePanel();
+  const { pushPanel, currentView, stack, setOpen, isOpen: isPanelOpen } = useSidePanel();
 
   // Panel mutex slot — broadcasts to global SidePanel + CalendarsList so
   // only one panel surface is open at a time.
@@ -434,12 +435,16 @@ const EconomicEventsPageInner: React.FC = () => {
       switch (view.id) {
         case 'event-detail': {
           const v = view as EventDetailView;
+          // When reached from the main events list, the X close + the list on
+          // the left handle navigation, so the back-arrow is visual noise. But
+          // when reached from the pinned-events panel, the back-arrow is the
+          // only way back to that list — surface it so the user isn't stranded.
+          const cameFromPinned =
+            stack[stack.length - 2]?.id === 'all-pinned-events';
           return {
             title: 'Event details',
             icon: <EventsIcon fontSize="small" />,
-            // The X close button + the events list on the left handle
-            // navigation back; the stack back-arrow would be visual noise.
-            hideBack: true,
+            hideBack: !cameFromPinned,
             component: (
               <EconomicEventDetailPanel
                 event={v.event}
@@ -508,7 +513,7 @@ const EconomicEventsPageInner: React.FC = () => {
           };
       }
     },
-    [userPins, events, getCountForEvent, pushPanel, tradeOps, isPanelOpen, currentView.id]
+    [userPins, events, getCountForEvent, pushPanel, stack, tradeOps, isPanelOpen, currentView.id]
   );
 
   return (
@@ -1288,7 +1293,7 @@ const EventList: React.FC<{
         title: label,
         eyebrow: headEyebrow,
       }}
-      radius="xl"
+      radius="lg"
       sx={{
         display: 'flex',
         flexDirection: 'column',
@@ -1390,7 +1395,7 @@ const ImpactDistributionCard: React.FC<{
   ];
   return (
     <CardShell
-      radius="xl"
+      radius="lg"
       head={{
         icon: <EventsIcon sx={{ fontSize: 16 }} />,
         title: 'Impact distribution',
@@ -1478,7 +1483,7 @@ const PinnedEventsCard: React.FC<{
 
   return (
     <CardShell
-      radius="xl"
+      radius="lg"
       head={{
         icon: <PinIcon sx={{ fontSize: 14 }} />,
         title: 'Pinned events',
@@ -1687,7 +1692,7 @@ const AllPinnedEventsDrawer: React.FC<{
           backgroundColor: theme.palette.background.paper,
           borderLeft: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
           boxShadow:
-            theme.palette.mode === 'dark'
+            isDarkMode(theme)
               ? '0 8px 32px rgba(0, 0, 0, 0.4)'
               : '0 8px 32px rgba(0, 0, 0, 0.12)',
           display: 'flex',

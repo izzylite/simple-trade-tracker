@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Box, IconButton, TextField, CircularProgress, Typography, keyframes } from '@mui/material';
 import { Delete as DeleteIcon } from '@mui/icons-material';
 import { alpha, useTheme } from '@mui/material/styles';
 import { PendingImage, TradeImage } from './TradeForm'; // Assuming these are defined elsewhere
 import { logger } from 'utils/logger';
+import { isDarkMode } from 'utils/themeMode';
 
 // Extended TradeImage interface with grid positioning properties
 export interface GridImage extends TradeImage {
@@ -59,13 +60,17 @@ const MIN_COL_WIDTH_PERCENT = 10; // Minimum width for a column
  */
 interface CaptionFieldProps {
   imageId: string;
+  isPending: boolean;
   initial: string;
   disabled: boolean;
-  onCommit: (value: string) => void;
+  // Receives the field's own identity so the parent can pass ONE stable
+  // callback for every caption (keeps this React.memo effective during a
+  // column resize, where the grid re-renders every frame).
+  onCommit: (imageId: string, isPending: boolean, value: string) => void;
   sx?: any;
 }
 const CaptionField: React.FC<CaptionFieldProps> = React.memo(
-  ({ imageId, initial, disabled, onCommit, sx }) => {
+  ({ imageId, isPending, initial, disabled, onCommit, sx }) => {
     const [value, setValue] = useState(initial);
     const prevImageIdRef = useRef(imageId);
 
@@ -86,7 +91,7 @@ const CaptionField: React.FC<CaptionFieldProps> = React.memo(
         onChange={(e) => {
           const next = e.target.value;
           setValue(next);
-          onCommit(next);
+          onCommit(imageId, isPending, next);
         }}
         variant="standard"
         multiline
@@ -267,6 +272,23 @@ const ImageGrid: React.FC<ImageGridProps> = ({
   } | null>(null);
   const gridContainerRef = useRef<HTMLDivElement>(null); // Ref for the main container
   const dragImageRef = useRef<HTMLElement | null>(null); // Ref to track drag image for cleanup
+
+  // --- Latest-value refs for the resize handlers ---
+  // The window mousemove/mouseup listeners (attached in the effect below) read
+  // these instead of closing over `rows`/`resizingState`/`onImagesReordered`.
+  // That keeps the handler identities stable so the listener effect subscribes
+  // ONCE per resize gesture instead of tearing down + re-adding listeners on
+  // every mouse-move. Assigned during render so they're always current.
+  const rowsRef = useRef(rows);
+  rowsRef.current = rows;
+  const resizingStateRef = useRef(resizingState);
+  resizingStateRef.current = resizingState;
+  const onReorderRef = useRef(onImagesReordered);
+  onReorderRef.current = onImagesReordered;
+  // rAF coalescing: at most one width recompute + setRows per animation frame,
+  // no matter how many mousemove events the browser fires.
+  const resizeRafRef = useRef<number | null>(null);
+  const resizeClientXRef = useRef(0);
 
 
   // Organize images into rows when inputs change
@@ -538,6 +560,10 @@ const ImageGrid: React.FC<ImageGridProps> = ({
       const rowElementWidth = rowElement.getBoundingClientRect().width;
       if (rowElementWidth <= 0) return; // Avoid division by zero
 
+      // Seed the rAF cursor position so the first frame has a value even if it
+      // fires before the first mousemove.
+      resizeClientXRef.current = e.clientX;
+
       // Store initial state for resizing calculation
       setResizingState({
           rowIndex,
@@ -590,133 +616,197 @@ const ImageGrid: React.FC<ImageGridProps> = ({
     return row;
   }, []);
 
-  // Use useCallback for handlers used in effects to prevent unnecessary re-renders/listener attachments
-  const handleResizeMouseMove = useCallback((e: MouseEvent) => {
-    if (!resizingState) return;
+  // Pure width recompute for the current resize gesture. Reads the live cursor
+  // X and the latest rows/resize context from refs and RETURNS the next rows
+  // (it does not call setRows itself), so both the rAF tick and the final
+  // mouse-up can share one implementation. The width math is unchanged from
+  // the original handler — only the inputs (refs) and the output (return) moved.
+  const computeResizedRows = useCallback(
+    (clientX: number): Array<Array<GridImage | GridPendingImage>> | null => {
+      const state = resizingStateRef.current;
+      if (!state) return null;
 
-    const { rowIndex, dividerIndex, startX, rowElementWidth, initialWidths } = resizingState;
+      const { rowIndex, dividerIndex, startX, rowElementWidth, initialWidths } = state;
+      const deltaX = clientX - startX;
+      const deltaPercent = (deltaX / rowElementWidth) * 100;
 
-    const currentX = e.clientX;
-    const deltaX = currentX - startX;
-    const deltaPercent = (deltaX / rowElementWidth) * 100;
+      // Deep copy rows so we never mutate the rendered state in place.
+      const newRows = rowsRef.current.map(row => row.map(img => ({ ...img })));
+      const targetRow = newRows[rowIndex];
+      if (!targetRow) return null;
 
-    // Create a deep copy of the rows for modification
-    const newRows = [...rows.map(row => [...row.map(img => ({ ...img }))])];
-    const targetRow = newRows[rowIndex];
+      // Calculate total initial width left and right of the divider
+      let totalInitialLeftWidth = 0;
+      for (let i = 0; i <= dividerIndex; i++) {
+        totalInitialLeftWidth += initialWidths[i];
+      }
+      let totalInitialRightWidth = 0;
+      for (let i = dividerIndex + 1; i < initialWidths.length; i++) {
+        totalInitialRightWidth += initialWidths[i];
+      }
 
-    // Calculate total initial width left and right of the divider
-    let totalInitialLeftWidth = 0;
-    for (let i = 0; i <= dividerIndex; i++) {
-      totalInitialLeftWidth += initialWidths[i];
-    }
-    let totalInitialRightWidth = 0;
-    for (let i = dividerIndex + 1; i < initialWidths.length; i++) {
-      totalInitialRightWidth += initialWidths[i];
-    }
+      // Calculate the new target total widths for left/right sections
+      let newTotalLeftWidth = totalInitialLeftWidth + deltaPercent;
+      let newTotalRightWidth = totalInitialRightWidth - deltaPercent;
 
-    // Calculate the new target total widths for left/right sections
-    let newTotalLeftWidth = totalInitialLeftWidth + deltaPercent;
-    let newTotalRightWidth = totalInitialRightWidth - deltaPercent;
+      // Apply minimum width constraints
+      const numLeftImages = dividerIndex + 1;
+      const numRightImages = initialWidths.length - numLeftImages;
+      const minTotalLeftWidth = numLeftImages * MIN_COL_WIDTH_PERCENT;
+      const minTotalRightWidth = numRightImages * MIN_COL_WIDTH_PERCENT;
 
-    // Apply minimum width constraints
-    const numLeftImages = dividerIndex + 1;
-    const numRightImages = initialWidths.length - numLeftImages;
-    const minTotalLeftWidth = numLeftImages * MIN_COL_WIDTH_PERCENT;
-    const minTotalRightWidth = numRightImages * MIN_COL_WIDTH_PERCENT;
-
-    // Clamp totals
-    newTotalLeftWidth = Math.max(minTotalLeftWidth, newTotalLeftWidth);
-    newTotalRightWidth = Math.max(minTotalRightWidth, newTotalRightWidth);
-
-    // Ensure the sum is still 100% after clamping
-    const currentTotal = newTotalLeftWidth + newTotalRightWidth;
-    if (Math.abs(currentTotal - 100) > 0.1) {
-      const scaleFactor = 100 / currentTotal;
-      newTotalLeftWidth *= scaleFactor;
-      newTotalRightWidth *= scaleFactor;
-
-      // Re-check min width constraints after scaling
+      // Clamp totals
       newTotalLeftWidth = Math.max(minTotalLeftWidth, newTotalLeftWidth);
       newTotalRightWidth = Math.max(minTotalRightWidth, newTotalRightWidth);
 
-      // If one side hit min, give remainder to the other
-      if (newTotalLeftWidth === minTotalLeftWidth) {
-        newTotalRightWidth = 100 - newTotalLeftWidth;
-      } else if (newTotalRightWidth === minTotalRightWidth) {
-        newTotalLeftWidth = 100 - newTotalRightWidth;
+      // Ensure the sum is still 100% after clamping
+      const currentTotal = newTotalLeftWidth + newTotalRightWidth;
+      if (Math.abs(currentTotal - 100) > 0.1) {
+        const scaleFactor = 100 / currentTotal;
+        newTotalLeftWidth *= scaleFactor;
+        newTotalRightWidth *= scaleFactor;
+
+        // Re-check min width constraints after scaling
+        newTotalLeftWidth = Math.max(minTotalLeftWidth, newTotalLeftWidth);
+        newTotalRightWidth = Math.max(minTotalRightWidth, newTotalRightWidth);
+
+        // If one side hit min, give remainder to the other
+        if (newTotalLeftWidth === minTotalLeftWidth) {
+          newTotalRightWidth = 100 - newTotalLeftWidth;
+        } else if (newTotalRightWidth === minTotalRightWidth) {
+          newTotalLeftWidth = 100 - newTotalRightWidth;
+        }
       }
-    }
 
-    // Distribute new total widths proportionally
-    // Left side
-    for (let i = 0; i <= dividerIndex; i++) {
-      let newWidth = 0;
-      if (totalInitialLeftWidth > 0) {
-        const proportion = initialWidths[i] / totalInitialLeftWidth;
-        newWidth = newTotalLeftWidth * proportion;
-      } else {
-        newWidth = newTotalLeftWidth / numLeftImages;
+      // Distribute new total widths proportionally
+      // Left side
+      for (let i = 0; i <= dividerIndex; i++) {
+        let newWidth = 0;
+        if (totalInitialLeftWidth > 0) {
+          const proportion = initialWidths[i] / totalInitialLeftWidth;
+          newWidth = newTotalLeftWidth * proportion;
+        } else {
+          newWidth = newTotalLeftWidth / numLeftImages;
+        }
+        targetRow[i].column_width = Math.max(MIN_COL_WIDTH_PERCENT, newWidth);
       }
-      targetRow[i].column_width = Math.max(MIN_COL_WIDTH_PERCENT, newWidth);
-    }
 
-    // Right side
-    for (let i = dividerIndex + 1; i < targetRow.length; i++) {
-      let newWidth = 0;
-      if (totalInitialRightWidth > 0) {
-        const proportion = initialWidths[i] / totalInitialRightWidth;
-        newWidth = newTotalRightWidth * proportion;
-      } else {
-        newWidth = newTotalRightWidth / numRightImages;
+      // Right side
+      for (let i = dividerIndex + 1; i < targetRow.length; i++) {
+        let newWidth = 0;
+        if (totalInitialRightWidth > 0) {
+          const proportion = initialWidths[i] / totalInitialRightWidth;
+          newWidth = newTotalRightWidth * proportion;
+        } else {
+          newWidth = newTotalRightWidth / numRightImages;
+        }
+        targetRow[i].column_width = Math.max(MIN_COL_WIDTH_PERCENT, newWidth);
       }
-      targetRow[i].column_width = Math.max(MIN_COL_WIDTH_PERCENT, newWidth);
+
+      // Final normalization to ensure total is exactly 100%
+      normalizeRowWidths(targetRow);
+
+      return newRows;
+    },
+    [normalizeRowWidths],
+  );
+
+  // Stable (identity never changes) listeners. They read everything from refs,
+  // so the listener effect below subscribes once per resize gesture. mousemove
+  // only stashes the cursor X and schedules a single rAF — the actual recompute
+  // + setRows happens at most once per animation frame.
+  const handleResizeMouseMove = useCallback((e: MouseEvent) => {
+    if (!resizingStateRef.current) return;
+    resizeClientXRef.current = e.clientX;
+    if (resizeRafRef.current === null) {
+      resizeRafRef.current = requestAnimationFrame(() => {
+        resizeRafRef.current = null;
+        const newRows = computeResizedRows(resizeClientXRef.current);
+        if (newRows) setRows(newRows);
+      });
     }
-
-    // Final normalization to ensure total is exactly 100%
-    normalizeRowWidths(targetRow);
-
-    // Update the state visually during drag
-    setRows(newRows);
-  }, [resizingState, rows, normalizeRowWidths]); // Added normalizeRowWidths to dependencies
+  }, [computeResizedRows]);
 
   const handleResizeMouseUp = useCallback(() => {
+    if (resizeRafRef.current !== null) {
+      cancelAnimationFrame(resizeRafRef.current);
+      resizeRafRef.current = null;
+    }
+    // Commit the final position once (state + parent) from the same object so
+    // the persisted layout exactly matches what's on screen.
+    const newRows = computeResizedRows(resizeClientXRef.current);
+    if (newRows) {
+      setRows(newRows);
+      onReorderRef.current?.(newRows.flat());
+    }
+    setResizingState(null); // End resizing
+  }, [computeResizedRows]);
+
+
+  // Effect to add/remove global listeners for resizing. Handlers are stable, so
+  // this runs once when a resize starts and tears down when it ends.
+  useEffect(() => {
       if (!resizingState) return;
 
-      // Persist the final state
-      if (onImagesReordered) {
-           // Find the updated row state (rows state should be current from mouseMove)
-           const finalRowIndex = resizingState.rowIndex;
-           if (rows[finalRowIndex]) {
-                const allImages = rows.flat(); // Flatten the current state
-                onImagesReordered(allImages); // Send the updated layout
-           }
-      }
-      setResizingState(null); // End resizing
-  }, [resizingState, rows, onImagesReordered]); // Include rows and callback
-
-
-  // Effect to add/remove global listeners for resizing
-  useEffect(() => {
-      if (resizingState) {
-          window.addEventListener('mousemove', handleResizeMouseMove);
-          window.addEventListener('mouseup', handleResizeMouseUp);
-          // Optional: Add cursor style to body
-          document.body.style.cursor = 'col-resize';
-      } else {
-          window.removeEventListener('mousemove', handleResizeMouseMove);
-          window.removeEventListener('mouseup', handleResizeMouseUp);
-          // Optional: Reset cursor style
-          document.body.style.cursor = '';
-      }
+      window.addEventListener('mousemove', handleResizeMouseMove);
+      window.addEventListener('mouseup', handleResizeMouseUp);
+      document.body.style.cursor = 'col-resize';
 
       // Cleanup function
       return () => {
           window.removeEventListener('mousemove', handleResizeMouseMove);
           window.removeEventListener('mouseup', handleResizeMouseUp);
-          // Optional: Ensure cursor is reset if component unmounts during resize
           document.body.style.cursor = '';
+          if (resizeRafRef.current !== null) {
+            cancelAnimationFrame(resizeRafRef.current);
+            resizeRafRef.current = null;
+          }
       };
-  }, [resizingState, handleResizeMouseMove, handleResizeMouseUp]); // Add handlers to dependency array
+  }, [resizingState, handleResizeMouseMove, handleResizeMouseUp]);
+
+  // ── Stable CaptionField props ──────────────────────────────────────────────
+  // CaptionField is React.memo'd, but it was being defeated by a fresh `sx`
+  // object + a fresh `onCommit` arrow on every render. During a column resize
+  // (which re-renders the grid every frame) that meant every multiline caption
+  // TextField re-rendered and re-measured (TextareaAutosize) per frame — the
+  // main source of the lag. Memoising both props lets the memo skip every
+  // caption subtree while only the column widths change.
+  const captionSx = useMemo(
+    () => ({
+      px: 1,
+      py: 0.5,
+      backgroundColor: theme.palette.background.paper,
+      fontSize: '0.75rem',
+      '& .MuiInput-underline:before': { borderBottomColor: 'transparent' },
+      '& .MuiInput-underline:after': { borderBottomColor: 'transparent' },
+      '& .MuiInput-underline:hover:not(.Mui-disabled):before': { borderBottomColor: 'transparent' },
+      '& .MuiInputBase-input': { fontSize: '0.75rem' },
+      '& .MuiInputBase-root': { overflow: 'visible' },
+      '&.Mui-disabled': {
+        opacity: 0.7,
+        '& .MuiInputBase-input': { color: 'text.disabled' },
+      },
+    }),
+    [theme],
+  );
+
+  // One stable caption-commit callback for the whole grid. CaptionField passes
+  // back its own imageId + isPending, so we keep the original
+  // `findIndex(id) → onImageCaptionChange(index, …)` semantics without minting
+  // a fresh closure per image per render. Stable across a resize (its deps —
+  // the source arrays + handler — don't change while dragging), so the
+  // CaptionField memo holds.
+  const commitCaption = useCallback(
+    (imageId: string, isPending: boolean, value: string) => {
+      const arr = isPending ? pendingImages : uploadedImages;
+      onImageCaptionChange(
+        arr.findIndex((img) => img.id === imageId),
+        value,
+        isPending,
+      );
+    },
+    [pendingImages, uploadedImages, onImageCaptionChange],
+  );
 
 
   return (
@@ -822,30 +912,11 @@ const ImageGrid: React.FC<ImageGridProps> = ({
                                 {/* Caption Field - Multiline with smaller font */}
                                 <CaptionField
                                     imageId={image.id}
+                                    isPending={true}
                                     initial={pendingImg?.caption || ''}
                                     disabled={true}
-                                    onCommit={(value) =>
-                                        onImageCaptionChange(
-                                            pendingImages.findIndex(img => img.id === image.id),
-                                            value,
-                                            true,
-                                        )
-                                    }
-                                    sx={{
-                                        px: 1,
-                                        py: 0.5,
-                                        backgroundColor: theme.palette.background.paper,
-                                        fontSize: '0.75rem',
-                                        '& .MuiInput-underline:before': { borderBottomColor: 'transparent' },
-                                        '& .MuiInput-underline:after': { borderBottomColor: 'transparent' },
-                                        '& .MuiInput-underline:hover:not(.Mui-disabled):before': { borderBottomColor: 'transparent' },
-                                        '& .MuiInputBase-input': { fontSize: '0.75rem' },
-                                        '& .MuiInputBase-root': { overflow: 'visible' },
-                                        '&.Mui-disabled': {
-                                            opacity: 0.7,
-                                            '& .MuiInputBase-input': { color: 'text.disabled' }
-                                        }
-                                    }}
+                                    onCommit={commitCaption}
+                                    sx={captionSx}
                                 />
                             </>
                         ) : (
@@ -886,30 +957,11 @@ const ImageGrid: React.FC<ImageGridProps> = ({
                                 {/* Caption Field - Multiline with smaller font */}
                                 <CaptionField
                                     imageId={image.id}
+                                    isPending={false}
                                     initial={uploadedImg?.caption || ''}
                                     disabled={isAnyImageUploading() || (uploadedImg?.pending === true)}
-                                    onCommit={(value) =>
-                                        onImageCaptionChange(
-                                            uploadedImages.findIndex(img => img.id === image.id),
-                                            value,
-                                            false,
-                                        )
-                                    }
-                                    sx={{
-                                        px: 1,
-                                        py: 0.5,
-                                        backgroundColor: theme.palette.background.paper,
-                                        fontSize: '0.75rem',
-                                        '& .MuiInput-underline:before': { borderBottomColor: 'transparent' },
-                                        '& .MuiInput-underline:after': { borderBottomColor: 'transparent' },
-                                        '& .MuiInput-underline:hover:not(.Mui-disabled):before': { borderBottomColor: 'transparent' },
-                                        '& .MuiInputBase-input': { fontSize: '0.75rem' },
-                                        '& .MuiInputBase-root': { overflow: 'visible' },
-                                        '&.Mui-disabled': {
-                                            opacity: 0.7,
-                                            '& .MuiInputBase-input': { color: 'text.disabled' }
-                                        }
-                                    }}
+                                    onCommit={commitCaption}
+                                    sx={captionSx}
                                 />
                             </>
                         )}
@@ -1057,8 +1109,8 @@ const ShimmerImageBox: React.FC<{
           height: '100%',
           background: () => {
             // Use slightly more pronounced colors for better visibility
-            const baseColor = theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)';
-            const shimmerColor = theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)';
+            const baseColor = isDarkMode(theme) ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)';
+            const shimmerColor = isDarkMode(theme) ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)';
             return `linear-gradient(90deg, ${baseColor} 25%, ${shimmerColor} 50%, ${baseColor} 75%)`;
           },
           backgroundSize: '200% 100%',

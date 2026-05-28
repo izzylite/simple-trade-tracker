@@ -16,6 +16,7 @@ import {
   Typography,
   Box,
   Button,
+  Skeleton,
   Tooltip,
   alpha,
   useTheme,
@@ -294,19 +295,26 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
             <Typography sx={{ ...monoLabelSx, fontSize: '0.62rem' }}>
               Account balance
             </Typography>
-            <Typography
-              sx={{
-                mt: 0.5,
-                fontSize: '1.05rem',
-                fontWeight: 700,
-                color: 'text.primary',
-                fontFeatureSettings: TNUM,
-                letterSpacing: '-0.01em',
-                opacity: isBalanceLoading ? 0.5 : 1,
-              }}
-            >
-              {formatCurrency(accountBalanceForDisplay)}
-            </Typography>
+            {isBalanceLoading ? (
+              <Skeleton
+                variant="text"
+                width={120}
+                sx={{ mt: 0.5, fontSize: '1.05rem' }}
+              />
+            ) : (
+              <Typography
+                sx={{
+                  mt: 0.5,
+                  fontSize: '1.05rem',
+                  fontWeight: 700,
+                  color: 'text.primary',
+                  fontFeatureSettings: TNUM,
+                  letterSpacing: '-0.01em',
+                }}
+              >
+                {formatCurrency(accountBalanceForDisplay)}
+              </Typography>
+            )}
           </Box>
           <Box
             sx={{

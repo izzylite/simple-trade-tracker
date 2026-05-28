@@ -10,6 +10,7 @@ import { useCalendars } from 'features/calendar/hooks/useCalendars';
 import { Calendar } from 'features/calendar/types/calendar';
 import PerformanceCharts, { TimePeriod } from 'features/performance/components/PerformanceCharts';
 import { useSelectedCalendar } from 'features/calendar/contexts/SelectedCalendarContext';
+import { useTradeViewer } from 'features/calendar/contexts/TradeViewerContext';
 import PerformanceHeader from 'features/performance/components/PerformanceHeader';
 
 const SWITCH_SPINNER_MS = 350;
@@ -47,6 +48,10 @@ const PerformancePage: React.FC<PerformancePageProps> = ({
   );
 
   const { calendarId: selectedId, setCalendarId } = useSelectedCalendar();
+  // App-level read-only gallery viewer (mounted via GlobalTradeViewer). It
+  // keys on the same SelectedCalendarContext as this page, so opening it here
+  // resolves to the calendar currently shown.
+  const { openGallery } = useTradeViewer();
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('month');
   const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
   const [isSwitching, setIsSwitching] = useState(false);
@@ -204,6 +209,9 @@ const PerformancePage: React.FC<PerformancePageProps> = ({
             profit_threshold_percentage: selectedCalendar.profit_threshold_percentage,
           }}
           onUpdateCalendarProperty={onUpdateCalendarProperty}
+          onOpenGalleryMode={(trades, initialTradeId, title) =>
+            openGallery({ trades, initialTradeId, title })
+          }
           isReadOnly
         />
       )}
