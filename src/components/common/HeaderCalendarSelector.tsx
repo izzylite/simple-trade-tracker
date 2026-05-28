@@ -32,7 +32,7 @@ const HeaderCalendarSelector: React.FC = () => {
   const active = useMemo<CalendarSelectorItem>(() => {
     const cal = activeCalendars.find((c) => c.id === calendarId);
     if (cal) {
-      return { id: cal.id, name: cal.name, hero_image_url: cal.hero_image_url };
+      return { id: cal.id, name: cal.name };
     }
     return { id: '', name: 'Select calendar' };
   }, [activeCalendars, calendarId]);
@@ -52,7 +52,6 @@ const HeaderCalendarSelector: React.FC = () => {
       name: c.name,
       totalTrades: c.total_trades,
       pnl: c.total_pnl,
-      hero_image_url: c.hero_image_url,
       active: c.id === calendarId,
     }));
   }, [activeCalendars, calendarId]);

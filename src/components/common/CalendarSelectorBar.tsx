@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   Box,
-  Avatar,
   Typography,
   Menu,
   MenuItem,
@@ -14,7 +13,6 @@ import {
 } from '@mui/material';
 import {
   KeyboardArrowDown as ChevronDownIcon,
-  CalendarToday as CalendarIcon,
   TrendingUp as TrendingUpIcon,
   TrendingDown as TrendingDownIcon,
 } from '@mui/icons-material';
@@ -25,7 +23,6 @@ export interface CalendarSelectorItem {
   name: string;
   totalTrades?: number;
   pnl?: number;
-  hero_image_url?: string;
   active?: boolean;
 }
 
@@ -92,9 +89,8 @@ const CalendarSelectorBar: React.FC<CalendarSelectorBarProps> = ({
         sx={{
           display: 'flex',
           alignItems: 'center',
-          gap: 1.25,
-          pl: 0.5,
-          pr: 1,
+          gap: 0.75,
+          px: 1,
           py: 0.5,
           borderRadius: 1,
           transition: 'background 150ms cubic-bezier(0.4, 0, 0.2, 1)',
@@ -107,21 +103,6 @@ const CalendarSelectorBar: React.FC<CalendarSelectorBarProps> = ({
           },
         }}
       >
-        <Avatar
-          src={active.hero_image_url || undefined}
-          variant="circular"
-          sx={{
-            width: 28,
-            height: 28,
-            bgcolor: alpha(theme.palette.primary.main, 0.18),
-            '& img': { objectFit: 'cover' },
-          }}
-        >
-          <CalendarIcon
-            sx={{ fontSize: 14, color: theme.palette.primary.main }}
-          />
-        </Avatar>
-
         <Typography
           sx={{
             fontSize: '0.9375rem',
@@ -216,21 +197,6 @@ const CalendarSelectorBar: React.FC<CalendarSelectorBarProps> = ({
                   alignItems="center"
                   sx={{ width: '100%' }}
                 >
-                  <Avatar
-                    src={item.hero_image_url || undefined}
-                    variant="circular"
-                    sx={{
-                      width: 28,
-                      height: 28,
-                      bgcolor: alpha(theme.palette.primary.main, 0.12),
-                      '& img': { objectFit: 'cover' },
-                    }}
-                  >
-                    <CalendarIcon
-                      sx={{ fontSize: 14, color: theme.palette.primary.main }}
-                    />
-                  </Avatar>
-
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Typography
                       sx={{
