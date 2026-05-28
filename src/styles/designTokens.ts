@@ -52,12 +52,12 @@ export const TNUM = "'tnum' on, 'lnum' on";
 /**
  * Mono font stack for currency / numeric amounts.
  *
- * Re-exported from `styles/dialogTokens` so every redesigned component imports
- * the JetBrains Mono → ui-monospace → monospace fallback chain from one place.
+ * Canonical declaration lives here (the lower-level token module) so
+ * `styles/dialogTokens` can import it without creating a circular dependency.
  * Use for any P&L, currency, or amount display where the mono typographic
  * texture is part of the design language.
  */
-export { MONO_FONT } from 'styles/dialogTokens';
+export const MONO_FONT = "'JetBrains Mono', ui-monospace, monospace";
 
 /**
  * Canonical eyebrow label sx — uppercase neutral mini-heading used for

@@ -15,9 +15,12 @@ import { useMemo } from 'react';
 import { alpha, useTheme } from '@mui/material';
 import type { Theme } from '@mui/material/styles';
 import { isDarkMode } from 'utils/themeMode';
-import { getHairline, getInsetSurface } from 'styles/designTokens';
+import { getHairline, getInsetSurface, MONO_FONT } from 'styles/designTokens';
 
-export const MONO_FONT = "'JetBrains Mono', ui-monospace, monospace";
+// Re-exported so the many `import { MONO_FONT } from 'styles/dialogTokens'`
+// callsites keep working. Canonical declaration lives in `styles/designTokens`
+// to avoid a circular import (dialogTokens already pulls helpers from there).
+export { MONO_FONT };
 
 export interface DialogTokens {
   isDark: boolean;
