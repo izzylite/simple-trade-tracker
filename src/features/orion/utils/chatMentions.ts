@@ -96,11 +96,13 @@ export interface NoteForExpansion {
  * Uniform format for outgoing note mentions:
  *  1. Each note mention renders as its title inline (where the chip was).
  *  2. For every mention, a context block is appended:
- *       [Referenced command:\n<content>\n]   when SlashCommand
- *       [Referenced note:\n<content>\n]      otherwise
- *     Titles are intentionally omitted from the block — the transcript shows
- *     a chip UI with the title, and stripping it from the payload prevents
- *     the LLM from quoting the command's name in its reply.
+ *       [Referenced command "Title":\n<content>\n]  when SlashCommand
+ *       [Referenced note:\n<content>\n]             otherwise
+ *     The command block carries the note title in its header so the
+ *     conversation-title generator can name the chat (e.g. "Slash Command:
+ *     Weekly Outlook"). Plain-note blocks omit the title — the transcript
+ *     already shows a chip with the title, and keeping it out of note
+ *     payloads avoids the LLM quoting the note's name back in its reply.
  *  3. Unknown noteIds render as their title with no context block.
  *
  * "Bare slash-command" emission: when the user has typed nothing else and

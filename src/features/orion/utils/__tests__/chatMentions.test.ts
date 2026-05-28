@@ -93,7 +93,7 @@ describe('expandMentionsForSend', () => {
       { type: 'note-mention', noteId: 'n1', noteTitle: 'Daily Review' }
     ];
     expect(expandMentionsForSend(segs, notesMap))
-      .toBe("[Referenced command:\nSummarize yesterday's trades and flag rule violations.\n]");
+      .toBe("[Referenced command \"Daily Review\":\nSummarize yesterday's trades and flag rule violations.\n]");
   });
 
   it('treats whitespace-only text segments as still "bare"', () => {
@@ -103,7 +103,7 @@ describe('expandMentionsForSend', () => {
       { type: 'text', value: ' ' },
     ];
     expect(expandMentionsForSend(segs, notesMap))
-      .toBe("[Referenced command:\nSummarize yesterday's trades and flag rule violations.\n]");
+      .toBe("[Referenced command \"Daily Review\":\nSummarize yesterday's trades and flag rule violations.\n]");
   });
 
   it('wraps slash-command mention as a context block when user text is present', () => {
@@ -113,8 +113,9 @@ describe('expandMentionsForSend', () => {
     ];
     const out = expandMentionsForSend(segs, notesMap);
     expect(out).toContain('help me with Daily Review');
-    expect(out).toContain('[Referenced command:');
-    expect(out).not.toContain('"Daily Review":');
+    // Command blocks carry the title in the header (for the conversation-title
+    // generator); the inline mention above is the plain, unquoted title.
+    expect(out).toContain('[Referenced command "Daily Review":');
     expect(out).toContain("Summarize yesterday's trades");
   });
 
@@ -138,7 +139,7 @@ describe('expandMentionsForSend', () => {
     ];
     const out = expandMentionsForSend(segs, notesMap);
     expect(out).toContain('Daily Review and Strategy');
-    expect(out).toContain('[Referenced command:');
+    expect(out).toContain('[Referenced command "Daily Review":');
     expect(out).toContain('[Referenced note:');
   });
 
