@@ -73,7 +73,10 @@ describe('findByUserId', () => {
  * the overridden `create` without mocking the full write chain.
  */
 class TestCalendarRepository extends CalendarRepository {
-  createSpy = jest.fn(async () => rawCalendar() as unknown as Calendar);
+  createSpy = jest.fn(
+    async (_entity: Omit<Calendar, 'id' | 'created_at' | 'updated_at'>) =>
+      rawCalendar() as unknown as Calendar,
+  );
   protected createInSupabase(entity: Omit<Calendar, 'id' | 'created_at' | 'updated_at'>) {
     return this.createSpy(entity);
   }
