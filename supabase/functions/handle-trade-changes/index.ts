@@ -12,6 +12,15 @@ import { canDeleteImage, deleteTradeImages } from '../_shared/utils.ts';
 import { prepareSyncedTrade, isWithinSyncWindow, buildCalendarRiskSettings, CalendarRiskSettings } from '../_shared/tradeSync.ts';
 import { updateYearStats } from '../_shared/yearStats.ts';
 import type { Trade, TradeWebhookPayload } from '../_shared/types.ts';
+
+// Timing-safe comparison to avoid leaking the secret via response-time differences.
+function constantTimeEquals(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let mismatch = 0;
+  for (let i = 0; i < a.length; i++) mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return mismatch === 0;
+}
+
 /**
  * Clean up removed images when a trade is deleted or updated
  */ async function cleanupRemovedImages(oldTrade: Trade | undefined, newTrade: Trade | undefined, calendarId: string, userId: string): Promise<void> {
@@ -73,6 +82,22 @@ import type { Trade, TradeWebhookPayload } from '../_shared/types.ts';
   // Handle CORS preflight requests
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
+
+  // Shared-secret auth: notify_trade_changes() sends X-Trade-Webhook-Secret.
+  // Required because verify_jwt is disabled (a DB webhook can't present a JWT),
+  // so without this the endpoint would be publicly invocable. Mirrors
+  // paddle-webhook / dispatch-reminders.
+  const expectedSecret = Deno.env.get('TRADE_WEBHOOK_SECRET');
+  if (!expectedSecret) {
+    log('TRADE_WEBHOOK_SECRET not set — refusing to process', 'error');
+    return errorResponse('Webhook not configured', 500);
+  }
+  const providedSecret = req.headers.get('x-trade-webhook-secret') ?? '';
+  if (!constantTimeEquals(providedSecret, expectedSecret)) {
+    log('handle-trade-changes auth failed', 'warn', { hasHeader: providedSecret.length > 0 });
+    return errorResponse('Unauthorized', 401);
+  }
+
   try {
     log('Trade changes webhook received');
     // Parse the webhook payload
@@ -97,12 +122,31 @@ import type { Trade, TradeWebhookPayload } from '../_shared/types.ts';
       return errorResponse('Missing records for UPDATE operation', 400);
     }
 
-    // Extract calendar ID and user ID
+    // Extract calendar ID (user_id is derived authoritatively below, not trusted from the body)
     const calendarId = payload.calendar_id || payload.old_record?.calendar_id || payload.new_record?.calendar_id;
-    const userId = payload.user_id || payload.old_record?.user_id || payload.new_record?.user_id;
+    if (!calendarId) {
+      return errorResponse('Missing calendar_id', 400);
+    }
 
-    if (!calendarId || !userId) {
-      return errorResponse('Missing calendar_id or user_id', 400);
+    // Defense in depth: derive the owning user_id from the calendar row rather than
+    // trusting the request body, so a forged payload cannot target another user's
+    // storage path. (The shared-secret gate above is the primary defense.)
+    const ownerClient = createServiceClient();
+    const { data: calRow, error: calErr } = await ownerClient
+      .from('calendars')
+      .select('user_id')
+      .eq('id', calendarId)
+      .maybeSingle();
+    if (calErr) {
+      log('Failed to load calendar for ownership derivation', 'error', calErr);
+      return errorResponse('Internal server error', 500);
+    }
+    if (!calRow) {
+      return successResponse({ message: 'Calendar not found; nothing to process', calendar_id: calendarId });
+    }
+    const userId = (calRow as { user_id?: string }).user_id;
+    if (!userId) {
+      return errorResponse('Calendar has no owner', 500);
     }
 
     // Clean up images based on operation type (UPDATE and DELETE only)
