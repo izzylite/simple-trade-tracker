@@ -19,7 +19,7 @@ import { BaseDialog } from 'components/common';
 import * as calendarService from '../../services/calendarService';
 import { DayHeader, TradeForm, NewTradeForm } from './';
 import { v4 as uuidv4 } from 'uuid';
-import { DEFAULT_PAIRS_TAG_GROUP, PendingImage, TradeImage } from './TradeForm';
+import { PendingImage, TradeImage } from './TradeForm';
 import { GridImage, GridPendingImage } from './ImageGrid';
 import {
   calculateCumulativePnLToDateAsync,
@@ -1026,11 +1026,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
 
   // Check if all required tag groups are present in the trade's tags
   const validateRequiredTagGroups = (tags: string[]): { valid: boolean; missingGroups: string[] } => {
-    // Automatically add "pair" to required tag groups if not already present
     const effectiveRequiredGroups = [...(requiredTagGroups || [])];
-    if (!effectiveRequiredGroups.includes(DEFAULT_PAIRS_TAG_GROUP)) {
-      effectiveRequiredGroups.push(DEFAULT_PAIRS_TAG_GROUP);
-    }
 
     if (effectiveRequiredGroups.length === 0) {
       return { valid: true, missingGroups: [] };

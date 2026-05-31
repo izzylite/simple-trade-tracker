@@ -31,10 +31,8 @@ import { useTradeLinkInsertion } from 'components/common/RichTextEditor/hooks/us
 import RoundedTabs, { TabPanel } from 'components/common/RoundedTabs';
 import { fetchAndGenerateTradeNameSuggestions } from '../../utils/tradeNameSuggestions';
 import { Currency } from 'features/events/types/economicCalendar';
-import { INSTRUMENTS } from 'features/events/services/instrumentCatalog';
 import { Z_INDEX } from 'styles/zIndex';
 
-export const DEFAULT_PAIRS_TAG_GROUP = "Asset"
 export interface NewTradeForm {
   id: string;
   name: string;
@@ -198,22 +196,9 @@ const TradeForm: React.FC<TradeFormProps> = ({
     fetchSuggestions();
   }, [calendarId, newTrade.tags, newTrade.session, newTrade.name]);
 
-  const tagsWithPairs = useMemo(() => {
-    return Array.from(new Set([...allTags, ...INSTRUMENTS.map(symbol => `${DEFAULT_PAIRS_TAG_GROUP}:${symbol}`)]));
-  }, [allTags]);
-
-  // Automatically add "pair" to required tag groups if not already present
-  const effectiveRequiredTagGroups = useMemo(() => {
-    const groups = [...requiredTagGroups];
-    if (!groups.includes(DEFAULT_PAIRS_TAG_GROUP)) {
-      groups.push(DEFAULT_PAIRS_TAG_GROUP);
-    }
-    return groups;
-  }, [requiredTagGroups]);
-
   // Calculate which required tag groups are still missing
   const missingRequiredGroups = useMemo(() => {
-    if (!effectiveRequiredTagGroups || effectiveRequiredTagGroups.length === 0) return [];
+    if (!requiredTagGroups || requiredTagGroups.length === 0) return [];
 
     // Get the groups that are already satisfied by current tags
     const satisfiedGroups = new Set<string>();
@@ -225,8 +210,8 @@ const TradeForm: React.FC<TradeFormProps> = ({
     });
 
     // Return groups that are required but not satisfied
-    return effectiveRequiredTagGroups.filter(group => !satisfiedGroups.has(group));
-  }, [effectiveRequiredTagGroups, newTrade.tags]);
+    return requiredTagGroups.filter(group => !satisfiedGroups.has(group));
+  }, [requiredTagGroups, newTrade.tags]);
 
   const cumulativePnl = calculateCumulativePnl(newTrade);
 
@@ -725,7 +710,7 @@ const TradeForm: React.FC<TradeFormProps> = ({
 
         <TagsInput
           tags={newTrade.tags}
-          allTags={tagsWithPairs}
+          allTags={allTags}
           onTagsChange={onTagsChange}
           calendarId={calendarId}
           onTagUpdated={onTagUpdated}
