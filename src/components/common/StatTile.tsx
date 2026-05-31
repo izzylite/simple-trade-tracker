@@ -18,6 +18,12 @@ export interface StatTileProps {
   icon?: React.ReactNode;
   /** Eyebrow label (uppercase) — describes the metric */
   label: string;
+  /**
+   * Optional node rendered inline beside the label (e.g. a growth-% pill).
+   * Keeps secondary figures out of the value row so the value stays a single
+   * line and footers stay aligned across tiles in a grid.
+   */
+  labelAdornment?: React.ReactNode;
   /** The value — string, number, or composite node (e.g. with a trailing chip) */
   value: React.ReactNode;
   /** Override the value color (defaults to `text.primary`) */
@@ -42,6 +48,7 @@ const VALUE_SIZES: Record<NonNullable<StatTileProps['size']>, string> = {
 const StatTile: React.FC<StatTileProps> = ({
   icon,
   label,
+  labelAdornment,
   value,
   valueColor,
   subtitle,
@@ -62,6 +69,7 @@ const StatTile: React.FC<StatTileProps> = ({
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0 }}>
         {icon}
         <Typography sx={EYEBROW_SX}>{label}</Typography>
+        {labelAdornment}
       </Box>
       <Typography
         sx={{

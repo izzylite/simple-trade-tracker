@@ -237,42 +237,39 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
           size="sm"
           icon={<TrendingUp sx={{ fontSize: 14, color: pnlColor }} />}
           label="Monthly P&L"
-          value={
-            <>
-              {formatCurrency(netAmountForThisMonth)}
-              {!isPnlLoading && (
-                <Tooltip
-                  title={`Percentage based on account value at start of ${format(
-                    currentDate,
-                    'MMMM',
-                  )}: ${formatCurrency(accountValueAtStartOfMonth)}`}
-                  placement="top"
-                  arrow
+          labelAdornment={
+            isPnlLoading ? (
+              <Skeleton
+                variant="text"
+                width={40}
+                sx={{ fontSize: '0.7rem', display: 'inline-block' }}
+              />
+            ) : (
+              <Tooltip
+                title={`Percentage based on account value at start of ${format(
+                  currentDate,
+                  'MMMM',
+                )}: ${formatCurrency(accountValueAtStartOfMonth)}`}
+                placement="top"
+                arrow
+              >
+                <Box
+                  component="span"
+                  sx={{
+                    fontSize: '0.7rem',
+                    fontWeight: 700,
+                    color: pnlColor,
+                    cursor: 'help',
+                    fontFeatureSettings: TNUM,
+                  }}
                 >
-                  <Box
-                    component="span"
-                    sx={{
-                      fontSize: '0.7rem',
-                      fontWeight: 600,
-                      color: pnlColor,
-                      cursor: 'help',
-                      ml: 0.5,
-                    }}
-                  >
-                    ({growthPercentage >= 0 ? '+' : ''}
-                    {growthPercentage.toFixed(1)}%)
-                  </Box>
-                </Tooltip>
-              )}
-              {isPnlLoading && (
-                <Skeleton
-                  variant="text"
-                  width={40}
-                  sx={{ fontSize: '0.75rem', display: 'inline-block', ml: 0.5 }}
-                />
-              )}
-            </>
+                  {growthPercentage >= 0 ? '+' : ''}
+                  {growthPercentage.toFixed(1)}%
+                </Box>
+              </Tooltip>
+            )
           }
+          value={formatCurrency(netAmountForThisMonth)}
           valueColor={pnlColor}
           footer={
             monthlyTarget ? (
