@@ -179,7 +179,7 @@ ORDER BY total_pnl DESC;
 - Confluence: tag LIKE 'Confluence:%'
 - Targets: tag LIKE 'Targets:%'
 - Counter Trend: tag LIKE 'Counter Trend:%'
-- Pairs: tag LIKE 'Pairs:%'
+- Asset (the instrument traded — FX pairs, metals, indices, crypto; e.g. EURUSD / XAUUSD / US30): tag LIKE 'Asset:%'  // user words "pair"/"instrument"/"symbol" all map here
 - Any tag category: tag LIKE 'CategoryName:%'
 
 ### Top 10 most profitable tags across ALL categories:
