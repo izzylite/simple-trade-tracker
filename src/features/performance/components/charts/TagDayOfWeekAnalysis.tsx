@@ -130,10 +130,10 @@ const TagDayOfWeekAnalysis: React.FC<TagDayOfWeekAnalysisProps> = ({
             Total Trades: {data.total_trades}
           </Typography>
           <Typography variant="body2" sx={{ color: theme.palette.success.main }}>
-            Wins: {data.winTrades}
+            Wins: {data.win_trades}
           </Typography>
           <Typography variant="body2" sx={{ color: theme.palette.error.main }}>
-            Losses: {data.lossTrades}
+            Losses: {data.loss_trades}
           </Typography>
           <Typography variant="body2" sx={{ color: 'text.secondary' }}>
             Win Rate: {data.win_rate.toFixed(1)}%

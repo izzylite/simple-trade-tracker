@@ -502,14 +502,14 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
                           {tradeStats.containWins && (
                             <TooltipRow
                               label="Wins"
-                              value={formatCount(data.winTrades)}
+                              value={formatCount(data.win_trades)}
                               color={theme.palette.success.main}
                             />
                           )}
                           {tradeStats.containLosses && (
                             <TooltipRow
                               label="Losses"
-                              value={formatCount(data.lossTrades)}
+                              value={formatCount(data.loss_trades)}
                               color={theme.palette.error.main}
                             />
                           )}
