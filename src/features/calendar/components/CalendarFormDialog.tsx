@@ -22,6 +22,7 @@ import {
   AutoAwesome as SparkIcon,
 } from '@mui/icons-material';
 import { Calendar } from '../types/calendar';
+import { ASSET_CLASSES } from 'features/events/services/instrumentCatalog';
 import { ImagePickerDialog, ImageAttribution } from 'components/heroImage';
 import { scrollbarStyles } from 'styles/scrollbarStyles';
 import { dialogProps } from 'styles/dialogStyles';
@@ -40,6 +41,7 @@ export interface CalendarFormData {
   profit_threshold_percentage?: number;
   hero_image_url?: string;
   hero_image_attribution?: ImageAttribution;
+  asset_classes?: string[];
 }
 
 interface CalendarFormDialogProps {
@@ -91,6 +93,13 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
 
   const [isImagePickerOpen, setIsImagePickerOpen] = useState(false);
 
+  const [assetClasses, setAssetClasses] = useState<string[]>([]);
+
+  const toggleAssetClass = (cls: string) =>
+    setAssetClasses((prev) =>
+      prev.includes(cls) ? prev.filter((c) => c !== cls) : [...prev, cls],
+    );
+
   // Extend hook's inputSx with adornment typography styling (used by numericField prefix/suffix).
   const inputSxWithAdornment = {
     ...inputSx,
@@ -137,6 +146,7 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
     setProfitThresholdPercentage('');
     setHeroImageUrl('');
     setHeroImageAttribution(undefined);
+    setAssetClasses([]);
   };
 
   const handleNumericChange = (setter: React.Dispatch<React.SetStateAction<string>>) =>
@@ -183,6 +193,7 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
       profit_threshold_percentage: profitThresholdVal,
       hero_image_url: heroImageUrl || undefined,
       hero_image_attribution: heroImageAttribution,
+      asset_classes: isEdit ? undefined : assetClasses,
     });
   };
 
@@ -197,8 +208,12 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
     setHeroImageAttribution(undefined);
   };
 
-  const isFormValid = name.trim() && accountBalance.trim() && maxDailyDrawdown.trim();
   const isEdit = mode === 'edit';
+  const isFormValid =
+    name.trim() &&
+    accountBalance.trim() &&
+    maxDailyDrawdown.trim() &&
+    (isEdit || assetClasses.length > 0);
   const subtitle = isEdit
     ? 'Update calendar settings, targets, and risk rules'
     : 'Set the rules and rhythm for a new trading calendar';
@@ -467,6 +482,56 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
             </Box>
           </Box>
         </Box>
+
+        {/* Assets — create mode only; edit manages instruments via the tag panel */}
+        {!isEdit && (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+            <Typography sx={sectionLabelSx}>Assets</Typography>
+            {renderLabel('Asset classes you trade', {
+              required: true,
+              hint: 'Seeds your required Asset tag group',
+            })}
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+              {ASSET_CLASSES.map((cls) => {
+                const selected = assetClasses.includes(cls);
+                return (
+                  <Box
+                    key={cls}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => !isSubmitting && toggleAssetClass(cls)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        if (!isSubmitting) toggleAssetClass(cls);
+                      }
+                    }}
+                    sx={{
+                      px: 1.5,
+                      py: 0.6,
+                      borderRadius: 999,
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
+                      lineHeight: 1.2,
+                      userSelect: 'none',
+                      cursor: isSubmitting ? 'default' : 'pointer',
+                      border: `1px solid ${selected ? violetBorder : hairline}`,
+                      backgroundColor: selected ? violetSoft : 'transparent',
+                      color: selected ? violet : theme.palette.text.secondary,
+                      transition: 'background-color 150ms ease, border-color 150ms ease, color 150ms ease',
+                      '&:hover': isSubmitting
+                        ? undefined
+                        : { borderColor: violetBorder, backgroundColor: violetSofter },
+                      '&:focus-visible': { outline: `2px solid ${violet}`, outlineOffset: 2 },
+                    }}
+                  >
+                    {cls}
+                  </Box>
+                );
+              })}
+            </Box>
+          </Box>
+        )}
 
         {/* Targets */}
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
