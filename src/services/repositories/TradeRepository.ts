@@ -1201,7 +1201,7 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
     const economicEvents = await this.fetchEconomicEventsForTrade(
       entity.trade_date,
       entity.session,
-      getRelevantCurrenciesFromTags(entity.tags || []), // Pass trade tags for currency filtering
+      entity.tags || [], // Pass raw tags; fetchEconomicEventsForTrade derives the currencies
       entity.economic_events
     );
 
