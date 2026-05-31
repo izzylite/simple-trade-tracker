@@ -15,3 +15,8 @@ verify_jwt = false
 # or the gateway 401s every trigger fire (deploys reset this to true otherwise).
 [functions.handle-trade-changes]
 verify_jwt = false
+
+# Called by the pg_cron year-stats-sweep (no JWT); authenticates via the
+# X-Year-Stats-Sweep-Secret shared secret.
+[functions.reconcile-year-stats]
+verify_jwt = false
