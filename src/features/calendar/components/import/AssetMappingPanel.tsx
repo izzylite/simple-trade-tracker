@@ -17,44 +17,44 @@ import {
 import { ImportFileData } from '../../types/import';
 import { useDialogTokens, MONO_FONT } from 'styles/dialogTokens';
 import { Z_INDEX } from 'styles/zIndex';
-import { getCurrencyPairMappings } from 'features/events/services/tradeEconomicEventService';
+import { getInstrumentMappings } from 'features/events/services/instrumentCatalog';
 
 const TNUM = "'tnum' on, 'lnum' on";
-const PAIR_MAPPINGS = getCurrencyPairMappings();
+const INSTRUMENT_MAPPINGS = getInstrumentMappings();
 
-// Heuristic substring → pair suggestion. Used to seed a one-click "Use EURUSD"
+// Heuristic substring → instrument suggestion. Used to seed a one-click "Use EURUSD"
 // chip below each group when the value looks like a known shorthand.
 // Order matters: longer/more specific matches first to avoid e.g. "EU" eating
-// "EURJPY". Direct pair names match first.
-const SUGGEST_HINTS: Array<{ keywords: string[]; pair: string }> = [
-  { keywords: ['EURUSD'], pair: 'EURUSD' },
-  { keywords: ['GBPUSD'], pair: 'GBPUSD' },
-  { keywords: ['USDJPY'], pair: 'USDJPY' },
-  { keywords: ['GBPJPY'], pair: 'GBPJPY' },
-  { keywords: ['EURJPY'], pair: 'EURJPY' },
-  { keywords: ['AUDUSD'], pair: 'AUDUSD' },
-  { keywords: ['NZDUSD'], pair: 'NZDUSD' },
-  { keywords: ['USDCAD'], pair: 'USDCAD' },
-  { keywords: ['USDCHF'], pair: 'USDCHF' },
-  { keywords: ['XAUUSD', 'GOLD', 'XAU'], pair: 'XAUUSD' },
-  { keywords: ['XAGUSD', 'SILVER', 'XAG'], pair: 'XAGUSD' },
-  { keywords: ['BTCUSD', 'BITCOIN', 'BTC'], pair: 'BTCUSD' },
-  { keywords: ['ETHUSD', 'ETHEREUM', 'ETH'], pair: 'ETHUSD' },
-  { keywords: ['CABLE', 'GU', 'POUND', 'GBP'], pair: 'GBPUSD' },
-  { keywords: ['EURO', 'EU', 'EUR'], pair: 'EURUSD' },
-  { keywords: ['UJ', 'YEN', 'JPY'], pair: 'USDJPY' },
-  { keywords: ['AU', 'AUD', 'AUSSIE'], pair: 'AUDUSD' },
-  { keywords: ['NU', 'NZD', 'KIWI'], pair: 'NZDUSD' },
-  { keywords: ['UC', 'LOONIE', 'CAD'], pair: 'USDCAD' },
-  { keywords: ['SWISSY', 'SWISS', 'CHF'], pair: 'USDCHF' },
+// "EURJPY". Direct instrument names match first.
+const SUGGEST_HINTS: Array<{ keywords: string[]; symbol: string }> = [
+  { keywords: ['EURUSD'], symbol: 'EURUSD' },
+  { keywords: ['GBPUSD'], symbol: 'GBPUSD' },
+  { keywords: ['USDJPY'], symbol: 'USDJPY' },
+  { keywords: ['GBPJPY'], symbol: 'GBPJPY' },
+  { keywords: ['EURJPY'], symbol: 'EURJPY' },
+  { keywords: ['AUDUSD'], symbol: 'AUDUSD' },
+  { keywords: ['NZDUSD'], symbol: 'NZDUSD' },
+  { keywords: ['USDCAD'], symbol: 'USDCAD' },
+  { keywords: ['USDCHF'], symbol: 'USDCHF' },
+  { keywords: ['XAUUSD', 'GOLD', 'XAU'], symbol: 'XAUUSD' },
+  { keywords: ['XAGUSD', 'SILVER', 'XAG'], symbol: 'XAGUSD' },
+  { keywords: ['BTCUSD', 'BITCOIN', 'BTC'], symbol: 'BTCUSD' },
+  { keywords: ['ETHUSD', 'ETHEREUM', 'ETH'], symbol: 'ETHUSD' },
+  { keywords: ['CABLE', 'GU', 'POUND', 'GBP'], symbol: 'GBPUSD' },
+  { keywords: ['EURO', 'EU', 'EUR'], symbol: 'EURUSD' },
+  { keywords: ['UJ', 'YEN', 'JPY'], symbol: 'USDJPY' },
+  { keywords: ['AU', 'AUD', 'AUSSIE'], symbol: 'AUDUSD' },
+  { keywords: ['NU', 'NZD', 'KIWI'], symbol: 'NZDUSD' },
+  { keywords: ['UC', 'LOONIE', 'CAD'], symbol: 'USDCAD' },
+  { keywords: ['SWISSY', 'SWISS', 'CHF'], symbol: 'USDCHF' },
 ];
 
-function suggestPairFor(display: string): string | null {
+function suggestInstrumentFor(display: string): string | null {
   const upper = display.toUpperCase().trim();
   if (!upper) return null;
   for (const hint of SUGGEST_HINTS) {
     for (const kw of hint.keywords) {
-      if (upper === kw || upper.includes(kw)) return hint.pair;
+      if (upper === kw || upper.includes(kw)) return hint.symbol;
     }
   }
   return null;
@@ -77,8 +77,8 @@ interface Props {
 }
 
 /**
- * Groups file rows by the chosen split column and lets the user assign a
- * currency pair to each group. Assignments get applied as `pair:XXXYYY` tags
+ * Groups file rows by the chosen split column and lets the user assign an
+ * asset to each group. Assignments get applied as `Asset:XXX` tags
  * on import so trades join the economic-events index. Optional — user can
  * leave everything unassigned and click Next to skip.
  */
@@ -122,14 +122,14 @@ export const AssetMappingPanel: React.FC<Props> = ({
     .filter((g) => assetAssignments[g.key])
     .reduce((sum, g) => sum + g.count, 0);
 
-  const pairOptions = PAIR_MAPPINGS.map((m) => ({
-    pair: m.pair,
+  const instrumentOptions = INSTRUMENT_MAPPINGS.map((m) => ({
+    symbol: m.symbol,
     category: m.category,
   }));
 
-  const handleAssign = (key: string, pair: string | null) => {
+  const handleAssign = (key: string, symbol: string | null) => {
     const next = { ...assetAssignments };
-    if (pair) next[key] = pair;
+    if (symbol) next[key] = symbol;
     else delete next[key];
     onAssetAssignmentsChange(next);
   };
@@ -220,9 +220,9 @@ export const AssetMappingPanel: React.FC<Props> = ({
               lineHeight: 1.5,
             }}
           >
-            Group your trades by a column, then assign each group a currency
-            pair to attach economic events. Skip this step entirely if you
-            trade indices or futures.
+            Group your trades by a column, then assign each group an asset
+            to attach economic events. Skip this step entirely if you don't
+            need economic event correlation.
           </Typography>
         </Box>
       </Box>
@@ -450,11 +450,11 @@ export const AssetMappingPanel: React.FC<Props> = ({
 
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.85 }}>
             {groups.map((group) => {
-              const assignedPair = assetAssignments[group.key] || null;
-              const isAssigned = !!assignedPair;
-              const suggestion = suggestPairFor(group.display);
+              const assignedInstrument = assetAssignments[group.key] || null;
+              const isAssigned = !!assignedInstrument;
+              const suggestion = suggestInstrumentFor(group.display);
               const matchedOption =
-                pairOptions.find((o) => o.pair === assignedPair) || null;
+                instrumentOptions.find((o) => o.symbol === assignedInstrument) || null;
 
               return (
                 <Box
@@ -541,18 +541,18 @@ export const AssetMappingPanel: React.FC<Props> = ({
                     </Box>
                   </Box>
 
-                  {/* Pair selector */}
+                  {/* Instrument selector */}
                   <Autocomplete
                     value={matchedOption}
                     onChange={(_, newValue) =>
-                      handleAssign(group.key, newValue?.pair ?? null)
+                      handleAssign(group.key, newValue?.symbol ?? null)
                     }
-                    options={pairOptions}
-                    getOptionLabel={(o) => o.pair}
+                    options={instrumentOptions}
+                    getOptionLabel={(o) => o.symbol}
                     groupBy={(o) =>
                       o.category.charAt(0).toUpperCase() + o.category.slice(1)
                     }
-                    isOptionEqualToValue={(a, b) => a.pair === b.pair}
+                    isOptionEqualToValue={(a, b) => a.symbol === b.symbol}
                     size="small"
                     componentsProps={{
                       popper: {
@@ -572,8 +572,8 @@ export const AssetMappingPanel: React.FC<Props> = ({
                         {...params}
                         placeholder={
                           suggestion
-                            ? `Pick currency pair (suggested: ${suggestion})`
-                            : 'Pick a currency pair…'
+                            ? `Pick an instrument (suggested: ${suggestion})`
+                            : 'Pick an instrument…'
                         }
                         sx={{
                           '& .MuiOutlinedInput-root': {
@@ -614,7 +614,7 @@ export const AssetMappingPanel: React.FC<Props> = ({
                             py: 0.5,
                           }}
                         >
-                          {option.pair}
+                          {option.symbol}
                         </Box>
                       );
                     }}

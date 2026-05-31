@@ -31,7 +31,7 @@ import { useTradeLinkInsertion } from 'components/common/RichTextEditor/hooks/us
 import RoundedTabs, { TabPanel } from 'components/common/RoundedTabs';
 import { fetchAndGenerateTradeNameSuggestions } from '../../utils/tradeNameSuggestions';
 import { Currency } from 'features/events/types/economicCalendar';
-import { CURRENCY_PAIRS } from 'features/events/services/tradeEconomicEventService';
+import { INSTRUMENTS } from 'features/events/services/instrumentCatalog';
 import { Z_INDEX } from 'styles/zIndex';
 
 export const DEFAULT_PAIRS_TAG_GROUP = "Asset"
@@ -199,7 +199,7 @@ const TradeForm: React.FC<TradeFormProps> = ({
   }, [calendarId, newTrade.tags, newTrade.session, newTrade.name]);
 
   const tagsWithPairs = useMemo(() => {
-    return Array.from(new Set([...allTags, ...CURRENCY_PAIRS.map(pair => `${DEFAULT_PAIRS_TAG_GROUP}:${pair}`)]));
+    return Array.from(new Set([...allTags, ...INSTRUMENTS.map(symbol => `${DEFAULT_PAIRS_TAG_GROUP}:${symbol}`)]));
   }, [allTags]);
 
   // Automatically add "pair" to required tag groups if not already present

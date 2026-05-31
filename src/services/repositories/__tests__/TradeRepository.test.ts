@@ -14,6 +14,8 @@ jest.mock('utils/logger', () => ({
 jest.mock('services/supabaseStorageService', () => ({ uploadTradeImage: jest.fn() }));
 jest.mock('features/events/services/tradeEconomicEventService', () => ({
   tradeEconomicEventService: {},
+}));
+jest.mock('features/events/services/instrumentCatalog', () => ({
   getRelevantCurrenciesFromTags: jest.fn(() => []),
 }));
 

@@ -20,7 +20,8 @@ import { uploadTradeImage } from 'services/supabaseStorageService';
 import { TradeImage } from 'features/calendar/components/trades/TradeForm';
 
 // Economic events imports
-import { tradeEconomicEventService, getRelevantCurrenciesFromTags } from 'features/events/services/tradeEconomicEventService';
+import { tradeEconomicEventService } from 'features/events/services/tradeEconomicEventService';
+import { getRelevantCurrenciesFromTags } from 'features/events/services/instrumentCatalog';
 import { TradeEconomicEvent } from 'features/calendar/types/dualWrite';
 
  

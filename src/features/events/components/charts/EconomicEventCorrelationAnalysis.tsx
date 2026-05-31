@@ -28,7 +28,7 @@ import { cleanEventNameForPinning } from 'features/events/utils/eventNameUtils';
 import { formatValue } from 'utils/formatters';
 
 import RoundedTabs from 'components/common/RoundedTabs';
-import { getCurrenciesForPair } from 'features/events/services/tradeEconomicEventService';
+import { getCurrenciesForInstrument } from 'features/events/services/instrumentCatalog';
 import { getSessionForTimestamp } from 'utils/sessionTimeUtils';
 import { EYEBROW_SX, TNUM, getInsetSurface, getInsetTileSx } from 'styles/designTokens';
 import CardShell from 'components/common/CardShell';
@@ -78,8 +78,8 @@ const EconomicEventCorrelationAnalysis: React.FC<EconomicEventCorrelationAnalysi
       .flat()
       .filter((tag) => tag?.includes('pair:'))
       .map((tag) => tag?.split(':')[1])
-      .filter((pair): pair is string => pair !== undefined)
-      .map((pair) => getCurrenciesForPair(pair))
+      .filter((symbol): symbol is string => symbol !== undefined)
+      .map((symbol) => getCurrenciesForInstrument(symbol))
       .flat();
     return Array.from(new Set(currencyTags));
   }, [trades]);
