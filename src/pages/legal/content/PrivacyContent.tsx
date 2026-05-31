@@ -17,7 +17,7 @@ const PrivacyContent: React.FC = () => (
       described here, and we honour them.
     </Typography>
 
-    <Typography variant="h3">1. What we collect</Typography>
+    <Typography variant="h3" component="h2">1. What we collect</Typography>
     <Typography variant="body1">
       To run the Service, we collect:
     </Typography>
@@ -28,13 +28,13 @@ const PrivacyContent: React.FC = () => (
       <li><Typography variant="body1" component="span"><strong>Operational data</strong> — server logs (IP address, user agent, edge function invocations) and error reports needed to keep the Service running and to debug issues.</Typography></li>
     </ul>
 
-    <Typography variant="h3">2. What we do not collect</Typography>
+    <Typography variant="h3" component="h2">2. What we do not collect</Typography>
     <Typography variant="body1">
       We do not embed advertising trackers, third-party analytics that profile you across the web,
       session replay tools, or fingerprinting libraries. We do not sell your data.
     </Typography>
 
-    <Typography variant="h3">3. How we use your data</Typography>
+    <Typography variant="h3" component="h2">3. How we use your data</Typography>
     <Typography variant="body1">
       We use the data above to:
     </Typography>
@@ -46,7 +46,7 @@ const PrivacyContent: React.FC = () => (
       <li><Typography variant="body1" component="span">Comply with legal obligations (e.g. tax records).</Typography></li>
     </ul>
 
-    <Typography variant="h3">4. AI training</Typography>
+    <Typography variant="h3" component="h2">4. AI training</Typography>
     <Typography variant="body1">
       <strong>We do not train AI models on your data.</strong> Your conversations and trade content
       are sent to Google's Gemini API only at inference time, to generate responses to your
@@ -54,7 +54,7 @@ const PrivacyContent: React.FC = () => (
       We do not fine-tune any model on individual user data.
     </Typography>
 
-    <Typography variant="h3">5. Sub-processors</Typography>
+    <Typography variant="h3" component="h2">5. Sub-processors</Typography>
     <Typography variant="body1">
       We use the following services to operate JournoTrades. They process data only on our behalf
       and only as needed to deliver the Service:
@@ -73,7 +73,7 @@ const PrivacyContent: React.FC = () => (
       list. We will announce material changes in-app or by email before they take effect.
     </Typography>
 
-    <Typography variant="h3">6. Cookies and local storage</Typography>
+    <Typography variant="h3" component="h2">6. Cookies and local storage</Typography>
     <Typography variant="body1">
       We do not use third-party advertising cookies. The Service uses:
     </Typography>
@@ -86,7 +86,7 @@ const PrivacyContent: React.FC = () => (
       affect data stored on our servers.
     </Typography>
 
-    <Typography variant="h3">7. Data retention</Typography>
+    <Typography variant="h3" component="h2">7. Data retention</Typography>
     <Typography variant="body1">
       Your data persists for the life of your account. When you delete your account, we
       permanently remove your calendars, trades, notes, Orion conversations, AI memory, and
@@ -94,7 +94,7 @@ const PrivacyContent: React.FC = () => (
       for the periods required by applicable tax and accounting law.
     </Typography>
 
-    <Typography variant="h3">8. Your rights</Typography>
+    <Typography variant="h3" component="h2">8. Your rights</Typography>
     <Typography variant="body1">
       Subject to applicable law (the NDPA in Nigeria, and the EU GDPR, UK GDPR, and CCPA where they
       apply to you), you have the right to:
@@ -113,7 +113,7 @@ const PrivacyContent: React.FC = () => (
       on your account. We will respond within 30 days.
     </Typography>
 
-    <Typography variant="h3">9. International transfers</Typography>
+    <Typography variant="h3" component="h2">9. International transfers</Typography>
     <Typography variant="body1">
       Most of our sub-processors operate outside Nigeria. Notably, Supabase hosts your data in the
       European Union (AWS Europe region). Where we transfer data outside Nigeria, we rely on the
@@ -125,7 +125,7 @@ const PrivacyContent: React.FC = () => (
       frameworks.
     </Typography>
 
-    <Typography variant="h3">10. Security</Typography>
+    <Typography variant="h3" component="h2">10. Security</Typography>
     <Typography variant="body1">
       We use TLS for data in transit, encryption at rest (managed by Supabase), and PostgreSQL Row
       Level Security on all user-scoped tables so users can only read their own data. API keys for
@@ -133,21 +133,21 @@ const PrivacyContent: React.FC = () => (
       users and authorities of any data breach as required by law.
     </Typography>
 
-    <Typography variant="h3">11. Children</Typography>
+    <Typography variant="h3" component="h2">11. Children</Typography>
     <Typography variant="body1">
       JournoTrades is not directed at children under 16, and we do not knowingly collect personal
       data from anyone under 16. If you believe a child has provided us with personal data, contact
       us and we will delete it.
     </Typography>
 
-    <Typography variant="h3">12. Changes to this policy</Typography>
+    <Typography variant="h3" component="h2">12. Changes to this policy</Typography>
     <Typography variant="body1">
       We may update this Privacy Policy from time to time. Material changes will be announced
       in-app or by email at least 14 days before they take effect. The "Last updated" date at the
       top of this page reflects the most recent revision.
     </Typography>
 
-    <Typography variant="h3">13. Contact</Typography>
+    <Typography variant="h3" component="h2">13. Contact</Typography>
     <Typography variant="body1">
       Privacy questions or requests? Email{' '}
       <Link href="mailto:support@journotrades.com">support@journotrades.com</Link>.

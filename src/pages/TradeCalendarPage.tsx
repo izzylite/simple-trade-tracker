@@ -1332,7 +1332,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
           };
         case 'stats': {
           return {
-            title: 'Overview',
+            title: 'Month Overview',
             icon: <InsightsIcon fontSize="small" />,
             component: (
               <StatsContent
@@ -1724,7 +1724,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
               },
             }}
           >
-            Overview
+            Month Overview
           </Button>
         }
         rightContent={breadcrumbRightContent}

@@ -17,7 +17,16 @@ const formatLastUpdated = (iso: string): string => {
   });
 };
 
-const LegalPage: React.FC<LegalPageProps> = ({ title, lastUpdated, children }) => (
+const LegalPage: React.FC<LegalPageProps> = ({ title, lastUpdated, children }) => {
+  React.useEffect(() => {
+    const previousTitle = document.title;
+    document.title = `${title} | JournoTrades`;
+    return () => {
+      document.title = previousTitle;
+    };
+  }, [title]);
+
+  return (
   <Box
     sx={{
       // Shell locks non-landing routes to 100vh with overflow:hidden and adds
@@ -29,7 +38,7 @@ const LegalPage: React.FC<LegalPageProps> = ({ title, lastUpdated, children }) =
     }}
   >
     <Container maxWidth="md" sx={{ py: { xs: 6, md: 10 } }}>
-      <Typography variant="h2" sx={{ fontWeight: 600, mb: 1 }}>
+      <Typography variant="h2" component="h1" sx={{ fontWeight: 600, mb: 1 }}>
         {title}
       </Typography>
       <Typography variant="caption" sx={{ color: 'text.secondary', mb: 5, display: 'block' }}>
@@ -49,6 +58,7 @@ const LegalPage: React.FC<LegalPageProps> = ({ title, lastUpdated, children }) =
       </Box>
     </Container>
   </Box>
-);
+  );
+};
 
 export default LegalPage;
