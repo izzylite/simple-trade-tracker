@@ -16,6 +16,28 @@ export interface AttachedImage {
   size?: number; // bytes
 }
 
+/**
+ * Reasoning depth for an interactive chat turn. Maps to Gemini's
+ * `thinkingConfig.thinkingLevel`. Exposed to users as Fast / Balanced / Deep;
+ * 'low' is the latency-optimised default. Higher = slower but more thorough.
+ */
+export type ThinkingLevel = 'low' | 'medium' | 'high';
+
+export const THINKING_LEVEL_OPTIONS: ReadonlyArray<{
+  value: ThinkingLevel;
+  label: string;
+  hint: string;
+}> = [
+  { value: 'low', label: 'Fast', hint: 'Quickest replies. Best for lookups and quick questions.' },
+  { value: 'medium', label: 'Balanced', hint: 'More reasoning. Good for multi-step questions.' },
+  { value: 'high', label: 'Deep', hint: 'Slowest, most thorough. Best for complex analysis.' },
+];
+
+export const DEFAULT_THINKING_LEVEL: ThinkingLevel = 'low';
+
+/** localStorage key for the user's remembered Fast/Balanced/Deep choice. */
+export const THINKING_LEVEL_STORAGE_KEY = 'orion.thinkingLevel';
+
 export interface ChatMessage {
   id: string;
   role: MessageRole;

@@ -21,13 +21,29 @@ Deno.serve(async (req: Request) => {
 
     log('Starting warmup ping to ai-trading-agent', 'info');
 
+    // ai-trading-agent runs with verify_jwt=true, so the gateway validates this
+    // bearer as a JWT BEFORE the function's X-Warmup short-circuit runs. After
+    // Supabase's API-key migration the two auto-injected candidates are unusable:
+    //   - SUPABASE_ANON_KEY         → empty in this runtime
+    //   - SUPABASE_SERVICE_ROLE_KEY → now sb_secret_* (non-JWT) → gateway
+    //     rejects with UNAUTHORIZED_INVALID_JWT_FORMAT
+    // The legacy anon key is still a valid gateway JWT, injected here under a
+    // custom name (custom secrets ARE reliably injected). The anon key is public
+    // by design (it ships in the frontend bundle), so this is not a secret leak —
+    // it lives in a secret only to honor the repo's no-hardcoded-keys rule.
+    // Set with: supabase secrets set WARMUP_BEARER_KEY=<project legacy anon key>
+    const warmupKey = Deno.env.get('WARMUP_BEARER_KEY');
+    if (!warmupKey) {
+      throw new Error('WARMUP_BEARER_KEY not configured (set to the project legacy anon key)');
+    }
+
     // Ping the AI agent with warmup header
     const warmupResponse = await fetch(`${supabaseUrl}/functions/v1/ai-trading-agent`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-Warmup': 'true',
-        'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY') || ''}`
+        'Authorization': `Bearer ${warmupKey}`
       },
       body: JSON.stringify({})
     });

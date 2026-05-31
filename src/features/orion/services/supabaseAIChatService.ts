@@ -161,7 +161,8 @@ class SupabaseAIChatService {
     conversationId?: string,
     userMessageId?: string,
     editingMessageId?: string,
-    titleHint?: string
+    titleHint?: string,
+    thinkingLevel?: string
   ): AsyncGenerator<SSEEvent, void, unknown> {
     try {
       logger.log(`Sending streaming message to AI agent: "${message.substring(0, 50)}..."`);
@@ -195,6 +196,7 @@ class SupabaseAIChatService {
           userMessageId,
           editingMessageId,
           titleHint,
+          thinkingLevel,
           focusedTradeId: focusedTradeId || undefined,
           calendarContext: calendar
             ? this.buildCalendarContext(calendar)

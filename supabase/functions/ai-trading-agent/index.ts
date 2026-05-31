@@ -74,6 +74,36 @@ const MODEL = Deno.env.get('GEMINI_MODEL') ?? 'gemini-2.5-flash';
 // the token budget on shallow tool-routing queries. Flip via env to A/B.
 const THINKING_LEVEL = Deno.env.get('GEMINI_THINKING_LEVEL') ?? 'medium';
 
+// Valid Gemini 3 thinking levels. Chat exposes only low/medium/high to users
+// (Fast/Balanced/Deep); `minimal` stays internal. Used to validate the
+// per-request `thinkingLevel` from the client so a malformed value can't reach
+// the Gemini body. See: https://ai.google.dev/gemini-api/docs/thinking
+type ThinkingLevel = 'minimal' | 'low' | 'medium' | 'high';
+const VALID_THINKING_LEVELS: ReadonlySet<string> = new Set([
+  'minimal',
+  'low',
+  'medium',
+  'high',
+]);
+
+/**
+ * Resolve the thinking level for an interactive chat turn. Precedence:
+ *   client-sent value (validated) → GEMINI_THINKING_LEVEL env → 'low'.
+ * The 'low' floor makes chat fast-by-default even if the env var is unset;
+ * the client's Fast/Balanced/Deep control overrides per request. Reminder
+ * and batch (market-research) paths never call this — they keep their own
+ * defaults.
+ */
+function resolveChatThinkingLevel(raw: unknown): ThinkingLevel {
+  if (typeof raw === 'string' && VALID_THINKING_LEVELS.has(raw)) {
+    return raw as ThinkingLevel;
+  }
+  if (VALID_THINKING_LEVELS.has(THINKING_LEVEL)) {
+    return THINKING_LEVEL as ThinkingLevel;
+  }
+  return 'low';
+}
+
 // Gemini 3 mediaResolution. API expects the enum constants
 // "MEDIA_RESOLUTION_LOW" | "MEDIA_RESOLUTION_MEDIUM" | "MEDIA_RESOLUTION_HIGH"
 // (not the lowercase names from the prose docs — those return 400). Default
@@ -160,14 +190,19 @@ function buildToolConfig(
  * temperature, mediaResolution, optional seed, and thinkingConfig in ONE
  * place so a tuning change touches one spot instead of three.
  */
-function buildGenerationConfig(maxOutputTokens: number): Record<string, unknown> {
+function buildGenerationConfig(
+  maxOutputTokens: number,
+  thinkingLevel: string = THINKING_LEVEL,
+): Record<string, unknown> {
   const cfg: Record<string, unknown> = {
     // Gemini 3 default — lower values cause function-calling loops.
     temperature: 1.0,
     maxOutputTokens,
     // Vision token control. Set explicitly so the cost profile is deterministic.
     mediaResolution: MEDIA_RESOLUTION,
-    thinkingConfig: { includeThoughts: true, thinkingLevel: THINKING_LEVEL },
+    // Per-turn thinking level. Chat threads the user's Fast/Balanced/Deep
+    // choice here; other callers omit it and fall back to THINKING_LEVEL.
+    thinkingConfig: { includeThoughts: true, thinkingLevel },
   };
   if (GEMINI_SEED !== undefined) {
     cfg.seed = GEMINI_SEED;
@@ -418,6 +453,8 @@ async function callGeminiWithContents(
     maxOutputTokens?: number;
     mode?: 'AUTO' | 'ANY' | 'NONE';
     systemInstruction?: string;
+    /** Per-turn thinking level. Omit to fall back to THINKING_LEVEL. */
+    thinkingLevel?: ThinkingLevel;
   }
 ): Promise<{
   text: string;
@@ -436,7 +473,7 @@ async function callGeminiWithContents(
       tools: tools.length > 0 ? tools : undefined,
       toolMode: opts.mode,
       maxOutputTokens: opts.maxOutputTokens ?? 4000,
-      thinkingLevel: THINKING_LEVEL as 'minimal' | 'low' | 'medium' | 'high',
+      thinkingLevel: (opts.thinkingLevel ?? THINKING_LEVEL) as ThinkingLevel,
     });
     logUsageMetadata('callGeminiWithContents:non-streaming', result.usageMetadata);
     return {
@@ -454,7 +491,10 @@ async function callGeminiWithContents(
     contents,
     tools: buildToolsArray(tools),
     tool_config: buildToolConfig(tools, opts.mode ?? 'AUTO'),
-    generationConfig: buildGenerationConfig(opts.maxOutputTokens ?? 4000),
+    generationConfig: buildGenerationConfig(
+      opts.maxOutputTokens ?? 4000,
+      opts.thinkingLevel,
+    ),
   };
   if (opts.systemInstruction) {
     body.systemInstruction = { parts: [{ text: opts.systemInstruction }] };
@@ -897,7 +937,8 @@ async function callGeminiStreaming(
   conversationHistory: Array<{ role: string; content: string }>,
   tools: GeminiFunctionDeclaration[],
   writer: WritableStreamDefaultWriter,
-  userImages?: Array<{ url: string; mimeType: string }>
+  userImages?: Array<{ url: string; mimeType: string }>,
+  thinkingLevel?: ThinkingLevel
 ): Promise<{
   text?: string;
   functionCall?: ParsedFunctionCall;
@@ -975,7 +1016,7 @@ async function callGeminiStreaming(
     tools: buildToolsArray(tools),
     // Force function calling on initial request (unless images present - then allow direct analysis)
     tool_config: buildToolConfig(tools, toolMode),
-    generationConfig: buildGenerationConfig(4000),
+    generationConfig: buildGenerationConfig(4000, thinkingLevel),
   };
 
   // Log request details for debugging
@@ -1215,7 +1256,8 @@ function handleStreamingRequest(
   supabaseUrl: string,
   userImages?: Array<{ url: string; mimeType: string }>,
   calendarTags?: string[],
-  conversationId?: string
+  conversationId?: string,
+  thinkingLevel?: ThinkingLevel
 ): Response {
   // Create SSE stream
   const { stream, writer } = createSSEStream();
@@ -1264,7 +1306,8 @@ function handleStreamingRequest(
         conversationHistory,
         allTools,
         writer,
-        userImages // Pass user-attached images on initial request
+        userImages, // Pass user-attached images on initial request
+        thinkingLevel
       );
       if (result.usageMetadata) {
         firstRoundUsage = result.usageMetadata;
@@ -1318,7 +1361,8 @@ function handleStreamingRequest(
             conversationHistory,
             retryTools,
             writer,
-            userImages // Preserve user images across retries
+            userImages, // Preserve user images across retries
+            thinkingLevel
           );
           if (result.usageMetadata) {
             // Retries replace the initial call's result — treat the successful
@@ -1552,7 +1596,7 @@ function handleStreamingRequest(
           googleApiKey,
           conversationContents,
           allTools,
-          { streaming: true, writer, maxOutputTokens: 8000, systemInstruction: systemPrompt }
+          { streaming: true, writer, maxOutputTokens: 8000, systemInstruction: systemPrompt, thinkingLevel }
         );
         if (newUsage) {
           lastUsageMetadata = newUsage;
@@ -1690,7 +1734,7 @@ function handleStreamingRequest(
               googleApiKey,
               conversationContents,
               allTools,
-              { streaming: true, writer, maxOutputTokens: 8000, systemInstruction: systemPrompt }
+              { streaming: true, writer, maxOutputTokens: 8000, systemInstruction: systemPrompt, thinkingLevel }
             );
             if (result.usageMetadata) {
               lastUsageMetadata = result.usageMetadata;
@@ -2542,6 +2586,9 @@ Deno.serve(async (req: Request) => {
     // client (old tab, mid-deploy bundle) silently override the DB-truth.
     const { message, userId, calendarId, focusedTradeId, calendarContext, images } = body;
     const conversationId = body.conversationId;
+    // Per-request thinking level from the client's Fast/Balanced/Deep control.
+    // Validated + floored to 'low' here; reminder/batch paths are unaffected.
+    const chatThinkingLevel = resolveChatThinkingLevel(body.thinkingLevel);
     // Soft compat: warn if a client still ships the old field so we can
     // grep for stragglers after the FE deploy lands.
     if (Array.isArray(body.conversationHistory) && body.conversationHistory.length > 0) {
@@ -2785,7 +2832,7 @@ Deno.serve(async (req: Request) => {
 
     // Route to streaming or non-streaming path
     if (wantsStreaming) {
-      log('Using streaming mode', 'info');
+      log(`Using streaming mode (thinkingLevel=${chatThinkingLevel})`, 'info');
       return handleStreamingRequest(
         googleApiKey,
         systemPrompt,
@@ -2799,7 +2846,8 @@ Deno.serve(async (req: Request) => {
         supabaseUrl,
         allImages.length > 0 ? allImages : images, // Trade + user images
         calendarContext?.tags,
-        conversationId
+        conversationId,
+        chatThinkingLevel
       );
     }
 

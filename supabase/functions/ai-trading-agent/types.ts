@@ -240,6 +240,9 @@ export interface AgentRequest {
   userMessageId?: string;
   editingMessageId?: string;
   titleHint?: string;
+  /** Per-request reasoning depth (Fast/Balanced/Deep → low/medium/high).
+   *  Validated server-side; falls back to GEMINI_THINKING_LEVEL when absent. */
+  thinkingLevel?: string;
 }
 
 export interface ConversationMessage {

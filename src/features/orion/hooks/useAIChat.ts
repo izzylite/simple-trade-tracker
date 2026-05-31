@@ -131,7 +131,7 @@ export interface UseAIChatReturn {
   blockedState: OrionBlockedState | null;
 
   // Actions
-  sendMessage: (messageText: string, images?: AttachedImage[], segments?: ChatMessageType['segments']) => Promise<void>;
+  sendMessage: (messageText: string, images?: AttachedImage[], segments?: ChatMessageType['segments'], thinkingLevel?: string) => Promise<void>;
   cancelRequest: () => void;
   editMessage: (messageId: string) => string | null;
   setInputForEdit: (messageId: string) => { content: string; images?: AttachedImage[]; segments?: ChatMessageType['segments'] } | null;
@@ -855,7 +855,7 @@ export function useAIChat({
   /**
    * Send a message to the AI
    */
-  const sendMessage = useCallback(async (messageText: string, images?: AttachedImage[], segments?: ChatMessageType['segments']) => {
+  const sendMessage = useCallback(async (messageText: string, images?: AttachedImage[], segments?: ChatMessageType['segments'], thinkingLevel?: string) => {
     const trimmedMessage = messageText.trim();
     if ((!trimmedMessage && (!images || images.length === 0)) || isLoading || !userId) return;
 
@@ -991,6 +991,7 @@ export function useAIChat({
         userMessage.id,
         editTargetId ?? undefined,
         titleHint,
+        thinkingLevel,
       )) {
         switch (event.type) {
           case 'text_chunk':

@@ -13,6 +13,8 @@ import {
   Button,
   Tooltip,
   Typography,
+  ToggleButton,
+  ToggleButtonGroup,
   useTheme,
   alpha
 } from '@mui/material';
@@ -37,7 +39,14 @@ import {
 } from 'types/notification';
 import AIChatMentionInput from 'features/orion/components/aiChat/AIChatMentionInput';
 import type { AIChatMentionInputHandle, SystemCommand } from 'features/orion/components/aiChat/AIChatMentionInput';
-import { ChatMessage as ChatMessageType, AttachedImage } from 'features/orion/types/aiChat';
+import {
+  ChatMessage as ChatMessageType,
+  AttachedImage,
+  ThinkingLevel,
+  THINKING_LEVEL_OPTIONS,
+  DEFAULT_THINKING_LEVEL,
+  THINKING_LEVEL_STORAGE_KEY,
+} from 'features/orion/types/aiChat';
 import { Trade } from 'features/calendar/types/trade';
 import { Calendar } from 'features/calendar/types/calendar';
 import { EconomicEvent } from 'features/events/types/economicCalendar';
@@ -125,7 +134,7 @@ export interface AIChatInterfaceProps {
   blockedState: OrionBlockedState | null;
 
   // Actions from useAIChat hook
-  sendMessage: (messageText: string, images?: AttachedImage[], segments?: ChatMessageType['segments']) => Promise<void>;
+  sendMessage: (messageText: string, images?: AttachedImage[], segments?: ChatMessageType['segments'], thinkingLevel?: string) => Promise<void>;
   cancelRequest: () => void;
   setInputForEdit: (messageId: string) => { content: string; images?: AttachedImage[]; segments?: ChatMessageType['segments'] } | null;
   startNewChat: () => Promise<void>;
@@ -289,6 +298,35 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
 
   // Local UI state
   const [inputMessage, setInputMessage] = useState('');
+
+  // Reasoning depth (Fast / Balanced / Deep). Seeded from localStorage so the
+  // user's last choice sticks across sends and sessions; sent per-request to
+  // ai-trading-agent, which maps it to Gemini's thinkingLevel. Market research
+  // is unaffected — it runs on a separate batch path.
+  const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel>(() => {
+    try {
+      const stored = localStorage.getItem(THINKING_LEVEL_STORAGE_KEY);
+      if (stored && THINKING_LEVEL_OPTIONS.some(o => o.value === stored)) {
+        return stored as ThinkingLevel;
+      }
+    } catch {
+      /* localStorage unavailable (private mode / SSR) — fall through */
+    }
+    return DEFAULT_THINKING_LEVEL;
+  });
+
+  const handleThinkingLevelChange = useCallback(
+    (_e: React.MouseEvent<HTMLElement>, next: ThinkingLevel | null) => {
+      if (!next) return; // ignore deselect (ToggleButtonGroup fires null on re-click)
+      setThinkingLevel(next);
+      try {
+        localStorage.setItem(THINKING_LEVEL_STORAGE_KEY, next);
+      } catch {
+        /* non-fatal — choice still applies for this session */
+      }
+    },
+    [],
+  );
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
   const [showScrollDown, setShowScrollDown] = useState(false);
   const [mentionWarning, setMentionWarning] = useState<string | null>(null);
@@ -438,7 +476,7 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
       setAttachedImages([]);
       // Persist segments alongside the message so Edit can rebuild chips.
       const segmentsToPersist = mentionSegs.length > 0 ? segments : undefined;
-      await sendMessage(outgoing, imagesToSend, segmentsToPersist);
+      await sendMessage(outgoing, imagesToSend, segmentsToPersist, thinkingLevel);
     } finally {
       sendingRef.current = false;
     }
@@ -1223,6 +1261,44 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
           style={{ display: 'none' }}
           onChange={handleImageSelect}
         />
+
+        {/* Reasoning depth — Fast / Balanced / Deep. Sets Gemini's thinking
+            level for the next send; choice is remembered locally. Market
+            research is unaffected (separate batch path). */}
+        <Box sx={{ display: 'flex', justifyContent: 'flex-start', mb: 0.75 }}>
+          <ToggleButtonGroup
+            exclusive
+            size="small"
+            value={thinkingLevel}
+            onChange={handleThinkingLevelChange}
+            disabled={isReadOnly || isLoading}
+            aria-label="Reasoning depth"
+            sx={{
+              '& .MuiToggleButton-root': {
+                px: 1.25,
+                py: 0.25,
+                fontSize: '0.68rem',
+                lineHeight: 1.4,
+                textTransform: 'none',
+                border: `1px solid ${hairline}`,
+                color: theme.palette.text.secondary,
+                '&.Mui-selected': {
+                  color: violet,
+                  backgroundColor: violetSoft,
+                  '&:hover': { backgroundColor: violetSofter },
+                },
+              },
+            }}
+          >
+            {THINKING_LEVEL_OPTIONS.map(opt => (
+              <Tooltip key={opt.value} title={opt.hint} placement="top">
+                <ToggleButton value={opt.value} aria-label={opt.label}>
+                  {opt.label}
+                </ToggleButton>
+              </Tooltip>
+            ))}
+          </ToggleButtonGroup>
+        </Box>
 
         <Box
           onPaste={handlePaste}
