@@ -34,7 +34,7 @@ import { Currency } from 'features/events/types/economicCalendar';
 import { CURRENCY_PAIRS } from 'features/events/services/tradeEconomicEventService';
 import { Z_INDEX } from 'styles/zIndex';
 
-export const DEFAULT_PAIRS_TAG_GROUP = "Pairs"
+export const DEFAULT_PAIRS_TAG_GROUP = "Asset"
 export interface NewTradeForm {
   id: string;
   name: string;
