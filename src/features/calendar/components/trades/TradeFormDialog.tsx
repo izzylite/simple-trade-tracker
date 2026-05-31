@@ -1412,6 +1412,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
             total_pnl={dayTotalPnL}
             onPrevDay={() => { }}
             onNextDay={() => { }}
+            loading={isLoadingPrecalculatedValues}
           />
 
           <Box sx={{
