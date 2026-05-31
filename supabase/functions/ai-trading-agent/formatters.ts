@@ -401,6 +401,20 @@ export function convertMarkdownToHtml(
     return `\n\n${marker}\n\n`;
   });
 
+  // Extract raw HTML <table> blocks the model emits directly. The system
+  // prompt invites either markdown pipe tables OR literal <table> HTML, but
+  // without this step a raw <table> hits the escape pass below and renders as
+  // visible tag soup (seen on low-thinking turns, where the model tends to
+  // emit literal HTML). Reuse the markdownTables marker/restore path so it's
+  // restored verbatim after escaping, then sanitized by DOMPurify on the
+  // client. Non-greedy + case-insensitive; a malformed (unclosed) table simply
+  // doesn't match and falls through to escaping unchanged (prior behavior).
+  html = html.replace(/<table[\s\S]*?<\/table>/gi, (m) => {
+    const marker = `___MARKDOWN_TABLE_${markdownTables.length}___`;
+    markdownTables.push({ marker, htmlTable: m });
+    return `\n\n${marker}\n\n`;
+  });
+
   // Escape HTML special characters
   html = html
     .replace(/&/g, '&amp;')
