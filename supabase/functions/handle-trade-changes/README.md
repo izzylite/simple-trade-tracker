@@ -49,11 +49,12 @@ and `dispatch-reminders`:
 
 - `notify_trade_changes()` reads `trade_webhook_secret` from `vault.decrypted_secrets`
   and sends it as the `X-Trade-Webhook-Secret` header.
-- The function compares it (constant-time) against `Deno.env.get('TRADE_WEBHOOK_SECRET')`
-  and returns `401` on missing/mismatch before doing any work.
+- The function fetches the same secret via the `service_role`-only RPC
+  `get_trade_webhook_secret()` (cached per warm isolate), compares it constant-time
+  against the header, and returns `401` on mismatch before doing any work.
 
-Both copies of the secret (Vault for the trigger, edge env for the function) must
-hold the same value.
+The secret lives **only in Vault** (generated server-side via `gen_random_bytes`) —
+one source of truth, no env copy to drift.
 
 As defense in depth, the function derives `user_id` from the calendar row
 (`calendars.user_id`) rather than trusting the request body.
@@ -84,7 +85,9 @@ transactional.
 ## Environment variables
 
 - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` — service-role DB/Storage access.
-- `TRADE_WEBHOOK_SECRET` — shared secret matching the Vault `trade_webhook_secret`.
+
+The webhook secret is **not** an env var — it is read from Vault at runtime via
+`get_trade_webhook_secret()`.
 
 ## Deploy
 

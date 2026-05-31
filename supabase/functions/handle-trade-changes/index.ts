@@ -21,6 +21,21 @@ function constantTimeEquals(a: string, b: string): boolean {
   return mismatch === 0;
 }
 
+// The shared webhook secret lives ONLY in Vault (generated server-side, never in
+// env/config). Fetch it once per warm isolate via a service-role-only RPC and cache.
+let cachedWebhookSecret: string | null = null;
+async function getExpectedSecret(): Promise<string | null> {
+  if (cachedWebhookSecret) return cachedWebhookSecret;
+  const supabase = createServiceClient();
+  const { data, error } = await supabase.rpc('get_trade_webhook_secret');
+  if (error || !data) {
+    log('Failed to load trade_webhook_secret via RPC', 'error', error);
+    return null;
+  }
+  cachedWebhookSecret = data as string;
+  return cachedWebhookSecret;
+}
+
 /**
  * Clean up removed images when a trade is deleted or updated
  */ async function cleanupRemovedImages(oldTrade: Trade | undefined, newTrade: Trade | undefined, calendarId: string, userId: string): Promise<void> {
@@ -85,11 +100,10 @@ function constantTimeEquals(a: string, b: string): boolean {
 
   // Shared-secret auth: notify_trade_changes() sends X-Trade-Webhook-Secret.
   // Required because verify_jwt is disabled (a DB webhook can't present a JWT),
-  // so without this the endpoint would be publicly invocable. Mirrors
-  // paddle-webhook / dispatch-reminders.
-  const expectedSecret = Deno.env.get('TRADE_WEBHOOK_SECRET');
+  // so without this the endpoint would be publicly invocable.
+  const expectedSecret = await getExpectedSecret();
   if (!expectedSecret) {
-    log('TRADE_WEBHOOK_SECRET not set — refusing to process', 'error');
+    log('trade webhook secret unavailable — refusing to process', 'error');
     return errorResponse('Webhook not configured', 500);
   }
   const providedSecret = req.headers.get('x-trade-webhook-secret') ?? '';

@@ -2,24 +2,51 @@
 --
 -- handle-trade-changes is verify_jwt=false (a DB webhook can't present a JWT), so
 -- without a secret it is an unauthenticated, internet-reachable, service-role
--- endpoint. This makes notify_trade_changes() send a shared secret
--- (`trade_webhook_secret`, stored in Vault) as the `X-Trade-Webhook-Secret`
--- header; the edge function rejects requests that don't match. Mirrors the
--- dispatch_reminders_call / paddle-webhook pattern.
+-- endpoint driven by the request body (audit Critical). This migration:
+--   1. Provisions a `trade_webhook_secret` in Vault (generated server-side via
+--      gen_random_bytes — the value never appears in this file, logs, or env).
+--   2. Exposes it to the edge function via a service_role-only RPC
+--      (get_trade_webhook_secret). Single source of truth — no env/Vault dual copy
+--      to drift.
+--   3. Makes notify_trade_changes() send it as the `X-Trade-Webhook-Secret` header.
+-- The edge function fetches the expected secret via the RPC and rejects (401)
+-- requests whose header doesn't match (constant-time).
 --
 -- The old `Authorization: Bearer <service_role_key>` header is dropped: it read
--- `app.settings.service_role_key`, which is NULL on this project (it fell back to
--- the request JWT sub), so it never authenticated anything.
+-- `app.settings.service_role_key`, which is NULL on this project, so it never
+-- authenticated anything.
 --
--- SAFETY: if the Vault secret is missing this RAISES WARNING and skips the webhook
--- (returns normally) rather than RAISE EXCEPTION — a trigger that errors would
--- block the trade write itself. A skipped recompute is backstopped by the
--- year-stats reconciliation sweep, so stats still converge.
---
--- Provision the Vault secret BEFORE applying this migration:
---   select vault.create_secret('<value>', 'trade_webhook_secret');
--- and set the matching edge env: supabase secrets set TRADE_WEBHOOK_SECRET=<value>
+-- SAFETY: if the Vault secret is somehow missing, notify_trade_changes RAISES
+-- WARNING and skips the webhook (returns normally) rather than RAISE EXCEPTION — a
+-- trigger that errors would block the trade write itself. A skipped recompute is
+-- backstopped by the year-stats reconciliation sweep, so stats still converge.
 
+-- 1. Provision the secret in Vault (idempotent; server-side random).
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM vault.secrets WHERE name = 'trade_webhook_secret') THEN
+    PERFORM vault.create_secret(
+      encode(extensions.gen_random_bytes(32), 'hex'),
+      'trade_webhook_secret',
+      'Shared secret authenticating the trades -> handle-trade-changes webhook'
+    );
+  END IF;
+END $$;
+
+-- 2. Service-role-only accessor for the edge function.
+CREATE OR REPLACE FUNCTION public.get_trade_webhook_secret()
+  RETURNS text
+  LANGUAGE sql
+  SECURITY DEFINER
+  SET search_path = ''
+AS $function$
+  SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'trade_webhook_secret';
+$function$;
+
+REVOKE ALL ON FUNCTION public.get_trade_webhook_secret() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.get_trade_webhook_secret() TO service_role;
+
+-- 3. Trigger sends the secret header (and drops the meaningless Bearer header).
 CREATE OR REPLACE FUNCTION public.notify_trade_changes()
   RETURNS trigger
   LANGUAGE plpgsql
@@ -33,7 +60,6 @@ DECLARE
   v_url text := 'https://gwubzauelilziaqnsfac.supabase.co/functions/v1/handle-trade-changes';
 BEGIN
   -- Bulk operations set this GUC to suppress the per-row webhook flood.
-  -- They are responsible for triggering one explicit recompute after their work.
   v_skip := current_setting('app.skip_trade_webhook', true);
   IF v_skip = 'true' THEN
     IF (TG_OP = 'DELETE') THEN RETURN OLD; ELSE RETURN NEW; END IF;
