@@ -443,6 +443,11 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
 
 
   const calculateFinalAmount = (trade: NewTradeForm): number => {
+    // Breakeven trades always have zero P&L regardless of risk settings or entered amount
+    if (trade.trade_type === 'breakeven') {
+      return 0;
+    }
+
     // Only use risk-based calculation if risk per trade is enabled AND risk_to_reward is set AND not taking partials
     const isRiskPerTradeEnabled = dynamicRiskSettings.risk_per_trade && dynamicRiskSettings.risk_per_trade > 0;
 
@@ -1065,8 +1070,8 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
       return;
     }
 
-    // Validate form
-    if (!newTrade.amount) {
+    // Validate form (breakeven trades are zero P&L by definition, so amount is not required)
+    if (newTrade.trade_type !== 'breakeven' && !newTrade.amount) {
       logger.error('Validation error: Amount is required');
       showErrorSnackbar('Amount is required');
       return;
@@ -1147,8 +1152,8 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
       return;
     }
 
-    // Validate form
-    if (!newTrade.amount) {
+    // Validate form (breakeven trades are zero P&L by definition, so amount is not required)
+    if (newTrade.trade_type !== 'breakeven' && !newTrade.amount) {
       logger.error('Validation error: Amount is required');
       showErrorSnackbar('Amount is required');
       return;

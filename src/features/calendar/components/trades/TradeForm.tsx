@@ -518,7 +518,28 @@ const TradeForm: React.FC<TradeFormProps> = ({
       </FormField>
 
       {/* Amount */}
-      {!dynamicRiskSettings.risk_per_trade ||
+      {newTrade.trade_type === 'breakeven' ? (
+        <FormField>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+            {renderLabel('Amount')}
+            <TextField
+              type="number"
+              value={0}
+              fullWidth
+              size="small"
+              disabled
+              sx={{
+                ...numericInputSx,
+                '& .MuiInputBase-input': {
+                  pointerEvents: 'none',
+                  fontFamily: 'inherit',
+                },
+              }}
+            />
+            {renderHelper('Breakeven trades have zero P&L')}
+          </Box>
+        </FormField>
+      ) : !dynamicRiskSettings.risk_per_trade ||
       (dynamicRiskSettings.risk_per_trade && newTrade.partials_taken) ? (
         <FormField>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
