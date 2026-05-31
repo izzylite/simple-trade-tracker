@@ -123,7 +123,7 @@ WHERE c.deleted_at IS NULL;
 UPDATE public.trades
 SET tags = (
   SELECT array(
-    SELECT
+    SELECT DISTINCT
       CASE
         WHEN t LIKE 'pair:%'  THEN 'Asset:' || split_part(t, ':', 2)
         WHEN t LIKE 'Pairs:%' THEN 'Asset:' || split_part(t, ':', 2)
