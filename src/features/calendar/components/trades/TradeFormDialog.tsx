@@ -1026,9 +1026,9 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
 
   // Check if all required tag groups are present in the trade's tags
   const validateRequiredTagGroups = (tags: string[]): { valid: boolean; missingGroups: string[] } => {
-    const effectiveRequiredGroups = [...(requiredTagGroups || [])];
+    const requiredGroups = [...(requiredTagGroups || [])];
 
-    if (effectiveRequiredGroups.length === 0) {
+    if (requiredGroups.length === 0) {
       return { valid: true, missingGroups: [] };
     }
 
@@ -1042,7 +1042,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
     });
 
     // Find missing required groups
-    const missingGroups = effectiveRequiredGroups.filter(group => !presentGroups.has(group));
+    const missingGroups = requiredGroups.filter(group => !presentGroups.has(group));
 
     return {
       valid: missingGroups.length === 0,
