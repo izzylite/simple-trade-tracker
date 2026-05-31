@@ -9,3 +9,9 @@
 
 [functions.paddle-webhook]
 verify_jwt = false
+
+# Called by the trades -> notify_trade_changes() DB webhook (no JWT); authenticates
+# via the X-Trade-Webhook-Secret shared secret instead. Must stay verify_jwt=false
+# or the gateway 401s every trigger fire (deploys reset this to true otherwise).
+[functions.handle-trade-changes]
+verify_jwt = false
