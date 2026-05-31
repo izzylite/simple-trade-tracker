@@ -480,9 +480,9 @@ export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
         return;
       }
 
-      // Note: pair/symbol/instrument detection used to warn here. That is now
-      // handled by the Assets step (next), where the user can group trades by
-      // any column and assign currency pairs explicitly. No pre-warning needed.
+      // Note: instrument detection used to warn here. That is now handled by the
+      // Assets step (next), where the user can group trades by any column and
+      // assign instruments explicitly. No pre-warning needed.
 
       validateData();
     }
@@ -567,7 +567,7 @@ export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
     if (currentStep === 0) return 'Parsing your file…';
     if (currentStep === 1) return 'Map your CSV columns to trade fields';
     if (currentStep === 2)
-      return 'Optional — link trades to currency pairs for economic events';
+      return 'Optional — link trades to instruments for economic events';
     return 'Review and confirm before importing';
   })();
 
