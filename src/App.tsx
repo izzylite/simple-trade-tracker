@@ -12,6 +12,7 @@ import { NotificationsProvider } from 'contexts/NotificationsContext';
 import { UserPinnedEventsProvider } from 'features/events/contexts/UserPinnedEventsContext';
 import ProtectedRoute from 'components/auth/ProtectedRoute';
 import * as calendarService from 'features/calendar/services/calendarService';
+import { assetTagsForClasses, ASSET_TAG_GROUP } from 'features/events/services/instrumentCatalog';
 import { createAppTheme } from 'theme';
 import TradeLoadingIndicator from 'features/calendar/components/TradeLoadingIndicator';
 import { useCalendars } from 'features/calendar/hooks/useCalendars';
@@ -141,7 +142,8 @@ function AppContent() {
         data.increased_risk_percentage,
         data.profit_threshold_percentage,
         data.hero_image_url,
-        data.hero_image_attribution
+        data.hero_image_attribution,
+        data.asset_classes,
       );
       setIsCreateDialogOpen(false);
       navigate(`/calendar/${newCalendar.id}`);
@@ -208,10 +210,13 @@ function AppContent() {
   );
 
   const handleCreateCalendar = async (name: string, account_balance: number, max_daily_drawdown: number,
-     weekly_target?: number, monthly_target?: number, yearly_target?: number, 
+     weekly_target?: number, monthly_target?: number, yearly_target?: number,
      risk_per_trade?: number, dynamic_risk_enabled?: boolean, increased_risk_percentage?: number,
-      profit_threshold_percentage?: number, heroImageUrl?: string, heroImageAttribution?: any) : Promise<Calendar> =>  {
+      profit_threshold_percentage?: number, heroImageUrl?: string, heroImageAttribution?: any,
+      asset_classes?: string[]) : Promise<Calendar> =>  {
     if (!user)  throw new Error('Failed to create calendar... user is undefined');
+
+    const assetTags = asset_classes ? assetTagsForClasses(asset_classes) : [];
 
     const newCalendar: Omit<Calendar, 'id' | 'user_id'> = {
       name,
@@ -227,7 +232,9 @@ function AppContent() {
       increased_risk_percentage,
       profit_threshold_percentage,
       hero_image_url: heroImageUrl,
-      hero_image_attribution: heroImageAttribution
+      hero_image_attribution: heroImageAttribution,
+      tags: assetTags,
+      required_tag_groups: assetTags.length > 0 ? [ASSET_TAG_GROUP] : [],
     };
 
     try {
