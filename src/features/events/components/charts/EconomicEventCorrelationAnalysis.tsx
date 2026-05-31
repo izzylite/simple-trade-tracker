@@ -28,7 +28,10 @@ import { cleanEventNameForPinning } from 'features/events/utils/eventNameUtils';
 import { formatValue } from 'utils/formatters';
 
 import RoundedTabs from 'components/common/RoundedTabs';
-import { getCurrenciesForInstrument } from 'features/events/services/instrumentCatalog';
+import {
+  getCurrenciesForInstrument,
+  extractInstrumentsFromTags,
+} from 'features/events/services/instrumentCatalog';
 import { getSessionForTimestamp } from 'utils/sessionTimeUtils';
 import { EYEBROW_SX, TNUM, getInsetSurface, getInsetTileSx } from 'styles/designTokens';
 import CardShell from 'components/common/CardShell';
@@ -74,13 +77,8 @@ const EconomicEventCorrelationAnalysis: React.FC<EconomicEventCorrelationAnalysi
 
   const CURRENCIES = useMemo(() => {
     const currencyTags = trades
-      .map((trade) => trade.tags)
-      .flat()
-      .filter((tag) => tag?.includes('Asset:'))
-      .map((tag) => tag?.split(':')[1])
-      .filter((symbol): symbol is string => symbol !== undefined)
-      .map((symbol) => getCurrenciesForInstrument(symbol))
-      .flat();
+      .flatMap((trade) => extractInstrumentsFromTags(trade.tags || []))
+      .flatMap((symbol) => getCurrenciesForInstrument(symbol));
     return Array.from(new Set(currencyTags));
   }, [trades]);
 
