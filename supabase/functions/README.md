@@ -80,53 +80,29 @@ supabase functions deploy function-name
 supabase secrets set --env-file .env
 ```
 
-## Database Triggers Setup
+## Database Triggers & Webhooks
 
-After deploying Edge Functions, run these SQL commands in your Supabase SQL Editor:
+DB triggers/webhooks live in `supabase/migrations/` — the source of truth. Do
+**not** copy DDL out of this README and run it by hand; hand-maintained trigger
+SQL drifts from the migrations (this section used to, and instructed recreating an
+already-dropped trigger). Add a migration instead of hand-creating a trigger.
 
-```sql
--- Enable HTTP extension for webhooks
-CREATE EXTENSION IF NOT EXISTS http;
+Current wiring:
 
--- Create trigger for trade changes
-CREATE OR REPLACE FUNCTION handle_trade_changes()
-RETURNS TRIGGER AS $$
-BEGIN
-  PERFORM net.http_post(
-    url := 'https://[your-project-ref].supabase.co/functions/v1/handle-trade-changes',
-    headers := '{"Content-Type": "application/json", "Authorization": "Bearer [service-key]"}',
-    body := json_build_object(
-      'table', TG_TABLE_NAME,
-      'operation', TG_OP,
-      'old_record', row_to_json(OLD),
-      'new_record', row_to_json(NEW)
-    )::text
-  );
-  RETURN COALESCE(NEW, OLD);
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER trade_changes_trigger
-  AFTER INSERT OR UPDATE OR DELETE ON trades
-  FOR EACH ROW EXECUTE FUNCTION handle_trade_changes();
-
--- Create trigger for calendar deletion
-CREATE OR REPLACE FUNCTION handle_calendar_deletion()
-RETURNS TRIGGER AS $$
-BEGIN
-  PERFORM net.http_post(
-    url := 'https://[your-project-ref].supabase.co/functions/v1/cleanup-deleted-calendar',
-    headers := '{"Content-Type": "application/json", "Authorization": "Bearer [service-key]"}',
-    body := json_build_object('calendar_id', OLD.id, 'user_id', OLD.user_id)::text
-  );
-  RETURN OLD;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER calendar_deletion_trigger
-  AFTER DELETE ON calendars
-  FOR EACH ROW EXECUTE FUNCTION handle_calendar_deletion();
-```
+- **Trade changes** → `trigger_trade_changes → notify_trade_changes()`
+  (`012_setup_webhooks.sql`, hardened in `20260518000000_*`). POSTs to the
+  `handle-trade-changes` edge function with an `X-Trade-Webhook-Secret` shared-secret
+  header (the function is `verify_jwt = false`), and early-returns when the bulk
+  guard `app.skip_trade_webhook = 'true'` is set.
+  > The legacy duplicate `trade_changes_trigger → handle_trade_changes()` was
+  > **dropped** 2026-05-31 (`20260531225101_*`) — do not recreate it. Note the name
+  > collision: the DB trigger function is `notify_trade_changes`, *not* a
+  > same-named `handle_trade_changes()`; the latter mirrored the `handle-trade-changes`
+  > edge-function slug and was the duplicate that was removed.
+- **Calendar changes** → `trigger_calendar_changes → notify_calendar_deletions()`
+  → `handle-calendar-changes` edge function.
+- **Year-stats reconciliation** → pg_cron `year-stats-sweep` → `reconcile-year-stats`
+  edge function (backstops coalesced/failed `year_stats` recomputes).
 
 ## Scheduled Functions Setup
 

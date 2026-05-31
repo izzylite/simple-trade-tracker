@@ -1,149 +1,93 @@
 # Handle Trade Changes Edge Function
 
-This Edge Function replaces the Firebase `onTradeChangedV2` trigger and handles trade modifications through database webhooks.
+Reacts to row changes on `public.trades` (INSERT / UPDATE / DELETE) and keeps
+derived state in sync. It is invoked by a database webhook, not the frontend.
 
-## Purpose
+## What it does
 
-Processes trade changes and performs:
-- **Image cleanup** - Removes unused trade images from storage
-- **Year changes** - Handles trade date changes (adapted for PostgreSQL schema)
-- **Tag synchronization** - Updates calendar-level tag lists when trade tags change
+1. **Image cleanup** — on UPDATE/DELETE, deletes trade images that are no longer
+   referenced by any of that user's trades (cross-calendar safe via
+   `canDeleteImage`). Best-effort; failures are logged, never thrown.
+2. **Year-stats recompute** — recomputes `calendars.year_stats` for the affected
+   calendar. Coalesced via `claim_year_stats_recompute` (≈5 s window) so a burst
+   of writes doesn't storm the calendars row. A pg_cron sweep backstops any
+   recompute the coalescer or a transient failure drops (see "Reliability").
+3. **Linked-calendar sync** — one-way sync of a trade to a linked calendar within
+   a 24 h window (`syncToLinkedCalendar`). The synced copy carries
+   `is_synced_copy = true` / `source_trade_id` and is de-duplicated by the partial
+   unique index `idx_trades_source_calendar_unique`.
 
-## Trigger Setup
+It does **not** do tag synchronization (that lives in `update-tag` /
+`bulk_update_tag_in_calendar`). Earlier versions of this doc claimed it did — it
+doesn't.
 
-This function is triggered by PostgreSQL database webhooks. Set up the trigger with this SQL:
+## How it is wired (do NOT hand-create the trigger)
 
-```sql
--- Enable HTTP extension for webhooks
-CREATE EXTENSION IF NOT EXISTS http;
+The live wiring is **`trigger_trade_changes → notify_trade_changes()`**
+(`SECURITY DEFINER`), defined in `supabase/migrations/012_setup_webhooks.sql` and
+hardened since:
+- `20260518000000_*` — adds the `app.skip_trade_webhook` guard (bulk writes set it
+  to suppress the per-row webhook) and `claim_year_stats_recompute` coalescing.
+- `20260531225101_*` — **dropped** the legacy duplicate trigger
+  `trade_changes_trigger → handle_trade_changes()`, which fired this same function
+  a second time per write (2× image cleanup / 2× sync / 2× cost, and bypassed the
+  skip flag). It now fires **once** per write.
+- `<auth-gate migration>` — `notify_trade_changes()` sends the shared-secret header
+  (below).
 
--- Create trigger function
-CREATE OR REPLACE FUNCTION handle_trade_changes()
-RETURNS TRIGGER AS $$
-BEGIN
-  PERFORM net.http_post(
-    url := 'https://[your-project-ref].supabase.co/functions/v1/handle-trade-changes',
-    headers := '{"Content-Type": "application/json", "Authorization": "Bearer [service-key]"}',
-    body := json_build_object(
-      'table', TG_TABLE_NAME,
-      'operation', TG_OP,
-      'old_record', row_to_json(OLD),
-      'new_record', row_to_json(NEW),
-      'calendar_id', COALESCE(NEW.calendar_id, OLD.calendar_id),
-      'user_id', COALESCE(NEW.user_id, OLD.user_id)
-    )::text
-  );
-  RETURN COALESCE(NEW, OLD);
-END;
-$$ LANGUAGE plpgsql;
+> **⚠️ Name collision.** The DB trigger function is **`notify_trade_changes`** —
+> NOT a same-named `handle_trade_changes()`. A legacy `handle_trade_changes()` DB
+> function (named to mirror this edge function's slug) was the duplicate dropped on
+> 2026-05-31; do not recreate it. The edge function (this directory,
+> `handle-trade-changes`) and the DB trigger function are different things.
 
--- Create trigger on trades table
-CREATE TRIGGER trade_changes_trigger
-  AFTER INSERT OR UPDATE OR DELETE ON trades
-  FOR EACH ROW EXECUTE FUNCTION handle_trade_changes();
-```
+## Auth
 
-## Request Format
+Deployed `verify_jwt = false` (a DB webhook can't present a user JWT), so the
+function authenticates itself with a **shared secret**, mirroring `paddle-webhook`
+and `dispatch-reminders`:
 
-The function expects a webhook payload with:
+- `notify_trade_changes()` reads `trade_webhook_secret` from `vault.decrypted_secrets`
+  and sends it as the `X-Trade-Webhook-Secret` header.
+- The function compares it (constant-time) against `Deno.env.get('TRADE_WEBHOOK_SECRET')`
+  and returns `401` on missing/mismatch before doing any work.
+
+Both copies of the secret (Vault for the trigger, edge env for the function) must
+hold the same value.
+
+As defense in depth, the function derives `user_id` from the calendar row
+(`calendars.user_id`) rather than trusting the request body.
+
+## Reliability — year-stats reconciliation
+
+Because the webhook is fire-and-forget (pg_net, no retry) and the recompute is
+coalesced, the last write in a burst or a transient recompute failure can leave
+`year_stats` stale. A pg_cron job (`year-stats-sweep`, via
+`reconcile-year-stats`) periodically recomputes any calendar where
+`MAX(trades.updated_at) > year_stats_last_recomputed_at`, covering both the source
+and any linked calendar. So `year_stats` is **eventually consistent**, not
+transactional.
+
+## Request format
 
 ```typescript
 {
   table: 'trades',
   operation: 'INSERT' | 'UPDATE' | 'DELETE',
-  old_record?: Trade,      // Required for UPDATE and DELETE
-  new_record?: Trade,      // Required for INSERT and UPDATE
-  calendar_id?: string,    // Extracted from records
-  user_id?: string        // Extracted from records
+  old_record?: Trade,   // present for UPDATE and DELETE
+  new_record?: Trade,   // present for INSERT and UPDATE
+  calendar_id?: string,
+  user_id?: string,
 }
 ```
 
-## Response Format
+## Environment variables
 
-Success response:
-```json
-{
-  "success": true,
-  "message": "Trade changes processed successfully",
-  "calendar_id": "uuid",
-  "operation": "UPDATE"
-}
-```
+- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` — service-role DB/Storage access.
+- `TRADE_WEBHOOK_SECRET` — shared secret matching the Vault `trade_webhook_secret`.
 
-Error response:
-```json
-{
-  "success": false,
-  "error": "Error message"
-}
-```
+## Deploy
 
-## Operations Handled
-
-### INSERT Operations
-- No cleanup needed
-- Returns success immediately
-
-### UPDATE Operations
-- Compares before/after trade states
-- Removes unused images from storage
-- Updates calendar tags if trade tags changed
-- Handles year changes (adapted for PostgreSQL)
-
-### DELETE Operations
-- Processes image cleanup for deleted trade
-- Updates calendar tags to remove unused tags
-- Handles cascading effects
-
-## Image Cleanup Logic
-
-1. **Identify removed images** - Compare before/after image lists
-2. **Safety check** - Verify images aren't used in other trades or duplicated calendars
-3. **Storage deletion** - Remove safe-to-delete images from Supabase Storage
-
-## Tag Synchronization
-
-1. **Detect changes** - Compare before/after tag sets
-2. **Rebuild tag list** - Query all trades in calendar for complete tag list
-3. **Update calendar** - Store updated tags array in calendar record
-
-## Testing
-
-Run the test suite:
-```bash
-deno run --allow-all test.ts
-```
-
-Tests cover:
-- ✅ CORS handling
-- ✅ Valid INSERT/UPDATE/DELETE operations
-- ✅ Error handling for invalid payloads
-- ✅ Missing required fields validation
-
-## Deployment
-
-Deploy this function:
 ```bash
 supabase functions deploy handle-trade-changes
 ```
-
-## Environment Variables
-
-Required:
-- `SUPABASE_URL` - Your Supabase project URL
-- `SUPABASE_SERVICE_ROLE_KEY` - Service role key for database operations
-
-## Migration Notes
-
-**From Firebase onTradeChangedV2:**
-- ✅ Image cleanup logic migrated
-- ✅ Tag synchronization migrated  
-- ⚠️ Year changes adapted for PostgreSQL (no subcollections)
-- ✅ Error handling and logging improved
-- ✅ CORS support added for webhook calls
-
-**Key Differences:**
-- Uses HTTP webhooks instead of Firestore triggers
-- PostgreSQL transactions instead of Firestore transactions
-- Supabase Storage API instead of Firebase Storage
-- Direct database queries instead of subcollection operations
