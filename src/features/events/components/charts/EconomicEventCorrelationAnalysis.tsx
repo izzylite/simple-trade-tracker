@@ -76,7 +76,7 @@ const EconomicEventCorrelationAnalysis: React.FC<EconomicEventCorrelationAnalysi
     const currencyTags = trades
       .map((trade) => trade.tags)
       .flat()
-      .filter((tag) => tag?.includes('pair:'))
+      .filter((tag) => tag?.includes('Asset:'))
       .map((tag) => tag?.split(':')[1])
       .filter((symbol): symbol is string => symbol !== undefined)
       .map((symbol) => getCurrenciesForInstrument(symbol))

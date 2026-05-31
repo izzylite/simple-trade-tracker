@@ -47,6 +47,7 @@ import {
 import BaseDialog from 'components/common/BaseDialog';
 import { useDialogTokens, MONO_FONT } from 'styles/dialogTokens';
 import { loadXLSX } from '../../utils/loadXLSX';
+import { ASSET_TAG_GROUP } from 'features/events/services/instrumentCatalog';
 
 interface ImportMappingDialogProps {
   open: boolean;
@@ -174,8 +175,8 @@ export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
   const [fileData, setFileData] = useState<ImportFileData | null>(null);
   const [columnMappings, setColumnMappings] = useState<ColumnMapping[]>([]);
   // Asset-mapping step state — `splitColumn` is the file column to group by;
-  // `assetAssignments` is uppercased-value → currency-pair (e.g. "EU" → "EURUSD").
-  // On import these get applied as `pair:XXXYYY` tags so trades join the
+  // `assetAssignments` is uppercased-value → instrument symbol (e.g. "EU" → "EURUSD").
+  // On import these get applied as `Asset:XXX` tags so trades join the
   // economic-events index. Step is fully optional.
   const [splitColumn, setSplitColumn] = useState<string | null>(null);
   const [assetAssignments, setAssetAssignments] = useState<Record<string, string>>({});
@@ -412,23 +413,23 @@ export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
       config,
     );
 
-    // Apply asset-mapping pair tags so the preview accurately reflects what
-    // will land. Walks each row, looks up its split-column value, and appends
-    // `pair:XXXYYY` if the user assigned a pair to that group.
+    // Apply asset-mapping tags so the preview accurately reflects what will
+    // land. Walks each row, looks up its split-column value, and appends
+    // `Asset:XXX` if the user assigned an instrument to that group.
     const enriched = splitColumn
       ? rows.map((row) => {
           const raw = String(fileData.rows[row.rowIndex]?.[splitColumn] ?? '').trim();
           const key = raw.toUpperCase() || '(EMPTY)';
-          const pair = assetAssignments[key];
-          if (!pair) return row;
+          const symbol = assetAssignments[key];
+          if (!symbol) return row;
           const existing = row.mappedData.tags || [];
-          const pairTag = `pair:${pair}`;
-          if (existing.includes(pairTag)) return row;
+          const assetTag = `${ASSET_TAG_GROUP}:${symbol}`;
+          if (existing.includes(assetTag)) return row;
           return {
             ...row,
             mappedData: {
               ...row.mappedData,
-              tags: [...existing, pairTag],
+              tags: [...existing, assetTag],
             },
           };
         })
@@ -967,24 +968,25 @@ export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
                     />
                   )}
 
-                  {/* Economic events context — tone depends on pair/session coverage */}
+                  {/* Economic events context — tone depends on asset/session coverage */}
                   {(() => {
-                    const hasPairTags = previewRows.some((row) => {
+                    const assetPrefix = `${ASSET_TAG_GROUP.toLowerCase()}:`;
+                    const hasAssetTags = previewRows.some((row) => {
                       const tags = row.mappedData.tags || [];
                       return tags.some((tag: string) =>
-                        tag.toLowerCase().startsWith('pair:'),
+                        tag.toLowerCase().startsWith(assetPrefix),
                       );
                     });
                     const hasSession = previewRows.some(
                       (row) => row.mappedData.session,
                     );
 
-                    if (!hasPairTags) {
+                    if (!hasAssetTags) {
                       return (
                         <NoticeStrip
                           tone="warning"
                           title="Economic events not available"
-                          body='No pair tags detected. Map a "Pair" column (e.g. EURUSD, GBPJPY) to Tags or Create Tag to attach events.'
+                          body='No asset tags detected. Map an instrument column (e.g. EURUSD, GBPJPY) to Tags or Create Tag to attach events.'
                         />
                       );
                     }
@@ -993,7 +995,7 @@ export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
                         <NoticeStrip
                           tone="info"
                           title="Partial economic events"
-                          body="Pair tags found, no session. Events will only attach to trades that include a session (London / NY / Asian)."
+                          body="Asset tags found, no session. Events will only attach to trades that include a session (London / NY / Asian)."
                         />
                       );
                     }
@@ -1001,7 +1003,7 @@ export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
                       <NoticeStrip
                         tone="success"
                         title="Economic events will attach"
-                        body="Pair tags and session info detected. Relevant events will be linked automatically during import."
+                        body="Asset tags and session info detected. Relevant events will be linked automatically during import."
                       />
                     );
                   })()}
