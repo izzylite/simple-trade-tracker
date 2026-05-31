@@ -305,7 +305,7 @@ const EconomicEventRow: React.FC<EconomicEventRowProps> = ({
       <Box
         sx={{
           display: 'grid',
-          gridTemplateColumns: '52px 1fr auto auto',
+          gridTemplateColumns: '52px 1fr auto',
           gap: 1.5,
           alignItems: 'flex-start',
         }}
@@ -418,39 +418,77 @@ const EconomicEventRow: React.FC<EconomicEventRowProps> = ({
 
       </Box>
 
-      <Box sx={{ pt: 0.5 }}>
-        <ImpactBars impact={event.impact} theme={theme} />
-      </Box>
+      {/* Right control column: impact + pin on top, trade count below —
+          kept separate from the event-data value pills in the strip below. */}
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'flex-end',
+          gap: 0.75,
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          <ImpactBars impact={event.impact} theme={theme} />
 
-      {onTogglePin && (
-        <Tooltip title={pinned ? 'Unpin event' : 'Pin event'} placement="left">
-          <span>
-            <IconButton
-              size="small"
-              onClick={onTogglePin}
-              disabled={busy}
+          {onTogglePin && (
+            <Tooltip title={pinned ? 'Unpin event' : 'Pin event'} placement="left">
+              <span>
+                <IconButton
+                  size="small"
+                  onClick={onTogglePin}
+                  disabled={busy}
+                  sx={{
+                    color: pinned ? 'primary.main' : 'text.disabled',
+                    '&:hover': {
+                      color: 'primary.main',
+                      bgcolor: alpha(theme.palette.primary.main, 0.08),
+                    },
+                  }}
+                >
+                  {busy ? (
+                    <CircularProgress size={14} />
+                  ) : pinned ? (
+                    <PinIcon sx={{ fontSize: 16 }} />
+                  ) : (
+                    <UnpinIcon sx={{ fontSize: 16 }} />
+                  )}
+                </IconButton>
+              </span>
+            </Tooltip>
+          )}
+        </Box>
+
+        {tradeCount > 0 && (
+          <Tooltip
+            title={`Traded ${tradeCount} time${tradeCount > 1 ? 's' : ''} across all calendars`}
+            placement="top"
+            arrow
+          >
+            <Box
               sx={{
-                color: pinned ? 'primary.main' : 'text.disabled',
-                '&:hover': {
-                  color: 'primary.main',
-                  bgcolor: alpha(theme.palette.primary.main, 0.08),
-                },
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 0.375,
+                px: 0.75,
+                py: 0.25,
+                borderRadius: 0.75,
+                bgcolor: alpha(theme.palette.primary.main, 0.14),
+                border: `1px solid ${alpha(theme.palette.primary.main, 0.28)}`,
+                color: theme.palette.primary.main,
+                fontSize: '0.68rem',
+                fontWeight: 700,
+                lineHeight: 1.4,
               }}
             >
-              {busy ? (
-                <CircularProgress size={14} />
-              ) : pinned ? (
-                <PinIcon sx={{ fontSize: 16 }} />
-              ) : (
-                <UnpinIcon sx={{ fontSize: 16 }} />
-              )}
-            </IconButton>
-          </span>
-        </Tooltip>
-      )}
+              {tradeCount}×
+            </Box>
+          </Tooltip>
+        )}
+      </Box>
       </Box>
 
-      {(hasAnyValue || tradeCount > 0) && (
+      {hasAnyValue && (
         <Stack
           direction="row"
           spacing={0.875}
@@ -466,70 +504,40 @@ const EconomicEventRow: React.FC<EconomicEventRowProps> = ({
             '& > *': { flexShrink: 0 },
           }}
         >
-          {hasAnyValue && (
-            <>
-              {event.actual_value ? (
-                <ValuePill
-                  label={`A: ${event.actual_value}`}
-                  bg={actualStyle.bg}
-                  border={actualStyle.border}
-                  color={actualStyle.color}
-                />
-              ) : (
-                (event.forecast_value || event.previous_value) && (
-                  <Stack direction="row" alignItems="center" spacing={0.5}>
-                    <Typography
-                      sx={{ fontSize: '0.7rem', fontWeight: 700, color: 'text.disabled' }}
-                    >
-                      A:
-                    </Typography>
-                    <HourglassEmptyIcon sx={{ fontSize: 12, color: 'warning.main' }} />
-                  </Stack>
-                )
-              )}
-              {event.forecast_value && (
-                <ValuePill
-                  label={`F: ${event.forecast_value}`}
-                  bg={alpha(theme.palette.info.main, 0.1)}
-                  border={alpha(theme.palette.info.main, 0.2)}
-                  color={theme.palette.text.secondary}
-                />
-              )}
-              {event.previous_value && (
-                <ValuePill
-                  label={`P: ${event.previous_value}`}
-                  bg={alpha(theme.palette.grey[500], 0.1)}
-                  border={alpha(theme.palette.grey[500], 0.2)}
-                  color={theme.palette.text.disabled}
-                />
-              )}
-            </>
+          {event.actual_value ? (
+            <ValuePill
+              label={`A: ${event.actual_value}`}
+              bg={actualStyle.bg}
+              border={actualStyle.border}
+              color={actualStyle.color}
+            />
+          ) : (
+            (event.forecast_value || event.previous_value) && (
+              <Stack direction="row" alignItems="center" spacing={0.5}>
+                <Typography
+                  sx={{ fontSize: '0.7rem', fontWeight: 700, color: 'text.disabled' }}
+                >
+                  A:
+                </Typography>
+                <HourglassEmptyIcon sx={{ fontSize: 12, color: 'warning.main' }} />
+              </Stack>
+            )
           )}
-          {tradeCount > 0 && (
-            <Tooltip
-              title={`Traded ${tradeCount} time${tradeCount > 1 ? 's' : ''} across all calendars`}
-              placement="top"
-              arrow
-            >
-              <Box
-                sx={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 0.375,
-                  px: 0.75,
-                  py: 0.25,
-                  borderRadius: 0.75,
-                  bgcolor: alpha(theme.palette.primary.main, 0.14),
-                  border: `1px solid ${alpha(theme.palette.primary.main, 0.28)}`,
-                  color: theme.palette.primary.main,
-                  fontSize: '0.68rem',
-                  fontWeight: 700,
-                  lineHeight: 1.4,
-                }}
-              >
-                {tradeCount}×
-              </Box>
-            </Tooltip>
+          {event.forecast_value && (
+            <ValuePill
+              label={`F: ${event.forecast_value}`}
+              bg={alpha(theme.palette.info.main, 0.1)}
+              border={alpha(theme.palette.info.main, 0.2)}
+              color={theme.palette.text.secondary}
+            />
+          )}
+          {event.previous_value && (
+            <ValuePill
+              label={`P: ${event.previous_value}`}
+              bg={alpha(theme.palette.grey[500], 0.1)}
+              border={alpha(theme.palette.grey[500], 0.2)}
+              color={theme.palette.text.disabled}
+            />
           )}
         </Stack>
       )}

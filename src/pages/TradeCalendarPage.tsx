@@ -2402,7 +2402,7 @@ export const TradeCalendar: FC<TradeCalendarProps> = (props) => {
   return (
     <SidePanelProvider
       defaultView={{ id: 'economic-calendar' }}
-      defaultOpen={false}
+      defaultOpen={true}
     >
       <TradeCalendarInner {...props} />
     </SidePanelProvider>
