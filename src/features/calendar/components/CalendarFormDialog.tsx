@@ -74,7 +74,7 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
     surfaceInset, hairline,
     paperSx, headerSx, iconAvatarSx, footerSx,
     monoLabelSx, monoSectionLabelSx, optionalSx, inputSx,
-    primaryButtonSx, ghostButtonSx,
+    primaryButtonSx, ghostButtonSx, chipStyle,
   } = useDialogTokens();
 
   const [name, setName] = useState('');
@@ -499,6 +499,7 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
                     key={cls}
                     role="button"
                     tabIndex={0}
+                    aria-pressed={selected}
                     onClick={() => !isSubmitting && toggleAssetClass(cls)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
@@ -507,21 +508,9 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
                       }
                     }}
                     sx={{
-                      px: 1.5,
-                      py: 0.6,
-                      borderRadius: 999,
-                      fontSize: '0.8rem',
-                      fontWeight: 600,
-                      lineHeight: 1.2,
-                      userSelect: 'none',
+                      ...chipStyle(selected),
                       cursor: isSubmitting ? 'default' : 'pointer',
-                      border: `1px solid ${selected ? violetBorder : hairline}`,
-                      backgroundColor: selected ? violetSoft : 'transparent',
-                      color: selected ? violet : theme.palette.text.secondary,
-                      transition: 'background-color 150ms ease, border-color 150ms ease, color 150ms ease',
-                      '&:hover': isSubmitting
-                        ? undefined
-                        : { borderColor: violetBorder, backgroundColor: violetSofter },
+                      pointerEvents: isSubmitting ? 'none' : undefined,
                       '&:focus-visible': { outline: `2px solid ${violet}`, outlineOffset: 2 },
                     }}
                   >
