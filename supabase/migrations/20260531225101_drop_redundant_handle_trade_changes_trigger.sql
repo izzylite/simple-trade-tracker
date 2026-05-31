@@ -1,0 +1,36 @@
+-- Drop the redundant legacy trade webhook trigger + function.
+--
+-- Background: `public.trades` carried TWO AFTER INSERT/UPDATE/DELETE triggers that
+-- both POST to the SAME `handle-trade-changes` edge function (which is verify_jwt=false,
+-- so both calls succeed):
+--   • trade_changes_trigger  → handle_trade_changes()   (legacy: no skip guard, no auth header)
+--   • trigger_trade_changes  → notify_trade_changes()   (current: app.skip_trade_webhook guard + service-role auth)
+--
+-- `notify_trade_changes()` is a strict functional SUPERSET of `handle_trade_changes()`
+-- (same payload + same edge target, plus skip-awareness and auth). The legacy one was
+-- never dropped when notify_trade_changes was introduced (migration 20260518000000),
+-- so every trade write invoked handle-trade-changes TWICE — 2x image cleanup, 2x
+-- linked-calendar sync (a latent duplicate-synced-copy risk on linked-calendar INSERTs,
+-- since syncToLinkedCalendar has no idempotency guard), 2x edge cost — and the legacy
+-- trigger BYPASSED the skip flag during bulk writes.
+--
+-- Verified redundant before dropping:
+--   1. Nothing references handle_trade_changes() by name except this trigger (full
+--      pg_proc scan: only bulk_update_tag_in_calendar / claim_year_stats_recompute /
+--      notify_trade_changes / handle_trade_changes touch the relevant identifiers).
+--   2. The only function setting app.skip_trade_webhook is bulk_update_tag_in_calendar,
+--      whose only caller (the update-tag edge fn) does its own explicit
+--      updateYearStats(coalesce:false) — it does NOT depend on the legacy webhook for
+--      stats. So dropping the legacy trigger cannot leave stale year_stats.
+--   3. Bulk data backfills use SET session_replication_role = replica (suppress all),
+--      not the skip flag — unaffected.
+--
+-- After this: normal writes fire notify_trade_changes exactly once (year_stats recompute
+-- coalesced via claim_year_stats_recompute as before); bulk tag rename keeps working via
+-- update-tag's explicit recompute and now fires ZERO redundant webhooks.
+--
+-- Plain DROP (no CASCADE): if any unexpected object depends on the function, this errors
+-- instead of silently force-dropping it.
+
+DROP TRIGGER IF EXISTS trade_changes_trigger ON public.trades;
+DROP FUNCTION IF EXISTS public.handle_trade_changes();
