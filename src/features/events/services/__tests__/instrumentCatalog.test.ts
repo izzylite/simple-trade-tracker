@@ -82,6 +82,10 @@ describe('getInstrumentCategory', () => {
   it('classifies an index', () => {
     expect(getInstrumentCategory('NAS100')).toBe('index');
   });
+
+  it('returns "unknown" for unmapped symbols', () => {
+    expect(getInstrumentCategory('AAPL')).toBe('unknown');
+  });
 });
 
 describe('extractInstrumentsFromTags', () => {
@@ -93,6 +97,10 @@ describe('extractInstrumentsFromTags', () => {
 
   it('ignores the legacy pair: and Pairs: prefixes', () => {
     expect(extractInstrumentsFromTags(['pair:EURUSD', 'Pairs:GBPUSD'])).toEqual([]);
+  });
+
+  it('drops a malformed bare Asset: tag', () => {
+    expect(extractInstrumentsFromTags(['Asset:'])).toEqual([]);
   });
 });
 

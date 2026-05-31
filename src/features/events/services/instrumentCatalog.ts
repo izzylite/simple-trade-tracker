@@ -63,7 +63,8 @@ export const INSTRUMENT_MAPPINGS: InstrumentMapping[] = [
   { symbol: 'NZDCAD', currencies: ['NZD', 'CAD'], category: 'minor' },
   { symbol: 'NZDCHF', currencies: ['NZD', 'CHF'], category: 'minor' },
 
-  // Metals (vs USD)
+  // Metals (vs USD) — XAU/XAG aren't in the Currency union, so gold/silver map
+  // to ['USD'] (their events are USD-tagged).
   { symbol: 'XAUUSD', currencies: ['USD'], category: 'commodity' },
   { symbol: 'XAGUSD', currencies: ['USD'], category: 'commodity' },
 
@@ -88,6 +89,8 @@ export const INSTRUMENTS = INSTRUMENT_MAPPINGS.map((m) => m.symbol);
 
 /** Asset class → the instrument categories it contains. Order drives chip order. */
 const CLASS_CATEGORIES: Record<string, InstrumentCategory[]> = {
+  // 'exotic' is wired for forward-compat but no exotic instruments are seeded
+  // yet, so Forex currently expands to majors+minors only.
   Forex: ['major', 'minor', 'exotic'],
   Indices: ['index'],
   Metals: ['commodity'],
@@ -115,7 +118,7 @@ export const getCurrenciesForInstrument = (symbol: string): Currency[] => {
   return mapping ? mapping.currencies : [];
 };
 
-export const getInstrumentCategory = (symbol: string): string => {
+export const getInstrumentCategory = (symbol: string): InstrumentCategory | 'unknown' => {
   const mapping = INSTRUMENT_MAPPINGS.find((m) => m.symbol === symbol);
   return mapping ? mapping.category : 'unknown';
 };
@@ -125,7 +128,10 @@ export const getInstrumentMappings = (): InstrumentMapping[] => INSTRUMENT_MAPPI
 /** Extract instrument symbols from a trade's tags. Reads the `Asset:` group only. */
 export const extractInstrumentsFromTags = (tags: string[]): string[] => {
   const prefix = `${ASSET_TAG_GROUP}:`;
-  return tags.filter((tag) => tag.startsWith(prefix)).map((tag) => tag.slice(prefix.length));
+  return tags
+    .filter((tag) => tag.startsWith(prefix))
+    .map((tag) => tag.slice(prefix.length))
+    .filter((symbol) => symbol.length > 0);
 };
 
 /** All distinct currencies a trade is exposed to, derived from its Asset tags. */
