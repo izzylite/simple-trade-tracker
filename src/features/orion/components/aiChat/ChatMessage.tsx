@@ -31,7 +31,7 @@ import {
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon
 } from '@mui/icons-material';
-import { stripReferencedBlocks } from 'features/orion/utils/chatMentions';
+import { stripReferencedBlocks, findTagRanges } from 'features/orion/utils/chatMentions';
 import { ChatMessage as ChatMessageType } from 'features/orion/types/aiChat';
 import { Trade } from 'features/calendar/types/trade';
 import { EconomicEvent } from 'features/events/types/economicCalendar';
@@ -111,21 +111,8 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   // to tag chips (same behaviour as before for typed text).
   const renderTextWithTagChips = (text: string, keyPrefix: string): React.ReactNode[] => {
     if (availableTags.length === 0) return [text];
-    const sortedTags = [...availableTags].sort((a, b) => b.length - a.length);
-    const matches: Array<{ start: number; end: number; tag: string }> = [];
-    for (const tag of sortedTags) {
-      let searchFrom = 0;
-      while (searchFrom < text.length) {
-        const idx = text.indexOf(tag, searchFrom);
-        if (idx === -1) break;
-        const end = idx + tag.length;
-        const overlaps = matches.some(m => idx < m.end && end > m.start);
-        if (!overlaps) matches.push({ start: idx, end, tag });
-        searchFrom = idx + 1;
-      }
-    }
+    const matches = findTagRanges(text, availableTags);
     if (matches.length === 0) return [text];
-    matches.sort((a, b) => a.start - b.start);
     const out: React.ReactNode[] = [];
     let lastIdx = 0;
     matches.forEach((m, i) => {

@@ -6,7 +6,7 @@ import { getTagChipStyles, formatTagForDisplay, isGroupedTag, getTagGroup } from
 import { scrollbarStyles } from 'styles/scrollbarStyles';
 import { Z_INDEX } from 'styles/zIndex';
 import { useDialogTokens } from 'styles/dialogTokens';
-import type { MessageSegment } from 'features/orion/utils/chatMentions';
+import type { MessageSegment, EditorSegment } from 'features/orion/utils/chatMentions';
 import { detectMentionTrigger, extractSegments } from 'features/orion/utils/chatMentions';
 import { SLASH_COMMAND_TAG } from 'features/notes/types/note';
 
@@ -20,7 +20,7 @@ export interface AIChatMentionInputHandle {
    * entities (chips); text segments become plain text. Used by the edit flow
    * to restore chip rendering for previously-sent messages.
    */
-  setSegments: (segments: MessageSegment[]) => void;
+  setSegments: (segments: EditorSegment[]) => void;
   /** Imperatively dismiss the slash/mention popup if it's open. */
   closeMention: () => void;
 }
@@ -198,7 +198,7 @@ const AIChatMentionInput = forwardRef<AIChatMentionInputHandle, AIChatMentionInp
     },
     getSegments: () => extractSegments(editorStateRef.current),
     closeMention: () => setMention(null),
-    setSegments: (segments: MessageSegment[]) => {
+    setSegments: (segments: EditorSegment[]) => {
       // Build a fresh ContentState block-by-block, applying NOTE_MENTION
       // entities for note-mention segments. Result is a single block
       // containing text+chips (newlines in text segments stay as soft breaks
@@ -220,6 +220,16 @@ const AIChatMentionInput = forwardRef<AIChatMentionInputHandle, AIChatMentionInp
       for (const seg of segments) {
         if (seg.type === 'text') {
           insertAt(seg.value);
+        } else if (seg.type === 'tag-mention') {
+          const start = cursor;
+          insertAt(seg.tag);
+          content = content.createEntity('TAG_MENTION', 'IMMUTABLE', { tag: seg.tag });
+          const entityKey = content.getLastCreatedEntityKey();
+          const range = SelectionState.createEmpty(blockKey).merge({
+            anchorOffset: start,
+            focusOffset: cursor,
+          }) as SelectionState;
+          content = Modifier.applyEntity(content, range, entityKey);
         } else {
           const start = cursor;
           insertAt(seg.noteTitle);
@@ -234,6 +244,18 @@ const AIChatMentionInput = forwardRef<AIChatMentionInputHandle, AIChatMentionInp
           }) as SelectionState;
           content = Modifier.applyEntity(content, range, entityKey);
         }
+      }
+
+      // If the content ends on a chip, append a trailing space so the caret
+      // lands in a real text node. Typing directly against an IMMUTABLE
+      // entity's trailing edge defeats Draft's input reconciler, which then
+      // flattens the block to its DOM textContent (the chip labels) and loses
+      // the entities. Mirrors the trailing space insertTag adds after a chip.
+      // Inter-chip gaps already carry spaces from their text segments, so only
+      // a trailing chip needs this buffer.
+      const lastSeg = segments[segments.length - 1];
+      if (lastSeg && lastSeg.type !== 'text') {
+        insertAt(' ');
       }
 
       // Force-mount a fresh editor (matches the pattern used after

@@ -86,6 +86,17 @@ export type MessageSegment =
   | { type: 'text'; value: string }
   | { type: 'note-mention'; noteId: string; noteTitle: string };
 
+/**
+ * Editor-only superset of MessageSegment that also carries tag chips. The
+ * `tag-mention` variant is produced transiently by tokenizeSegmentsWithTags
+ * for the edit-rehydrate path and consumed by the editor's setSegments — it is
+ * NEVER persisted or sent. Tags round-trip on the wire as plain text and are
+ * reconstructed against the known tag list, exactly like the read-only bubble.
+ */
+export type EditorSegment =
+  | MessageSegment
+  | { type: 'tag-mention'; tag: string };
+
 export interface NoteForExpansion {
   title: string;
   content: string;
@@ -260,4 +271,77 @@ export function extractSegments(editorState: EditorState): MessageSegment[] {
   });
 
   return segs;
+}
+
+/**
+ * Find non-overlapping occurrences of known tags within a string, preferring
+ * the longest tag when candidates overlap. This is the single matcher shared
+ * by the read-only message bubble (ChatMessage.renderTextWithTagChips) and the
+ * editor's edit-rehydrate path (tokenizeSegmentsWithTags) so a tag renders as
+ * the same chip in both places. Ranges are returned sorted by start offset.
+ */
+export function findTagRanges(
+  text: string,
+  tags: string[]
+): Array<{ start: number; end: number; tag: string }> {
+  if (!text || tags.length === 0) return [];
+  const sortedTags = [...tags].sort((a, b) => b.length - a.length);
+  const matches: Array<{ start: number; end: number; tag: string }> = [];
+  for (const tag of sortedTags) {
+    if (!tag) continue;
+    let searchFrom = 0;
+    while (searchFrom < text.length) {
+      const idx = text.indexOf(tag, searchFrom);
+      if (idx === -1) break;
+      const end = idx + tag.length;
+      const overlaps = matches.some(m => idx < m.end && end > m.start);
+      if (!overlaps) matches.push({ start: idx, end, tag });
+      searchFrom = idx + 1;
+    }
+  }
+  matches.sort((a, b) => a.start - b.start);
+  return matches;
+}
+
+/**
+ * Split the text segments of a `MessageSegment[]` into interleaved `text` and
+ * `tag-mention` segments by matching against the known tag list. Non-text
+ * segments (note mentions) pass through untouched.
+ *
+ * Used by the chat editor's Edit flow: a previously-sent message carries tags
+ * inline as plain text (extractSegments flattens TAG_MENTION entities, and a
+ * tag-only message persists no segments at all), so without this the editor
+ * would drop tag chips back in as raw text. Re-deriving them from the tag list
+ * mirrors how the read-only bubble paints chips, and fixes legacy messages
+ * that were sent before any of this existed.
+ */
+export function tokenizeSegmentsWithTags(
+  segments: MessageSegment[],
+  tags: string[]
+): EditorSegment[] {
+  if (tags.length === 0) return segments;
+  const out: EditorSegment[] = [];
+  for (const seg of segments) {
+    if (seg.type !== 'text') {
+      out.push(seg);
+      continue;
+    }
+    const ranges = findTagRanges(seg.value, tags);
+    if (ranges.length === 0) {
+      out.push(seg);
+      continue;
+    }
+    let lastIdx = 0;
+    for (const r of ranges) {
+      if (r.start > lastIdx) {
+        out.push({ type: 'text', value: seg.value.slice(lastIdx, r.start) });
+      }
+      out.push({ type: 'tag-mention', tag: r.tag });
+      lastIdx = r.end;
+    }
+    if (lastIdx < seg.value.length) {
+      out.push({ type: 'text', value: seg.value.slice(lastIdx) });
+    }
+  }
+  return out;
 }

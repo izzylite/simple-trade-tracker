@@ -56,7 +56,7 @@ import { Z_INDEX } from 'styles/zIndex';
 import { logger } from 'utils/logger';
 import { compressImageToDataUrl } from 'utils/fileValidation';
 import * as notesService from 'features/notes/services/notesService';
-import { expandMentionsForSend, stripReferencedBlocks } from 'features/orion/utils/chatMentions';
+import { expandMentionsForSend, stripReferencedBlocks, tokenizeSegmentsWithTags } from 'features/orion/utils/chatMentions';
 import { OrionUpgradeCard } from 'features/billing/components/OrionUpgradeCard';
 import type { OrionBlockedState } from 'features/orion/hooks/useAIChat';
 
@@ -597,15 +597,25 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
   const handleEditMessage = useCallback((messageId: string) => {
     const editData = setInputForEdit(messageId);
     if (editData) {
-      if (editData.segments && editData.segments.length > 0) {
+      // Base segments: persisted ones (note mentions) if present, otherwise a
+      // single text segment from the stripped content (legacy / tag-only).
+      // Then re-derive tag chips from the known tag list — tags travel the
+      // wire as plain text, so without this they'd drop into the editor as raw
+      // text instead of chips (same reconstruction the read-only bubble does).
+      const baseSegments = editData.segments && editData.segments.length > 0
+        ? editData.segments
+        : [{ type: 'text' as const, value: stripReferencedBlocks(editData.content) }];
+      const tokenized = tokenizeSegmentsWithTags(baseSegments, calendar?.tags || []);
+      const hasChips = tokenized.some(s => s.type !== 'text');
+      if (hasChips) {
         // Rebuild the editor with chip entities. setSegments calls onChange
         // internally to sync the parent's value, so the value-sync effect
         // sees a matching plain text and bails out instead of rebuilding
         // a plain EditorState that would wipe the chips.
-        inputRef.current?.setSegments?.(editData.segments);
+        inputRef.current?.setSegments?.(tokenized);
       } else {
-        // Legacy / no-mention message — strip any leftover Referenced blocks
-        // and use plain text. User can re-add a slash command via "/".
+        // Pure text (no mentions, no tags) — keep the plain-text path so
+        // multi-line messages stay split into proper blocks.
         setInputMessage(stripReferencedBlocks(editData.content));
       }
       // Restore images when editing
@@ -616,7 +626,7 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
       }
       setTimeout(() => inputRef.current?.focus(), 100);
     }
-  }, [setInputForEdit]);
+  }, [setInputForEdit, calendar?.tags]);
 
   // Stable send handler ref so handleKeyPress can stay referentially stable
   // without being re-created every time inputMessage changes.

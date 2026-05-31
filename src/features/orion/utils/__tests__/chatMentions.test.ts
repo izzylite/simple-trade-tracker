@@ -262,3 +262,59 @@ describe('extractSegments', () => {
     expect(extractSegments(state)).toEqual([{ type: 'text', value: 'line1\nline2' }]);
   });
 });
+
+import { tokenizeSegmentsWithTags } from 'features/orion/utils/chatMentions';
+
+describe('tokenizeSegmentsWithTags', () => {
+  it('leaves text untouched when no tags match', () => {
+    const segs: MessageSegment[] = [{ type: 'text', value: 'hello world' }];
+    expect(tokenizeSegmentsWithTags(segs, ['Sessions:NY PM'])).toEqual([
+      { type: 'text', value: 'hello world' },
+    ]);
+  });
+
+  it('splits a text run around a known tag (the reported bug scenario)', () => {
+    const segs: MessageSegment[] = [
+      { type: 'text', value: 'This is Sessions:London Session not Sessions:NY PM' },
+    ];
+    expect(
+      tokenizeSegmentsWithTags(segs, ['Sessions:London Session', 'Sessions:NY PM'])
+    ).toEqual([
+      { type: 'text', value: 'This is ' },
+      { type: 'tag-mention', tag: 'Sessions:London Session' },
+      { type: 'text', value: ' not ' },
+      { type: 'tag-mention', tag: 'Sessions:NY PM' },
+    ]);
+  });
+
+  it('prefers the longest matching tag (no overlap)', () => {
+    const segs: MessageSegment[] = [{ type: 'text', value: 'a Sessions:London Session b' }];
+    expect(
+      tokenizeSegmentsWithTags(segs, ['Sessions:London', 'Sessions:London Session'])
+    ).toEqual([
+      { type: 'text', value: 'a ' },
+      { type: 'tag-mention', tag: 'Sessions:London Session' },
+      { type: 'text', value: ' b' },
+    ]);
+  });
+
+  it('passes note-mention segments through and tokenizes surrounding text', () => {
+    const segs: MessageSegment[] = [
+      { type: 'text', value: 'check Sessions:NY PM with ' },
+      { type: 'note-mention', noteId: 'n1', noteTitle: 'Daily Review' },
+    ];
+    expect(tokenizeSegmentsWithTags(segs, ['Sessions:NY PM'])).toEqual([
+      { type: 'text', value: 'check ' },
+      { type: 'tag-mention', tag: 'Sessions:NY PM' },
+      { type: 'text', value: ' with ' },
+      { type: 'note-mention', noteId: 'n1', noteTitle: 'Daily Review' },
+    ]);
+  });
+
+  it('returns segments unchanged when the tag list is empty', () => {
+    const segs: MessageSegment[] = [{ type: 'text', value: 'Sessions:NY PM' }];
+    expect(tokenizeSegmentsWithTags(segs, [])).toEqual([
+      { type: 'text', value: 'Sessions:NY PM' },
+    ]);
+  });
+});
