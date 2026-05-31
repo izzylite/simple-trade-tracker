@@ -20,3 +20,54 @@ verify_jwt = false
 # X-Year-Stats-Sweep-Secret shared secret.
 [functions.reconcile-year-stats]
 verify_jwt = false
+
+# ---------------------------------------------------------------------------
+# The functions below were already running verify_jwt=false in prod but were
+# never pinned here, so any CLI/dashboard redeploy would silently flip them to
+# verify_jwt=true and break them (the gateway would 401 every call before the
+# function even runs). Pinned 2026-06-01 to match deployed state. Grouped by
+# WHY each one cannot use gateway JWT verification.
+# ---------------------------------------------------------------------------
+
+# DB-trigger webhook: fired by a Postgres trigger on `calendars`, which cannot
+# present a JWT. Same shape as handle-trade-changes.
+[functions.handle-calendar-changes]
+verify_jwt = false
+
+# Scheduled / dispatcher functions: invoked by pg_cron or by another edge
+# function (service-to-service). Neither path carries a user JWT.
+[functions.refresh-economic-calendar]
+verify_jwt = false
+
+[functions.auto-refresh-economic-calendar]
+verify_jwt = false
+
+[functions.cleanup-scheduler]
+verify_jwt = false
+
+[functions.dispatch-orion-tasks]
+verify_jwt = false
+
+[functions.dispatch-reminders]
+verify_jwt = false
+
+[functions.run-orion-task]
+verify_jwt = false
+
+# Public-by-design: reached by unauthenticated end users — invite recipients
+# before they have an account, and public share-link viewers — so there is no
+# JWT to verify.
+[functions.verify-invite]
+verify_jwt = false
+
+[functions.get-shared-link]
+verify_jwt = false
+
+# Self-validated JWT: the function reads and verifies the Authorization token
+# itself (and may also accept the service-role key), so gateway verification
+# must stay off or it cannot inspect the header.
+[functions.send-invite-email]
+verify_jwt = false
+
+[functions.custom-tools-register]
+verify_jwt = false
