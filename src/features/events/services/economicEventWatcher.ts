@@ -476,13 +476,18 @@ class EconomicEventWatcher {
             if (result?.success && result.data) {
               const fetchedData = result.data;
 
-              // Update the event with fresh data
+              // Update the event with fresh data.
+              // Preserve impact from the primary source — MQL5 uses different
+              // importance ratings, so only fall back to MQL5's impact when the
+              // event has none. This mirrors the backend policy in
+              // fetch-mql5-event (otherwise the notification shows a different
+              // impact color than the calendar panel for the same event).
               const eventToNotify: EconomicEvent = {
                 ...batchEvent.originalEvent,
                 actual_value: fetchedData.actual_value || batchEvent.originalEvent.actual_value,
                 forecast_value: fetchedData.forecast_value || batchEvent.originalEvent.forecast_value,
                 previous_value: fetchedData.previous_value || batchEvent.originalEvent.previous_value,
-                impact: fetchedData.impact || batchEvent.originalEvent.impact,
+                impact: batchEvent.originalEvent.impact || fetchedData.impact,
                 actual_result_type: fetchedData.actual_result_type ?? batchEvent.originalEvent.actual_result_type,
               };
 
