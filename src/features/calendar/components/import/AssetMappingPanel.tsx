@@ -322,9 +322,9 @@ export const AssetMappingPanel: React.FC<Props> = ({
 
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
               {[
-                { value: 'EU', count: 42, pair: 'EURUSD' },
-                { value: 'GU', count: 28, pair: 'GBPUSD' },
-                { value: 'UJ', count: 15, pair: 'USDJPY' },
+                { value: 'EU', count: 42, symbol: 'EURUSD' },
+                { value: 'GU', count: 28, symbol: 'GBPUSD' },
+                { value: 'UJ', count: 15, symbol: 'USDJPY' },
               ].map((row) => (
                 <Box
                   key={row.value}
@@ -378,7 +378,7 @@ export const AssetMappingPanel: React.FC<Props> = ({
                   >
                     →
                   </Box>
-                  {/* Assigned pair pill */}
+                  {/* Assigned instrument pill */}
                   <Box
                     sx={{
                       fontFamily: MONO_FONT,
@@ -393,7 +393,7 @@ export const AssetMappingPanel: React.FC<Props> = ({
                       textAlign: 'center',
                     }}
                   >
-                    {row.pair}
+                    {row.symbol}
                   </Box>
                 </Box>
               ))}

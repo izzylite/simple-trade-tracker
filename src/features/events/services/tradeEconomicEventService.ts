@@ -61,7 +61,7 @@ export class TradeEconomicEventService {
   /**
    * Fetch economic events for a specific trade session and date
    * Only fetches high and medium impact events to optimize performance
-   * Filters events based on the currencies relevant to the trade's currency pairs
+   * Filters events based on the currencies relevant to the trade's instruments
    */
   async fetchEventsForTrade(
     tradeDate: Date,

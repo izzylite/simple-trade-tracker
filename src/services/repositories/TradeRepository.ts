@@ -1143,7 +1143,7 @@ export class TradeRepository extends AbstractBaseRepository<Trade> {
    *
    * @param tradeDate - The date of the trade
    * @param session - The trading session (Asia, London, NY AM, NY PM)
-   * @param tags - The trade tags (used to extract currency pairs)
+   * @param tags - The trade tags (used to derive the relevant currencies from the trade's instruments)
    * @param existingEvents - Existing economic events (if any)
    * @returns Array of economic events for the trade
    */
