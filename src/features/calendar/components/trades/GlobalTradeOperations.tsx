@@ -8,6 +8,8 @@ import { useTradeViewer } from '../../contexts/TradeViewerContext';
 import { formatCount } from 'utils/formatters';
 import { DynamicRiskSettings } from '../../utils/dynamicRiskUtils';
 import { Z_INDEX } from 'styles/zIndex';
+import CopyTradeDialog from '../dialogs/CopyTradeDialog';
+import { summarizeCopyResults } from '../../services/tradeCopyService';
 
 /**
  * App-level mount for the trade form + delete-confirm dialogs. State lives
@@ -34,6 +36,9 @@ const GlobalTradeOperations: React.FC = () => {
     deletingTradeIdsList,
     notification,
     clearNotification,
+    copyDialog,
+    closeCopyDialog,
+    pushNotification,
   } = useTradeOperations();
 
   const dynamicRiskSettings: DynamicRiskSettings = useMemo(
@@ -149,6 +154,15 @@ const GlobalTradeOperations: React.FC = () => {
           {notification?.message ?? ''}
         </Alert>
       </Snackbar>
+
+      <CopyTradeDialog
+        open={copyDialog.open}
+        trade={copyDialog.trade}
+        currentCalendarId={calendar.id}
+        userId={calendar.user_id}
+        onClose={closeCopyDialog}
+        onCopied={(results) => pushNotification(summarizeCopyResults(results))}
+      />
     </>
   );
 };

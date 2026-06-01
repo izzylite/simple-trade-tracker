@@ -34,6 +34,7 @@ import {
   DeleteSweep as DeleteMultipleIcon,
   KeyboardArrowDown as LoadMoreIcon,
   MoreVert as MoreVertIcon,
+  ContentCopy as ContentCopyIcon,
   EventBusyOutlined as EmptyDayIcon
 } from '@mui/icons-material';
 import { Trade, Calendar } from '../../types/dualWrite';
@@ -237,6 +238,7 @@ const TradeList: React.FC<TradeListProps> = ({
   // Destructure from tradeOperations
   const {
     onEditTrade: onEditClick,
+    onCopyTrade,
     onDeleteTrade: onDeleteClick,
     onDeleteMultipleTrades: onDeleteMultiple,
     deletingTradeIds = [],
@@ -279,6 +281,11 @@ const TradeList: React.FC<TradeListProps> = ({
     if (menuTrade && onDeleteClick) onDeleteClick(menuTrade.id);
     handleCloseMenu();
   }, [menuTrade, onDeleteClick, handleCloseMenu]);
+
+  const handleCopySelected = useCallback(() => {
+    if (menuTrade && onCopyTrade) onCopyTrade(menuTrade);
+    handleCloseMenu();
+  }, [menuTrade, onCopyTrade, handleCloseMenu]);
 
   // Reset displayed count when trades array changes (e.g., filtering, new data)
   useEffect(() => {
@@ -651,6 +658,14 @@ const TradeList: React.FC<TradeListProps> = ({
                         </ListItemIcon>
                         <ListItemText primary="Edit" />
                       </MenuItem>
+                      {onCopyTrade && (
+                        <MenuItem onClick={(e) => { e.stopPropagation(); handleCopySelected(); }}>
+                          <ListItemIcon>
+                            <ContentCopyIcon fontSize="small" />
+                          </ListItemIcon>
+                          <ListItemText primary="Copy to calendar" />
+                        </MenuItem>
+                      )}
                       <MenuItem
                         onClick={(e) => { e.stopPropagation(); handleDeleteSelected(); }}
                         disabled={isTradeBeingDeleted(trade.id)}

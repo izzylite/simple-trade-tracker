@@ -25,6 +25,9 @@ export interface TradeOperationsProps {
   /** Open trade edit form */
   onEditTrade?: (trade: Trade) => void;
 
+  /** Open the copy-to-calendar dialog for a trade */
+  onCopyTrade?: (trade: Trade) => void;
+
   /** Delete a single trade */
   onDeleteTrade?: (tradeId: string) => void;
 

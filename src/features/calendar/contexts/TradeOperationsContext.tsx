@@ -84,6 +84,9 @@ interface TradeOperationsContextValue extends TradeOperationsProps {
   deletingTradeIdsList: string[];
   notification: OpNotification | null;
   clearNotification: () => void;
+  copyDialog: { open: boolean; trade: Trade | null };
+  closeCopyDialog: () => void;
+  pushNotification: (n: OpNotification) => void;
 }
 
 const TradeOperationsContext =
@@ -104,6 +107,21 @@ export const TradeOperationsProvider: React.FC<{
   const [notification, setNotification] = useState<OpNotification | null>(null);
 
   const clearNotification = useCallback(() => setNotification(null), []);
+
+  const [copyDialog, setCopyDialog] = useState<{ open: boolean; trade: Trade | null }>({
+    open: false,
+    trade: null,
+  });
+
+  const onCopyTrade = useCallback((trade: Trade) => {
+    setCopyDialog({ open: true, trade });
+  }, []);
+
+  const closeCopyDialog = useCallback(() => {
+    setCopyDialog({ open: false, trade: null });
+  }, []);
+
+  const pushNotification = useCallback((n: OpNotification) => setNotification(n), []);
 
   const formatCountFor = (n: number): string =>
     n === 1 ? '1 trade' : `${n} trades`;
@@ -219,6 +237,7 @@ export const TradeOperationsProvider: React.FC<{
         ? undefined
         : hook.handleUpdateTradeProperty,
       onEditTrade: isReadOnly ? undefined : onEditTrade,
+      onCopyTrade: isReadOnly ? undefined : onCopyTrade,
       onDeleteTrade: isReadOnly ? undefined : onDeleteTrade,
       onDeleteMultipleTrades: isReadOnly ? undefined : onDeleteMultipleTrades,
       onZoomImage: undefined,
@@ -245,6 +264,9 @@ export const TradeOperationsProvider: React.FC<{
       deletingTradeIdsList,
       notification,
       clearNotification,
+      copyDialog,
+      closeCopyDialog,
+      pushNotification,
     }),
     [
       isReadOnly,
@@ -266,6 +288,10 @@ export const TradeOperationsProvider: React.FC<{
       retryDelete,
       notification,
       clearNotification,
+      onCopyTrade,
+      copyDialog,
+      closeCopyDialog,
+      pushNotification,
     ]
   );
 
