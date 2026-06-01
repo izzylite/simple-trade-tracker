@@ -39,6 +39,19 @@ function makeMockClient(initialMessages: Message[], userId: string) {
     select(_cols?: string) { return this; },
     // deno-lint-ignore no-explicit-any
     update(payload: any) { this._update = payload; return this; },
+    // Atomic append RPC: the normal (non-truncate) path now appends via
+    // append_conversation_message instead of a read-modify-write UPDATE. The
+    // real RPC appends server-side and does NOT mutate the array the function
+    // already read, so the mock must not either — it just reports success
+    // (token gate passes). `priorHistory` is derived from the pre-append read.
+    // deno-lint-ignore no-explicit-any
+    rpc(_fn: string, _params: any) {
+      return Promise.resolve({ data: true, error: null });
+    },
+    // Used by deleteAllChunks on the edit-resend truncate path. The chain is
+    // awaited as `{ error } = await from().delete().eq()`; returning `this`
+    // (no `error` prop) yields a clean result.
+    delete() { return this; },
     // deno-lint-ignore no-explicit-any
     eq(_col: string, _val: any) { return this; },
     // deno-lint-ignore no-explicit-any

@@ -28,18 +28,40 @@ import {
 } from '../_shared/customTools/runtime.ts';
 
 /**
- * Scrub webhook-tool results out of any functionCalls[] before it ships to
- * the FE in SSE/JSON metadata. The result string is the fenced webhook body
- * — attacker-controlled content. FE today only reads name/label, but
- * leaving the body in transit is one debug-dump or one eager render away
- * from stored-XSS-via-webhook. Belt-and-braces.
+ * Sanitize a tool result for CLIENT consumption. Two concerns:
+ *  - Webhook-tool bodies are attacker-controlled (fenced) → null entirely.
+ *  - Built-in/MCP tool ERRORS are raw strings ("Error: ...", "MCP tool call
+ *    failed: ...", "Tool execution error: ...") that can carry SQL/table names,
+ *    MCP RPC detail, or stack text → replace with a generic label.
+ * Gemini still receives the FULL result via buildFunctionResponseParts (a
+ * separate path), so its ability to reason about / recover from the error is
+ * unaffected — only the browser-bound copy is redacted.
+ */
+function redactToolErrorForClient(name: string, result: string | null): string | null {
+  if (isWebhookTool(name)) return null;
+  if (typeof result !== 'string') return result;
+  const lower = result.toLowerCase();
+  if (
+    result.startsWith('Error:') ||
+    lower.startsWith('tool execution error') ||
+    lower.startsWith('mcp tool call failed') ||
+    lower.startsWith('mcp error')
+  ) {
+    return 'This tool call failed.';
+  }
+  return result;
+}
+
+/**
+ * Scrub tool results before they ship to the FE in SSE/JSON `done` metadata:
+ * null webhook bodies and genericize raw error strings (see
+ * redactToolErrorForClient). FE today only reads name/label, but leaving raw
+ * bodies/errors in transit is one debug-dump or eager render away from a leak.
  */
 function scrubWebhookResults(
   calls: Array<{ name: string; args: unknown; result: string }>,
 ): Array<{ name: string; args: unknown; result: string | null }> {
-  return calls.map((c) =>
-    isWebhookTool(c.name) ? { ...c, result: null } : c,
-  );
+  return calls.map((c) => ({ ...c, result: redactToolErrorForClient(c.name, c.result) }));
 }
 import { fetchEmbeddedData, type EmbeddedData } from './embedDataFetcher.ts';
 import {
@@ -228,14 +250,14 @@ async function preflightTokenCount(
   if (bytes / 1024 < PREFLIGHT_KB_THRESHOLD) return { ok: true };
 
   try {
-    const url = `${GEMINI_API_BASE}/${MODEL}:countTokens?key=${apiKey}`;
+    const url = `${GEMINI_API_BASE}/${MODEL}:countTokens`;
     const reqBody: Record<string, unknown> = { contents };
     if (systemInstruction) {
       reqBody.systemInstruction = { parts: [{ text: systemInstruction }] };
     }
     const resp = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
       body: JSON.stringify(reqBody),
     });
     if (!resp.ok) {
@@ -255,10 +277,13 @@ async function preflightTokenCount(
   }
 }
 
-function buildGeminiUrl(apiKey: string, streaming: boolean): string {
+// The API key is sent via the `x-goog-api-key` request header at each fetch
+// site (Google's recommended practice), NOT in the URL — a key in the query
+// string leaks into access logs / proxies / any error that stringifies the URL.
+function buildGeminiUrl(streaming: boolean): string {
   return streaming
-    ? `${GEMINI_API_BASE}/${MODEL}:streamGenerateContent?alt=sse&key=${apiKey}`
-    : `${GEMINI_API_BASE}/${MODEL}:generateContent?key=${apiKey}`;
+    ? `${GEMINI_API_BASE}/${MODEL}:streamGenerateContent?alt=sse`
+    : `${GEMINI_API_BASE}/${MODEL}:generateContent`;
 }
 
 /**
@@ -459,13 +484,23 @@ async function callGeminiWithContents(
 ): Promise<{
   text: string;
   functionCall?: ParsedFunctionCall;
+  /**
+   * Set when the model emitted MULTIPLE parallel functionCall parts in one
+   * turn. The loop must execute ALL of them and return one functionResponse
+   * per call, or Gemini 400s on the next turn (functionCall/functionResponse
+   * count mismatch). Convention mirrors callGeminiStreaming: `functionCalls`
+   * is populated only when length > 1; a single call uses `functionCall`.
+   */
+  functionCalls?: ParsedFunctionCall[];
   rawParts: Array<Record<string, unknown>>;
   usageMetadata?: Record<string, unknown>;
+  finishReason?: string;
 }> {
   // Non-streaming: delegate to the shared `_shared/gemini.ts` helper.
   // The shared version handles body construction, error handling, and
   // part extraction; we just map the return shape (shared returns
-  // `functionCalls: []`, chat consumer expects `functionCall` singular).
+  // `functionCalls: []`, this consumer uses `functionCall` for the single
+  // case and `functionCalls` for the parallel case).
   if (!opts.streaming) {
     const result = await sharedCallGemini({
       systemInstruction: opts.systemInstruction,
@@ -478,9 +513,11 @@ async function callGeminiWithContents(
     logUsageMetadata('callGeminiWithContents:non-streaming', result.usageMetadata);
     return {
       text: result.text,
-      functionCall: result.functionCalls[0],
+      functionCall: result.functionCalls.length >= 1 ? result.functionCalls[0] : undefined,
+      functionCalls: result.functionCalls.length > 1 ? result.functionCalls : undefined,
       rawParts: result.rawParts,
       usageMetadata: result.usageMetadata,
+      finishReason: result.finishReason,
     };
   }
 
@@ -500,9 +537,9 @@ async function callGeminiWithContents(
     body.systemInstruction = { parts: [{ text: opts.systemInstruction }] };
   }
 
-  const response = await fetch(buildGeminiUrl(apiKey, true), {
+  const response = await fetch(buildGeminiUrl(true), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
     body: JSON.stringify(body),
   });
 
@@ -513,8 +550,14 @@ async function callGeminiWithContents(
 
   let text = '';
   let functionCall: ParsedFunctionCall | undefined;
+  // Accumulate ALL functionCall parts across chunks. The previous single
+  // `functionCall` (last-wins) silently dropped parallel calls on continuation
+  // turns, producing a model turn with N functionCall parts but only 1
+  // functionResponse → Gemini 400 + lost tool results.
+  const functionCalls: ParsedFunctionCall[] = [];
   const rawParts: Array<Record<string, unknown>> = [];
   let lastUsageMetadata: Record<string, unknown> | undefined;
+  let lastFinishReason: string | undefined;
 
   if (!response.body) return { text, functionCall, rawParts };
   const reader = response.body.getReader();
@@ -541,6 +584,7 @@ async function callGeminiWithContents(
         try {
           const chunk = JSON.parse(jsonLine);
           if (chunk.usageMetadata) lastUsageMetadata = chunk.usageMetadata;
+          if (chunk.candidates?.[0]?.finishReason) lastFinishReason = chunk.candidates[0].finishReason;
           const parts = chunk.candidates?.[0]?.content?.parts || [];
           // Preserve ALL raw parts across chunks — thoughtSignature may arrive
           // as its own standalone Part preceding the functionCall Part, and
@@ -555,10 +599,12 @@ async function callGeminiWithContents(
             text += part.text;
             if (opts.writer) await sendSSE(opts.writer, 'text_chunk', { text: part.text });
           }
-          const fcPart = parts.find((p: { functionCall?: unknown }) => p.functionCall);
-          if (fcPart) {
+          const fcParts = parts.filter((p: { functionCall?: unknown }) => p.functionCall);
+          for (const fcPart of fcParts) {
             const extracted = extractFunctionCall(fcPart);
-            if (extracted) functionCall = extracted;
+            if (!extracted) continue;
+            functionCalls.push(extracted);
+            if (!functionCall) functionCall = extracted; // keep first for back-compat
           }
         } catch (parseError) {
           log(`Failed to parse streaming chunk: ${parseError}`, 'warn');
@@ -570,7 +616,14 @@ async function callGeminiWithContents(
   }
 
   logUsageMetadata('callGeminiWithContents', lastUsageMetadata);
-  return { text, functionCall, rawParts, usageMetadata: lastUsageMetadata };
+  return {
+    text,
+    functionCall: functionCalls.length >= 1 ? functionCalls[0] : undefined,
+    functionCalls: functionCalls.length > 1 ? functionCalls : undefined,
+    rawParts,
+    usageMetadata: lastUsageMetadata,
+    finishReason: lastFinishReason,
+  };
 }
 
 /**
@@ -865,8 +918,8 @@ async function callGemini(
   message: string,
   conversationHistory: Array<{ role: string; content: string }>,
   tools: GeminiFunctionDeclaration[]
-): Promise<{ text?: string; functionCall?: ParsedFunctionCall; rawParts: Array<Record<string, unknown>>; usageMetadata?: Record<string, unknown> }> {
-  const apiUrl = buildGeminiUrl(apiKey, false);
+): Promise<{ text?: string; functionCall?: ParsedFunctionCall; functionCalls?: ParsedFunctionCall[]; rawParts: Array<Record<string, unknown>>; usageMetadata?: Record<string, unknown> }> {
+  const apiUrl = buildGeminiUrl(false);
 
   // Build contents array — systemPrompt goes in the top-level `systemInstruction`
   // field (Gemini docs standard) rather than a fake role:user turn. This keeps
@@ -895,7 +948,7 @@ async function callGemini(
 
   const response = await fetch(apiUrl, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
     body: JSON.stringify(requestBody),
   });
 
@@ -911,11 +964,22 @@ async function callGemini(
   const content = candidate?.content;
   const parts: Array<Record<string, unknown>> = content?.parts || [];
 
-  // Check for function call
-  const functionCallPart = parts.find((p: { functionCall?: unknown }) => p.functionCall);
-  if (functionCallPart) {
-    const extracted = extractFunctionCall(functionCallPart);
-    if (extracted) return { functionCall: extracted, rawParts: parts, usageMetadata };
+  // Check for function calls — collect ALL parts (parallel calls), not just
+  // the first. Returning a single call here would drop the rest and unbalance
+  // the next turn's functionResponse count → Gemini 400.
+  const functionCallParts = parts.filter((p: { functionCall?: unknown }) => p.functionCall);
+  if (functionCallParts.length > 0) {
+    const extractedCalls = functionCallParts
+      .map((p) => extractFunctionCall(p))
+      .filter((c): c is ParsedFunctionCall => !!c);
+    if (extractedCalls.length > 0) {
+      return {
+        functionCall: extractedCalls[0],
+        functionCalls: extractedCalls.length > 1 ? extractedCalls : undefined,
+        rawParts: parts,
+        usageMetadata,
+      };
+    }
   }
 
   // Get text response (exclude thought-summary parts so chain-of-thought doesn't leak into answer)
@@ -947,7 +1011,7 @@ async function callGeminiStreaming(
   rawParts?: Array<Record<string, unknown>>;
   usageMetadata?: Record<string, unknown>;
 }> {
-  const apiUrl = buildGeminiUrl(apiKey, true);
+  const apiUrl = buildGeminiUrl(true);
 
   // Build user message parts (text + optional images)
   const userMessageParts: Array<Record<string, unknown>> = [];
@@ -1016,7 +1080,10 @@ async function callGeminiStreaming(
     tools: buildToolsArray(tools),
     // Force function calling on initial request (unless images present - then allow direct analysis)
     tool_config: buildToolConfig(tools, toolMode),
-    generationConfig: buildGenerationConfig(4000, thinkingLevel),
+    // 8000 (not 4000) so thinking tokens can't starve the visible output budget
+    // on the first/heaviest turn → MAX_TOKENS with empty text. Matches the 8000
+    // used on continuation turns. See: https://ai.google.dev/gemini-api/docs/thinking
+    generationConfig: buildGenerationConfig(8000, thinkingLevel),
   };
 
   // Log request details for debugging
@@ -1028,7 +1095,7 @@ async function callGeminiStreaming(
     log('Initiating Gemini fetch...', 'info');
     response = await fetch(apiUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
       body: JSON.stringify(requestBody),
     });
     log(`Gemini fetch completed with status: ${response.status}`, 'info');
@@ -1146,6 +1213,13 @@ async function callGeminiStreaming(
             if (finishReason === 'STOP' && (!parts || parts.length === 0)) {
               log('Warning: Gemini empty content bug - finishReason:STOP but no parts (known API issue)', 'warn');
               // Continue processing - the empty response will be detected at the end
+            }
+            // MAX_TOKENS with no visible text = thinking starved the output
+            // budget (the dominant empty cause on Gemini-3-Flash). Log it as a
+            // distinct, greppable root cause so it isn't mistaken for the STOP
+            // empty bug — the fix is a bigger maxOutputTokens / lower thinking.
+            if (finishReason === 'MAX_TOKENS' && !parts.some((p: { text?: string; thought?: boolean }) => p.text && !p.thought)) {
+              log('Warning: Gemini MAX_TOKENS with empty visible text — thinking starved the output budget; raise maxOutputTokens or lower thinkingLevel', 'warn');
             }
 
             // Preserve every raw Part so we can echo the model turn verbatim
@@ -1472,10 +1546,11 @@ function handleStreamingRequest(
           const userParts: Array<Record<string, unknown>> = [];
 
           for (const { call, result: funcResult } of results) {
-            // Send tool_result event
+            // Send tool_result event (redacted for the client; Gemini still
+            // gets the full result via buildFunctionResponseParts below).
             await sendSSE(writer, 'tool_result', {
               name: call.name,
-              result: funcResult
+              result: redactToolErrorForClient(call.name, funcResult)
             });
 
             // Add to function calls history
@@ -1554,10 +1629,11 @@ function handleStreamingRequest(
 
           functionCalls.push({ name: call.name, args: call.args, result: functionResult });
 
-          // Send tool_result event
+          // Send tool_result event (redacted for the client; Gemini still gets
+          // the full result via buildFunctionResponseParts below).
           await sendSSE(writer, 'tool_result', {
             name: call.name,
-            result: functionResult
+            result: redactToolErrorForClient(call.name, functionResult)
           });
 
           // Echo the model turn verbatim (preserves thoughtSignature Parts)
@@ -1590,6 +1666,7 @@ function handleStreamingRequest(
         const {
           text: newText,
           functionCall: newFunctionCall,
+          functionCalls: newFunctionCalls,
           rawParts: newRawParts,
           usageMetadata: newUsage,
         } = await callGeminiWithContents(
@@ -1614,8 +1691,13 @@ function handleStreamingRequest(
           await sendSSE(writer, 'thought_chunk', { text: newText });
         }
 
-        // Include text alongside function call if both present
-        result = newFunctionCall
+        // Forward the FULL set: when the model emitted parallel calls,
+        // `functionCalls` must reach the loop's parallel branch so every call
+        // is executed and answered. Dropping it back to a single `functionCall`
+        // is what unbalanced the next turn (N calls echoed, 1 response).
+        result = newFunctionCalls && newFunctionCalls.length > 0
+          ? { functionCalls: newFunctionCalls, text: newText || undefined, rawParts: newRawParts }
+          : newFunctionCall
           ? { functionCall: newFunctionCall, text: newText || undefined, rawParts: newRawParts }
           : { text: newText, rawParts: newRawParts };
       }
@@ -1640,7 +1722,7 @@ function handleStreamingRequest(
               { role: 'user', parts: [{ text: 'Please now summarise everything you found and give your final answer. Do not call any more tools.' }] }
             ],
             allTools,
-            { streaming: false, maxOutputTokens: 4000, mode: 'NONE', systemInstruction: systemPrompt }
+            { streaming: false, maxOutputTokens: 8192, mode: 'NONE', thinkingLevel: 'low', systemInstruction: systemPrompt }
           );
           if (synthesisResult.usageMetadata) {
             lastUsageMetadata = synthesisResult.usageMetadata;
@@ -1651,6 +1733,10 @@ function handleStreamingRequest(
             finalText = synthesisResult.text;
             await sendSSE(writer, 'text_chunk', { text: finalText });
             log(`Forced synthesis succeeded (${finalText.length} chars)`, 'info');
+          } else if (synthesisResult.finishReason === 'MAX_TOKENS') {
+            // Even at thinkingLevel:'low' + 8192 tokens the summary starved —
+            // the accumulated tool-result history is pathologically large.
+            log('Forced synthesis hit MAX_TOKENS with empty text — tool-result history too large to summarise in one turn', 'warn');
           }
         } catch (synthErr) {
           log(`Forced synthesis failed: ${synthErr}`, 'error');
@@ -1690,9 +1776,16 @@ function handleStreamingRequest(
         validationRetryCount++;
         log(`ID Validation: Found ${validationResult.invalidCount} invalid refs (trades: ${validationResult.invalidIds.trades.length}, events: ${validationResult.invalidIds.events.length}, notes: ${validationResult.invalidIds.notes.length})`, 'warn');
 
-        if (validationRetryCount >= maxValidationRetries) {
-          // Max retries reached - strip invalid refs and continue
-          log('Max validation retries reached - proceeding with partial response', 'warn');
+        // Strip-and-stop on max retries OR when the wall-clock budget is
+        // exhausted. A post-break correction call is another streaming Gemini
+        // round (maxOutputTokens 8000); running it after 130s risks crossing
+        // the 150s edge ceiling before the assistant message is persisted.
+        const validationOverBudget = Date.now() - wallClockStartMs > WALL_CLOCK_BUDGET_MS;
+        if (validationRetryCount >= maxValidationRetries || validationOverBudget) {
+          // Strip invalid refs and continue (no further Gemini calls).
+          log(validationOverBudget
+            ? 'Wall-clock budget exhausted during ID validation - stripping invalid refs instead of another correction call'
+            : 'Max validation retries reached - proceeding with partial response', 'warn');
           // Remove invalid reference tags from the response
           for (const id of validationResult.invalidIds.trades) {
             cleanedFinalText = cleanedFinalText.replace(new RegExp(`<trade-ref\\s+id="${id}"\\s*/?>(</trade-ref>)?`, 'gi'), '');
@@ -1927,10 +2020,13 @@ function handleStreamingRequest(
       log(`Error in streaming handler: ${error}`, 'error');
       const rawMessage = error instanceof Error ? error.message : 'Unknown error';
       const classified = classifyProviderError(rawMessage);
+      // Do NOT ship `details: rawMessage` to the client — for a provider failure
+      // it is the full `Gemini API error: <status> - <body>` string. The raw
+      // value is already logged server-side above; the client gets the friendly
+      // message + classification only.
       await sendSSE(writer, 'error', {
         error: classified.userMessage,
         errorType: classified.errorType,
-        details: rawMessage,
         retryAfter: classified.retryAfterSeconds,
       });
     } finally {
@@ -2141,7 +2237,6 @@ async function handleReminderRequest(req: Request, body: AgentRequest): Promise<
     return errorResponse('conversation does not belong to reminder owner', 403);
   }
 
-  const currentCount = Number(convo.message_count ?? 0);
   const currentPromptTokens = Number(convo.last_prompt_tokens ?? 0);
   if (currentPromptTokens >= MAX_PROMPT_TOKENS) {
     await serviceClient
@@ -2285,49 +2380,82 @@ async function handleReminderRequest(req: Request, body: AgentRequest): Promise<
         break;
       }
 
-      if (result.text && !result.functionCall) {
+      // Final answer: text and no pending calls (single OR parallel).
+      if (result.text && !result.functionCall && !result.functionCalls) {
         finalText = result.text;
         break;
       }
-      if (!result.functionCall) break;
 
-      const call = result.functionCall;
-      log(`[reminder] Executing function: ${call.name}`, 'info');
+      if (result.functionCalls && result.functionCalls.length > 0) {
+        // Parallel calls — execute ALL and return one functionResponse per call
+        // so the echoed model turn (N functionCall parts) stays balanced and
+        // Gemini doesn't 400 on the next turn.
+        log(`[reminder] Executing ${result.functionCalls.length} functions in parallel`, 'info');
+        const execResults = await Promise.all(result.functionCalls.map(async (call) => {
+          try {
+            const r = CUSTOM_TOOL_NAMES.has(call.name)
+              ? await executeCustomTool(call.name, call.args, { userId, calendarId, conversationId }, serviceClient)
+              : isWebhookTool(call.name)
+              ? await dispatchWebhookTool({ userId, registeredName: call.name, args: call.args, conversationId: conversationId ?? null })
+              : await callMCPTool(projectRef, supabaseAccessToken, call.name, call.args);
+            return { call, result: r };
+          } catch (error) {
+            log(`[reminder] Error executing ${call.name}: ${error}`, 'error');
+            return { call, result: `Error: ${error}` };
+          }
+        }));
+        const userParts: Array<Record<string, unknown>> = [];
+        for (const { call, result: funcResult } of execResults) {
+          functionCalls.push({ name: call.name, args: call.args, result: funcResult });
+          const responseParts = await buildFunctionResponseParts(call.name, funcResult, call.id);
+          userParts.push(...responseParts);
+        }
+        const modelParts = result.rawParts && result.rawParts.length > 0
+          ? result.rawParts
+          : result.functionCalls.map(buildFunctionCallPart);
+        conversationContents.push({ role: 'model', parts: modelParts });
+        conversationContents.push({ role: 'user', parts: userParts });
+      } else if (result.functionCall) {
+        const call = result.functionCall;
+        log(`[reminder] Executing function: ${call.name}`, 'info');
 
-      // Repeat-call detection (mirrors chat path).
-      const lastCall = functionCalls[functionCalls.length - 1];
-      if (lastCall && lastCall.name === call.name &&
-          JSON.stringify(lastCall.args) === JSON.stringify(call.args)) {
-        log('[reminder] Detected repeated function call - breaking loop', 'info');
+        // Repeat-call detection (mirrors chat path).
+        const lastCall = functionCalls[functionCalls.length - 1];
+        if (lastCall && lastCall.name === call.name &&
+            JSON.stringify(lastCall.args) === JSON.stringify(call.args)) {
+          log('[reminder] Detected repeated function call - breaking loop', 'info');
+          break;
+        }
+
+        let functionResult: string;
+        if (CUSTOM_TOOL_NAMES.has(call.name)) {
+          functionResult = await executeCustomTool(
+            call.name,
+            call.args,
+            { userId, calendarId, conversationId },
+            serviceClient
+          );
+        } else if (isWebhookTool(call.name)) {
+          functionResult = await dispatchWebhookTool({
+            userId,
+            registeredName: call.name,
+            args: call.args,
+            conversationId: conversationId ?? null,
+          });
+        } else {
+          functionResult = await callMCPTool(projectRef, supabaseAccessToken, call.name, call.args);
+        }
+        functionCalls.push({ name: call.name, args: call.args, result: functionResult });
+
+        const modelTurnParts = result.rawParts && result.rawParts.length > 0
+          ? result.rawParts
+          : [buildFunctionCallPart(call)];
+        conversationContents.push({ role: 'model', parts: modelTurnParts });
+        const responseParts = await buildFunctionResponseParts(call.name, functionResult, call.id);
+        conversationContents.push({ role: 'user', parts: responseParts });
+      } else {
         break;
       }
-
-      let functionResult: string;
-      if (CUSTOM_TOOL_NAMES.has(call.name)) {
-        functionResult = await executeCustomTool(
-          call.name,
-          call.args,
-          { userId, calendarId, conversationId },
-          serviceClient
-        );
-      } else if (isWebhookTool(call.name)) {
-        functionResult = await dispatchWebhookTool({
-          userId,
-          registeredName: call.name,
-          args: call.args,
-          conversationId: conversationId ?? null,
-        });
-      } else {
-        functionResult = await callMCPTool(projectRef, supabaseAccessToken, call.name, call.args);
-      }
-      functionCalls.push({ name: call.name, args: call.args, result: functionResult });
-
-      const modelTurnParts = result.rawParts && result.rawParts.length > 0
-        ? result.rawParts
-        : [buildFunctionCallPart(call)];
-      conversationContents.push({ role: 'model', parts: modelTurnParts });
-      const responseParts = await buildFunctionResponseParts(call.name, functionResult, call.id);
-      conversationContents.push({ role: 'user', parts: responseParts });
 
       const cont = await callGeminiWithContents(
         googleApiKey,
@@ -2340,7 +2468,9 @@ async function handleReminderRequest(req: Request, body: AgentRequest): Promise<
         roundUsages.push(cont.usageMetadata);
         billOrionTokensForRound(userId, cont.usageMetadata);
       }
-      result = cont.functionCall
+      result = cont.functionCalls && cont.functionCalls.length > 0
+        ? { functionCalls: cont.functionCalls, rawParts: cont.rawParts }
+        : cont.functionCall
         ? { functionCall: cont.functionCall, rawParts: cont.rawParts }
         : { text: cont.text, rawParts: cont.rawParts };
     }
@@ -2356,7 +2486,7 @@ async function handleReminderRequest(req: Request, body: AgentRequest): Promise<
             { role: 'user', parts: [{ text: 'Please now summarise everything you found and give your final answer. Do not call any more tools.' }] }
           ],
           allTools,
-          { streaming: false, maxOutputTokens: 4000, mode: 'NONE', systemInstruction: systemPrompt }
+          { streaming: false, maxOutputTokens: 8192, mode: 'NONE', thinkingLevel: 'low', systemInstruction: systemPrompt }
         );
         if (synth.usageMetadata) {
           lastUsageMetadata = synth.usageMetadata;
@@ -2406,11 +2536,12 @@ async function handleReminderRequest(req: Request, body: AgentRequest): Promise<
     },
   };
 
-  const existingMessages = Array.isArray(convo.messages) ? convo.messages : [];
-  // Atomic cap guard: `.lt('last_prompt_tokens', MAX_PROMPT_TOKENS)` filters
-  // at the row-lock level. If a concurrent turn pushed tokens past the cap
-  // between our 3e read and this UPDATE, the WHERE fails and `appendData` is
-  // null — we then mark this reminder failed (don't double-write).
+  // Atomically append via the SECURITY DEFINER RPC: `messages = messages ||
+  // newMessage` runs under the row lock, so a 2nd browser tab or a concurrent
+  // chat turn on the same conversation can't clobber this fire (the previous
+  // read-modify-write lost whichever writer landed second). p_user_id also adds
+  // the tenancy guard the inline UPDATE was missing, and p_cap enforces the
+  // token cap atomically (returns false if a concurrent turn pushed past it).
   //
   // Persist an estimate of what the NEXT turn's first round prompt will be:
   //   first round prompt (this fire's history + reminder instructions + system + tools)
@@ -2420,21 +2551,14 @@ async function handleReminderRequest(req: Request, body: AgentRequest): Promise<
   const firstRoundPrompt = Number(firstRoundUsage?.promptTokenCount ?? 0);
   const assistantOutput = Number(lastUsageMetadata?.candidatesTokenCount ?? 0);
   const nextTurnEstimate = firstRoundPrompt + assistantOutput;
-  const appendPayload: Record<string, unknown> = {
-    messages: [...existingMessages, newMessage],
-    message_count: currentCount + 1,
-    last_message_preview: finalText ? finalText.slice(0, 200) : null,
-  };
-  if (nextTurnEstimate > 0) {
-    appendPayload.last_prompt_tokens = nextTurnEstimate;
-  }
-  const { data: appendData, error: appendErr } = await serviceClient
-    .from('ai_conversations')
-    .update(appendPayload)
-    .eq('id', conversationId)
-    .lt('last_prompt_tokens', MAX_PROMPT_TOKENS)
-    .select('id')
-    .maybeSingle();
+  const { data: appendData, error: appendErr } = await serviceClient.rpc('append_conversation_message', {
+    p_id: conversationId,
+    p_user_id: userId,
+    p_message: newMessage,
+    p_cap: MAX_PROMPT_TOKENS,
+    p_prompt_tokens: nextTurnEstimate > 0 ? nextTurnEstimate : null,
+    p_preview: finalText ? finalText.slice(0, 200) : null,
+  });
 
   if (appendErr) {
     // Agent ran successfully but the append failed — mark failed so the user
@@ -2445,9 +2569,9 @@ async function handleReminderRequest(req: Request, body: AgentRequest): Promise<
       .eq('id', reminderId);
     return errorResponse(`append failed: ${appendErr.message}`, 500);
   }
-  if (!appendData) {
-    // Lost the cap-guard race OR the conversation was deleted between 3e and
-    // here. Either way, don't pretend this fired.
+  if (appendData !== true) {
+    // RPC returned false: lost the cap-guard race, the conversation was deleted,
+    // or owner mismatch. Either way, don't pretend this fired.
     await serviceClient
       .from('reminders')
       .update({ status: 'failed', last_error: 'token_budget_exceeded_or_gone' })
@@ -2903,82 +3027,106 @@ Deno.serve(async (req: Request) => {
         break;
       }
 
-      // Only treat text as final answer when there are NO function calls
-      if (result.text && !result.functionCall) {
+      // Only treat text as final answer when there are NO pending calls.
+      if (result.text && !result.functionCall && !result.functionCalls) {
         finalText = result.text;
         break;
       }
 
-      if (!result.functionCall) {
-        // No function call and no text - shouldn't happen
-        break;
-      }
-
-      const call = result.functionCall!;
-      log(`Executing function: ${call.name}`, 'info');
-
-      // Check if we're repeating the same function call (sign of being stuck)
-      const lastCall = functionCalls[functionCalls.length - 1];
-      if (lastCall && lastCall.name === call.name &&
-          JSON.stringify(lastCall.args) === JSON.stringify(call.args)) {
-        log('Detected repeated function call - breaking loop to avoid infinite loop', 'info');
-        break;
-      }
-
-      // Check if we've made too many search_web calls (more than 3)
-      const searchWebCount = functionCalls.filter(fc => fc.name === 'search_web').length;
-      if (call.name === 'search_web' && searchWebCount >= 3) {
-        log('Too many search_web calls - breaking loop', 'info');
-        break;
-      }
-
-      let functionResult: string;
-
-      // Check if it's a custom tool (from tools.ts), a user webhook, or MCP
       const supabaseClient = createServiceClient();
-      if (CUSTOM_TOOL_NAMES.has(call.name)) {
-        // Execute custom tool
-        functionResult = await executeCustomTool(call.name, call.args, {
+
+      if (result.functionCalls && result.functionCalls.length > 0) {
+        // Parallel calls — execute ALL and return one functionResponse per call
+        // so the echoed model turn stays balanced (else Gemini 400s next turn).
+        log(`Executing ${result.functionCalls.length} functions in parallel`, 'info');
+        const execResults = await Promise.all(result.functionCalls.map(async (call) => {
+          try {
+            const r = CUSTOM_TOOL_NAMES.has(call.name)
+              ? await executeCustomTool(call.name, call.args, { userId, calendarId, conversationId }, supabaseClient)
+              : isWebhookTool(call.name)
+              ? await dispatchWebhookTool({ userId, registeredName: call.name, args: call.args, conversationId: conversationId ?? null })
+              : await callMCPTool(projectRef, supabaseAccessToken, call.name, call.args);
+            return { call, result: r };
+          } catch (error) {
+            log(`Error executing ${call.name}: ${error}`, 'error');
+            return { call, result: `Error: ${error}` };
+          }
+        }));
+        const userParts: Array<Record<string, unknown>> = [];
+        for (const { call, result: funcResult } of execResults) {
+          functionCalls.push({ name: call.name, args: call.args, result: funcResult });
+          const responseParts = await buildFunctionResponseParts(call.name, funcResult, call.id);
+          userParts.push(...responseParts);
+        }
+        const modelParts = result.rawParts && result.rawParts.length > 0
+          ? result.rawParts
+          : result.functionCalls.map(buildFunctionCallPart);
+        conversationContents.push({ role: 'model', parts: modelParts });
+        conversationContents.push({ role: 'user', parts: userParts });
+      } else if (result.functionCall) {
+        const call = result.functionCall;
+        log(`Executing function: ${call.name}`, 'info');
+
+        // Check if we're repeating the same function call (sign of being stuck)
+        const lastCall = functionCalls[functionCalls.length - 1];
+        if (lastCall && lastCall.name === call.name &&
+            JSON.stringify(lastCall.args) === JSON.stringify(call.args)) {
+          log('Detected repeated function call - breaking loop to avoid infinite loop', 'info');
+          break;
+        }
+
+        // Check if we've made too many search_web calls (more than 3)
+        const searchWebCount = functionCalls.filter(fc => fc.name === 'search_web').length;
+        if (call.name === 'search_web' && searchWebCount >= 3) {
+          log('Too many search_web calls - breaking loop', 'info');
+          break;
+        }
+
+        let functionResult: string;
+        if (CUSTOM_TOOL_NAMES.has(call.name)) {
+          functionResult = await executeCustomTool(call.name, call.args, {
                   userId,
                   calendarId,
                   conversationId
                 }, supabaseClient);
+        } else if (isWebhookTool(call.name)) {
+          functionResult = await dispatchWebhookTool({
+            userId,
+            registeredName: call.name,
+            args: call.args,
+            conversationId: conversationId ?? null,
+          });
+        } else {
+          functionResult = await callMCPTool(projectRef, supabaseAccessToken, call.name, call.args);
+        }
         functionCalls.push({ name: call.name, args: call.args, result: functionResult });
-      } else if (isWebhookTool(call.name)) {
-        functionResult = await dispatchWebhookTool({
-          userId,
-          registeredName: call.name,
-          args: call.args,
-          conversationId: conversationId ?? null,
+
+        // Echo the model turn verbatim (preserves thoughtSignature Parts)
+        const modelTurnParts = result.rawParts && result.rawParts.length > 0
+          ? result.rawParts
+          : [buildFunctionCallPart(call)];
+        conversationContents.push({
+          role: 'model',
+          parts: modelTurnParts
         });
-        functionCalls.push({ name: call.name, args: call.args, result: functionResult });
+
+        // Append function response (handles image injection). Pass call.id for
+        // Gemini 3 id mapping.
+        const responseParts = await buildFunctionResponseParts(call.name, functionResult, call.id);
+        conversationContents.push({
+          role: 'user',
+          parts: responseParts
+        });
       } else {
-        // Execute MCP tool via HTTP
-        functionResult = await callMCPTool(projectRef, supabaseAccessToken, call.name, call.args);
-        functionCalls.push({ name: call.name, args: call.args, result: functionResult });
+        // No function call and no text - shouldn't happen
+        break;
       }
-
-      // Echo the model turn verbatim (preserves thoughtSignature Parts)
-      const modelTurnParts = result.rawParts && result.rawParts.length > 0
-        ? result.rawParts
-        : [buildFunctionCallPart(call)];
-      conversationContents.push({
-        role: 'model',
-        parts: modelTurnParts
-      });
-
-      // Append function response to conversation history (handles image injection).
-      // Pass call.id for Gemini 3 id mapping.
-      const responseParts = await buildFunctionResponseParts(call.name, functionResult, call.id);
-      conversationContents.push({
-        role: 'user',
-        parts: responseParts
-      });
 
       // Non-streaming continuation with updated conversation history.
       const {
         text: newText,
         functionCall: newFunctionCall,
+        functionCalls: newFunctionCalls,
         rawParts: newRawParts,
         usageMetadata: newUsage,
       } = await callGeminiWithContents(
@@ -2992,7 +3140,9 @@ Deno.serve(async (req: Request) => {
         roundUsages.push(newUsage);
         billOrionTokensForRound(userId, newUsage);
       }
-      result = newFunctionCall
+      result = newFunctionCalls && newFunctionCalls.length > 0
+        ? { functionCalls: newFunctionCalls, rawParts: newRawParts }
+        : newFunctionCall
         ? { functionCall: newFunctionCall, rawParts: newRawParts }
         : { text: newText, rawParts: newRawParts };
     }
@@ -3011,7 +3161,7 @@ Deno.serve(async (req: Request) => {
             { role: 'user', parts: [{ text: 'Please now summarise everything you found and give your final answer. Do not call any more tools.' }] }
           ],
           allTools,
-          { streaming: false, maxOutputTokens: 4000, mode: 'NONE', systemInstruction: systemPrompt }
+          { streaming: false, maxOutputTokens: 8192, mode: 'NONE', thinkingLevel: 'low', systemInstruction: systemPrompt }
         );
         if (synthesisResult.usageMetadata) {
           lastUsageMetadata = synthesisResult.usageMetadata;
@@ -3060,9 +3210,17 @@ Deno.serve(async (req: Request) => {
       validationRetryCount++;
       log(`ID Validation: Found ${idValidationResult.invalidCount} invalid refs (trades: ${idValidationResult.invalidIds.trades.length}, events: ${idValidationResult.invalidIds.events.length}, notes: ${idValidationResult.invalidIds.notes.length})`, 'warn');
 
-      if (validationRetryCount >= maxValidationRetries) {
-        // Max retries reached - strip invalid refs and continue
-        log('Max validation retries reached - proceeding with partial response', 'warn');
+      // Strip-and-stop on max retries OR wall-clock exhaustion. The
+      // non-streaming handler returns its Response only at the very end, so the
+      // 150s request-idle ceiling binds here; a post-break correction call
+      // (another 8000-token Gemini round) can cross it before the assistant
+      // message is persisted via EdgeRuntime.waitUntil → silent loss.
+      const idValidationOverBudget = Date.now() - nonStreamStartMs > NON_STREAM_BUDGET_MS;
+      if (validationRetryCount >= maxValidationRetries || idValidationOverBudget) {
+        // Strip invalid refs and continue (no further Gemini calls).
+        log(idValidationOverBudget
+          ? 'Wall-clock budget exhausted during ID validation - stripping invalid refs instead of another correction call'
+          : 'Max validation retries reached - proceeding with partial response', 'warn');
         // Remove invalid reference tags from the response
         for (const id of idValidationResult.invalidIds.trades) {
           cleanedFinalText = cleanedFinalText.replace(new RegExp(`<trade-ref\\s+id="${id}"\\s*/?>(</trade-ref>)?`, 'gi'), '');

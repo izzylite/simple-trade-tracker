@@ -103,6 +103,10 @@ export function classifyProviderError(rawMessage: string): {
  */
 export function formatErrorResponse(error: Error, model: string): AgentResponse {
   const classified = classifyProviderError(error.message);
+  // NOTE: deliberately do NOT echo the raw `error.message` back to the client.
+  // For a provider failure it is `Gemini API error: <status> - <full body>`,
+  // which can carry internal request detail. The friendly `message` covers the
+  // user; the raw string is logged server-side for debugging.
   return {
     success: false,
     message: classified.userMessage,
@@ -111,7 +115,6 @@ export function formatErrorResponse(error: Error, model: string): AgentResponse 
       model,
       timestamp: new Date().toISOString(),
     },
-    error: error.message,
     errorType: classified.errorType,
   };
 }

@@ -42,6 +42,13 @@ export interface GeminiFunctionCall {
    * tool loops should pass `rawParts` through instead of reconstructing.
    */
   thoughtSignature?: string;
+  /**
+   * Gemini 3 returns a unique id on every functionCall. The matching
+   * functionResponse should echo this id so results map back to calls by id
+   * (critical when the model emits PARALLEL calls). Older models may omit it.
+   * See: https://ai.google.dev/gemini-api/docs/function-calling#parallel-and-compositional
+   */
+  id?: string;
 }
 
 export interface CallGeminiParams {
@@ -83,6 +90,14 @@ export interface CallGeminiResult {
    * parsing the raw response.
    */
   usageMetadata?: Record<string, unknown>;
+  /**
+   * Candidate finishReason. `MAX_TOKENS` with empty `text` means the output
+   * budget was exhausted (often by thinking tokens) BEFORE any visible text —
+   * a recoverable truncation, distinct from a genuine empty answer. Callers
+   * that summarise/synthesise should detect this and retry with a bigger
+   * budget / less thinking rather than treat it as "no answer".
+   */
+  finishReason?: string;
 }
 
 export function extractFunctionCalls(
@@ -91,7 +106,7 @@ export function extractFunctionCalls(
   const calls: GeminiFunctionCall[] = [];
   for (const part of parts) {
     const fc = part.functionCall as
-      | { name?: string; args?: Record<string, unknown>; thoughtSignature?: string }
+      | { name?: string; args?: Record<string, unknown>; thoughtSignature?: string; id?: string }
       | undefined;
     if (!fc?.name) continue;
     const thoughtSignature =
@@ -101,6 +116,7 @@ export function extractFunctionCalls(
       name: fc.name,
       args: fc.args ?? {},
       thoughtSignature,
+      id: fc.id,
     });
   }
   return calls;
@@ -118,12 +134,26 @@ export async function callGemini(params: CallGeminiParams): Promise<CallGeminiRe
   }
 
   const model = params.model ?? getDefaultGeminiModel();
-  const url = `${GEMINI_API_BASE}/${model}:generateContent?key=${apiKey}`;
+  // API key goes in the x-goog-api-key header (Google's recommended practice),
+  // NOT the URL query string — a key in the URL leaks into any access log,
+  // proxy, or error that stringifies the request.
+  const url = `${GEMINI_API_BASE}/${model}:generateContent`;
 
   const body: Record<string, unknown> = {
     contents: params.contents,
     generationConfig: {
-      temperature: params.temperature ?? 0.3,
+      // Gemini 3 default is 1.0; Google warns that lowering temperature on a
+      // tool-using (AUTO/ANY) turn causes function-calling loops / degraded
+      // reasoning. So default tool-using turns to 1.0 and keep the
+      // deterministic 0.3 only for non-tool calls — structured output
+      // (responseSchema) and the forced-synthesis turn (mode: 'NONE').
+      // Callers can still override explicitly via params.temperature.
+      // See: https://ai.google.dev/gemini-api/docs/gemini-3
+      temperature:
+        params.temperature ??
+        (params.tools && params.tools.length > 0 && (params.toolMode ?? 'AUTO') !== 'NONE'
+          ? 1.0
+          : 0.3),
       maxOutputTokens: params.maxOutputTokens ?? 8192,
       ...(params.responseSchema
         ? {
@@ -156,7 +186,7 @@ export async function callGemini(params: CallGeminiParams): Promise<CallGeminiRe
     }
     response = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
       body: fetchBody,
     });
     if (response.ok || !RETRYABLE_STATUSES.has(response.status)) break;
@@ -187,6 +217,7 @@ export async function callGemini(params: CallGeminiParams): Promise<CallGeminiRe
     .join('');
 
   const functionCalls = extractFunctionCalls(rawParts);
+  const finishReason = data.candidates?.[0]?.finishReason as string | undefined;
 
-  return { text, functionCalls, rawParts, usageMetadata: data.usageMetadata };
+  return { text, functionCalls, rawParts, usageMetadata: data.usageMetadata, finishReason };
 }
