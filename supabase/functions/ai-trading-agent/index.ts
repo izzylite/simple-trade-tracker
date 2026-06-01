@@ -1137,18 +1137,39 @@ async function callGeminiStreaming(
   log(`Gemini streaming request: ${contents.length} messages, ${tools.length} tools`, 'info');
   log(`Last user message: "${message.substring(0, 100)}..."`, 'info');
 
-  let response: Response;
-  try {
-    log('Initiating Gemini fetch...', 'info');
-    response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(requestBody),
-    });
-    log(`Gemini fetch completed with status: ${response.status}`, 'info');
-  } catch (fetchError) {
-    log(`Gemini fetch failed: ${fetchError}`, 'error');
-    throw new Error(`Gemini fetch failed: ${fetchError}`);
+  // Serialize once so the body is reused across retry attempts without re-serializing.
+  const serializedBody = JSON.stringify(requestBody);
+
+  // Retry on transient 5xx / 429 — matches the retry policy in _shared/gemini.ts.
+  // callGeminiStreaming previously had zero HTTP-level retries; callGeminiWithContents
+  // (continuation turns) delegates to _shared/gemini.ts which already retries.
+  // 2 retries keeps total overhead at 3s (1s+2s) — well inside the wall-clock budget.
+  const STREAMING_RETRY_STATUSES = new Set([429, 500, 502, 503, 504]);
+  const STREAMING_MAX_RETRIES = 2;
+  let response!: Response;
+  for (let attempt = 0; attempt <= STREAMING_MAX_RETRIES; attempt++) {
+    if (attempt > 0) {
+      await new Promise((r) => setTimeout(r, 1000 * attempt));
+      log(`Gemini streaming retry ${attempt}/${STREAMING_MAX_RETRIES}`, 'warn');
+    }
+    try {
+      log('Initiating Gemini fetch...', 'info');
+      response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: serializedBody,
+      });
+      log(`Gemini fetch completed with status: ${response.status}`, 'info');
+    } catch (fetchError) {
+      if (attempt < STREAMING_MAX_RETRIES) {
+        log(`Gemini fetch failed (attempt ${attempt + 1}): ${fetchError}`, 'warn');
+        continue;
+      }
+      log(`Gemini fetch failed: ${fetchError}`, 'error');
+      throw new Error(`Gemini fetch failed: ${fetchError}`);
+    }
+    if (response.ok || !STREAMING_RETRY_STATUSES.has(response.status)) break;
+    log(`Gemini transient error (attempt ${attempt + 1}), status: ${response.status}`, 'warn');
   }
 
   if (!response.ok) {
