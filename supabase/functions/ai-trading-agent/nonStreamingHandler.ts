@@ -170,7 +170,7 @@ export async function handleNonStreamingRequest(p: NonStreamingParams): Promise<
       usageMetadata: newUsage,
     } = await callGeminiWithContents(
       p.googleApiKey, conversationContents, p.allTools,
-      { streaming: false, maxOutputTokens: 4000, systemInstruction: p.systemPrompt }
+      { streaming: false, maxOutputTokens: 8000, systemInstruction: p.systemPrompt }
     );
     if (newUsage) {
       lastUsageMetadata = newUsage;

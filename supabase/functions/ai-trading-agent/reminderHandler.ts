@@ -277,74 +277,103 @@ export async function handleReminderRequest(req: Request, body: AgentRequest): P
   const firstRoundPrompt = Number(firstRoundUsage?.promptTokenCount ?? 0);
   const assistantOutput = Number(lastUsageMetadata?.candidatesTokenCount ?? 0);
   const nextTurnEstimate = firstRoundPrompt + assistantOutput;
-  const { data: appendData, error: appendErr } = await serviceClient.rpc('append_conversation_message', {
-    p_id: conversationId,
-    p_user_id: userId,
-    p_message: newMessage,
-    p_cap: MAX_PROMPT_TOKENS,
-    p_prompt_tokens: nextTurnEstimate > 0 ? nextTurnEstimate : null,
-    p_preview: finalText ? finalText.slice(0, 200) : null,
-  });
+  // The agent loop can run up to 130s. Wrap all post-loop DB work in
+  // EdgeRuntime.waitUntil so it survives past the 150s response window
+  // even if the HTTP response has already been sent.
+  // https://supabase.com/docs/guides/functions/background-tasks
+  const er = (globalThis as { EdgeRuntime?: { waitUntil(p: Promise<unknown>): void } }).EdgeRuntime;
 
-  if (appendErr) {
-    await serviceClient.from('reminders')
-      .update({ status: 'failed', last_error: `append: ${appendErr.message}`.slice(0, 500) })
-      .eq('id', reminderId);
-    return errorResponse(`append failed: ${appendErr.message}`, 500);
+  let appendOk = false;
+  let appendSkipped = false;
+  let appendErrMsg = '';
+
+  const appendTask = (async () => {
+    const { data: appendData, error: appendErr } = await serviceClient.rpc('append_conversation_message', {
+      p_id: conversationId,
+      p_user_id: userId,
+      p_message: newMessage,
+      p_cap: MAX_PROMPT_TOKENS,
+      p_prompt_tokens: nextTurnEstimate > 0 ? nextTurnEstimate : null,
+      p_preview: finalText ? finalText.slice(0, 200) : null,
+    });
+
+    if (appendErr) {
+      appendErrMsg = appendErr.message;
+      await serviceClient.from('reminders')
+        .update({ status: 'failed', last_error: `append: ${appendErr.message}`.slice(0, 500) })
+        .eq('id', reminderId);
+      return;
+    }
+    if (appendData !== true) {
+      appendSkipped = true;
+      await serviceClient.from('reminders')
+        .update({ status: 'failed', last_error: 'token_budget_exceeded_or_gone' })
+        .eq('id', reminderId);
+      return;
+    }
+    appendOk = true;
+
+    logTurnAudit(conversationId, functionCalls, firstRoundUsage, lastUsageMetadata, roundUsages);
+
+    // Re-embed for semantic recall
+    const embedTask = maybeUpdateEmbedding(serviceClient, conversationId, userId);
+    if (er?.waitUntil) er.waitUntil(embedTask); else await embedTask;
+
+    // Mark reminder fired
+    const { error: markFiredErr } = await serviceClient.from('reminders')
+      .update({ status: 'fired', fired_at: new Date().toISOString() }).eq('id', reminderId);
+    if (markFiredErr) {
+      log('Failed to mark reminder fired (stuck in firing state)', 'error', {
+        reminderId, error: markFiredErr.message,
+      });
+    }
+
+    // Insert notification row
+    try {
+      const previewSource = (finalText || '').replace(/\s+/g, ' ').trim();
+      const preview = previewSource.length > 120 ? previewSource.slice(0, 117) + '…' : previewSource;
+      const fallbackTitle = (claimed.instructions || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+      const title = (claimed.description?.trim() || fallbackTitle || 'Reminder fired').slice(0, 200);
+      const { error: notifErr } = await serviceClient.from('notifications').insert({
+        user_id: userId,
+        type: 'reminder_fired',
+        title,
+        payload: {
+          calendarId: calendarId ?? null,
+          conversationId,
+          reminderId,
+          messageId: newMessage.id,
+          preview,
+          batchId: claimed.batch_id ?? null,
+        },
+      });
+      if (notifErr) {
+        log('Notification insert failed (non-fatal)', 'warn', { reminderId, error: notifErr.message });
+      }
+    } catch (notifThrow) {
+      log('Notification insert threw (non-fatal)', 'warn', {
+        reminderId,
+        error: notifThrow instanceof Error ? notifThrow.message : String(notifThrow),
+      });
+    }
+  })();
+
+  if (er?.waitUntil) {
+    er.waitUntil(appendTask);
+    // Await anyway to capture the result flags before the response is sent.
+    // waitUntil ensures the task runs to completion even if the await here
+    // is cut short by the response being delivered first.
+    await appendTask.catch(() => {});
+  } else {
+    await appendTask;
   }
-  if (appendData !== true) {
-    await serviceClient.from('reminders')
-      .update({ status: 'failed', last_error: 'token_budget_exceeded_or_gone' })
-      .eq('id', reminderId);
+
+  if (appendErrMsg) return errorResponse(`append failed: ${appendErrMsg}`, 500);
+  if (appendSkipped) {
     return successResponse(
       { claimed: true, fired: false, reason: 'token_budget_exceeded_or_gone' },
       'Append skipped'
     );
-  }
-
-  logTurnAudit(conversationId, functionCalls, firstRoundUsage, lastUsageMetadata, roundUsages);
-
-  // Re-embed for semantic recall
-  const er = (globalThis as { EdgeRuntime?: { waitUntil(p: Promise<unknown>): void } }).EdgeRuntime;
-  const embedTask = maybeUpdateEmbedding(serviceClient, conversationId, userId);
-  if (er?.waitUntil) er.waitUntil(embedTask); else await embedTask;
-
-  // ---- 3i. Mark reminder fired ----
-  const { error: markFiredErr } = await serviceClient.from('reminders')
-    .update({ status: 'fired', fired_at: new Date().toISOString() }).eq('id', reminderId);
-  if (markFiredErr) {
-    log('Failed to mark reminder fired (stuck in firing state)', 'error', {
-      reminderId, error: markFiredErr.message,
-    });
-  }
-
-  // ---- 3j. Insert notification row ----
-  try {
-    const previewSource = (finalText || '').replace(/\s+/g, ' ').trim();
-    const preview = previewSource.length > 120 ? previewSource.slice(0, 117) + '…' : previewSource;
-    const fallbackTitle = (claimed.instructions || '').replace(/\s+/g, ' ').trim().slice(0, 60);
-    const title = (claimed.description?.trim() || fallbackTitle || 'Reminder fired').slice(0, 200);
-    const { error: notifErr } = await serviceClient.from('notifications').insert({
-      user_id: userId,
-      type: 'reminder_fired',
-      title,
-      payload: {
-        calendarId: calendarId ?? null,
-        conversationId,
-        reminderId,
-        messageId: newMessage.id,
-        preview,
-        batchId: claimed.batch_id ?? null,
-      },
-    });
-    if (notifErr) {
-      log('Notification insert failed (non-fatal)', 'warn', { reminderId, error: notifErr.message });
-    }
-  } catch (notifThrow) {
-    log('Notification insert threw (non-fatal)', 'warn', {
-      reminderId,
-      error: notifThrow instanceof Error ? notifThrow.message : String(notifThrow),
-    });
   }
 
   return successResponse(

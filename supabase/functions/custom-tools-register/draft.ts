@@ -148,8 +148,8 @@ export async function handleDraftSchema(
       },
     ],
     responseSchema,
-    temperature: 0.4,
-    maxOutputTokens: 2048,
+    // Gemini 3: keep temperature at default 1.0 per Google recommendation.
+    maxOutputTokens: 4096,
   });
 
   interface GeminiDraftEnvelope {

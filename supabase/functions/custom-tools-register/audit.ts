@@ -100,8 +100,11 @@ export async function handleAudit(
       { role: "user", parts: [{ text: buildUserPrompt(req) }] },
     ],
     responseSchema,
-    temperature: 0.2,  // critic — keep tight
-    maxOutputTokens: 1024,
+    // Gemini 3: "strongly recommend keeping temperature at 1.0; lower values
+    // may cause looping or degraded performance." Structured output (responseSchema)
+    // keeps output deterministic regardless of temperature.
+    // https://ai.google.dev/gemini-api/docs/function-calling
+    maxOutputTokens: 4096,
   });
 
   let parsed: Partial<AuditResult>;

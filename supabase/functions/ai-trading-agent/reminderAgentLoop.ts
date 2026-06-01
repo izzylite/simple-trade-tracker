@@ -22,7 +22,11 @@ import {
   isWebhookTool,
 } from '../_shared/customTools/runtime.ts';
 import { finiteOrZero, billOrionTokensForRound } from './billing.ts';
-import { buildFunctionCallPart } from './functionCallHelpers.ts';
+import {
+  buildFunctionCallPart,
+  getWriteDedupeKey,
+  DEDUP_SKIP_RESULT,
+} from './functionCallHelpers.ts';
 import { buildFunctionResponseParts } from './sseHelpers.ts';
 import { callGemini, callGeminiWithContents } from './geminiCalls.ts';
 
@@ -50,10 +54,12 @@ export interface ReminderAgentLoopResult {
 
 export async function reminderAgentLoop(p: ReminderAgentLoopParams): Promise<ReminderAgentLoopResult> {
   const functionCalls: Array<{ name: string; args: unknown; result: string }> = [];
+  const executedWriteKeys = new Set<string>();
   let firstRoundUsage: Record<string, unknown> | undefined;
   let lastUsageMetadata: Record<string, unknown> | undefined;
   const roundUsages: Array<Record<string, unknown>> = [];
   let lastBilledPromptTokens = 0;
+  let lastBatchKey = '';
   let finalText = '';
 
   let result = await callGemini(
@@ -96,9 +102,31 @@ export async function reminderAgentLoop(p: ReminderAgentLoopParams): Promise<Rem
       break;
     }
 
+    // Repeated-batch guard: same tool batch twice = stuck loop.
+    const batchKey = result.functionCalls.map(c => `${c.name}:${JSON.stringify(c.args)}`).sort().join('|');
+    if (batchKey === lastBatchKey) {
+      log('[reminder] Repeated function batch detected — breaking loop', 'warn');
+      break;
+    }
+    lastBatchKey = batchKey;
+
+    // search_web rate cap: 3 calls per turn maximum.
+    const searchWebCount = functionCalls.filter(fc => fc.name === 'search_web').length;
+    if (searchWebCount >= 3 && result.functionCalls.some(c => c.name === 'search_web')) {
+      log('[reminder] search_web rate limit (3/turn) reached — breaking loop', 'info');
+      break;
+    }
+
     log(`[reminder] Executing ${result.functionCalls.length} function(s)`, 'info');
     const execResults = await Promise.all(result.functionCalls.map(async (call) => {
       try {
+        const dedupeKey = getWriteDedupeKey(call.name, call.args);
+        if (dedupeKey && executedWriteKeys.has(dedupeKey)) {
+          log(`[reminder] Dedup: skipping duplicate write ${call.name}`, 'warn');
+          return { call, result: DEDUP_SKIP_RESULT };
+        }
+        if (dedupeKey) executedWriteKeys.add(dedupeKey);
+
         const r = CUSTOM_TOOL_NAMES.has(call.name)
           ? await executeCustomTool(call.name, call.args, {
             userId: p.userId, calendarId: p.calendarId, conversationId: p.conversationId
@@ -130,7 +158,7 @@ export async function reminderAgentLoop(p: ReminderAgentLoopParams): Promise<Rem
 
     const cont = await callGeminiWithContents(
       p.googleApiKey, conversationContents, p.allTools,
-      { streaming: false, maxOutputTokens: 4000, systemInstruction: p.systemPrompt }
+      { streaming: false, maxOutputTokens: 8000, systemInstruction: p.systemPrompt }
     );
     if (cont.usageMetadata) {
       lastUsageMetadata = cont.usageMetadata;
