@@ -1383,6 +1383,48 @@ function validateUserDataIsolation(response: unknown, expectedUserId: string): {
 }
 
 /**
+ * Within-turn write-deduplication.
+ *
+ * The empty-bug retry and sequential repeated-call loop can both cause the
+ * same write tool (manage_note create, manage_event record, etc.) to run twice
+ * within a single user turn.  For every tool call we compute a stable key over
+ * (name, args); if we've seen the key before we skip execution and return a
+ * canned message so Gemini can synthesise from the earlier result without
+ * re-applying the mutation.
+ *
+ * Only write-capable tool+action combinations are tracked.  Read-only actions
+ * (search, get, list, recall) and all MCP tools (read_only=true on MCP URL)
+ * are intentionally excluded — they're safe to re-execute and excluding them
+ * would block legitimate clarification searches.
+ */
+const WRITE_TOOL_ACTIONS: ReadonlyMap<string, ReadonlySet<string> | 'all'> = new Map([
+  ['manage_note',      new Set(['create', 'update', 'delete'])],
+  ['manage_event',     new Set(['record'])],
+  ['manage_tag',       new Set(['save'])],
+  ['manage_reminder',  new Set(['set', 'cancel', 'edit'])],
+  ['update_memory',    'all' as const],
+  ['apply_rule_change','all' as const],
+]);
+
+function getWriteDedupeKey(toolName: string, args: Record<string, unknown>): string | null {
+  // Webhook tools are always side-effecting; dedup any repeat.
+  if (isWebhookTool(toolName)) return `${toolName}:${JSON.stringify(args)}`;
+
+  const entry = WRITE_TOOL_ACTIONS.get(toolName);
+  if (!entry) return null; // pure read-only tool or MCP tool
+
+  if (entry === 'all') return `${toolName}:${JSON.stringify(args)}`;
+
+  const action = typeof args.action === 'string' ? args.action : '';
+  if (!(entry as ReadonlySet<string>).has(action)) return null; // read action, safe to repeat
+
+  return `${toolName}:${JSON.stringify(args)}`;
+}
+
+const DEDUP_SKIP_RESULT =
+  'This action was already performed earlier in this turn with the same arguments — skipping to prevent a duplicate write. The result from the earlier execution still applies.';
+
+/**
  * Handle streaming request with SSE
  */
 function handleStreamingRequest(
@@ -1409,6 +1451,10 @@ function handleStreamingRequest(
     try {
 
       const functionCalls: Array<{ name: string; args: unknown; result: string }> = [];
+      // Tracks (toolName + serialised args) for every write call executed this
+      // turn so re-submissions (empty-bug retries, repeated model calls) skip
+      // re-execution rather than double-applying a mutation.
+      const executedWriteKeys = new Set<string>();
       let finalText = '';
       let turnCount = 0;
       const maxTurns = 15;
@@ -1587,6 +1633,16 @@ function handleStreamingRequest(
           const supabaseClient = createServiceClient();
           const executionPromises = result.functionCalls.map(async (call) => {
             try {
+              // Within-turn write dedup: skip re-execution if we've already
+              // run this exact write call.  The key must be computed before any
+              // await so the Set check is synchronous (parallel promises race).
+              const dedupeKey = getWriteDedupeKey(call.name, call.args);
+              if (dedupeKey && executedWriteKeys.has(dedupeKey)) {
+                log(`Dedup: skipping duplicate write ${call.name} (same args, already executed this turn)`, 'warn');
+                return { call, result: DEDUP_SKIP_RESULT, success: true };
+              }
+              if (dedupeKey) executedWriteKeys.add(dedupeKey);
+
               const result = CUSTOM_TOOL_NAMES.has(call.name)
                 ? await executeCustomTool(call.name, call.args, {
                   userId,
@@ -1676,23 +1732,33 @@ function handleStreamingRequest(
 
           let functionResult: string;
 
-          // Execute tool (custom or MCP or user-defined webhook)
-          const supabaseClient = createServiceClient();
-          if (CUSTOM_TOOL_NAMES.has(call.name)) {
-            functionResult = await executeCustomTool(call.name, call.args, {
-                  userId,
-                  calendarId: _calendarId,
-                  conversationId
-                }, supabaseClient);
-          } else if (isWebhookTool(call.name)) {
-            functionResult = await dispatchWebhookTool({
-              userId,
-              registeredName: call.name,
-              args: call.args,
-              conversationId: conversationId ?? null,
-            });
+          // Within-turn write dedup: skip re-execution of a write tool we
+          // already ran this turn with the same args.
+          const seqDedupeKey = getWriteDedupeKey(call.name, call.args);
+          if (seqDedupeKey && executedWriteKeys.has(seqDedupeKey)) {
+            log(`Dedup: skipping duplicate write ${call.name} (same args, already executed this turn)`, 'warn');
+            functionResult = DEDUP_SKIP_RESULT;
           } else {
-            functionResult = await callMCPTool(projectRef, supabaseAccessToken, call.name, call.args);
+            if (seqDedupeKey) executedWriteKeys.add(seqDedupeKey);
+
+            // Execute tool (custom or MCP or user-defined webhook)
+            const supabaseClient = createServiceClient();
+            if (CUSTOM_TOOL_NAMES.has(call.name)) {
+              functionResult = await executeCustomTool(call.name, call.args, {
+                    userId,
+                    calendarId: _calendarId,
+                    conversationId
+                  }, supabaseClient);
+            } else if (isWebhookTool(call.name)) {
+              functionResult = await dispatchWebhookTool({
+                userId,
+                registeredName: call.name,
+                args: call.args,
+                conversationId: conversationId ?? null,
+              });
+            } else {
+              functionResult = await callMCPTool(projectRef, supabaseAccessToken, call.name, call.args);
+            }
           }
 
           functionCalls.push({ name: call.name, args: call.args, result: functionResult });
