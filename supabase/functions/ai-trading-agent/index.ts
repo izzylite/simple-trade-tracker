@@ -778,28 +778,54 @@ async function buildFunctionResponseParts(
     const imageUrl = imageMarkerMatch[1];
     log(`Injecting image into conversation: ${imageUrl.substring(0, 50)}...`, 'info');
 
+    // Strip the marker (and the "IMAGE LOADED SUCCESSFULLY" header line that follows)
+    // so the fallback text is always honest — the model must never see that claim
+    // if the image was not actually fetched.
+    const textWithoutMarker = result.replace(/\[IMAGE_ANALYSIS:[^\]]+\]\n?/, '').trim();
+
+    // Safety: re-validate the URL here as a second layer (primary validation happens
+    // in executeAnalyzeImage). Belt-and-suspenders for any code path that might
+    // synthesise a marker without going through the tool executor.
+    let urlAllowed = false;
     try {
-      // Fetch and convert image to base64
-      const imageResponse = await fetch(imageUrl);
+      const p = new URL(imageUrl);
+      urlAllowed = p.protocol === 'https:';
+    } catch { /* invalid URL */ }
+
+    if (!urlAllowed) {
+      log(`buildFunctionResponseParts: blocked non-https image URL`, 'warn');
+      parts.push(buildFnResponse({ result: 'Image could not be loaded (unsupported URL). Please describe the trade based on available context.' }));
+      return parts;
+    }
+
+    const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB — cap before base64 expansion
+    try {
+      // 15s timeout so a slow/hung image fetch cannot eat the wall-clock budget
+      const imageResponse = await fetch(imageUrl, {
+        signal: AbortSignal.timeout(15_000),
+      });
       if (imageResponse.ok) {
+        // Fast-fail on Content-Length before we stream the body
+        const clHeader = Number(imageResponse.headers.get('content-length') || 0);
+        if (clHeader > MAX_IMAGE_BYTES) {
+          log(`Image too large (Content-Length: ${clHeader} bytes) — skipping`, 'warn');
+          parts.push(buildFnResponse({ result: 'Image could not be loaded (file too large). Please describe the trade based on available context.' }));
+          return parts;
+        }
+
         const imageBuffer = await imageResponse.arrayBuffer();
-        // Use Deno's encodeBase64 which handles large buffers without stack overflow
+        if (imageBuffer.byteLength > MAX_IMAGE_BYTES) {
+          log(`Image too large (actual: ${imageBuffer.byteLength} bytes) — skipping`, 'warn');
+          parts.push(buildFnResponse({ result: 'Image could not be loaded (file too large). Please describe the trade based on available context.' }));
+          return parts;
+        }
+
         const base64Image = encodeBase64(new Uint8Array(imageBuffer));
         const contentType = imageResponse.headers.get('content-type') || 'image/png';
         const mimeType = contentType.split(';')[0].trim();
 
-        // Add image as inline_data part first (so model sees image before instructions)
-        parts.push({
-          inline_data: {
-            mime_type: mimeType,
-            data: base64Image
-          }
-        });
-
-        // Add text instructions (without the marker)
-        const textWithoutMarker = result.replace(/\[IMAGE_ANALYSIS:[^\]]+\]\n?/, '').trim();
+        parts.push({ inline_data: { mime_type: mimeType, data: base64Image } });
         parts.push(buildFnResponse({ result: textWithoutMarker }));
-
         log('Image injected successfully into conversation', 'info');
         return parts;
       } else {
@@ -808,6 +834,11 @@ async function buildFunctionResponseParts(
     } catch (error) {
       log(`Error fetching image for injection: ${error}`, 'error');
     }
+
+    // Fetch failed — return the cleaned text (marker stripped) so the model
+    // does NOT see "IMAGE LOADED SUCCESSFULLY" and hallucinate an analysis.
+    parts.push(buildFnResponse({ result: `Image could not be loaded. ${textWithoutMarker}` }));
+    return parts;
   }
 
   // Default: just return text function response
@@ -867,6 +898,7 @@ async function fetchTradeImages(
   if (!images?.length) return [];
 
   const MAX_TRADE_IMAGES = 4;
+  const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
   const toFetch = images.slice(0, MAX_TRADE_IMAGES);
   const results: Array<{ url: string; mimeType: string }> = [];
 
@@ -876,13 +908,29 @@ async function fetchTradeImages(
       if (!imageUrl) return;
 
       try {
-        const response = await fetch(imageUrl);
+        // 15s timeout — 4 concurrent fetches before turn 0 must not eat the
+        // wall-clock budget. Trade images are user-uploaded Supabase Storage
+        // objects so SSRF risk is low, but timeout + size cap still apply.
+        const response = await fetch(imageUrl, {
+          signal: AbortSignal.timeout(15_000),
+        });
         if (!response.ok) {
           log(`[TradeImages] Failed to fetch ${imageUrl.substring(0, 50)}: ${response.status}`, 'warn');
           return;
         }
 
+        const clHeader = Number(response.headers.get('content-length') || 0);
+        if (clHeader > MAX_IMAGE_BYTES) {
+          log(`[TradeImages] Skipping oversized image (Content-Length: ${clHeader})`, 'warn');
+          return;
+        }
+
         const buffer = await response.arrayBuffer();
+        if (buffer.byteLength > MAX_IMAGE_BYTES) {
+          log(`[TradeImages] Skipping oversized image (actual: ${buffer.byteLength} bytes)`, 'warn');
+          return;
+        }
+
         const base64 = encodeBase64(new Uint8Array(buffer));
         const contentType = response.headers.get('content-type') || 'image/png';
         const mimeType = contentType.split(';')[0].trim();

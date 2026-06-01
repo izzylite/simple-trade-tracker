@@ -50,6 +50,56 @@ function isStockImageUrl(url: string): boolean {
   return stockDomains.some((domain) => url.toLowerCase().includes(domain));
 }
 
+/**
+ * Block server-side fetch of URLs that point at internal/metadata endpoints.
+ * Deno.resolveDns is not available in Supabase Edge Functions so we use
+ * hostname pattern matching rather than IP resolution.
+ *
+ * Allowed: any public HTTPS URL that doesn't resolve to a private range by
+ * hostname pattern. The edge function's network egress is restricted by
+ * Supabase anyway, but defense-in-depth matters for SSRF.
+ */
+function isAllowedImageUrl(url: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+
+  // Only HTTPS — no http://, data:, file:, ftp:, etc.
+  if (parsed.protocol !== 'https:') return false;
+
+  const host = parsed.hostname.toLowerCase();
+
+  // Loopback and link-local hostnames
+  if (
+    host === 'localhost' ||
+    host === '127.0.0.1' ||
+    host === '::1' ||
+    host.endsWith('.local') ||
+    host.endsWith('.internal') ||
+    host.endsWith('.localhost')
+  ) return false;
+
+  // Literal private / link-local IPv4 ranges:
+  //   10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16, 127.x
+  const ipv4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (ipv4) {
+    const [a, b] = [Number(ipv4[1]), Number(ipv4[2])];
+    if (
+      a === 10 ||
+      a === 127 ||
+      a === 0 ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      (a === 169 && b === 254)   // AWS / GCP metadata
+    ) return false;
+  }
+
+  return true;
+}
+
 function analyzeImage(
   imageUrl: string,
   analysisFocus: string = "overview",
@@ -112,5 +162,14 @@ export function executeAnalyzeImage(args: Record<string, unknown>): string {
   const tradeContext = typeof args.trade_context === "string"
     ? args.trade_context
     : undefined;
+
+  // Block URLs that point at internal / metadata endpoints before emitting
+  // the [IMAGE_ANALYSIS:] marker. The marker triggers a server-side fetch in
+  // buildFunctionResponseParts; if the URL is disallowed we never create it.
+  if (!isAllowedImageUrl(imageUrl)) {
+    log(`analyze_image: rejected URL (not an allowed public HTTPS URL): ${imageUrl.substring(0, 80)}`, "warn");
+    return "Image analysis skipped: the provided URL is not a supported image source. Only public HTTPS image URLs are supported.";
+  }
+
   return analyzeImage(imageUrl, analysisFocus, tradeContext);
 }
