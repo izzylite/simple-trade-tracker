@@ -58,7 +58,8 @@
     "migrate-trade-events": "node migrate-trade-economic-events.js",
     "setup-vector-index": "node scripts/setup-vector-index.js",
     "test:ai": "node scripts/test-ai-agent.js",
-    "test:ai:formatter": "node scripts/test-chart-formatter.js"
+    "test:ai:formatter": "node scripts/test-chart-formatter.js",
+    "gen-icons": "node scripts/gen-rounded-icons.js"
   },
   "eslintConfig": {
     "extends": [
