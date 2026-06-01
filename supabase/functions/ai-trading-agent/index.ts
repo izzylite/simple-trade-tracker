@@ -1397,13 +1397,13 @@ function validateUserDataIsolation(response: unknown, expectedUserId: string): {
  * are intentionally excluded — they're safe to re-execute and excluding them
  * would block legitimate clarification searches.
  */
-const WRITE_TOOL_ACTIONS: ReadonlyMap<string, ReadonlySet<string> | 'all'> = new Map([
+const WRITE_TOOL_ACTIONS = new Map<string, Set<string> | 'all'>([
   ['manage_note',      new Set(['create', 'update', 'delete'])],
   ['manage_event',     new Set(['record'])],
   ['manage_tag',       new Set(['save'])],
   ['manage_reminder',  new Set(['set', 'cancel', 'edit'])],
-  ['update_memory',    'all' as const],
-  ['apply_rule_change','all' as const],
+  ['update_memory',    'all'],
+  ['apply_rule_change','all'],
 ]);
 
 function getWriteDedupeKey(toolName: string, args: Record<string, unknown>): string | null {
@@ -1416,7 +1416,7 @@ function getWriteDedupeKey(toolName: string, args: Record<string, unknown>): str
   if (entry === 'all') return `${toolName}:${JSON.stringify(args)}`;
 
   const action = typeof args.action === 'string' ? args.action : '';
-  if (!(entry as ReadonlySet<string>).has(action)) return null; // read action, safe to repeat
+  if (!(entry as Set<string>).has(action)) return null; // read action, safe to repeat
 
   return `${toolName}:${JSON.stringify(args)}`;
 }
@@ -1598,6 +1598,7 @@ function handleStreamingRequest(
       // Function calling loop — per Google docs, loop until no function calls remain.
       // Do NOT use finalText as a loop exit condition: the model may return text
       // alongside function calls (e.g. "Let me search...") which is not the final answer.
+      let lastBatchKey = '';
       while (turnCount < maxTurns) {
         turnCount++;
 
@@ -1611,26 +1612,45 @@ function handleStreamingRequest(
           break;
         }
 
-        // If we have text and NO function calls, we're done (final answer)
-        if (result.text && !result.functionCall && !result.functionCalls) {
-          finalText = result.text;
+        // Normalize single functionCall → array so there is one execution path.
+        if (result.functionCall && !result.functionCalls) {
+          result = { ...result, functionCalls: [result.functionCall], functionCall: undefined };
+        }
+
+        // No function calls → final answer or empty response.
+        if (!result.functionCalls?.length) {
+          if (result.text) finalText = result.text;
+          else if (!finalText) log('Warning: No function calls and no text in response — breaking loop', 'warn');
           break;
         }
 
-        // Handle multiple function calls (parallel execution)
-        if (result.functionCalls && result.functionCalls.length > 0) {
-          log(`Executing ${result.functionCalls.length} functions in parallel`, 'info');
+        // Repeated-batch guard: same call set two turns in a row → model is stuck.
+        const batchKey = result.functionCalls.map(c => `${c.name}:${JSON.stringify(c.args)}`).sort().join('|');
+        if (batchKey === lastBatchKey) {
+          log('Detected repeated function batch — breaking loop to prevent infinite loop', 'info');
+          break;
+        }
+        lastBatchKey = batchKey;
 
-          // Send all tool_call events first
-          for (const call of result.functionCalls) {
-            await sendSSE(writer, 'tool_call', {
-              name: call.name,
-              args: call.args
-            });
-          }
+        // search_web rate limit: cap total search calls per turn at 3.
+        const searchWebExecuted = functionCalls.filter(fc => fc.name === 'search_web').length;
+        if (searchWebExecuted >= 3 && result.functionCalls.some(c => c.name === 'search_web')) {
+          log('search_web rate limit reached (3 calls per turn) — breaking loop', 'info');
+          break;
+        }
 
-          // Execute all tools in parallel
-          const supabaseClient = createServiceClient();
+        log(`Executing ${result.functionCalls.length} function(s)`, 'info');
+
+        // Send all tool_call events first
+        for (const call of result.functionCalls) {
+          await sendSSE(writer, 'tool_call', {
+            name: call.name,
+            args: call.args
+          });
+        }
+
+        // Execute all tools — single calls run as a 1-element batch.
+        const supabaseClient = createServiceClient();
           const executionPromises = result.functionCalls.map(async (call) => {
             try {
               // Within-turn write dedup: skip re-execution if we've already
@@ -1703,96 +1723,6 @@ function handleStreamingRequest(
             role: 'user',
             parts: userParts
           });
-        }
-        // Handle single function call (sequential execution - backward compatibility)
-        else if (result.functionCall) {
-          const call = result.functionCall;
-          log(`Executing function: ${call.name}`, 'info');
-
-          // Send tool_call event
-          await sendSSE(writer, 'tool_call', {
-            name: call.name,
-            args: call.args
-          });
-
-          // Check for repeated calls
-          const lastCall = functionCalls[functionCalls.length - 1];
-          if (lastCall && lastCall.name === call.name &&
-              JSON.stringify(lastCall.args) === JSON.stringify(call.args)) {
-            log('Detected repeated function call - breaking loop', 'info');
-            break;
-          }
-
-          // Check for too many search_web calls
-          const searchWebCount = functionCalls.filter(fc => fc.name === 'search_web').length;
-          if (call.name === 'search_web' && searchWebCount >= 3) {
-            log('Too many search_web calls - breaking loop', 'info');
-            break;
-          }
-
-          let functionResult: string;
-
-          // Within-turn write dedup: skip re-execution of a write tool we
-          // already ran this turn with the same args.
-          const seqDedupeKey = getWriteDedupeKey(call.name, call.args);
-          if (seqDedupeKey && executedWriteKeys.has(seqDedupeKey)) {
-            log(`Dedup: skipping duplicate write ${call.name} (same args, already executed this turn)`, 'warn');
-            functionResult = DEDUP_SKIP_RESULT;
-          } else {
-            if (seqDedupeKey) executedWriteKeys.add(seqDedupeKey);
-
-            // Execute tool (custom or MCP or user-defined webhook)
-            const supabaseClient = createServiceClient();
-            if (CUSTOM_TOOL_NAMES.has(call.name)) {
-              functionResult = await executeCustomTool(call.name, call.args, {
-                    userId,
-                    calendarId: _calendarId,
-                    conversationId
-                  }, supabaseClient);
-            } else if (isWebhookTool(call.name)) {
-              functionResult = await dispatchWebhookTool({
-                userId,
-                registeredName: call.name,
-                args: call.args,
-                conversationId: conversationId ?? null,
-              });
-            } else {
-              functionResult = await callMCPTool(projectRef, supabaseAccessToken, call.name, call.args);
-            }
-          }
-
-          functionCalls.push({ name: call.name, args: call.args, result: functionResult });
-
-          // Send tool_result event (redacted for the client; Gemini still gets
-          // the full result via buildFunctionResponseParts below).
-          await sendSSE(writer, 'tool_result', {
-            name: call.name,
-            result: redactToolErrorForClient(call.name, functionResult)
-          });
-
-          // Echo the model turn verbatim (preserves thoughtSignature Parts)
-          const singleCallModelParts = result.rawParts && result.rawParts.length > 0
-            ? result.rawParts
-            : [buildFunctionCallPart(call)];
-          conversationContents.push({
-            role: 'model',
-            parts: singleCallModelParts
-          });
-
-          // Build multimodal response parts (handles image injection).
-          // Pass call.id for Gemini 3 id mapping.
-          const responseParts = await buildFunctionResponseParts(call.name, functionResult, call.id);
-          conversationContents.push({
-            role: 'user',
-            parts: responseParts
-          });
-        } else {
-          // No function calls - check if we have text (final answer) or empty response
-          if (!result.text && !finalText) {
-            log('Warning: No function calls and no text in response - breaking loop', 'warn');
-          }
-          break;
-        }
 
         // Continuation call — conversationContents is already in Gemini format.
         // If the model returns both text and a function call in the same turn,
@@ -1815,24 +1745,23 @@ function handleStreamingRequest(
           billOrionTokensForRound(userId, newUsage);
         }
 
-        if (!newFunctionCall && newText) {
+        const hasNewCalls = (newFunctionCalls?.length ?? 0) > 0 || !!newFunctionCall;
+        if (!hasNewCalls && newText) {
           // Text was already streamed as text_chunk — this is the final answer
           finalText = newText;
-        } else if (newFunctionCall && newText) {
+        } else if (hasNewCalls && newText) {
           // Text was streamed but was narration alongside a function call.
           // Reset the frontend's accumulated text and re-send as thought_chunk.
           await sendSSE(writer, 'text_reset', {});
           await sendSSE(writer, 'thought_chunk', { text: newText });
         }
 
-        // Forward the FULL set: when the model emitted parallel calls,
-        // `functionCalls` must reach the loop's parallel branch so every call
-        // is executed and answered. Dropping it back to a single `functionCall`
-        // is what unbalanced the next turn (N calls echoed, 1 response).
+        // Normalize: always use functionCalls array so the next iteration
+        // has one unified path.  Single functionCall is wrapped into an array.
         result = newFunctionCalls && newFunctionCalls.length > 0
           ? { functionCalls: newFunctionCalls, text: newText || undefined, rawParts: newRawParts }
           : newFunctionCall
-          ? { functionCall: newFunctionCall, text: newText || undefined, rawParts: newRawParts }
+          ? { functionCalls: [newFunctionCall], text: newText || undefined, rawParts: newRawParts }
           : { text: newText, rawParts: newRawParts };
       }
 
@@ -2514,82 +2443,42 @@ async function handleReminderRequest(req: Request, body: AgentRequest): Promise<
         break;
       }
 
-      // Final answer: text and no pending calls (single OR parallel).
-      if (result.text && !result.functionCall && !result.functionCalls) {
-        finalText = result.text;
+      // Normalize single functionCall → array so there is one execution path.
+      if (result.functionCall && !result.functionCalls) {
+        result = { ...result, functionCalls: [result.functionCall], functionCall: undefined };
+      }
+
+      // No function calls → final answer or empty.
+      if (!result.functionCalls?.length) {
+        if (result.text) finalText = result.text;
         break;
       }
 
-      if (result.functionCalls && result.functionCalls.length > 0) {
-        // Parallel calls — execute ALL and return one functionResponse per call
-        // so the echoed model turn (N functionCall parts) stays balanced and
-        // Gemini doesn't 400 on the next turn.
-        log(`[reminder] Executing ${result.functionCalls.length} functions in parallel`, 'info');
-        const execResults = await Promise.all(result.functionCalls.map(async (call) => {
-          try {
-            const r = CUSTOM_TOOL_NAMES.has(call.name)
-              ? await executeCustomTool(call.name, call.args, { userId, calendarId, conversationId }, serviceClient)
-              : isWebhookTool(call.name)
-              ? await dispatchWebhookTool({ userId, registeredName: call.name, args: call.args, conversationId: conversationId ?? null })
-              : await callMCPTool(projectRef, supabaseAccessToken, call.name, call.args);
-            return { call, result: r };
-          } catch (error) {
-            log(`[reminder] Error executing ${call.name}: ${error}`, 'error');
-            return { call, result: `Error: ${error}` };
-          }
-        }));
-        const userParts: Array<Record<string, unknown>> = [];
-        for (const { call, result: funcResult } of execResults) {
-          functionCalls.push({ name: call.name, args: call.args, result: funcResult });
-          const responseParts = await buildFunctionResponseParts(call.name, funcResult, call.id);
-          userParts.push(...responseParts);
+      log(`[reminder] Executing ${result.functionCalls.length} function(s)`, 'info');
+      const execResults = await Promise.all(result.functionCalls.map(async (call) => {
+        try {
+          const r = CUSTOM_TOOL_NAMES.has(call.name)
+            ? await executeCustomTool(call.name, call.args, { userId, calendarId, conversationId }, serviceClient)
+            : isWebhookTool(call.name)
+            ? await dispatchWebhookTool({ userId, registeredName: call.name, args: call.args, conversationId: conversationId ?? null })
+            : await callMCPTool(projectRef, supabaseAccessToken, call.name, call.args);
+          return { call, result: r };
+        } catch (error) {
+          log(`[reminder] Error executing ${call.name}: ${error}`, 'error');
+          return { call, result: `Error: ${error}` };
         }
-        const modelParts = result.rawParts && result.rawParts.length > 0
-          ? result.rawParts
-          : result.functionCalls.map(buildFunctionCallPart);
-        conversationContents.push({ role: 'model', parts: modelParts });
-        conversationContents.push({ role: 'user', parts: userParts });
-      } else if (result.functionCall) {
-        const call = result.functionCall;
-        log(`[reminder] Executing function: ${call.name}`, 'info');
-
-        // Repeat-call detection (mirrors chat path).
-        const lastCall = functionCalls[functionCalls.length - 1];
-        if (lastCall && lastCall.name === call.name &&
-            JSON.stringify(lastCall.args) === JSON.stringify(call.args)) {
-          log('[reminder] Detected repeated function call - breaking loop', 'info');
-          break;
-        }
-
-        let functionResult: string;
-        if (CUSTOM_TOOL_NAMES.has(call.name)) {
-          functionResult = await executeCustomTool(
-            call.name,
-            call.args,
-            { userId, calendarId, conversationId },
-            serviceClient
-          );
-        } else if (isWebhookTool(call.name)) {
-          functionResult = await dispatchWebhookTool({
-            userId,
-            registeredName: call.name,
-            args: call.args,
-            conversationId: conversationId ?? null,
-          });
-        } else {
-          functionResult = await callMCPTool(projectRef, supabaseAccessToken, call.name, call.args);
-        }
-        functionCalls.push({ name: call.name, args: call.args, result: functionResult });
-
-        const modelTurnParts = result.rawParts && result.rawParts.length > 0
-          ? result.rawParts
-          : [buildFunctionCallPart(call)];
-        conversationContents.push({ role: 'model', parts: modelTurnParts });
-        const responseParts = await buildFunctionResponseParts(call.name, functionResult, call.id);
-        conversationContents.push({ role: 'user', parts: responseParts });
-      } else {
-        break;
+      }));
+      const userParts: Array<Record<string, unknown>> = [];
+      for (const { call, result: funcResult } of execResults) {
+        functionCalls.push({ name: call.name, args: call.args, result: funcResult });
+        const responseParts = await buildFunctionResponseParts(call.name, funcResult, call.id);
+        userParts.push(...responseParts);
       }
+      const modelParts = result.rawParts && result.rawParts.length > 0
+        ? result.rawParts
+        : result.functionCalls.map(buildFunctionCallPart);
+      conversationContents.push({ role: 'model', parts: modelParts });
+      conversationContents.push({ role: 'user', parts: userParts });
 
       const cont = await callGeminiWithContents(
         googleApiKey,
@@ -2605,7 +2494,7 @@ async function handleReminderRequest(req: Request, body: AgentRequest): Promise<
       result = cont.functionCalls && cont.functionCalls.length > 0
         ? { functionCalls: cont.functionCalls, rawParts: cont.rawParts }
         : cont.functionCall
-        ? { functionCall: cont.functionCall, rawParts: cont.rawParts }
+        ? { functionCalls: [cont.functionCall], rawParts: cont.rawParts }
         : { text: cont.text, rawParts: cont.rawParts };
     }
 
@@ -3161,100 +3050,44 @@ Deno.serve(async (req: Request) => {
         break;
       }
 
-      // Only treat text as final answer when there are NO pending calls.
-      if (result.text && !result.functionCall && !result.functionCalls) {
-        finalText = result.text;
+      // Normalize single functionCall → array so there is one execution path.
+      if (result.functionCall && !result.functionCalls) {
+        result = { ...result, functionCalls: [result.functionCall], functionCall: undefined };
+      }
+
+      // No function calls → final answer or empty.
+      if (!result.functionCalls?.length) {
+        if (result.text) finalText = result.text;
         break;
       }
 
       const supabaseClient = createServiceClient();
 
-      if (result.functionCalls && result.functionCalls.length > 0) {
-        // Parallel calls — execute ALL and return one functionResponse per call
-        // so the echoed model turn stays balanced (else Gemini 400s next turn).
-        log(`Executing ${result.functionCalls.length} functions in parallel`, 'info');
-        const execResults = await Promise.all(result.functionCalls.map(async (call) => {
-          try {
-            const r = CUSTOM_TOOL_NAMES.has(call.name)
-              ? await executeCustomTool(call.name, call.args, { userId, calendarId, conversationId }, supabaseClient)
-              : isWebhookTool(call.name)
-              ? await dispatchWebhookTool({ userId, registeredName: call.name, args: call.args, conversationId: conversationId ?? null })
-              : await callMCPTool(projectRef, supabaseAccessToken, call.name, call.args);
-            return { call, result: r };
-          } catch (error) {
-            log(`Error executing ${call.name}: ${error}`, 'error');
-            return { call, result: `Error: ${error}` };
-          }
-        }));
-        const userParts: Array<Record<string, unknown>> = [];
-        for (const { call, result: funcResult } of execResults) {
-          functionCalls.push({ name: call.name, args: call.args, result: funcResult });
-          const responseParts = await buildFunctionResponseParts(call.name, funcResult, call.id);
-          userParts.push(...responseParts);
+      log(`Executing ${result.functionCalls.length} function(s)`, 'info');
+      const execResults = await Promise.all(result.functionCalls.map(async (call) => {
+        try {
+          const r = CUSTOM_TOOL_NAMES.has(call.name)
+            ? await executeCustomTool(call.name, call.args, { userId, calendarId, conversationId }, supabaseClient)
+            : isWebhookTool(call.name)
+            ? await dispatchWebhookTool({ userId, registeredName: call.name, args: call.args, conversationId: conversationId ?? null })
+            : await callMCPTool(projectRef, supabaseAccessToken, call.name, call.args);
+          return { call, result: r };
+        } catch (error) {
+          log(`Error executing ${call.name}: ${error}`, 'error');
+          return { call, result: `Error: ${error}` };
         }
-        const modelParts = result.rawParts && result.rawParts.length > 0
-          ? result.rawParts
-          : result.functionCalls.map(buildFunctionCallPart);
-        conversationContents.push({ role: 'model', parts: modelParts });
-        conversationContents.push({ role: 'user', parts: userParts });
-      } else if (result.functionCall) {
-        const call = result.functionCall;
-        log(`Executing function: ${call.name}`, 'info');
-
-        // Check if we're repeating the same function call (sign of being stuck)
-        const lastCall = functionCalls[functionCalls.length - 1];
-        if (lastCall && lastCall.name === call.name &&
-            JSON.stringify(lastCall.args) === JSON.stringify(call.args)) {
-          log('Detected repeated function call - breaking loop to avoid infinite loop', 'info');
-          break;
-        }
-
-        // Check if we've made too many search_web calls (more than 3)
-        const searchWebCount = functionCalls.filter(fc => fc.name === 'search_web').length;
-        if (call.name === 'search_web' && searchWebCount >= 3) {
-          log('Too many search_web calls - breaking loop', 'info');
-          break;
-        }
-
-        let functionResult: string;
-        if (CUSTOM_TOOL_NAMES.has(call.name)) {
-          functionResult = await executeCustomTool(call.name, call.args, {
-                  userId,
-                  calendarId,
-                  conversationId
-                }, supabaseClient);
-        } else if (isWebhookTool(call.name)) {
-          functionResult = await dispatchWebhookTool({
-            userId,
-            registeredName: call.name,
-            args: call.args,
-            conversationId: conversationId ?? null,
-          });
-        } else {
-          functionResult = await callMCPTool(projectRef, supabaseAccessToken, call.name, call.args);
-        }
-        functionCalls.push({ name: call.name, args: call.args, result: functionResult });
-
-        // Echo the model turn verbatim (preserves thoughtSignature Parts)
-        const modelTurnParts = result.rawParts && result.rawParts.length > 0
-          ? result.rawParts
-          : [buildFunctionCallPart(call)];
-        conversationContents.push({
-          role: 'model',
-          parts: modelTurnParts
-        });
-
-        // Append function response (handles image injection). Pass call.id for
-        // Gemini 3 id mapping.
-        const responseParts = await buildFunctionResponseParts(call.name, functionResult, call.id);
-        conversationContents.push({
-          role: 'user',
-          parts: responseParts
-        });
-      } else {
-        // No function call and no text - shouldn't happen
-        break;
+      }));
+      const userParts: Array<Record<string, unknown>> = [];
+      for (const { call, result: funcResult } of execResults) {
+        functionCalls.push({ name: call.name, args: call.args, result: funcResult });
+        const responseParts = await buildFunctionResponseParts(call.name, funcResult, call.id);
+        userParts.push(...responseParts);
       }
+      const modelParts = result.rawParts && result.rawParts.length > 0
+        ? result.rawParts
+        : result.functionCalls.map(buildFunctionCallPart);
+      conversationContents.push({ role: 'model', parts: modelParts });
+      conversationContents.push({ role: 'user', parts: userParts });
 
       // Non-streaming continuation with updated conversation history.
       const {
@@ -3277,7 +3110,7 @@ Deno.serve(async (req: Request) => {
       result = newFunctionCalls && newFunctionCalls.length > 0
         ? { functionCalls: newFunctionCalls, rawParts: newRawParts }
         : newFunctionCall
-        ? { functionCall: newFunctionCall, rawParts: newRawParts }
+        ? { functionCalls: [newFunctionCall], rawParts: newRawParts }
         : { text: newText, rawParts: newRawParts };
     }
 
