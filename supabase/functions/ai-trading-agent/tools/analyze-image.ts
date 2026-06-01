@@ -51,15 +51,21 @@ function isStockImageUrl(url: string): boolean {
 }
 
 /**
- * Block server-side fetch of URLs that point at internal/metadata endpoints.
- * Deno.resolveDns is not available in Supabase Edge Functions so we use
- * hostname pattern matching rather than IP resolution.
+ * Strict allowlist for server-side image fetches.
  *
- * Allowed: any public HTTPS URL that doesn't resolve to a private range by
- * hostname pattern. The edge function's network egress is restricted by
- * Supabase anyway, but defense-in-depth matters for SSRF.
+ * Only URLs hosted on the project's own Supabase storage are permitted.
+ * In normal flow, ALL image URLs in this system come from Supabase Storage:
+ * - Trade images: stored via supabaseStorageService.ts, URL = <project>.supabase.co/storage/v1/...
+ * - Rehosted chart images: same path (imageRehost.ts re-uploads QuickChart URLs there)
+ *
+ * A blocklist (private IP ranges, etc.) would still leave open decimal IPs
+ * (2130706433 = 127.0.0.1), IPv6 variants (::ffff:127.0.0.1), DNS rebinding,
+ * and redirect-chain bypasses. An allowlist closes all of these by construction.
+ *
+ * Deno.resolveDns is not available in Supabase Edge Functions (hangs → 502),
+ * so hostname-based matching is the correct approach here.
  */
-function isAllowedImageUrl(url: string): boolean {
+export function isAllowedImageUrl(url: string): boolean {
   let parsed: URL;
   try {
     parsed = new URL(url);
@@ -67,37 +73,30 @@ function isAllowedImageUrl(url: string): boolean {
     return false;
   }
 
-  // Only HTTPS — no http://, data:, file:, ftp:, etc.
+  // HTTPS only — data:, http:, file:, ftp: are all rejected
   if (parsed.protocol !== 'https:') return false;
 
   const host = parsed.hostname.toLowerCase();
 
-  // Loopback and link-local hostnames
-  if (
-    host === 'localhost' ||
-    host === '127.0.0.1' ||
-    host === '::1' ||
-    host.endsWith('.local') ||
-    host.endsWith('.internal') ||
-    host.endsWith('.localhost')
-  ) return false;
+  // Allowlist: only the project's own Supabase storage domain.
+  // The Supabase URL is always set in edge function env; fall back to the
+  // known project ref if (somehow) the env is missing.
+  const supabaseUrl = (() => {
+    try { return Deno.env.get('SUPABASE_URL') ?? ''; } catch { return ''; }
+  })();
+  const supabaseHost = supabaseUrl
+    ? new URL(supabaseUrl).hostname.toLowerCase()
+    : 'gwubzauelilziaqnsfac.supabase.co';
 
-  // Literal private / link-local IPv4 ranges:
-  //   10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16, 127.x
-  const ipv4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
-  if (ipv4) {
-    const [a, b] = [Number(ipv4[1]), Number(ipv4[2])];
-    if (
-      a === 10 ||
-      a === 127 ||
-      a === 0 ||
-      (a === 172 && b >= 16 && b <= 31) ||
-      (a === 192 && b === 168) ||
-      (a === 169 && b === 254)   // AWS / GCP metadata
-    ) return false;
-  }
+  // Allow: <project>.supabase.co and any sub-paths under it
+  if (host === supabaseHost) return true;
 
-  return true;
+  // Allow: Supabase's storage CDN hostnames (supabase.co sub-domains only)
+  // e.g. signed-URL CDN at <project>.supabase.co is already covered above;
+  // add the storage subdomain variant just in case.
+  if (host.endsWith('.supabase.co')) return true;
+
+  return false;
 }
 
 function analyzeImage(

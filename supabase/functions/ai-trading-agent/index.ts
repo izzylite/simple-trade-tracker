@@ -14,6 +14,7 @@ import { fetchMemory } from '../_shared/memory/index.ts';
 import { fetchGuidelineReminder } from '../_shared/orionGuideline.ts';
 import { GUIDELINE_TAG } from '../_shared/noteTags.ts';
 import { classifyProviderError, formatErrorResponse, formatResponseWithHtmlAndCitations } from './formatters.ts';
+import { isAllowedImageUrl } from './tools/analyze-image.ts';
 import type { AgentRequest, ToolCall } from './types.ts';
 import {
   type GeminiFunctionDeclaration,
@@ -783,25 +784,24 @@ async function buildFunctionResponseParts(
     // if the image was not actually fetched.
     const textWithoutMarker = result.replace(/\[IMAGE_ANALYSIS:[^\]]+\]\n?/, '').trim();
 
-    // Safety: re-validate the URL here as a second layer (primary validation happens
-    // in executeAnalyzeImage). Belt-and-suspenders for any code path that might
-    // synthesise a marker without going through the tool executor.
-    let urlAllowed = false;
-    try {
-      const p = new URL(imageUrl);
-      urlAllowed = p.protocol === 'https:';
-    } catch { /* invalid URL */ }
-
-    if (!urlAllowed) {
-      log(`buildFunctionResponseParts: blocked non-https image URL`, 'warn');
+    // Safety: re-validate using the same isAllowedImageUrl function as the tool
+    // executor. Belt-and-suspenders: any code path that synthesises a marker
+    // without going through executeAnalyzeImage is still blocked here.
+    if (!isAllowedImageUrl(imageUrl)) {
+      log(`buildFunctionResponseParts: blocked image URL not on allowlist`, 'warn');
       parts.push(buildFnResponse({ result: 'Image could not be loaded (unsupported URL). Please describe the trade based on available context.' }));
       return parts;
     }
 
     const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB — cap before base64 expansion
     try {
-      // 15s timeout so a slow/hung image fetch cannot eat the wall-clock budget
+      // redirect:'manual' prevents fetch from silently following a redirect to a
+      // private/internal URL that would bypass the hostname allowlist above.
+      // A 3xx response is not ok (status outside 200-299) and falls to the
+      // error-message path — we never follow redirects for image fetches.
+      // AbortSignal.timeout: 15s so a slow image cannot eat the wall-clock budget.
       const imageResponse = await fetch(imageUrl, {
+        redirect: 'manual',
         signal: AbortSignal.timeout(15_000),
       });
       if (imageResponse.ok) {
@@ -909,9 +909,11 @@ async function fetchTradeImages(
 
       try {
         // 15s timeout — 4 concurrent fetches before turn 0 must not eat the
-        // wall-clock budget. Trade images are user-uploaded Supabase Storage
-        // objects so SSRF risk is low, but timeout + size cap still apply.
+        // wall-clock budget. redirect:'manual' prevents a redirect to an internal
+        // URL from bypassing the storage domain expectation; a 3xx is non-ok and
+        // silently skipped.
         const response = await fetch(imageUrl, {
+          redirect: 'manual',
           signal: AbortSignal.timeout(15_000),
         });
         if (!response.ok) {
