@@ -89,9 +89,7 @@ const TradeTagsDisplay: React.FC<{ tags: string[] }> = React.memo(({ tags }) => 
       visibleGroups,
       visibleUngroupedTags,
       hasMore,
-      remainingCount,
-      groupEntries,
-      ungroupedTags
+      remainingCount
     };
   }, [tags]);
 
@@ -101,38 +99,23 @@ const TradeTagsDisplay: React.FC<{ tags: string[] }> = React.memo(({ tags }) => 
     visibleGroups,
     visibleUngroupedTags,
     hasMore,
-    remainingCount,
-    groupEntries,
-    ungroupedTags
+    remainingCount
   } = tagDisplayData;
 
   return (
     <>
       {visibleGroups.map(([group, groupTags]) => (
-        <Tooltip
+        <Chip
           key={group}
-          title={
-            <Box sx={{ p: 0.5 }}>
-              {groupTags.map(tag => (
-                <Typography key={tag} variant="body2">
-                  {formatTagForDisplay(tag, true)}
-                </Typography>
-              ))}
-            </Box>
-          }
-          arrow
-        >
-          <Chip
-            label={`${group} ${groupTags.length > 1 ? groupTags.length : ""}`}
-            size="small"
-            sx={{
-              ...getTagChipStyles(groupTags[0], theme),
-              height: '20px',
-              fontWeight: 600,
-              '& .MuiChip-label': { px: 1, fontSize: '0.7rem' }
-            }}
-          />
-        </Tooltip>
+          label={`${group} ${groupTags.length > 1 ? groupTags.length : ""}`}
+          size="small"
+          sx={{
+            ...getTagChipStyles(groupTags[0], theme),
+            height: '20px',
+            fontWeight: 600,
+            '& .MuiChip-label': { px: 1, fontSize: '0.7rem' }
+          }}
+        />
       ))}
       {visibleUngroupedTags.map((tag, tagIndex) => (
         <Chip
@@ -147,47 +130,19 @@ const TradeTagsDisplay: React.FC<{ tags: string[] }> = React.memo(({ tags }) => 
         />
       ))}
       {hasMore && remainingCount > 0 && (
-        <Tooltip
-          title={
-            <Box sx={{ p: 0.5 }}>
-              <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                {formatCount(remainingCount)} more tag{remainingCount > 1 ? 's' : ''}
-              </Typography>
-              {groupEntries.slice(visibleGroups.length).map(([group, groupTags]) => (
-                <Box key={group} sx={{ mb: 0.5 }}>
-                  <Typography variant="caption" sx={{ fontWeight: 600 }}>
-                    {group}:
-                  </Typography>
-                  {groupTags.map(tag => (
-                    <Typography key={tag} variant="body2" sx={{ ml: 1 }}>
-                      {formatTagForDisplay(tag, true)}
-                    </Typography>
-                  ))}
-                </Box>
-              ))}
-              {ungroupedTags.slice(visibleUngroupedTags.length).map(tag => (
-                <Typography key={tag} variant="body2">
-                  {formatTagForDisplay(tag)}
-                </Typography>
-              ))}
-            </Box>
-          }
-          arrow
-        >
-          <Chip
-            label={`+${formatCount(remainingCount)}`}
-            size="small"
-            sx={{
-              height: '20px',
-              backgroundColor: isDarkMode(theme) ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)',
-              color: 'text.secondary',
-              fontWeight: 600,
-              border: '1px dashed',
-              borderColor: 'divider',
-              '& .MuiChip-label': { px: 1, fontSize: '0.7rem' }
-            }}
-          />
-        </Tooltip>
+        <Chip
+          label={`+${formatCount(remainingCount)}`}
+          size="small"
+          sx={{
+            height: '20px',
+            backgroundColor: isDarkMode(theme) ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)',
+            color: 'text.secondary',
+            fontWeight: 600,
+            border: '1px dashed',
+            borderColor: 'divider',
+            '& .MuiChip-label': { px: 1, fontSize: '0.7rem' }
+          }}
+        />
       )}
     </>
   );
