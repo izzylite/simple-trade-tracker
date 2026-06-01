@@ -139,18 +139,13 @@ export async function callGemini(params: CallGeminiParams): Promise<CallGeminiRe
   const body: Record<string, unknown> = {
     contents: params.contents,
     generationConfig: {
-      // Gemini 3 default is 1.0; Google warns that lowering temperature on a
-      // tool-using (AUTO/ANY) turn causes function-calling loops / degraded
-      // reasoning. So default tool-using turns to 1.0 and keep the
-      // deterministic 0.3 only for non-tool calls — structured output
-      // (responseSchema) and the forced-synthesis turn (mode: 'NONE').
-      // Callers can still override explicitly via params.temperature.
-      // See: https://ai.google.dev/gemini-api/docs/gemini-3
-      temperature:
-        params.temperature ??
-        (params.tools && params.tools.length > 0 && (params.toolMode ?? 'AUTO') !== 'NONE'
-          ? 1.0
-          : 0.3),
+      // Google docs (Gemini 3): "strongly recommend keeping temperature at 1.0;
+      // changing it may lead to unexpected behavior such as looping or degraded
+      // performance." This applies to ALL call types including mode='NONE'
+      // synthesis turns — earlier 0.3 for NONE was pre-Gemini-3 reasoning and
+      // caused production issues (see memory: project_gemini_temperature_default).
+      // Callers that genuinely need determinism pass params.temperature explicitly.
+      temperature: params.temperature ?? 1.0,
       maxOutputTokens: params.maxOutputTokens ?? 8192,
       ...(params.responseSchema
         ? {

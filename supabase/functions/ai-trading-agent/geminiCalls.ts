@@ -41,6 +41,7 @@ export async function callGemini(
   functionCalls?: ParsedFunctionCall[];
   rawParts: Array<Record<string, unknown>>;
   usageMetadata?: Record<string, unknown>;
+  finishReason?: string;
 }> {
   const apiUrl = buildGeminiUrl(apiKey, false);
 
@@ -66,7 +67,9 @@ export async function callGemini(
     // TIER 1 ACTION-ORIENTED rule + the text_reset SSE path in the streaming
     // call cover the "narrate then call" drift case.
     tool_config: buildToolConfig(tools, 'AUTO'),
-    generationConfig: buildGenerationConfig(4000),
+    // 8000 matches the streaming initial call — 4000 could truncate complex
+    // first-turn responses on the non-streaming path.
+    generationConfig: buildGenerationConfig(8000),
   };
 
   const response = await fetch(apiUrl, {
@@ -84,6 +87,15 @@ export async function callGemini(
   const usageMetadata = data?.usageMetadata;
   logUsageMetadata('callGemini', usageMetadata);
   const candidate = data.candidates?.[0];
+
+  // Surface SAFETY/RECITATION blocks explicitly — without this, a blocked
+  // response returns empty parts and looks identical to the known empty-bug,
+  // masking the real cause in logs.
+  const finishReason: string | undefined = candidate?.finishReason;
+  if (finishReason && finishReason !== 'STOP' && finishReason !== 'MAX_TOKENS') {
+    log(`callGemini finishReason=${finishReason}`, 'warn');
+  }
+
   const content = candidate?.content;
   const parts: Array<Record<string, unknown>> = content?.parts || [];
 
@@ -110,7 +122,7 @@ export async function callGemini(
     .filter((p: { text?: string; thought?: boolean }) => !p.thought)
     .map((p: { text?: string }) => p.text || '')
     .join('');
-  return { text, rawParts: parts, usageMetadata };
+  return { text, rawParts: parts, usageMetadata, finishReason };
 }
 
 /**

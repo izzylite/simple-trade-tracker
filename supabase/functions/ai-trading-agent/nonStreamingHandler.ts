@@ -34,7 +34,11 @@ import { rehostChartUrlsInText } from './imageRehost.ts';
 import { validateReferenceIds, hasReferenceTags } from './idValidator.ts';
 import { MODEL } from './agentConfig.ts';
 import { finiteOrZero, billOrionTokensForRound, logTurnAudit } from './billing.ts';
-import { buildFunctionCallPart } from './functionCallHelpers.ts';
+import {
+  buildFunctionCallPart,
+  getWriteDedupeKey,
+  DEDUP_SKIP_RESULT,
+} from './functionCallHelpers.ts';
 import { scrubWebhookResults, validateUserDataIsolation } from './requestHelpers.ts';
 import { buildFunctionResponseParts } from './sseHelpers.ts';
 import { callGemini, callGeminiWithContents } from './geminiCalls.ts';
@@ -71,11 +75,13 @@ export async function handleNonStreamingRequest(p: NonStreamingParams): Promise<
   }
 
   const functionCalls: Array<{ name: string; args: unknown; result: string }> = [];
+  const executedWriteKeys = new Set<string>();
   let finalText = '';
   let turnCount = 0;
   const maxTurns = 15;
   const nonStreamStartMs = Date.now();
   const NON_STREAM_BUDGET_MS = 130_000;
+  let lastBatchKey = '';
 
   const conversationContents: Array<{ role: string; parts: Array<Record<string, unknown>> }> = [
     ...p.priorHistory.map(msg => ({
@@ -101,10 +107,32 @@ export async function handleNonStreamingRequest(p: NonStreamingParams): Promise<
       break;
     }
 
+    // Repeated-batch guard: same tool batch twice in a row = loop, break early.
+    const batchKey = result.functionCalls.map(c => `${c.name}:${JSON.stringify(c.args)}`).sort().join('|');
+    if (batchKey === lastBatchKey) {
+      log('[non-streaming] Repeated function batch detected — breaking loop', 'warn');
+      break;
+    }
+    lastBatchKey = batchKey;
+
+    // search_web rate cap: mirrors the streaming handler's 3-call-per-turn limit.
+    const searchWebCount = functionCalls.filter(fc => fc.name === 'search_web').length;
+    if (searchWebCount >= 3 && result.functionCalls.some(c => c.name === 'search_web')) {
+      log('[non-streaming] search_web rate limit (3/turn) reached — breaking loop', 'info');
+      break;
+    }
+
     const supabaseClient = createServiceClient();
     log(`Executing ${result.functionCalls.length} function(s)`, 'info');
     const execResults = await Promise.all(result.functionCalls.map(async (call) => {
       try {
+        const dedupeKey = getWriteDedupeKey(call.name, call.args);
+        if (dedupeKey && executedWriteKeys.has(dedupeKey)) {
+          log(`[non-streaming] Dedup: skipping duplicate write ${call.name}`, 'warn');
+          return { call, result: DEDUP_SKIP_RESULT };
+        }
+        if (dedupeKey) executedWriteKeys.add(dedupeKey);
+
         const r = CUSTOM_TOOL_NAMES.has(call.name)
           ? await executeCustomTool(call.name, call.args, {
             userId: p.userId, calendarId: p.calendarId, conversationId: p.conversationId
