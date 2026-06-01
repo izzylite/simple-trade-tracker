@@ -96,6 +96,7 @@ export async function runOrionAgent(
   let finalText = '';
   let turnCount = 0;
   let forcedSynthesis = false;
+  let lastBatchKey = '';
   const agentStartMs = Date.now();
   const AGENT_WALL_CLOCK_MS = 130_000;
 
@@ -143,20 +144,18 @@ export async function runOrionAgent(
       break;
     }
 
-    // Short-circuit: if the model keeps re-calling the same tool with the
-    // same args, break out of the loop. This indicates a stuck model, not
-    // legitimate iterative querying.
-    const firstCall = result.functionCalls[0];
-    const lastRecorded = toolCalls[toolCalls.length - 1];
-    if (
-      result.functionCalls.length === 1 &&
-      lastRecorded &&
-      lastRecorded.name === firstCall.name &&
-      JSON.stringify(lastRecorded.args) === JSON.stringify(firstCall.args)
-    ) {
-      log('Detected repeated function call — breaking loop', 'info');
+    // Repeated-batch guard: same batch of calls as the previous turn = stuck.
+    // Covers both single and parallel call repetitions (the old single-call
+    // check missed length>1 repetitions).
+    const batchKey = result.functionCalls
+      .map((c: GeminiFunctionCall) => `${c.name}:${JSON.stringify(c.args)}`)
+      .sort()
+      .join('|');
+    if (batchKey === lastBatchKey) {
+      log('[orionAgent] Detected repeated function batch — breaking loop', 'info');
       break;
     }
+    lastBatchKey = batchKey;
 
     // Execute all parallel calls concurrently. A single call still goes
     // through this path (length-1 array) — keeps the code path uniform.
