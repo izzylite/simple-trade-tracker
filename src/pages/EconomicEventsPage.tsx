@@ -73,7 +73,7 @@ import { useEventPageTradeOps } from 'features/events/hooks/useEventPageTradeOps
 import AllPinnedEventsContent from 'features/events/components/AllPinnedEventsContent';
 import EconomicEventShimmer from 'features/events/components/EconomicEventShimmer';
 import { Z_INDEX } from 'styles/zIndex';
-import { EYEBROW_SX, TNUM } from 'styles/designTokens';
+import { EYEBROW_SX, TNUM, getShadow } from 'styles/designTokens';
 import CardShell from 'components/common/CardShell';
 import StatTile from 'components/common/StatTile';
 import CompareBar from 'components/common/CompareBar';
@@ -896,7 +896,8 @@ const FilterPill: React.FC<{
         p: 0.5,
         borderRadius: 1.25,
         border: `1px solid ${theme.palette.divider}`,
-        bgcolor: alpha(theme.palette.background.paper, 0.4),
+        bgcolor: 'background.paper',
+        boxShadow: getShadow(theme, 'md'),
       }}
     >
       {IMPACT_LEVELS.map((opt) => {
@@ -1008,7 +1009,8 @@ const HubTabs: React.FC<{
       p: 0.5,
       borderRadius: 1.5,
       border: `1px solid ${theme.palette.divider}`,
-      bgcolor: alpha(theme.palette.background.paper, 0.4),
+      bgcolor: 'background.paper',
+      boxShadow: getShadow(theme, 'md'),
     }}
   >
     {HUB_TABS.map((opt) => {
@@ -1297,6 +1299,9 @@ const EventList: React.FC<{
       sx={{
         display: 'flex',
         flexDirection: 'column',
+        // Center card is the page's focus — give it the stronger Floating-tier
+        // shadow so it sits above the two flanking sidebar cards.
+        boxShadow: getShadow(theme, 'lg'),
         // Fill grid cell. Parent caps height to viewport so rows scroll
         // internally and the main page never grows past the screen.
         height: { xs: 'auto', md: '100%' },
@@ -1401,6 +1406,7 @@ const ImpactDistributionCard: React.FC<{
         title: 'Impact distribution',
         eyebrow: 'This week',
       }}
+      sx={{ boxShadow: getShadow(theme, 'md') }}
       innerSx={{ p: 1.75, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1 }}
     >
       {rows.map((row) => {
@@ -1495,6 +1501,7 @@ const PinnedEventsCard: React.FC<{
         flexDirection: 'column',
         flex: { xs: 'none', lg: 1 },
         minHeight: 0,
+        boxShadow: getShadow(theme, 'md'),
       }}
     >
       {pins.length === 0 ? (
