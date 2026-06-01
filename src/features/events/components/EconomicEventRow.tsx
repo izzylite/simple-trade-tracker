@@ -282,7 +282,7 @@ const EconomicEventRow: React.FC<EconomicEventRowProps> = ({
       sx={{
         position: 'relative',
         display: 'flex',
-        flexDirection: 'column',
+        flexDirection: 'column', 
         px: 2.25,
         py: 1.75,
         borderTop: firstRow ? 'none' : `1px solid ${theme.palette.divider}`,
@@ -425,6 +425,7 @@ const EconomicEventRow: React.FC<EconomicEventRowProps> = ({
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'flex-end',
+          minHeight: 55,
           gap: 0.75,
         }}
       >
