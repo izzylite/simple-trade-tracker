@@ -346,11 +346,17 @@ function finiteOrZero(v: unknown): number {
  */
 function billOrionTokensForRound(
   userId: string,
-  usage: Record<string, unknown> | undefined
+  usage: Record<string, unknown> | undefined,
+  prevPromptTokens = 0
 ): void {
   if (!usage) return;
+  // Delta-bill the prompt: each continuation round's promptTokenCount includes
+  // the full growing prefix (system + history + all prior tool results).
+  // Summing raw promptTokenCount across rounds would charge the shared prefix
+  // N times. Instead, bill only the tokens added since the previous round.
+  const promptDelta = Math.max(0, finiteOrZero(usage.promptTokenCount) - prevPromptTokens);
   const roundTotalTokens =
-    finiteOrZero(usage.promptTokenCount) +
+    promptDelta +
     finiteOrZero(usage.candidatesTokenCount) +
     finiteOrZero(usage.thoughtsTokenCount);
   if (roundTotalTokens <= 0) return;
@@ -1479,6 +1485,10 @@ function handleStreamingRequest(
       // Per-round usage snapshots for cost computation in logTurnAudit. Every
       // place that sets lastUsageMetadata also pushes here.
       const roundUsages: Array<Record<string, unknown>> = [];
+      // Running baseline for delta-billing in billOrionTokensForRound. Each
+      // continuation round's promptTokenCount includes the full shared prefix;
+      // we bill only the delta (new tool results injected this turn).
+      let lastBilledPromptTokens = 0;
       // Wall-clock budget: Supabase edge functions are hard-killed at 150s for
       // the initial request (Free + Pro). Track turn-start so we can bail out
       // BEFORE infra terminates us, giving the persist step a chance to run.
@@ -1502,6 +1512,7 @@ function handleStreamingRequest(
         lastUsageMetadata = result.usageMetadata;
         roundUsages.push(result.usageMetadata);
         billOrionTokensForRound(userId, result.usageMetadata);
+        lastBilledPromptTokens = finiteOrZero(result.usageMetadata.promptTokenCount);
       }
 
       // RETRY LOGIC: Handle known Gemini empty content bug
@@ -1565,7 +1576,8 @@ function handleStreamingRequest(
             firstRoundUsage = result.usageMetadata;
             lastUsageMetadata = result.usageMetadata;
             roundUsages.push(result.usageMetadata);
-            billOrionTokensForRound(userId, result.usageMetadata);
+            billOrionTokensForRound(userId, result.usageMetadata, lastBilledPromptTokens);
+            lastBilledPromptTokens = Math.max(lastBilledPromptTokens, finiteOrZero(result.usageMetadata.promptTokenCount));
           }
 
           if (!result.emptyBug && (result.text || result.functionCall || result.functionCalls)) {
@@ -1742,7 +1754,8 @@ function handleStreamingRequest(
         if (newUsage) {
           lastUsageMetadata = newUsage;
           roundUsages.push(newUsage);
-          billOrionTokensForRound(userId, newUsage);
+          billOrionTokensForRound(userId, newUsage, lastBilledPromptTokens);
+          lastBilledPromptTokens = Math.max(lastBilledPromptTokens, finiteOrZero(newUsage.promptTokenCount));
         }
 
         const hasNewCalls = (newFunctionCalls?.length ?? 0) > 0 || !!newFunctionCall;
@@ -1790,7 +1803,8 @@ function handleStreamingRequest(
           if (synthesisResult.usageMetadata) {
             lastUsageMetadata = synthesisResult.usageMetadata;
             roundUsages.push(synthesisResult.usageMetadata);
-            billOrionTokensForRound(userId, synthesisResult.usageMetadata);
+            billOrionTokensForRound(userId, synthesisResult.usageMetadata, lastBilledPromptTokens);
+            lastBilledPromptTokens = Math.max(lastBilledPromptTokens, finiteOrZero(synthesisResult.usageMetadata.promptTokenCount));
           }
           if (synthesisResult.text) {
             finalText = synthesisResult.text;
@@ -1895,7 +1909,8 @@ function handleStreamingRequest(
             if (result.usageMetadata) {
               lastUsageMetadata = result.usageMetadata;
               roundUsages.push(result.usageMetadata);
-              billOrionTokensForRound(userId, result.usageMetadata);
+              billOrionTokensForRound(userId, result.usageMetadata, lastBilledPromptTokens);
+              lastBilledPromptTokens = Math.max(lastBilledPromptTokens, finiteOrZero(result.usageMetadata.promptTokenCount));
             }
             correctedText = result.text;
           } catch (error) {
@@ -2399,6 +2414,7 @@ async function handleReminderRequest(req: Request, body: AgentRequest): Promise<
   let firstRoundUsage: Record<string, unknown> | undefined;
   let lastUsageMetadata: Record<string, unknown> | undefined;
   const roundUsages: Array<Record<string, unknown>> = [];
+  let lastBilledPromptTokensReminder = 0;
   try {
     // Build tools (MCP + custom) — same as chat path.
     const geminiMcpTools = await getCachedMCPTools(
@@ -2417,6 +2433,7 @@ async function handleReminderRequest(req: Request, body: AgentRequest): Promise<
       lastUsageMetadata = result.usageMetadata;
       roundUsages.push(result.usageMetadata);
       billOrionTokensForRound(userId, result.usageMetadata);
+      lastBilledPromptTokensReminder = finiteOrZero(result.usageMetadata.promptTokenCount);
     }
 
     const conversationContents: Array<{ role: string; parts: Array<Record<string, unknown>> }> = [
@@ -2489,7 +2506,8 @@ async function handleReminderRequest(req: Request, body: AgentRequest): Promise<
       if (cont.usageMetadata) {
         lastUsageMetadata = cont.usageMetadata;
         roundUsages.push(cont.usageMetadata);
-        billOrionTokensForRound(userId, cont.usageMetadata);
+        billOrionTokensForRound(userId, cont.usageMetadata, lastBilledPromptTokensReminder);
+        lastBilledPromptTokensReminder = Math.max(lastBilledPromptTokensReminder, finiteOrZero(cont.usageMetadata.promptTokenCount));
       }
       result = cont.functionCalls && cont.functionCalls.length > 0
         ? { functionCalls: cont.functionCalls, rawParts: cont.rawParts }
@@ -2514,7 +2532,8 @@ async function handleReminderRequest(req: Request, body: AgentRequest): Promise<
         if (synth.usageMetadata) {
           lastUsageMetadata = synth.usageMetadata;
           roundUsages.push(synth.usageMetadata);
-          billOrionTokensForRound(userId, synth.usageMetadata);
+          billOrionTokensForRound(userId, synth.usageMetadata, lastBilledPromptTokensReminder);
+          lastBilledPromptTokensReminder = Math.max(lastBilledPromptTokensReminder, finiteOrZero(synth.usageMetadata.promptTokenCount));
         }
         if (synth.text) finalText = synth.text;
       } catch (synthErr) {
@@ -3015,9 +3034,11 @@ Deno.serve(async (req: Request) => {
     const firstRoundUsage: Record<string, unknown> | undefined = result.usageMetadata;
     let lastUsageMetadata: Record<string, unknown> | undefined = result.usageMetadata;
     const roundUsages: Array<Record<string, unknown>> = [];
+    let lastBilledPromptTokensNS = 0;
     if (result.usageMetadata) {
       roundUsages.push(result.usageMetadata);
       billOrionTokensForRound(userId, result.usageMetadata);
+      lastBilledPromptTokensNS = finiteOrZero(result.usageMetadata.promptTokenCount);
     }
 
     const functionCalls: Array<{ name: string; args: unknown; result: string }> = [];
@@ -3105,7 +3126,8 @@ Deno.serve(async (req: Request) => {
       if (newUsage) {
         lastUsageMetadata = newUsage;
         roundUsages.push(newUsage);
-        billOrionTokensForRound(userId, newUsage);
+        billOrionTokensForRound(userId, newUsage, lastBilledPromptTokensNS);
+        lastBilledPromptTokensNS = Math.max(lastBilledPromptTokensNS, finiteOrZero(newUsage.promptTokenCount));
       }
       result = newFunctionCalls && newFunctionCalls.length > 0
         ? { functionCalls: newFunctionCalls, rawParts: newRawParts }
@@ -3133,7 +3155,8 @@ Deno.serve(async (req: Request) => {
         if (synthesisResult.usageMetadata) {
           lastUsageMetadata = synthesisResult.usageMetadata;
           roundUsages.push(synthesisResult.usageMetadata);
-          billOrionTokensForRound(userId, synthesisResult.usageMetadata);
+          billOrionTokensForRound(userId, synthesisResult.usageMetadata, lastBilledPromptTokensNS);
+          lastBilledPromptTokensNS = Math.max(lastBilledPromptTokensNS, finiteOrZero(synthesisResult.usageMetadata.promptTokenCount));
         }
         if (synthesisResult.text) {
           finalText = synthesisResult.text;
@@ -3229,7 +3252,8 @@ Deno.serve(async (req: Request) => {
           if (result.usageMetadata) {
             lastUsageMetadata = result.usageMetadata;
             roundUsages.push(result.usageMetadata);
-            billOrionTokensForRound(userId, result.usageMetadata);
+            billOrionTokensForRound(userId, result.usageMetadata, lastBilledPromptTokensNS);
+            lastBilledPromptTokensNS = Math.max(lastBilledPromptTokensNS, finiteOrZero(result.usageMetadata.promptTokenCount));
           }
           correctedText = result.text;
         } catch (error) {

@@ -79,12 +79,18 @@ export interface TurnCostBreakdown {
 /**
  * Compute the USD cost of a turn from the per-round usageMetadata snapshots.
  *
- * Why "fresh = prompt - cached" instead of just summing promptTokenCount:
- * Gemini's billing splits the prompt into the part that came from the
- * cache prefix (cached) and the part that didn't (fresh). The
- * promptTokenCount field is the total, cachedContentTokenCount is the
- * cached portion. Charging the full input rate on cachedContentTokenCount
- * overcounts cost ~4×.
+ * Why delta-billing the prompt across rounds:
+ * Each continuation round's promptTokenCount includes the full growing prefix
+ * (system prompt + history + all prior tool results). Summing raw
+ * promptTokenCount across rounds would charge the shared prefix N times.
+ * Instead we bill only the delta: the new context added since the previous
+ * round. The cached split (fresh = delta - cachedDelta) is estimated by
+ * scaling cachedContentTokenCount proportionally to the delta.
+ *
+ * Why "fresh = prompt - cached" on a per-round delta instead of raw prompt:
+ * Gemini's billing splits the prompt into the cached prefix (cheap) and the
+ * uncached portion (full rate). Charging the full input rate on the cached
+ * portion overcounts cost ~4–10×.
  */
 export function estimateTurnCost(
   rounds: UsageRound[],
@@ -94,13 +100,24 @@ export function estimateTurnCost(
   let cachedInputTokens = 0;
   let outputTokens = 0;
 
+  let prevPrompt = 0;
   for (const r of rounds) {
     const prompt = Number(r.promptTokenCount ?? 0);
     const cached = Number(r.cachedContentTokenCount ?? 0);
     const candidates = Number(r.candidatesTokenCount ?? 0);
     const thoughts = Number(r.thoughtsTokenCount ?? 0);
-    freshInputTokens += Math.max(0, prompt - cached);
-    cachedInputTokens += cached;
+    const promptDelta = Math.max(0, prompt - prevPrompt);
+    const isFirstRound = prevPrompt === 0;
+    prevPrompt = Math.max(prevPrompt, prompt);
+    if (isFirstRound) {
+      // First round: the shared prefix (system + history) may be cache-eligible.
+      freshInputTokens += Math.max(0, promptDelta - cached);
+      cachedInputTokens += cached;
+    } else {
+      // Continuation deltas are new tail content (tool results) — not part of
+      // any cache prefix, so all billed at the full input rate.
+      freshInputTokens += promptDelta;
+    }
     outputTokens += candidates + thoughts;
   }
 
