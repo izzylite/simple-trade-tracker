@@ -211,14 +211,27 @@ function filterTools(
 }
 
 /**
- * Execute a single MCP tool. Re-initializes the session once if the server
+ * Execute a single MCP tool. Re-initializes the session ONCE if the server
  * reports it expired (can happen after idle periods longer than our TTL).
+ *
+ * Error contract for callers:
+ * - On success:  returns the tool result text (real data).
+ * - On failure:  returns a string that STARTS WITH "Error: " so the Gemini
+ *   function-calling loop can distinguish a tool failure from a data result
+ *   and inform the user gracefully rather than narrating fabricated data.
+ *   Raw internal detail (Postgres errors, table names, query text) is logged
+ *   server-side but NOT forwarded to the model.
+ *
+ * `_sessionRetried` is a private guard that prevents the expired-session
+ * branch from recursing more than once — a persistent 400 that happens to
+ * contain "Mcp-Session-Id" in its body would otherwise loop until overflow.
  */
 export async function callMCPTool(
   projectRef: string,
   accessToken: string,
   toolName: string,
-  args: Record<string, unknown>
+  args: Record<string, unknown>,
+  _sessionRetried = false
 ): Promise<string> {
   try {
     const sessionId = await initializeMCPSession(projectRef, accessToken);
@@ -242,18 +255,28 @@ export async function callMCPTool(
 
     if (!response.ok) {
       const errorText = await response.text();
-      // Expired session — clear cache once and retry.
-      if (response.status === 400 && errorText.includes('Mcp-Session-Id')) {
-        log('MCP session expired, clearing cache and retrying...', 'info');
+      // Expired session — clear cache and retry exactly once.
+      // The `_sessionRetried` guard prevents infinite recursion when the
+      // 400 body happens to contain "Mcp-Session-Id" for any other reason.
+      if (!_sessionRetried && response.status === 400 && errorText.includes('Mcp-Session-Id')) {
+        log('MCP session expired, clearing cache and retrying once...', 'info');
         mcpSession = null;
-        return callMCPTool(projectRef, accessToken, toolName, args);
+        return callMCPTool(projectRef, accessToken, toolName, args, true);
       }
-      return `MCP tool call failed: ${response.status} - ${errorText}`;
+      // Log the raw detail server-side; return a model-facing error that
+      // starts with "Error: " so the loop can distinguish failure from data.
+      log(`MCP tool call failed (${response.status}) for ${toolName}: ${errorText.substring(0, 300)}`, 'error');
+      const isTransient = response.status >= 500 || response.status === 429;
+      return isTransient
+        ? `Error: The database tool is temporarily unavailable (${response.status}). Please let the user know and suggest they try again in a moment.`
+        : `Error: The database query could not be completed. Please let the user know and suggest they rephrase the request.`;
     }
 
     const data = await response.json();
     if (data.error) {
-      return `MCP error: ${data.error.message || JSON.stringify(data.error)}`;
+      // JSON-RPC application error — log detail, return generic message.
+      log(`MCP JSON-RPC error for ${toolName}: ${JSON.stringify(data.error).substring(0, 300)}`, 'error');
+      return `Error: The database query returned an error. Please let the user know the query could not be completed, and suggest they try a simpler or differently worded request.`;
     }
 
     const content = data.result?.content;
@@ -262,7 +285,8 @@ export async function callMCPTool(
     }
     return JSON.stringify(data.result || data);
   } catch (error) {
-    return `MCP tool error: ${error instanceof Error ? error.message : 'Unknown'}`;
+    log(`MCP tool exception for ${toolName}: ${error instanceof Error ? error.message : String(error)}`, 'error');
+    return `Error: The database tool encountered a network issue. Please let the user know and suggest they try again.`;
   }
 }
 
