@@ -250,14 +250,14 @@ async function preflightTokenCount(
   if (bytes / 1024 < PREFLIGHT_KB_THRESHOLD) return { ok: true };
 
   try {
-    const url = `${GEMINI_API_BASE}/${MODEL}:countTokens`;
+    const url = `${GEMINI_API_BASE}/${MODEL}:countTokens?key=${apiKey}`;
     const reqBody: Record<string, unknown> = { contents };
     if (systemInstruction) {
       reqBody.systemInstruction = { parts: [{ text: systemInstruction }] };
     }
     const resp = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(reqBody),
     });
     if (!resp.ok) {
@@ -277,13 +277,10 @@ async function preflightTokenCount(
   }
 }
 
-// The API key is sent via the `x-goog-api-key` request header at each fetch
-// site (Google's recommended practice), NOT in the URL — a key in the query
-// string leaks into access logs / proxies / any error that stringifies the URL.
-function buildGeminiUrl(streaming: boolean): string {
+function buildGeminiUrl(apiKey: string, streaming: boolean): string {
   return streaming
-    ? `${GEMINI_API_BASE}/${MODEL}:streamGenerateContent?alt=sse`
-    : `${GEMINI_API_BASE}/${MODEL}:generateContent`;
+    ? `${GEMINI_API_BASE}/${MODEL}:streamGenerateContent?alt=sse&key=${apiKey}`
+    : `${GEMINI_API_BASE}/${MODEL}:generateContent?key=${apiKey}`;
 }
 
 /**
@@ -537,9 +534,9 @@ async function callGeminiWithContents(
     body.systemInstruction = { parts: [{ text: opts.systemInstruction }] };
   }
 
-  const response = await fetch(buildGeminiUrl(true), {
+  const response = await fetch(buildGeminiUrl(apiKey, true), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
 
@@ -919,7 +916,7 @@ async function callGemini(
   conversationHistory: Array<{ role: string; content: string }>,
   tools: GeminiFunctionDeclaration[]
 ): Promise<{ text?: string; functionCall?: ParsedFunctionCall; functionCalls?: ParsedFunctionCall[]; rawParts: Array<Record<string, unknown>>; usageMetadata?: Record<string, unknown> }> {
-  const apiUrl = buildGeminiUrl(false);
+  const apiUrl = buildGeminiUrl(apiKey, false);
 
   // Build contents array — systemPrompt goes in the top-level `systemInstruction`
   // field (Gemini docs standard) rather than a fake role:user turn. This keeps
@@ -948,7 +945,7 @@ async function callGemini(
 
   const response = await fetch(apiUrl, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(requestBody),
   });
 
@@ -1011,7 +1008,7 @@ async function callGeminiStreaming(
   rawParts?: Array<Record<string, unknown>>;
   usageMetadata?: Record<string, unknown>;
 }> {
-  const apiUrl = buildGeminiUrl(true);
+  const apiUrl = buildGeminiUrl(apiKey, true);
 
   // Build user message parts (text + optional images)
   const userMessageParts: Array<Record<string, unknown>> = [];
@@ -1095,7 +1092,7 @@ async function callGeminiStreaming(
     log('Initiating Gemini fetch...', 'info');
     response = await fetch(apiUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(requestBody),
     });
     log(`Gemini fetch completed with status: ${response.status}`, 'info');

@@ -134,10 +134,7 @@ export async function callGemini(params: CallGeminiParams): Promise<CallGeminiRe
   }
 
   const model = params.model ?? getDefaultGeminiModel();
-  // API key goes in the x-goog-api-key header (Google's recommended practice),
-  // NOT the URL query string — a key in the URL leaks into any access log,
-  // proxy, or error that stringifies the request.
-  const url = `${GEMINI_API_BASE}/${model}:generateContent`;
+  const url = `${GEMINI_API_BASE}/${model}:generateContent?key=${apiKey}`;
 
   const body: Record<string, unknown> = {
     contents: params.contents,
@@ -186,7 +183,7 @@ export async function callGemini(params: CallGeminiParams): Promise<CallGeminiRe
     }
     response = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+      headers: { 'Content-Type': 'application/json' },
       body: fetchBody,
     });
     if (response.ok || !RETRYABLE_STATUSES.has(response.status)) break;
