@@ -47,6 +47,7 @@ import { logger } from 'utils/logger';
 import { useAuthState } from 'contexts/AuthStateContext';
 import { CalendarRepository } from 'services/repositories/CalendarRepository';
 import { scrollbarStyles } from 'styles/scrollbarStyles';
+import { getInsetSurface } from 'styles/designTokens';
 import { useNotes } from 'features/notes/hooks/useNotes';
 import type { Currency, ImpactLevel } from 'features/events/types/economicCalendar';
 
@@ -256,7 +257,7 @@ const NotesContent: React.FC<NotesContentProps> = ({
                 displayEmpty
                 sx={{
                   borderRadius: 1,
-                  bgcolor: 'background.default',
+                  bgcolor: getInsetSurface(theme),
                 }}
               >
                 <MenuItem value="all">
@@ -316,7 +317,7 @@ const NotesContent: React.FC<NotesContentProps> = ({
               ),
               sx: {
                 borderRadius: '8px',
-                bgcolor: 'background.default',
+                bgcolor: getInsetSurface(theme),
               },
             }}
           />

@@ -378,7 +378,7 @@ const FocusedCalendarCard: React.FC<FocusedCalendarCardProps> = ({
       sx={{
         ...getCardShellSx(theme, 'lg'),
         bgcolor: isLight
-          ? alpha(theme.palette.background.paper, 0.7)
+          ? theme.palette.background.paper
           : insetSurface,
         borderColor: isActive
           ? alpha(theme.palette.primary.main, 0.45)
@@ -1363,7 +1363,7 @@ const CalendarsListContent: React.FC<CalendarsListContentProps> = ({
                   sx={{
                     bgcolor: isDark
                       ? insetSurface
-                      : alpha(theme.palette.background.paper, 0.7),
+                      : theme.palette.background.paper,
                     border: `1px solid ${theme.palette.divider}`,
                     borderRadius: `${theme.palette.custom.radius.md}px`,
                     overflow: 'hidden',
@@ -1484,7 +1484,7 @@ const CalendarsListContent: React.FC<CalendarsListContentProps> = ({
               borderRadius: `${theme.palette.custom.radius.md}px`,
               bgcolor: isDark
                 ? insetSurface
-                : alpha(theme.palette.background.paper, 0.7),
+                : theme.palette.background.paper,
               border: `1px solid ${theme.palette.divider}`,
               color: 'text.secondary',
               '&:hover': {

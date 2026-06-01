@@ -323,7 +323,7 @@ const NoteMetaPanel: React.FC<NoteMetaPanelProps> = ({ note, notes, onSelectNote
         borderLeft: `1px solid ${theme.palette.divider}`,
         height: '100%',
         overflowY: 'auto',
-        bgcolor: 'background.default',
+        bgcolor: 'background.paper',
         ...scrollbarStyles(theme),
       }}
     >

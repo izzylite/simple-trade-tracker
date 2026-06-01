@@ -41,7 +41,7 @@ import {
   filterTagsByGroup
 } from 'utils/tagColors';
 import { SelectInput } from 'components/common';
-import { isDarkMode } from 'utils/themeMode';
+import { getInsetSurface } from 'styles/designTokens';
 import { scrollbarStyles } from 'styles/scrollbarStyles';
 import { dialogProps } from 'styles/dialogStyles';
 import { Z_INDEX } from 'styles/zIndex';
@@ -74,8 +74,7 @@ const SearchContent: React.FC<SearchContentProps> = ({
   onTagsChange,
 }) => {
   const theme = useTheme();
-  const isDark = isDarkMode(theme);
-  const subtleBg = alpha(isDark ? '#fff' : '#000', 0.03);
+  const subtleBg = getInsetSurface(theme);
   const baseTradeOperations = useTradeOperations();
   const tradeViewer = useTradeViewer();
 
@@ -151,7 +150,7 @@ const SearchContent: React.FC<SearchContentProps> = ({
       flexDirection: 'column',
       height: '100%',
       overflow: 'hidden',
-      bgcolor: 'background.default',
+      bgcolor: 'background.paper',
     }}>
       {/* Search + filter row */}
       <Box sx={{ px: 1.75, pt: 1.5, pb: 1, display: 'flex', gap: 0.75 }}>

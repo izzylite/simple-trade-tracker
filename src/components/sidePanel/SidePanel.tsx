@@ -1,9 +1,8 @@
 // src/components/sidePanel/SidePanel.tsx
 import React from 'react';
-import { Box, alpha, useTheme } from '@mui/material';
+import { Box, useTheme } from '@mui/material';
 import { useSidePanel, SidePanelView } from 'contexts/SidePanelContext';
 import SidePanelHeader from 'components/sidePanel/SidePanelHeader';
-import { isDarkMode } from 'utils/themeMode';
 
 interface ViewConfig {
   title: string;
@@ -41,8 +40,9 @@ const SidePanel: React.FC<SidePanelProps> = ({ renderView }) => {
         transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
         flexShrink: 0,
         height: '100%',
+        bgcolor: 'background.paper',
         borderLeft: isOpen
-          ? `1px solid ${alpha(theme.palette.divider, 0.08)}`
+          ? `1px solid ${theme.palette.divider}`
           : 'none',
       }}
     >
@@ -54,9 +54,7 @@ const SidePanel: React.FC<SidePanelProps> = ({ renderView }) => {
             height: '100%',
             minWidth: PANEL_WIDTH,
             overflow: 'hidden',
-            bgcolor: isDarkMode(theme)
-              ? alpha(theme.palette.background.paper, 0.4)
-              : alpha(theme.palette.background.paper, 0.7),
+            bgcolor: 'background.paper',
           }}
         >
           <SidePanelHeader

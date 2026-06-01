@@ -1,6 +1,6 @@
 // src/components/sidePanel/SidePanelHeader.tsx
 import React from 'react';
-import { Box, IconButton, Typography, alpha, useTheme } from '@mui/material';
+import { Box, IconButton, Typography, useTheme } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
   Close as CloseIcon,
@@ -28,10 +28,7 @@ const SidePanelHeader: React.FC<SidePanelHeaderProps> = ({ title, icon, hideBack
         px: 2,
         py: 1,
         minHeight: 48,
-        borderBottom: `1px solid ${alpha(
-          theme.palette.divider,
-          0.08
-        )}`,
+        borderBottom: `1px solid ${theme.palette.divider}`,
         flexShrink: 0,
       }}
     >

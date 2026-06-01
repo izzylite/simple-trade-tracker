@@ -34,7 +34,7 @@ const CalendarsPanelShimmer: React.FC = () => {
           bgcolor:
             isDarkMode(theme)
               ? surface
-              : alpha(theme.palette.background.paper, 0.7),
+              : theme.palette.background.paper,
           border: `1px solid ${
             isDarkMode(theme) ? divider : theme.palette.divider
           }`,
@@ -95,7 +95,7 @@ const CalendarsPanelShimmer: React.FC = () => {
           bgcolor:
             isDarkMode(theme)
               ? surface
-              : alpha(theme.palette.background.paper, 0.7),
+              : theme.palette.background.paper,
           border: `1px solid ${
             isDarkMode(theme) ? divider : theme.palette.divider
           }`,

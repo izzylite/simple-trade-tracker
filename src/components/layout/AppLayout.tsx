@@ -7,7 +7,6 @@ import {
   LinearProgress,
   Typography,
   Divider,
-  alpha,
   useTheme,
   useMediaQuery,
 } from '@mui/material';
@@ -27,7 +26,6 @@ import SidePanel from 'components/sidePanel/SidePanel';
 import { useSidePanel } from 'contexts/SidePanelContext';
 import { appRenderView } from 'components/sidePanel/appRenderView';
 import UnifiedDrawer from 'components/common/UnifiedDrawer';
-import { isDarkMode } from 'utils/themeMode';
 // Eagerly imported so it can serve as the Suspense fallback for the lazy
 // CalendarsListContent chunk below — must be ready before that chunk arrives.
 import CalendarsPanelShimmer from 'features/calendar/components/sidePanel/CalendarsPanelShimmer';
@@ -238,11 +236,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, onNewCalendar, isLocked
             transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
             flexShrink: 0,
             borderLeft: inlinePanelOpen
-              ? `1px solid ${alpha(theme.palette.divider, 0.08)}`
+              ? `1px solid ${theme.palette.divider}`
               : 'none',
-            bgcolor: isDarkMode(theme)
-              ? alpha(theme.palette.background.paper, 0.4)
-              : alpha(theme.palette.background.paper, 0.7),
+            bgcolor: 'background.paper',
           }}
         >
           {inlinePanelOpen && (
@@ -264,7 +260,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, onNewCalendar, isLocked
                   gap: 1.25,
                   px: 2,
                   py: 1.5,
-                  borderBottom: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
+                  borderBottom: `1px solid ${theme.palette.divider}`,
                 }}
               >
                 <CalendarIcon

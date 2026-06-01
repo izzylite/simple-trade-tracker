@@ -1,10 +1,17 @@
 import React from 'react';
-import { Badge, Box, Fab, Tooltip, alpha, useTheme } from '@mui/material';
+import { Badge, Box, Fab, Tooltip, alpha, useMediaQuery, useTheme } from '@mui/material';
 import { useLocation } from 'react-router-dom';
 import { useAuthState } from 'contexts/AuthStateContext';
 import { useAIChat } from 'features/orion/contexts/AIChatContext';
 import { useAnyPanelOpen } from 'contexts/PanelMutexContext';
 import OrionMark from 'features/orion/components/aiChat/OrionMark';
+
+/**
+ * Inline panel width at lg+ — kept in sync with SidePanel/AppLayout's
+ * `PANEL_WIDTH`. When an inline panel is open the FAB shifts left by this
+ * amount so it rides alongside the panel instead of hiding behind it.
+ */
+const INLINE_PANEL_WIDTH = 'clamp(340px, 28vw, 450px)';
 
 /**
  * Floating "Open Orion" button mounted once at App level. Shows on every
@@ -17,22 +24,40 @@ import OrionMark from 'features/orion/components/aiChat/OrionMark';
  */
 const HIDDEN_PREFIXES = ['/shared', '/auth'];
 
+/** Stable identity so `useAnyPanelOpen`'s internal memo doesn't churn. */
+const EXCLUDE_CHAT_SLOT = ['ai-chat'] as const;
+
 const GlobalAIChatFab: React.FC = () => {
   const theme = useTheme();
   const { user } = useAuthState();
-  const { open, aiTasks } = useAIChat();
+  const { open, aiTasks, isOpen: isChatOpen } = useAIChat();
   const location = useLocation();
-  const anyPanelOpen = useAnyPanelOpen();
+  // Exclude the chat slot — that's hidden separately below. `anyPanelOpen`
+  // here means "some OTHER inline/drawer panel is open".
+  const anyPanelOpen = useAnyPanelOpen(EXCLUDE_CHAT_SLOT);
+  // At lg+ panels are inline (they push page content and leave the corner
+  // free), so the FAB can slide alongside them. Below lg panels are overlay
+  // drawers that cover the corner, so the FAB still hides.
+  const isLgUp = useMediaQuery(theme.breakpoints.up('lg'));
 
   if (!user) return null;
   if (HIDDEN_PREFIXES.some((p) => location.pathname.startsWith(p))) return null;
-  if (anyPanelOpen) return null;
+  // The chat drawer being open makes the launcher redundant — hide it.
+  if (isChatOpen) return null;
+  // Below lg an open panel is a full-height overlay drawer that covers the
+  // launcher's corner; there's nowhere to shift to, so keep hiding.
+  if (anyPanelOpen && !isLgUp) return null;
   // Landing route at exactly "/" is auth-gated to LandingPage when no user;
   // when user is present "/" redirects through HomeRouteResolver to a
   // calendar route, so it's safe to render here.
 
   const unreadCount = aiTasks.unreadCount ?? 0;
   const hasUnread = unreadCount > 0;
+
+  // When an inline panel is open at lg+, ride just to the left of it instead
+  // of disappearing. The translate matches the panel's 0.3s width slide so
+  // the launcher tracks the panel edge as it opens/closes.
+  const shiftForPanel = anyPanelOpen && isLgUp;
 
   return (
     <Box
@@ -42,6 +67,10 @@ const GlobalAIChatFab: React.FC = () => {
         right: { xs: 16, sm: 24 },
         zIndex: theme.zIndex.modal - 1,
         pointerEvents: 'none',
+        transform: shiftForPanel
+          ? `translateX(calc(-1 * ${INLINE_PANEL_WIDTH}))`
+          : 'translateX(0)',
+        transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
       }}
     >
       <Tooltip title="Orion" placement="left">

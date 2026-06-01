@@ -576,7 +576,7 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
                 sx={{
                   position: 'absolute',
                   inset: 0,
-                  backgroundColor: theme.palette.background.default,
+                  backgroundColor: theme.palette.background.paper,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -658,7 +658,7 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
           <Box sx={{
             position: 'absolute',
             inset: 0,
-            backgroundColor: theme.palette.background.default,
+            backgroundColor: theme.palette.background.paper,
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
@@ -952,7 +952,7 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
           <Box sx={{
             position: 'absolute',
             inset: 0,
-            backgroundColor: theme.palette.background.default,
+            backgroundColor: theme.palette.background.paper,
             overflow: 'auto',
             ...scrollbarStyles(theme),
             // Above the in-chat scroll-to-bottom button (zIndex 10) so it
@@ -972,7 +972,7 @@ const AIChatContent: React.FC<AIChatContentProps> = ({
           <Box sx={{
             position: 'absolute',
             inset: 0,
-            backgroundColor: theme.palette.background.default,
+            backgroundColor: theme.palette.background.paper,
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',

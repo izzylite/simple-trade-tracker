@@ -703,7 +703,7 @@ const NoteListPanel: React.FC<NoteListPanelProps> = ({
         flexDirection: 'column',
         height: '100%',
         minHeight: 0,
-        bgcolor: 'background.default',
+        bgcolor: 'background.paper',
       }}
     >
       {/* Header — only when not embedded inside a labeled drawer/panel */}

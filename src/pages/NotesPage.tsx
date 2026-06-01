@@ -363,8 +363,14 @@ const NotesPage: React.FC = () => {
         )}
 
         {/* Right rail: outline + stats (hidden below lg) */}
-        <Box sx={{ display: { xs: 'none', lg: 'block' }, minHeight: 0, overflow: 'hidden' }}>
-          <NoteMetaPanel
+        <Box
+          sx={{
+            display: { xs: 'none', lg: 'flex' },
+            flexDirection: 'column',
+            minHeight: 0,
+            overflow: 'hidden'
+          }}
+        >    <NoteMetaPanel
             note={selectedNote}
             notes={notes}
             onSelectNote={handleNoteClick}
