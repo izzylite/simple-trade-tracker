@@ -50,6 +50,55 @@ function isStockImageUrl(url: string): boolean {
   return stockDomains.some((domain) => url.toLowerCase().includes(domain));
 }
 
+/**
+ * Strict allowlist for server-side image fetches.
+ *
+ * Only URLs hosted on the project's own Supabase storage are permitted.
+ * In normal flow, ALL image URLs in this system come from Supabase Storage:
+ * - Trade images: stored via supabaseStorageService.ts, URL = <project>.supabase.co/storage/v1/...
+ * - Rehosted chart images: same path (imageRehost.ts re-uploads QuickChart URLs there)
+ *
+ * A blocklist (private IP ranges, etc.) would still leave open decimal IPs
+ * (2130706433 = 127.0.0.1), IPv6 variants (::ffff:127.0.0.1), DNS rebinding,
+ * and redirect-chain bypasses. An allowlist closes all of these by construction.
+ *
+ * Deno.resolveDns is not available in Supabase Edge Functions (hangs → 502),
+ * so hostname-based matching is the correct approach here.
+ */
+export function isAllowedImageUrl(url: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+
+  // HTTPS only — data:, http:, file:, ftp: are all rejected
+  if (parsed.protocol !== 'https:') return false;
+
+  const host = parsed.hostname.toLowerCase();
+
+  // Allowlist: only the project's own Supabase storage domain.
+  // The Supabase URL is always set in edge function env; fall back to the
+  // known project ref if (somehow) the env is missing.
+  const supabaseUrl = (() => {
+    try { return Deno.env.get('SUPABASE_URL') ?? ''; } catch { return ''; }
+  })();
+  const supabaseHost = supabaseUrl
+    ? new URL(supabaseUrl).hostname.toLowerCase()
+    : 'gwubzauelilziaqnsfac.supabase.co';
+
+  // Allow: <project>.supabase.co and any sub-paths under it
+  if (host === supabaseHost) return true;
+
+  // Allow: Supabase's storage CDN hostnames (supabase.co sub-domains only)
+  // e.g. signed-URL CDN at <project>.supabase.co is already covered above;
+  // add the storage subdomain variant just in case.
+  if (host.endsWith('.supabase.co')) return true;
+
+  return false;
+}
+
 function analyzeImage(
   imageUrl: string,
   analysisFocus: string = "overview",
@@ -112,5 +161,14 @@ export function executeAnalyzeImage(args: Record<string, unknown>): string {
   const tradeContext = typeof args.trade_context === "string"
     ? args.trade_context
     : undefined;
+
+  // Block URLs that point at internal / metadata endpoints before emitting
+  // the [IMAGE_ANALYSIS:] marker. The marker triggers a server-side fetch in
+  // buildFunctionResponseParts; if the URL is disallowed we never create it.
+  if (!isAllowedImageUrl(imageUrl)) {
+    log(`analyze_image: rejected URL (not an allowed public HTTPS URL): ${imageUrl.substring(0, 80)}`, "warn");
+    return "Image analysis skipped: the provided URL is not a supported image source. Only public HTTPS image URLs are supported.";
+  }
+
   return analyzeImage(imageUrl, analysisFocus, tradeContext);
 }

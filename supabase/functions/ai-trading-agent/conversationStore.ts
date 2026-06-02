@@ -235,30 +235,56 @@ export async function appendUserMessage(
   // most recent reminder fire instead.
   const lastMsg = nextMessages[nextMessages.length - 1] as { content?: unknown } | undefined;
   const lastContent = typeof lastMsg?.content === 'string' ? lastMsg.content : '';
-  const updatePayload: Record<string, unknown> = {
-    messages: nextMessages,
-    message_count: nextMessages.length,
-    last_message_preview: lastContent ? lastContent.slice(0, 200) : null,
-    updated_at: new Date().toISOString(),
-  };
-  if (truncated) {
-    updatePayload.embedding = null;
-    updatePayload.embedded_at_message_count = 0;
-  }
 
-  const { data: updated, error: updateErr } = await serviceClient
-    .from('ai_conversations')
-    .update(updatePayload)
-    .eq('id', conversationId)
-    .eq('user_id', userId)
-    .lt('last_prompt_tokens', MAX_PROMPT_TOKENS)
-    .select('id')
-    .maybeSingle();
-  if (updateErr) {
-    return { ok: false, code: 'unknown', message: updateErr.message };
-  }
-  if (!updated) {
-    return { ok: false, code: 'token_budget_exceeded' };
+  if (truncated) {
+    // Edit-resend REPLACES the array (truncate + re-append + preserved reminder
+    // fires) and resets the embedding — not a pure append, so it can't use the
+    // atomic append RPC. Keep read-modify-write; the `.lt(cap)` guard is atomic
+    // at the row lock. The tiny read→write window can still drop a reminder that
+    // fires mid-edit, but edit-resend is rare and the user can resend.
+    const updatePayload: Record<string, unknown> = {
+      messages: nextMessages,
+      message_count: nextMessages.length,
+      last_message_preview: lastContent ? lastContent.slice(0, 200) : null,
+      updated_at: new Date().toISOString(),
+      embedding: null,
+      embedded_at_message_count: 0,
+    };
+    const { data: updated, error: updateErr } = await serviceClient
+      .from('ai_conversations')
+      .update(updatePayload)
+      .eq('id', conversationId)
+      .eq('user_id', userId)
+      .lt('last_prompt_tokens', MAX_PROMPT_TOKENS)
+      .select('id')
+      .maybeSingle();
+    if (updateErr) {
+      return { ok: false, code: 'unknown', message: updateErr.message };
+    }
+    if (!updated) {
+      return { ok: false, code: 'token_budget_exceeded' };
+    }
+  } else {
+    // Normal append → atomic RPC: `messages = messages || userMessage` under the
+    // row lock appends to the CURRENT DB array, so a concurrent reminder fire or
+    // second tab can't be clobbered (the previous read-modify-write could lose
+    // whichever writer landed second). The user append does NOT set
+    // last_prompt_tokens (the assistant append does, at turn end) so
+    // p_prompt_tokens is null; p_cap enforces the runaway guard atomically.
+    const { data: appended, error: rpcErr } = await serviceClient.rpc('append_conversation_message', {
+      p_id: conversationId,
+      p_user_id: userId,
+      p_message: userMessage,
+      p_cap: MAX_PROMPT_TOKENS,
+      p_prompt_tokens: null,
+      p_preview: lastContent ? lastContent.slice(0, 200) : null,
+    });
+    if (rpcErr) {
+      return { ok: false, code: 'unknown', message: rpcErr.message };
+    }
+    if (appended !== true) {
+      return { ok: false, code: 'token_budget_exceeded' };
+    }
   }
 
   // On edit-resend, drop the window-level chunks too. We've already NULLed
@@ -328,51 +354,47 @@ export async function appendAssistantMessage(
 ): Promise<{ ok: boolean; deleted?: boolean; error?: string }> {
   const { conversationId, userId, assistantMessage, promptTokenCount } = params;
 
-  const { data: convo, error: readErr } = await serviceClient
-    .from('ai_conversations')
-    .select('id, user_id, messages, message_count')
-    .eq('id', conversationId)
-    .maybeSingle();
-  if (readErr) {
-    log('appendAssistantMessage read failed', 'error', { conversationId, error: readErr.message });
-    return { ok: false, error: readErr.message };
-  }
-  if (!convo) {
-    // Row was deleted (likely /clear during turn). No-op is correct.
-    return { ok: true, deleted: true };
-  }
-  if (convo.user_id !== userId) {
-    log('appendAssistantMessage cross-tenant attempt blocked', 'warn', { conversationId });
-    return { ok: false, error: 'forbidden' };
-  }
-
-  const existing = Array.isArray(convo.messages) ? convo.messages : [];
-  const next = [...existing, assistantMessage];
-  const currentCount = Number(convo.message_count ?? 0);
-
   const assistantContent = typeof assistantMessage.content === 'string'
     ? assistantMessage.content
     : '';
-  const updatePayload: Record<string, unknown> = {
-    messages: next,
-    message_count: currentCount + 1,
-    last_message_preview: assistantContent ? assistantContent.slice(0, 200) : null,
-    updated_at: new Date().toISOString(),
-  };
-  if (typeof promptTokenCount === 'number' && promptTokenCount > 0) {
-    updatePayload.last_prompt_tokens = promptTokenCount;
-  }
 
-  const { error: updateErr } = await serviceClient
-    .from('ai_conversations')
-    .update(updatePayload)
-    .eq('id', conversationId)
-    .eq('user_id', userId);
-  if (updateErr) {
-    log('appendAssistantMessage update failed', 'error', { conversationId, error: updateErr.message });
-    return { ok: false, error: updateErr.message };
+  // Atomic append via the SECURITY DEFINER RPC: `messages = messages ||
+  // assistantMessage` under the row lock. The previous read-modify-write could
+  // be clobbered by a concurrent writer (a reminder firing on the same
+  // conversation, or a second tab) — both read the same array and the second
+  // UPDATE overwrote the first. p_cap is null because the assistant append
+  // intentionally does NOT re-enforce the token cap (entry was already gated at
+  // the user-message append).
+  const { data: appended, error: rpcErr } = await serviceClient.rpc('append_conversation_message', {
+    p_id: conversationId,
+    p_user_id: userId,
+    p_message: assistantMessage,
+    p_cap: null,
+    p_prompt_tokens: (typeof promptTokenCount === 'number' && promptTokenCount > 0)
+      ? promptTokenCount
+      : null,
+    p_preview: assistantContent ? assistantContent.slice(0, 200) : null,
+  });
+  if (rpcErr) {
+    log('appendAssistantMessage rpc failed', 'error', { conversationId, error: rpcErr.message });
+    return { ok: false, error: rpcErr.message };
   }
-  return { ok: true };
+  if (appended === true) return { ok: true };
+
+  // RPC returned false (no row matched). With p_cap null the only causes are
+  // row-gone (/clear during the turn) or a cross-tenant user_id mismatch.
+  // Distinguish with a cheap read so the deleted case stays a silent no-op.
+  const { data: row } = await serviceClient
+    .from('ai_conversations')
+    .select('user_id')
+    .eq('id', conversationId)
+    .maybeSingle();
+  if (!row) {
+    // Row was deleted (likely /clear during turn). No-op is correct.
+    return { ok: true, deleted: true };
+  }
+  log('appendAssistantMessage cross-tenant attempt blocked', 'warn', { conversationId });
+  return { ok: false, error: 'forbidden' };
 }
 
 // maybeUpdateEmbedding moved to tools/recall-conversations.ts (write side of

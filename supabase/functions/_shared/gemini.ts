@@ -42,6 +42,13 @@ export interface GeminiFunctionCall {
    * tool loops should pass `rawParts` through instead of reconstructing.
    */
   thoughtSignature?: string;
+  /**
+   * Gemini 3 returns a unique id on every functionCall. The matching
+   * functionResponse should echo this id so results map back to calls by id
+   * (critical when the model emits PARALLEL calls). Older models may omit it.
+   * See: https://ai.google.dev/gemini-api/docs/function-calling#parallel-and-compositional
+   */
+  id?: string;
 }
 
 export interface CallGeminiParams {
@@ -83,6 +90,14 @@ export interface CallGeminiResult {
    * parsing the raw response.
    */
   usageMetadata?: Record<string, unknown>;
+  /**
+   * Candidate finishReason. `MAX_TOKENS` with empty `text` means the output
+   * budget was exhausted (often by thinking tokens) BEFORE any visible text —
+   * a recoverable truncation, distinct from a genuine empty answer. Callers
+   * that summarise/synthesise should detect this and retry with a bigger
+   * budget / less thinking rather than treat it as "no answer".
+   */
+  finishReason?: string;
 }
 
 export function extractFunctionCalls(
@@ -91,7 +106,7 @@ export function extractFunctionCalls(
   const calls: GeminiFunctionCall[] = [];
   for (const part of parts) {
     const fc = part.functionCall as
-      | { name?: string; args?: Record<string, unknown>; thoughtSignature?: string }
+      | { name?: string; args?: Record<string, unknown>; thoughtSignature?: string; id?: string }
       | undefined;
     if (!fc?.name) continue;
     const thoughtSignature =
@@ -101,6 +116,7 @@ export function extractFunctionCalls(
       name: fc.name,
       args: fc.args ?? {},
       thoughtSignature,
+      id: fc.id,
     });
   }
   return calls;
@@ -123,7 +139,13 @@ export async function callGemini(params: CallGeminiParams): Promise<CallGeminiRe
   const body: Record<string, unknown> = {
     contents: params.contents,
     generationConfig: {
-      temperature: params.temperature ?? 0.3,
+      // Google docs (Gemini 3): "strongly recommend keeping temperature at 1.0;
+      // changing it may lead to unexpected behavior such as looping or degraded
+      // performance." This applies to ALL call types including mode='NONE'
+      // synthesis turns — earlier 0.3 for NONE was pre-Gemini-3 reasoning and
+      // caused production issues (see memory: project_gemini_temperature_default).
+      // Callers that genuinely need determinism pass params.temperature explicitly.
+      temperature: params.temperature ?? 1.0,
       maxOutputTokens: params.maxOutputTokens ?? 8192,
       ...(params.responseSchema
         ? {
@@ -187,6 +209,7 @@ export async function callGemini(params: CallGeminiParams): Promise<CallGeminiRe
     .join('');
 
   const functionCalls = extractFunctionCalls(rawParts);
+  const finishReason = data.candidates?.[0]?.finishReason as string | undefined;
 
-  return { text, functionCalls, rawParts, usageMetadata: data.usageMetadata };
+  return { text, functionCalls, rawParts, usageMetadata: data.usageMetadata, finishReason };
 }

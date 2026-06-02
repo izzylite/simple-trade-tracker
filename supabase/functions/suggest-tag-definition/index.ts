@@ -135,7 +135,7 @@ Deno.serve(async (req: Request) => {
         { role: 'user', parts: [{ text: buildUserPrompt(tags, examples) }] },
       ],
       responseSchema,
-      temperature: 0.6,
+      // Gemini 3: keep at default 1.0 per Google recommendation.
       maxOutputTokens: 2048,
     });
 
