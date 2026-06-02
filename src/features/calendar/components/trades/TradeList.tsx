@@ -618,7 +618,7 @@ const TradeList: React.FC<TradeListProps> = ({
                           <ListItemIcon>
                             <ContentCopyIcon fontSize="small" />
                           </ListItemIcon>
-                          <ListItemText primary="Copy to calendar" />
+                          <ListItemText primary="Copy" />
                         </MenuItem>
                       )}
                       <MenuItem
