@@ -1235,6 +1235,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
   const tradeOperations: TradeOperationsProps = useMemo(() => ({
     onUpdateTradeProperty: isReadOnly ? undefined : globalTradeOps.onUpdateTradeProperty,
     onEditTrade: isReadOnly ? undefined : globalTradeOps.onEditTrade,
+    onCopyTrade: isReadOnly ? undefined : globalTradeOps.onCopyTrade,
     onDeleteTrade: isReadOnly ? undefined : globalTradeOps.onDeleteTrade,
     onDeleteMultipleTrades: isReadOnly ? undefined : globalTradeOps.onDeleteMultipleTrades,
     onZoomImage: tradeViewer.openImageZoom,
