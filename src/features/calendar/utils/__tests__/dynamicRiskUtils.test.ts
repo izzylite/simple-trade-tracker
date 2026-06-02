@@ -1,5 +1,6 @@
 import {
   calculateRiskAmount,
+  amountFromRiskAmount,
   calculateEffectiveMaxDailyDrawdown,
   calculateEffectiveRiskPercentageAsync,
   calculateCumulativePnLToDateAsync,
@@ -161,5 +162,20 @@ describe('calculateEffectiveRiskPercentageAsync', () => {
       [win(100, new Date(2026, 0, 10))] // 1% < 5%
     );
     expect(result).toBe(1);
+  });
+});
+
+describe('amountFromRiskAmount', () => {
+  it('scales a win by R:R', () => {
+    expect(amountFromRiskAmount('win', 2, 1000)).toBe(2000);
+  });
+  it('rounds the win amount', () => {
+    expect(amountFromRiskAmount('win', 1.5, 333)).toBe(500); // round(499.5)
+  });
+  it('returns a negative amount for a loss (R:R ignored)', () => {
+    expect(amountFromRiskAmount('loss', 2, 1000)).toBe(-1000);
+  });
+  it('returns 0 for breakeven', () => {
+    expect(amountFromRiskAmount('breakeven', 2, 1000)).toBe(0);
   });
 });
