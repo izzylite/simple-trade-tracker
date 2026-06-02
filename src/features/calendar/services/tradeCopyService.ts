@@ -12,8 +12,9 @@ import {
   calculateCumulativePnLToDateAsync,
   calculateEffectiveRiskPercentageAsync,
   calculateRiskAmount,
+  amountFromRiskAmount,
 } from '../utils/dynamicRiskUtils';
-import { addTrade, getAllTrades } from './calendarService';
+import { addTrade, getTradeById } from './calendarService';
 
 const TRADE_IMAGES_BUCKET = 'trade-images';
 
@@ -22,7 +23,7 @@ export interface CopyResult {
   calendarName: string;
   status: 'success' | 'error';
   error?: string;
-  /** true when the trade was created but its images could not be duplicated */
+  /** true when the trade was created but one or more images could not be duplicated */
   imagesOmitted?: boolean;
 }
 
@@ -30,15 +31,15 @@ export interface CopyResult {
  * Recompute a copied trade's `amount` for the destination calendar's risk
  * model. Carries the raw amount when recalculation isn't possible.
  *
- * Pure when `destTrades` is provided (no DB access). Mirrors the recalc in
- * `useCalendarTrades` / `tradeSync.calculateSyncedAmount`: wins are
- * `round(riskAmount * RR)`, losses are stored negative as `-round(riskAmount)`,
- * breakeven is 0.
+ * Pure when `destTrades` is provided. When omitted, the destination's
+ * cumulative-PnL-to-date is derived from its `year_stats` plus a single
+ * narrow query for the trade's own month (the canonical optimized path) —
+ * cheaper than reading the destination's full trade history.
  */
 export async function computeCopyAmount(
   trade: Trade,
   destCalendar: Calendar,
-  destTrades: Trade[]
+  destTrades?: Trade[]
 ): Promise<number> {
   if (trade.trade_type === 'breakeven') return 0;
   if (!destCalendar.risk_per_trade) return trade.amount;
@@ -57,9 +58,7 @@ export async function computeCopyAmount(
   const effRisk = await calculateEffectiveRiskPercentageAsync(tradeDate, destCalendar, drs, destTrades);
   const riskAmount = calculateRiskAmount(effRisk, destCalendar.account_balance, cumulativePnL);
 
-  return trade.trade_type === 'win'
-    ? Math.round(riskAmount * trade.risk_to_reward)
-    : -Math.round(riskAmount);
+  return amountFromRiskAmount(trade.trade_type, trade.risk_to_reward, riskAmount);
 }
 
 /**
@@ -109,7 +108,7 @@ export function buildCopiedTradePayload(
 /** Build the aggregate snackbar notification for a finished copy run. */
 export function summarizeCopyResults(
   results: CopyResult[]
-): { kind: 'success' | 'error'; message: string } {
+): { kind: 'success' | 'warning' | 'error'; message: string } {
   const ok = results.filter((r) => r.status === 'success');
   const failed = results.filter((r) => r.status === 'error');
   const omitted = ok.some((r) => r.imagesOmitted);
@@ -129,21 +128,27 @@ export function summarizeCopyResults(
 
   const failedNames = failed.map((r) => r.calendarName).join(', ');
   return {
-    kind: 'error',
+    kind: 'warning',
     message: `Copied to ${ok.length} of ${ok.length + failed.length} calendars${imgNote} · failed: ${failedNames}.`,
   };
 }
 
-/** Resolve the in-bucket object path for a source image. */
-function sourceObjectPath(image: TradeImageEntity): string | null {
+/** Resolve the in-bucket object path for a source image. Exported for tests. */
+export function sourceObjectPath(image: TradeImageEntity): string | null {
   if (image.storage_path) return image.storage_path;
   const marker = `/object/public/${TRADE_IMAGES_BUCKET}/`;
   const i = image.url ? image.url.indexOf(marker) : -1;
-  return i >= 0 ? decodeURIComponent(image.url.slice(i + marker.length)) : null;
+  if (i < 0) return null;
+  try {
+    return decodeURIComponent(image.url.slice(i + marker.length));
+  } catch {
+    // Malformed percent-encoding — fall back to the raw slice rather than throw.
+    return image.url.slice(i + marker.length);
+  }
 }
 
-/** Generate a unique object id preserving the source extension. */
-function freshImageId(sourcePath: string): string {
+/** Generate a unique object id preserving the source extension. Exported for tests. */
+export function freshImageId(sourcePath: string): string {
   const slash = sourcePath.lastIndexOf('/');
   const base = slash >= 0 ? sourcePath.slice(slash + 1) : sourcePath;
   const dot = base.lastIndexOf('.');
@@ -152,25 +157,28 @@ function freshImageId(sourcePath: string): string {
 }
 
 /**
- * Duplicate a trade's images into fresh storage objects owned by the
- * destination calendar. Best-effort per image. Returns the copied entities and
- * whether *all* non-pending images failed.
+ * Duplicate a trade's images into fresh storage objects under the destination
+ * owner's canonical prefix (`users/{userId}/trade-images/{newId}`) — the exact
+ * path the by-id cleanup reconstructs, so a copy is never orphaned when the
+ * source is deleted. Best-effort per image. Returns the copied entities and how
+ * many real (non-pending) images were NOT copied.
  */
 async function copyTradeImages(
   images: TradeImageEntity[] | undefined,
-  destCalendarId: string
-): Promise<{ images: TradeImageEntity[]; allFailed: boolean }> {
+  destCalendarId: string,
+  userId: string | undefined
+): Promise<{ images: TradeImageEntity[]; omittedCount: number }> {
   const real = (images ?? []).filter((img) => !img.pending);
-  if (real.length === 0) return { images: [], allFailed: false };
+  if (real.length === 0) return { images: [], omittedCount: 0 };
+  if (!userId) return { images: [], omittedCount: real.length };
 
   const copied: TradeImageEntity[] = [];
   for (const img of real) {
     try {
       const srcPath = sourceObjectPath(img);
       if (!srcPath) continue;
-      const prefix = srcPath.slice(0, srcPath.lastIndexOf('/') + 1);
       const newId = freshImageId(srcPath);
-      const destPath = `${prefix}${newId}`;
+      const destPath = `users/${userId}/trade-images/${newId}`;
 
       const { error } = await supabase.storage
         .from(TRADE_IMAGES_BUCKET)
@@ -190,13 +198,18 @@ async function copyTradeImages(
     }
   }
 
-  return { images: copied, allFailed: copied.length === 0 };
+  return { images: copied, omittedCount: real.length - copied.length };
 }
 
 /**
  * Copy a trade into each destination calendar. Per-destination isolation:
  * one failure never aborts the rest. Calls `onResult` after each destination
  * so callers can render per-row progress.
+ *
+ * The source trade is re-read from the DB so a non-persisted "consistent risk"
+ * hypothetical amount held in memory can never be written into a destination.
+ * If a destination INSERT fails after its images were duplicated, those orphan
+ * storage objects are removed best-effort.
  */
 export async function copyTradeToCalendars(
   trade: Trade,
@@ -205,21 +218,55 @@ export async function copyTradeToCalendars(
 ): Promise<CopyResult[]> {
   const results: CopyResult[] = [];
 
+  let userId: string | undefined;
+  try {
+    const { data } = await supabase.auth.getUser();
+    userId = data?.user?.id;
+  } catch (e) {
+    logger.error('copyTradeToCalendars: getUser failed', e);
+  }
+
+  // Authoritative persisted source row — the in-memory `trade` may carry a
+  // hypothetical amount when the "consistent risk" view is toggled on.
+  let source: Trade = trade;
+  try {
+    const fetched = await getTradeById(trade.id);
+    if (fetched) source = fetched;
+  } catch (e) {
+    logger.error('copyTradeToCalendars: getTradeById failed, using in-memory trade', e);
+  }
+
   for (const dest of destCalendars) {
+    let copiedPaths: string[] = [];
     let result: CopyResult;
     try {
-      const destTrades = await getAllTrades(dest.id!);
-      const amount = await computeCopyAmount(trade, dest, destTrades);
-      const { images: copiedImages, allFailed } = await copyTradeImages(trade.images, dest.id!);
-      const payload = buildCopiedTradePayload(trade, dest.id!, amount, copiedImages);
+      const amount = await computeCopyAmount(source, dest);
+      const { images: copiedImages, omittedCount } = await copyTradeImages(
+        source.images,
+        dest.id!,
+        userId
+      );
+      copiedPaths = copiedImages
+        .map((i) => i.storage_path)
+        .filter((p): p is string => !!p);
+      const payload = buildCopiedTradePayload(source, dest.id!, amount, copiedImages);
       await addTrade(dest.id!, payload);
       result = {
         calendarId: dest.id!,
         calendarName: dest.name,
         status: 'success',
-        imagesOmitted: allFailed,
+        imagesOmitted: omittedCount > 0,
       };
     } catch (e) {
+      // Remove any images already copied for this failed destination so the
+      // insert failure doesn't leak orphaned storage objects.
+      if (copiedPaths.length) {
+        try {
+          await supabase.storage.from(TRADE_IMAGES_BUCKET).remove(copiedPaths);
+        } catch (cleanupErr) {
+          logger.error('copyTradeToCalendars: orphan image cleanup failed', cleanupErr);
+        }
+      }
       logger.error('copyTradeToCalendars: failed for calendar', dest.id, e);
       result = {
         calendarId: dest.id!,

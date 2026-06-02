@@ -20,6 +20,7 @@ import { logger } from "utils/logger";
 import {
   calculateEffectiveRiskPercentageAsync,
   calculateRiskAmount,
+  amountFromRiskAmount,
   DynamicRiskSettings,
 } from "../utils/dynamicRiskUtils";
 import { supabase } from "config/supabase";
@@ -639,12 +640,12 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
           );
 
           // Calculate new amount based on trade type and risk to reward
-          let newAmount = 0;
-          if (trade.trade_type === "win") {
-            newAmount = Math.round(riskAmount * trade.risk_to_reward);
-          } else if (trade.trade_type === "loss") {
-            newAmount = -Math.round(riskAmount);
-          }
+          // (shared canonical formula — see amountFromRiskAmount)
+          const newAmount = amountFromRiskAmount(
+            trade.trade_type,
+            trade.risk_to_reward,
+            riskAmount,
+          );
 
           // Update cumulative P&L with the new amount
           cumulativePnL += newAmount;

@@ -125,7 +125,11 @@ const GlobalTradeOperations: React.FC = () => {
       <Snackbar
         open={!!notification}
         autoHideDuration={
-          notification?.kind === 'success' ? 3000 : hasRetry ? 6000 : 4000
+          notification?.kind === 'success'
+            ? 3000
+            : hasRetry || notification?.kind === 'warning'
+            ? 6000
+            : 4000
         }
         onClose={clearNotification}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
@@ -133,7 +137,13 @@ const GlobalTradeOperations: React.FC = () => {
       >
         <Alert
           onClose={clearNotification}
-          severity={notification?.kind === 'error' ? 'error' : 'success'}
+          severity={
+            notification?.kind === 'error'
+              ? 'error'
+              : notification?.kind === 'warning'
+              ? 'warning'
+              : 'success'
+          }
           variant="filled"
           sx={{ width: '100%' }}
           action={

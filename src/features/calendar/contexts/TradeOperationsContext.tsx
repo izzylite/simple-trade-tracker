@@ -66,7 +66,7 @@ export interface OpenAddDialogArgs {
  * surface a Retry action that re-runs the deletion without re-prompting.
  */
 export interface OpNotification {
-  kind: 'success' | 'error';
+  kind: 'success' | 'warning' | 'error';
   message: string;
   retryIds?: string[];
 }

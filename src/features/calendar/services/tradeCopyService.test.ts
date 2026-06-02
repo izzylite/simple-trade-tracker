@@ -2,30 +2,49 @@ import {
   computeCopyAmount,
   buildCopiedTradePayload,
   summarizeCopyResults,
+  sourceObjectPath,
+  freshImageId,
+  copyTradeToCalendars,
   CopyResult,
 } from './tradeCopyService';
 import { makeTrade, win, loss, breakeven } from 'test-utils/makeTrade';
-import { Calendar, TradeImageEntity } from 'features/calendar/types/dualWrite';
+import { Calendar, Trade, TradeImageEntity, YearStats } from 'features/calendar/types/dualWrite';
 
 // Mock infra modules that throw at import when env vars are missing, plus the
 // heavy sibling imports pulled in transitively (supabaseStorageService imports
 // the TradeForm component; dynamicRiskUtils imports TradeRepository). The pure
-// functions under test don't touch any of these at runtime — dynamicRiskUtils
-// itself stays REAL so the recalc is exercised for real.
+// PnL functions stay exercised against the REAL dynamicRiskUtils.
+const mockStorageCopy = jest.fn();
+const mockStorageRemove = jest.fn();
+const mockGetUser = jest.fn();
 jest.mock('config/supabase', () => ({
-  supabase: { from: jest.fn(), rpc: jest.fn(), storage: { from: jest.fn() } },
+  supabase: {
+    from: jest.fn(),
+    rpc: jest.fn(),
+    auth: { getUser: (...a: unknown[]) => mockGetUser(...a) },
+    storage: {
+      from: () => ({
+        copy: (...a: unknown[]) => mockStorageCopy(...a),
+        remove: (...a: unknown[]) => mockStorageRemove(...a),
+      }),
+    },
+  },
   supabaseUrl: 'http://test.local',
 }));
 jest.mock('utils/logger', () => ({
   logger: { error: jest.fn(), warn: jest.fn(), info: jest.fn(), debug: jest.fn(), log: jest.fn() },
 }));
 jest.mock('services/supabaseStorageService', () => ({
-  getPublicUrl: jest.fn(() => 'https://example.test/img'),
+  getPublicUrl: jest.fn((b: string, p: string) => `https://example.test/${b}/${p}`),
   uploadTradeImage: jest.fn(),
 }));
+const mockAddTrade = jest.fn();
+const mockGetTradeById = jest.fn();
+const mockGetAllTrades = jest.fn();
 jest.mock('features/calendar/services/calendarService', () => ({
-  addTrade: jest.fn(),
-  getAllTrades: jest.fn(),
+  addTrade: (...a: unknown[]) => mockAddTrade(...a),
+  getTradeById: (...a: unknown[]) => mockGetTradeById(...a),
+  getAllTrades: (...a: unknown[]) => mockGetAllTrades(...a),
 }));
 jest.mock('features/events/services/tradeEconomicEventService', () => ({
   tradeEconomicEventService: {},
@@ -33,6 +52,17 @@ jest.mock('features/events/services/tradeEconomicEventService', () => ({
 jest.mock('features/events/services/instrumentCatalog', () => ({
   getRelevantCurrenciesFromTags: jest.fn(() => []),
 }));
+
+// jsdom may not provide crypto.randomUUID, which freshImageId relies on.
+if (typeof globalThis.crypto?.randomUUID !== 'function') {
+  Object.defineProperty(globalThis, 'crypto', {
+    value: {
+      ...(globalThis.crypto || {}),
+      randomUUID: () => 'test-' + Math.random().toString(36).slice(2),
+    },
+    configurable: true,
+  });
+}
 
 const makeCalendar = (overrides: Partial<Calendar> = {}): Calendar =>
   ({
@@ -111,6 +141,38 @@ describe('computeCopyAmount', () => {
     // riskAmount = (10000 + 400) * 1% = 104; loss => -104
     await expect(computeCopyAmount(t, dest, prior)).resolves.toBe(-104);
   });
+
+  it('reflects a non-zero year_stats account_value_at_start baseline (at-scale case)', async () => {
+    const t = win(0, new Date(2026, 0, 15), { risk_to_reward: 2 });
+    // account_balance 10000 but the month already started at 13000 (+3000 carried).
+    const monthly = Array.from({ length: 12 }, (_, i) => ({
+      month_index: i,
+      month_pnl: 0,
+      trade_count: 0,
+      win_count: 0,
+      loss_count: 0,
+      growth_percentage: 0,
+      account_value_at_start: i === 0 ? 13000 : 10000,
+    }));
+    const yearStats: Record<string, YearStats> = {
+      '2026': {
+        year: 2026,
+        yearly_pnl: 0,
+        yearly_growth_percentage: 0,
+        total_trades: 0,
+        win_count: 0,
+        loss_count: 0,
+        win_rate: 0,
+        best_month_index: 0,
+        best_month_pnl: 0,
+        monthly_stats: monthly,
+      },
+    };
+    const dest = makeCalendar({ account_balance: 10000, risk_per_trade: 1, year_stats: yearStats });
+    // cumulativePnLAtMonthStart = 13000 - 10000 = 3000; no prior in-month trades.
+    // riskAmount = (10000 + 3000) * 1% = 130; win RR 2 => 260
+    await expect(computeCopyAmount(t, dest, [])).resolves.toBe(260);
+  });
 });
 
 describe('buildCopiedTradePayload', () => {
@@ -173,9 +235,9 @@ describe('summarizeCopyResults', () => {
       message: 'Copied trade to 3 calendars.',
     });
   });
-  it('partial success', () => {
+  it('partial success is a warning, not an error', () => {
     const r = summarizeCopyResults([ok('A'), ok('B'), bad('C')]);
-    expect(r.kind).toBe('error');
+    expect(r.kind).toBe('warning');
     expect(r.message).toContain('2 of 3');
     expect(r.message).toContain('C');
   });
@@ -187,5 +249,101 @@ describe('summarizeCopyResults', () => {
   it('notes when images were omitted', () => {
     const r = summarizeCopyResults([{ calendarId: 'A', calendarName: 'A', status: 'success', imagesOmitted: true }]);
     expect(r.message).toContain('without images');
+  });
+});
+
+describe('sourceObjectPath', () => {
+  const img = (o: Partial<TradeImageEntity>): TradeImageEntity =>
+    ({ id: 'i', url: '', calendar_id: 'c', ...o } as TradeImageEntity);
+
+  it('prefers an explicit storage_path', () => {
+    expect(sourceObjectPath(img({ storage_path: 'users/u/trade-images/a.png', url: 'whatever' }))).toBe(
+      'users/u/trade-images/a.png'
+    );
+  });
+  it('extracts the object path from a public URL', () => {
+    const url = 'https://x.supabase.co/storage/v1/object/public/trade-images/users/u/trade-images/a.png';
+    expect(sourceObjectPath(img({ url }))).toBe('users/u/trade-images/a.png');
+  });
+  it('decodes percent-encoded path segments', () => {
+    const url = 'https://x/storage/v1/object/public/trade-images/users/u/trade-images/a%20b.png';
+    expect(sourceObjectPath(img({ url }))).toBe('users/u/trade-images/a b.png');
+  });
+  it('returns null when neither storage_path nor a matching url marker is present', () => {
+    expect(sourceObjectPath(img({ url: 'https://x/not-a-storage-url.png' }))).toBeNull();
+  });
+});
+
+describe('freshImageId', () => {
+  it('preserves the source extension', () => {
+    expect(freshImageId('users/u/trade-images/photo.png')).toMatch(/\.png$/);
+    expect(freshImageId('a/b/c.JPEG')).toMatch(/\.JPEG$/);
+  });
+  it('handles a path with no extension', () => {
+    expect(freshImageId('users/u/trade-images/noext')).not.toMatch(/\./);
+  });
+});
+
+describe('copyTradeToCalendars', () => {
+  const srcTrade = (o: Partial<Trade> = {}): Trade =>
+    makeTrade({ id: 'src', amount: 111, trade_type: 'win', risk_to_reward: 2, ...o });
+  // destination with NO risk_per_trade so computeCopyAmount short-circuits (no DB).
+  const dest = (id: string, name: string): Calendar => makeCalendar({ id, name });
+
+  beforeEach(() => {
+    mockStorageCopy.mockReset().mockResolvedValue({ error: null });
+    mockStorageRemove.mockReset().mockResolvedValue({ error: null });
+    mockGetUser.mockReset().mockResolvedValue({ data: { user: { id: 'u1' } } });
+    mockAddTrade.mockReset().mockResolvedValue({ id: 'new' });
+    mockGetTradeById.mockReset().mockResolvedValue(null); // fall back to in-memory trade
+  });
+
+  it('re-fetches the source trade so the persisted amount is used, not the in-memory one', async () => {
+    // in-memory trade carries a hypothetical amount (111); DB row carries 999.
+    mockGetTradeById.mockResolvedValue(srcTrade({ amount: 999 }));
+    const results = await copyTradeToCalendars(srcTrade({ amount: 111 }), [dest('a', 'Alpha')]);
+    expect(results).toEqual([{ calendarId: 'a', calendarName: 'Alpha', status: 'success', imagesOmitted: false }]);
+    expect(mockGetTradeById).toHaveBeenCalledWith('src');
+    expect(mockAddTrade).toHaveBeenCalledTimes(1);
+    expect(mockAddTrade.mock.calls[0][1].amount).toBe(999);
+  });
+
+  it('isolates failures per destination and fires onResult for each', async () => {
+    mockAddTrade.mockRejectedValueOnce(new Error('insert A failed')).mockResolvedValueOnce({ id: 'b' });
+    const seen: CopyResult[] = [];
+    const results = await copyTradeToCalendars(
+      srcTrade(),
+      [dest('a', 'Alpha'), dest('b', 'Beta')],
+      (r) => seen.push(r)
+    );
+    expect(results.map((r) => r.status)).toEqual(['error', 'success']);
+    expect(results[0].calendarName).toBe('Alpha');
+    expect(seen).toHaveLength(2);
+  });
+
+  it('flags imagesOmitted when an image copy fails but still creates the trade', async () => {
+    mockStorageCopy.mockResolvedValue({ error: new Error('rls') });
+    mockGetTradeById.mockResolvedValue(
+      srcTrade({ images: [{ id: 'old', url: 'u', calendar_id: 'src', storage_path: 'users/u1/trade-images/old.png' }] })
+    );
+    const results = await copyTradeToCalendars(srcTrade(), [dest('a', 'Alpha')]);
+    expect(results[0].status).toBe('success');
+    expect(results[0].imagesOmitted).toBe(true);
+    expect(mockAddTrade).toHaveBeenCalledTimes(1);
+    expect(mockAddTrade.mock.calls[0][1].images).toEqual([]);
+  });
+
+  it('removes orphaned copied images when the insert fails after copy', async () => {
+    mockStorageCopy.mockResolvedValue({ error: null });
+    mockGetTradeById.mockResolvedValue(
+      srcTrade({ images: [{ id: 'old', url: 'u', calendar_id: 'src', storage_path: 'users/u1/trade-images/old.png' }] })
+    );
+    mockAddTrade.mockRejectedValue(new Error('insert failed'));
+    const results = await copyTradeToCalendars(srcTrade(), [dest('a', 'Alpha')]);
+    expect(results[0].status).toBe('error');
+    expect(mockStorageRemove).toHaveBeenCalledTimes(1);
+    const removedPaths = mockStorageRemove.mock.calls[0][0] as string[];
+    expect(removedPaths).toHaveLength(1);
+    expect(removedPaths[0]).toMatch(/^users\/u1\/trade-images\/.+\.png$/);
   });
 });

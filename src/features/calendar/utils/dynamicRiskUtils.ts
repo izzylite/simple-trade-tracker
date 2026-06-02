@@ -172,6 +172,24 @@ export const calculateRiskAmount = (
 };
 
 /**
+ * Derive a trade's signed PnL amount from a risk amount and R:R.
+ * Wins scale by R:R; losses are stored NEGATIVE; breakeven is 0.
+ *
+ * Canonical formula shared by the "consistent risk" recalc (useCalendarTrades)
+ * and copy-to-calendar (tradeCopyService) so the rounding and loss-sign
+ * convention can never diverge between them.
+ */
+export const amountFromRiskAmount = (
+  tradeType: Trade['trade_type'],
+  riskToReward: number,
+  riskAmount: number
+): number => {
+  if (tradeType === 'win') return Math.round(riskAmount * riskToReward);
+  if (tradeType === 'loss') return -Math.round(riskAmount);
+  return 0;
+};
+
+/**
  * Check if dynamic risk is currently active.
  * Internal helper used by calculateEffectiveMaxDailyDrawdown.
  */

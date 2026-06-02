@@ -6,6 +6,7 @@ import {
   Button,
   IconButton,
   Checkbox,
+  FormControlLabel,
   CircularProgress,
   useTheme,
 } from '@mui/material';
@@ -58,9 +59,10 @@ export const CopyTradeDialog: React.FC<CopyTradeDialogProps> = ({
     footerSx,
     monoSectionLabelSx,
     ghostButtonSx,
+    primaryButtonSx,
   } = useDialogTokens();
 
-  const { calendars, isLoading } = useCalendars(userId);
+  const { calendars, isLoading, refresh } = useCalendars(userId);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [isCopying, setIsCopying] = useState(false);
   const [rowStatus, setRowStatus] = useState<Record<string, RowStatus>>({});
@@ -107,6 +109,9 @@ export const CopyTradeDialog: React.FC<CopyTradeDialogProps> = ({
     setIsCopying(false);
     setDone(true);
     onCopied?.(results);
+    // Refresh the calendars list so destination stats/balances revalidate after
+    // the trade-insert webhook recomputes year_stats.
+    if (results.some((r) => r.status === 'success')) refresh();
   };
 
   const rowSx = {
@@ -115,19 +120,20 @@ export const CopyTradeDialog: React.FC<CopyTradeDialogProps> = ({
     gap: 1,
     px: 1.5,
     py: 1,
+    m: 0,
     borderRadius: 1.5,
     border: `1px solid ${hairline}`,
     backgroundColor: surfaceInset,
-    cursor: isCopying || done ? 'default' : 'pointer',
     transition: 'all 120ms ease',
     '&:hover': isCopying || done ? {} : { borderColor: violetBorder, backgroundColor: violetSofter },
+    '& .MuiFormControlLabel-label': { flex: 1, minWidth: 0 },
   };
 
   const statusIcon = (id: string) => {
     const s = rowStatus[id];
-    if (s === 'running') return <CircularProgress size={16} sx={{ color: violet }} />;
-    if (s === 'success') return <CheckCircleIcon sx={{ fontSize: 18, color: 'success.main' }} />;
-    if (s === 'error') return <ErrorIcon sx={{ fontSize: 18, color: 'error.main' }} />;
+    if (s === 'running') return <CircularProgress size={16} aria-label="Copying" sx={{ color: violet }} />;
+    if (s === 'success') return <CheckCircleIcon titleAccess="Copied" sx={{ fontSize: 18, color: 'success.main' }} />;
+    if (s === 'error') return <ErrorIcon titleAccess="Failed" sx={{ fontSize: 18, color: 'error.main' }} />;
     return null;
   };
 
@@ -175,6 +181,8 @@ export const CopyTradeDialog: React.FC<CopyTradeDialogProps> = ({
       <Box sx={{ px: 2.5, py: 2 }}>
         <Typography sx={monoSectionLabelSx}>Destination calendars</Typography>
         <Box
+          aria-live="polite"
+          aria-busy={isCopying}
           sx={{
             mt: 1.25,
             display: 'flex',
@@ -201,25 +209,33 @@ export const CopyTradeDialog: React.FC<CopyTradeDialogProps> = ({
             </Typography>
           ) : (
             destinations.map((c) => (
-              <Box key={c.id} sx={rowSx} onClick={() => toggle(c.id!)}>
-                <Checkbox
-                  checked={selected.has(c.id!)}
-                  onChange={() => toggle(c.id!)}
-                  onClick={(e) => e.stopPropagation()}
-                  disabled={isCopying || done}
-                  size="small"
-                  sx={{ p: 0.5, color: violetBorder, '&.Mui-checked': { color: violet } }}
-                />
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography sx={{ fontWeight: 600, fontSize: '0.9rem', color: theme.palette.text.primary }}>
-                    {c.name}
-                  </Typography>
-                  <Typography sx={{ fontSize: '0.75rem', color: theme.palette.text.secondary }}>
-                    Balance ${Number(c.account_balance ?? 0).toLocaleString()}
-                  </Typography>
-                </Box>
-                {statusIcon(c.id!)}
-              </Box>
+              <FormControlLabel
+                key={c.id}
+                sx={rowSx}
+                control={
+                  <Checkbox
+                    checked={selected.has(c.id!)}
+                    onChange={() => toggle(c.id!)}
+                    disabled={isCopying || done}
+                    size="small"
+                    inputProps={{ 'aria-label': `Copy to ${c.name}` }}
+                    sx={{ p: 0.5, color: violetBorder, '&.Mui-checked': { color: violet } }}
+                  />
+                }
+                label={
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography sx={{ fontWeight: 600, fontSize: '0.9rem', color: theme.palette.text.primary }}>
+                        {c.name}
+                      </Typography>
+                      <Typography sx={{ fontSize: '0.75rem', color: theme.palette.text.secondary }}>
+                        Balance ${Number(c.account_balance ?? 0).toLocaleString()}
+                      </Typography>
+                    </Box>
+                    {statusIcon(c.id!)}
+                  </Box>
+                }
+              />
             ))
           )}
         </Box>
@@ -234,7 +250,7 @@ export const CopyTradeDialog: React.FC<CopyTradeDialogProps> = ({
             onClick={handleCopy}
             disabled={isCopying || selected.size === 0}
             variant="contained"
-            sx={{ textTransform: 'none', borderRadius: 1.5, backgroundColor: violet }}
+            sx={primaryButtonSx}
             startIcon={
               isCopying ? (
                 <CircularProgress size={16} sx={{ color: 'inherit' }} />
