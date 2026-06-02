@@ -134,7 +134,11 @@ export async function callGemini(params: CallGeminiParams): Promise<CallGeminiRe
   }
 
   const model = params.model ?? getDefaultGeminiModel();
-  const url = `${GEMINI_API_BASE}/${model}:generateContent?key=${apiKey}`;
+  // API key goes in the `x-goog-api-key` header (set on the fetch below), NOT
+  // the URL query string — a logged request URL (e.g. a fetch rejection that
+  // embeds the URL) must never be able to leak the secret.
+  // https://ai.google.dev/gemini-api/docs/api-key
+  const url = `${GEMINI_API_BASE}/${model}:generateContent`;
 
   const body: Record<string, unknown> = {
     contents: params.contents,
@@ -178,7 +182,7 @@ export async function callGemini(params: CallGeminiParams): Promise<CallGeminiRe
     }
     response = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
       body: fetchBody,
     });
     if (response.ok || !RETRYABLE_STATUSES.has(response.status)) break;

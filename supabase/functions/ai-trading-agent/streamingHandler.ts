@@ -92,6 +92,15 @@ export function handleStreamingRequest(
           : '';
 
         for (let retryAttempt = 1; retryAttempt <= maxRetries; retryAttempt++) {
+          // The empty-bug retries (backoff sleeps + extra streaming calls) run
+          // BEFORE the main loop's own wall-clock guard kicks in. Without this
+          // check a slow turn could burn most of the 150s budget here, leaving
+          // no time to persist. Stop retrying once the budget is spent — the
+          // fallback below still sets finalText so the turn is never silent.
+          if (Date.now() - wallClockStartMs > WALL_CLOCK_BUDGET_MS) {
+            log('Wall-clock budget exhausted during empty-bug retries — stopping retries', 'warn');
+            break;
+          }
           const delayMs = Math.pow(2, retryAttempt - 1) * 1000;
           log(`Retry ${retryAttempt}/${maxRetries} after ${delayMs}ms delay`, 'info');
           await new Promise(resolve => setTimeout(resolve, delayMs));

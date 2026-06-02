@@ -17,10 +17,21 @@ import {
   GEMINI_API_BASE,
 } from './agentConfig.ts';
 
-export function buildGeminiUrl(apiKey: string, streaming: boolean): string {
+export function buildGeminiUrl(streaming: boolean): string {
   return streaming
-    ? `${GEMINI_API_BASE}/${MODEL}:streamGenerateContent?alt=sse&key=${apiKey}`
-    : `${GEMINI_API_BASE}/${MODEL}:generateContent?key=${apiKey}`;
+    ? `${GEMINI_API_BASE}/${MODEL}:streamGenerateContent?alt=sse`
+    : `${GEMINI_API_BASE}/${MODEL}:generateContent`;
+}
+
+/**
+ * Auth + content-type headers for a Gemini REST call. The API key goes in the
+ * `x-goog-api-key` HEADER, never the URL query string — a logged request URL
+ * (e.g. a `fetch` rejection that embeds the URL) must not be able to leak the
+ * secret. Mirrors the pattern already used in `_shared/embed.ts`.
+ * https://ai.google.dev/gemini-api/docs/api-key
+ */
+export function geminiHeaders(apiKey: string): Record<string, string> {
+  return { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey };
 }
 
 /**
@@ -106,14 +117,14 @@ export async function preflightTokenCount(
   if (bytes / 1024 < PREFLIGHT_KB_THRESHOLD) return { ok: true };
 
   try {
-    const url = `${GEMINI_API_BASE}/${MODEL}:countTokens?key=${apiKey}`;
+    const url = `${GEMINI_API_BASE}/${MODEL}:countTokens`;
     const reqBody: Record<string, unknown> = { contents };
     if (systemInstruction) {
       reqBody.systemInstruction = { parts: [{ text: systemInstruction }] };
     }
     const resp = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: geminiHeaders(apiKey),
       body: JSON.stringify(reqBody),
     });
     if (!resp.ok) {

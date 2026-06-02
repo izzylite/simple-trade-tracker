@@ -15,6 +15,7 @@ import { THINKING_LEVEL } from './agentConfig.ts';
 import type { ThinkingLevel } from './agentConfig.ts';
 import {
   buildGeminiUrl,
+  geminiHeaders,
   buildToolsArray,
   buildToolConfig,
   buildGenerationConfig,
@@ -43,7 +44,7 @@ export async function callGemini(
   usageMetadata?: Record<string, unknown>;
   finishReason?: string;
 }> {
-  const apiUrl = buildGeminiUrl(apiKey, false);
+  const apiUrl = buildGeminiUrl(false);
 
   // Build contents array — systemPrompt goes in the top-level `systemInstruction`
   // field (Gemini docs standard) rather than a fake role:user turn. This keeps
@@ -74,7 +75,7 @@ export async function callGemini(
 
   const response = await fetch(apiUrl, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: geminiHeaders(apiKey),
     body: JSON.stringify(requestBody),
   });
 
@@ -174,7 +175,11 @@ export async function callGeminiWithContents(
       contents: contents as Array<{ role: 'user' | 'model'; parts: Array<Record<string, unknown>> }>,
       tools: tools.length > 0 ? tools : undefined,
       toolMode: opts.mode,
-      maxOutputTokens: opts.maxOutputTokens ?? 4000,
+      // 8000 (not 4000) so thinking tokens can't starve the visible output
+      // budget → MAX_TOKENS with empty text. Matches every real call site +
+      // the streaming branch below; the old 4000 was a latent truncation
+      // footgun for any caller relying on the default.
+      maxOutputTokens: opts.maxOutputTokens ?? 8000,
       thinkingLevel: (opts.thinkingLevel ?? THINKING_LEVEL) as ThinkingLevel,
     });
     logUsageMetadata('callGeminiWithContents:non-streaming', result.usageMetadata);
@@ -196,7 +201,7 @@ export async function callGeminiWithContents(
     tools: buildToolsArray(tools),
     tool_config: buildToolConfig(tools, opts.mode ?? 'AUTO'),
     generationConfig: buildGenerationConfig(
-      opts.maxOutputTokens ?? 4000,
+      opts.maxOutputTokens ?? 8000,
       opts.thinkingLevel,
     ),
   };
@@ -204,9 +209,9 @@ export async function callGeminiWithContents(
     body.systemInstruction = { parts: [{ text: opts.systemInstruction }] };
   }
 
-  const response = await fetch(buildGeminiUrl(apiKey, true), {
+  const response = await fetch(buildGeminiUrl(true), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: geminiHeaders(apiKey),
     body: JSON.stringify(body),
   });
 

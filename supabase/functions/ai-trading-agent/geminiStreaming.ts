@@ -11,6 +11,7 @@ import type { GeminiFunctionDeclaration } from './tools.ts';
 import type { ThinkingLevel } from './agentConfig.ts';
 import {
   buildGeminiUrl,
+  geminiHeaders,
   buildToolsArray,
   buildToolConfig,
   buildGenerationConfig,
@@ -44,7 +45,7 @@ export async function callGeminiStreaming(
   rawParts?: Array<Record<string, unknown>>;
   usageMetadata?: Record<string, unknown>;
 }> {
-  const apiUrl = buildGeminiUrl(apiKey, true);
+  const apiUrl = buildGeminiUrl(true);
 
   // Build user message parts (text + optional images)
   const userMessageParts: Array<Record<string, unknown>> = [];
@@ -142,7 +143,7 @@ export async function callGeminiStreaming(
       log('Initiating Gemini fetch...', 'info');
       response = await fetch(apiUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: geminiHeaders(apiKey),
         body: serializedBody,
       });
       log(`Gemini fetch completed with status: ${response.status}`, 'info');
