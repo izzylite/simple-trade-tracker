@@ -248,3 +248,46 @@ happy path). No new at-scale failure mode is introduced.
 - PnL fallback: copy the original `$amount` when recalculation isn't possible
   (no warn).
 - All-images-fail: create the trade without images and note it in the result.
+
+## Post-review (2026-06-02)
+
+A multi-agent adversarial review (6 dimensions → per-finding verification) found
+**0 critical / 0 high**, 9 medium, 10 low confirmed (12 invalidated). All
+correctness/robustness/a11y/reuse findings were fixed in commit
+`fix(calendar): address copy-trade review findings`:
+
+- re-read the source trade from the DB (guards against the "consistent risk"
+  in-memory hypothetical amount being persisted into a destination)
+- shared `amountFromRiskAmount` helper (no formula divergence between copy and
+  the `useCalendarTrades` recalc)
+- canonical destination image prefix + orphan cleanup on insert failure
+- year_stats optimized amount path (dropped the full destination history read)
+- `imagesOmitted` partial-failure signal + `warning`-severity snackbar for
+  partial copy runs
+- keyboard-operable destination rows (`FormControlLabel`) + aria-live list
+- `primaryButtonSx` token + post-copy SWR refresh
+
+**Deliberately deferred (with rationale):**
+
+1. **Onward re-sync when a destination is itself a calendar-link source.**
+   Inserting the copy fires the trades webhook, which (if the destination has
+   `linked_to_calendar_id`) propagates it to the linked target. This is
+   *consistent* with the calendar-link contract ("new trades in the source copy
+   to the target") and was already flagged as accepted scope above. The
+   suggested fix (a `skip_trade_webhook` SECURITY DEFINER RPC + explicit
+   `year_stats` recompute) is a substantial backend change that would also
+   change link semantics — not worth it for behavior that is arguably correct.
+   Revisit only if product decides copies must never propagate.
+
+2. **Client-side tier precheck before `storage.copy()`.** The storage RLS
+   INSERT policy already gates image creation on paid tier, so a downgraded
+   user's copy fails closed and is reported as "copied without images" (never a
+   raw error). Adding a precheck would cost an extra `getUser` + `subscriptions`
+   query on every copy run (the common paid case) to spare a rare edge case —
+   a net pessimization. Skipped.
+
+3. **Timeout/abort on a hung copy.** The dialog blocks close while copying.
+   Wrapping each step in `Promise.race(timeout)` risks reporting a destination
+   as failed while its insert later succeeds (Supabase calls can't be
+   cancelled), producing a worse inconsistency. The Supabase client has its own
+   network timeouts; left as-is.
