@@ -963,7 +963,7 @@ export function useCalendarTrades(options: UseCalendarTradesOptions) {
 
       if (data && data.success) {
         logger.log(
-          `✅ Tag updated successfully: ${data.tradesUpdated} trades affected`,
+          `✅ Tag updated successfully: ${data.tradesUpdated} trades, ${data.notesUpdated ?? 0} notes affected`,
         );
         // Patch local state immediately. The broadcast path is unreliable for bulk
         // tag renames: a single SQL UPDATE in bulk_update_tag_in_calendar fires N

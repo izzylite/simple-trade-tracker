@@ -2,17 +2,12 @@
  * Update Tag Edge Function
  *
  * Renames a tag (or a tag group, e.g. "Setup:A" → "Strategy:A") across every trade
- * in a calendar, then refreshes calendar metadata (tags array, required_tag_groups,
- * excluded_tags_from_patterns) and triggers exactly one year_stats recompute.
+ * and note owned by the user, then refreshes calendar metadata and triggers exactly
+ * one year_stats recompute.
  *
- * Previously this issued N individual UPDATE statements (one per affected trade),
- * each of which fired the per-row trigger_trade_changes webhook, spawning N
- * concurrent handle-trade-changes invocations that all raced to update the same
- * calendars row. With ~500 trades this hit Postgres statement_timeout (57014).
- *
- * Now: one SQL RPC (bulk_update_tag_in_calendar) does all writes inside a
- * transaction with app.skip_trade_webhook = 'true', then we explicitly recompute
- * year_stats once per affected calendar.
+ * The trade and note bulk RPCs run in parallel (Promise.all). Each uses a GUC to
+ * suppress per-row triggers during the bulk write, then does one explicit mirror/
+ * stats refresh at the end.
  */
 import { createAuthenticatedClient, createServiceClient, errorResponse, successResponse, handleCors, log, parseJsonBody } from '../_shared/supabase.ts';
 import { extractTagsFromTrades, formatTagWithCapitalizedGroup } from '../_shared/utils.ts';
@@ -53,33 +48,46 @@ Deno.serve(async (req) => {
 
     if (oldTag === newTag) {
       log('oldTag and newTag are identical, no update needed');
-      return successResponse({ success: true, tradesUpdated: 0 });
+      return successResponse({ success: true, tradesUpdated: 0, notesUpdated: 0 });
     }
 
     log('Processing tag update', 'info', { calendarId, oldTag, newTag, userId: user.id });
 
-    // Single RPC does all writes (trades + calendar metadata + linked-calendar sync)
-    // with the skip-webhook GUC set, so we don't trigger the per-row webhook storm.
-    // The RPC enforces calendar ownership against auth.uid().
-    const { data: result, error: rpcError } = await supabase.rpc('bulk_update_tag_in_calendar', {
-      p_calendar_id: calendarId,
-      p_old_tag: oldTag,
-      p_new_tag: newTag,
-    });
+    // Run trade and note bulk renames in parallel. Each RPC uses a GUC to suppress
+    // per-row triggers during the write, so neither causes a webhook/trigger storm.
+    // bulk_update_tag_in_calendar enforces calendar ownership; bulk_update_tag_in_notes
+    // enforces user ownership — both via auth.uid() inside SECURITY DEFINER functions.
+    const [calRpc, notesRpc] = await Promise.all([
+      supabase.rpc('bulk_update_tag_in_calendar', {
+        p_calendar_id: calendarId,
+        p_old_tag: oldTag,
+        p_new_tag: newTag,
+      }),
+      supabase.rpc('bulk_update_tag_in_notes', {
+        p_user_id: user.id,
+        p_old_tag: oldTag,
+        p_new_tag: newTag,
+      }),
+    ]);
 
-    if (rpcError) {
-      log('bulk_update_tag_in_calendar RPC failed', 'error', rpcError);
-      const status = rpcError.message?.includes('Not authorized') ? 403
-        : rpcError.message?.includes('not found') ? 404
+    if (calRpc.error) {
+      log('bulk_update_tag_in_calendar RPC failed', 'error', calRpc.error);
+      const status = calRpc.error.message?.includes('Not authorized') ? 403
+        : calRpc.error.message?.includes('not found') ? 404
         : 500;
-      return errorResponse(rpcError.message || 'Failed to update tags', status);
+      return errorResponse(calRpc.error.message || 'Failed to update tags', status);
     }
 
-    const tradesUpdated = (result as { trades_updated?: number })?.trades_updated ?? 0;
-    const linkedTradesUpdated = (result as { linked_trades_updated?: number })?.linked_trades_updated ?? 0;
-    const linkedCalendarId = (result as { linked_calendar_id?: string | null })?.linked_calendar_id ?? null;
+    if (notesRpc.error) {
+      log('bulk_update_tag_in_notes RPC failed (non-fatal)', 'warn', notesRpc.error);
+    }
 
-    log('Bulk tag update completed', 'info', { tradesUpdated, linkedTradesUpdated, linkedCalendarId });
+    const tradesUpdated = (calRpc.data as { trades_updated?: number })?.trades_updated ?? 0;
+    const linkedTradesUpdated = (calRpc.data as { linked_trades_updated?: number })?.linked_trades_updated ?? 0;
+    const linkedCalendarId = (calRpc.data as { linked_calendar_id?: string | null })?.linked_calendar_id ?? null;
+    const notesUpdated = (notesRpc.data as { notes_updated?: number })?.notes_updated ?? 0;
+
+    log('Bulk tag update completed', 'info', { tradesUpdated, linkedTradesUpdated, linkedCalendarId, notesUpdated });
 
     // Refresh the calendar's tags array from the current trade tags. The RPC
     // already applied the rename transform, but a full re-derive from trades
@@ -111,12 +119,13 @@ Deno.serve(async (req) => {
     }
     await Promise.all(recomputes);
 
-    log(`Tag update completed successfully: ${tradesUpdated} trades updated`);
+    log(`Tag update completed successfully: ${tradesUpdated} trades, ${notesUpdated} notes updated`);
     return successResponse({
       success: true,
       tradesUpdated,
+      notesUpdated,
       linkedTradesUpdated,
-      message: `Successfully updated ${tradesUpdated} trades`,
+      message: `Successfully updated ${tradesUpdated} trades and ${notesUpdated} notes`,
     });
   } catch (error) {
     log('Error processing tag update', 'error', error);
