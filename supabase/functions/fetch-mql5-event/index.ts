@@ -28,6 +28,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
  */
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { resolveImpact } from "./impact.ts";
 
 // Cache freshness threshold (5 minutes)
 const CACHE_FRESHNESS_MS = 5 * 60 * 1000;
@@ -295,7 +296,10 @@ async function updateEventInDatabase(
     return { updated: false, skipped: true, reason: "No Supabase client" };
   }
 
-  // No cached event to update
+  // ENRICHMENT-ONLY CONTRACT: this function never creates economic_event rows —
+  // MyFXBook is the sole source of rows (see refresh-economic-calendar). If no
+  // matching row exists we skip rather than insert, so MQL5 can never reintroduce
+  // the cross-source duplicates we removed. Do not change this to an upsert.
   if (!cachedEvent) {
     log(`No existing record to update for ${mql5Data.event_name} (${mql5Data.country}). Skipping insert.`);
     return { updated: false, skipped: true, reason: "No cached event found" };
@@ -320,8 +324,13 @@ async function updateEventInDatabase(
   }
 
   try {
-    // Preserve impact from primary source — MQL5 uses different ratings
-    // Only use MQL5 impact if the event has no impact set yet
+    // The MQL5 event page is authoritative for this event's impact. Let a fresh
+    // scrape correct impact upward (or fill an empty value) but never silently
+    // downgrade a higher stored rating. This unsticks the placeholder "Low" the
+    // bulk weekly refresh writes for not-yet-enriched events (e.g. Nonfarm
+    // Payrolls) while preserving a genuine High set by the primary source. The
+    // old `if (!cachedEvent.impact)` guard refused to ever overwrite, so a
+    // high-impact event mislabeled "Low" stayed wrong forever. See impact.ts.
     const updateData: Record<string, unknown> = {
       actual_value: mql5Data.actual_value,
       forecast_value: mql5Data.forecast_value,
@@ -330,8 +339,9 @@ async function updateEventInDatabase(
       last_updated: new Date().toISOString(),
       data_source: "mql5",
     };
-    if (!cachedEvent.impact && mql5Data.impact) {
-      updateData.impact = mql5Data.impact;
+    const resolvedImpact = resolveImpact(cachedEvent.impact, mql5Data.impact);
+    if (resolvedImpact) {
+      updateData.impact = resolvedImpact;
     }
 
     // Update existing record

@@ -50,6 +50,47 @@ export interface CachedMetadata {
   higher_is_better: boolean | null;
 }
 
+// Impact rating helpers. NOTE: kept in sync with the twin copy in
+// `fetch-mql5-event/impact.ts` (edge functions are independent deploy bundles
+// and cannot share a local module without the _shared/ machinery).
+//
+// `'Low'` is overloaded: it is BOTH a genuine rating AND the placeholder this
+// extractor writes for inline events it has not yet enriched. When the per-event
+// enrichment fetch flakes, the placeholder must NOT clobber a good stored value
+// (e.g. a High set on a prior run or by fetch-mql5-event). resolveImpact lets a
+// value move up or fill an empty slot, but never silently downgrades.
+export type ImpactLevel = 'High' | 'Medium' | 'Low';
+
+const IMPACT_RANK: Record<ImpactLevel, number> = { High: 3, Medium: 2, Low: 1 };
+
+export function normalizeImpact(value: string | null | undefined): ImpactLevel | null {
+  if (!value) return null;
+  switch (value.trim().toLowerCase()) {
+    case 'high': return 'High';
+    case 'medium': return 'Medium';
+    case 'low': return 'Low';
+    default: return null;
+  }
+}
+
+/**
+ * Returns the impact to persist, or null to leave the stored value unchanged.
+ * - Unrecognized scraped value → null (ignore).
+ * - No valid cached impact → take the scraped value (fill).
+ * - Otherwise take scraped only when its rank ≥ cached (correct/upgrade),
+ *   never lower (no silent downgrade).
+ */
+export function resolveImpact(
+  cachedImpact: string | null | undefined,
+  scrapedImpact: string | null | undefined,
+): ImpactLevel | null {
+  const scraped = normalizeImpact(scrapedImpact);
+  if (!scraped) return null;
+  const cached = normalizeImpact(cachedImpact);
+  if (!cached) return scraped;
+  return IMPACT_RANK[scraped] >= IMPACT_RANK[cached] ? scraped : null;
+}
+
 // Cache for event metadata (event URL path -> metadata)
 const eventMetadataCache: Map<string, EventMetadata> = new Map();
 
@@ -512,18 +553,28 @@ async function getExistingMetadataFromSupabase(
 
   log(`Checking Supabase for existing metadata for ${eventNames.length} events...`);
 
-  // Query events by name and currency that have impact data
-  // Include actual_value, forecast_value, actual_result_type to infer direction
-  const { data, error } = await supabase
-    .from("economic_events")
-    .select("event_name, currency, impact, actual_value, forecast_value, actual_result_type")
-    .in("event_name", eventNames)
-    .in("currency", currencies)
-    .not("impact", "is", null);
+  // Query events by name and currency that have impact data.
+  // CHUNK the name filter: a single .in() with ~300 names builds a >8KB URL the
+  // gateway rejects (414). That failure used to return an empty map, silently
+  // disabling the cache and forcing EVERY event through the flaky per-page fetch
+  // — the root cause of impacts randomly reverting to the placeholder.
+  const uniqueNames = [...new Set(eventNames)];
+  // deno-lint-ignore no-explicit-any
+  const data: any[] = [];
+  for (let i = 0; i < uniqueNames.length; i += 80) {
+    const nameChunk = uniqueNames.slice(i, i + 80);
+    const { data: rows, error } = await supabase
+      .from("economic_events")
+      .select("event_name, currency, impact, actual_value, forecast_value, actual_result_type")
+      .in("event_name", nameChunk)
+      .in("currency", currencies)
+      .not("impact", "is", null);
 
-  if (error) {
-    log("Error querying existing metadata from Supabase", "warn", error);
-    return metadataMap;
+    if (error) {
+      log("Error querying existing metadata chunk from Supabase", "warn", error);
+      continue;
+    }
+    if (rows) data.push(...rows);
   }
 
   // Build a lookup map: "eventName|currency" -> { impact, higher_is_better }

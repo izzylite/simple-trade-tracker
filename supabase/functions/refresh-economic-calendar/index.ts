@@ -8,7 +8,12 @@
  * Called by cron job: Sunday and Wednesday at 3 AM UTC
  */
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { fetchFromMQL5Weekly } from './mql5-extractor.ts'
+// NOTE: MyFXBook is the SOLE source of economic-event rows. MQL5 is
+// enrichment-only (see fetch-mql5-event, which only UPDATES existing rows). The
+// MQL5 weekly fallback was removed because a second row-creating source produced
+// un-dedupable cross-source duplicates. `mql5-extractor.ts` is retained only for
+// the impact helpers below; its scraping/enrichment exports are now unused here.
+import { normalizeImpact, resolveImpact } from './mql5-extractor.ts'
 
 // CORS headers
 const corsHeaders = {
@@ -127,6 +132,10 @@ async function fetchFromMyFXBookWeekly(): Promise<Record<string, unknown>[]> {
       throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
     }
 
+    const processSecret = Deno.env.get("PROCESS_EVENTS_SECRET");
+    if (!processSecret) {
+      throw new Error("Missing PROCESS_EVENTS_SECRET");
+    }
     const processResponse = await fetch(
       `${supabaseUrl}/functions/v1/process-economic-events`,
       {
@@ -134,7 +143,11 @@ async function fetchFromMyFXBookWeekly(): Promise<Record<string, unknown>[]> {
         headers: {
           "Content-Type": "application/json",
           "apikey": serviceRoleKey,
-          "Authorization": `Bearer ${serviceRoleKey}`,
+          // process-economic-events is verify_jwt=false + shared-secret guarded.
+          // No Authorization: Bearer — post API-key migration the service-role
+          // key isn't a valid JWT and the gateway rejects it (the bug that
+          // silently forced the MQL5 fallback and created cross-source dupes).
+          "X-Process-Secret": processSecret,
         },
         body: JSON.stringify({ htmlContent: html }),
       },
@@ -167,13 +180,33 @@ async function updateEventsInDatabase(events: Record<string, unknown>[]): Promis
   const supabase = createServiceClient();
   let updatedCount = 0;
 
-  const normalizeImpact = (impact: unknown): string => {
-    const i = (impact as string || "").toLowerCase();
-    if (i === "high") return "High";
-    if (i === "medium") return "Medium";
-    if (i === "low") return "Low";
-    return "Low";
-  };
+  // Read the currently-stored impact for every event up front so we never
+  // downgrade a good rating with a flaky-enrichment placeholder "Low". The
+  // weekly enrichment writes "Low" both for genuinely-low events AND as a
+  // placeholder when the per-event page fetch fails; without this guard a
+  // failed fetch silently reverts a High/Medium event (e.g. it was reverting
+  // Nonfarm Payrolls / CAD jobs every 4h). See resolveImpact in mql5-extractor.
+  const externalIds = events
+    .map((e) => e.external_id)
+    .filter((id): id is string => typeof id === "string" && id.length > 0);
+  // Chunk small: a single .in() with all ~300 external_ids builds a >8KB URL
+  // that the gateway rejects (414), which would leave this map empty and silently
+  // disable the no-downgrade guard. ~80 IDs keeps the query string safe.
+  const existingImpactByExternalId = new Map<string, string | null>();
+  for (let i = 0; i < externalIds.length; i += 80) {
+    const chunk = externalIds.slice(i, i + 80);
+    const { data: existingRows, error: existingErr } = await supabase
+      .from("economic_events")
+      .select("external_id, impact")
+      .in("external_id", chunk);
+    if (existingErr) {
+      log("Could not load existing impacts for a chunk (treating those as new)", "warn", existingErr);
+      continue;
+    }
+    for (const row of existingRows || []) {
+      existingImpactByExternalId.set(row.external_id as string, (row.impact as string) ?? null);
+    }
+  }
 
   for (const e of events) {
     if (!e.event_name || !e.currency) {
@@ -181,11 +214,15 @@ async function updateEventsInDatabase(events: Record<string, unknown>[]): Promis
       continue;
     }
 
+    const existingImpact = existingImpactByExternalId.get(e.external_id as string);
+    // resolveImpact: scraped wins only if same/higher rank than stored; null
+    // means "don't change" (preserve the stored value).
+    const resolvedImpact = resolveImpact(existingImpact, e.impact as string);
+
     const row: Record<string, unknown> = {
       external_id: e.external_id,
       currency: e.currency,
       event_name: e.event_name,
-      impact: normalizeImpact(e.impact),
       event_date: e.event_date || e.date,
       event_time: e.time_utc ? new Date(e.time_utc as string).toISOString() : null,
       time_utc: e.time_utc ?? null,
@@ -200,6 +237,15 @@ async function updateEventsInDatabase(events: Record<string, unknown>[]): Promis
       data_source: e.source ?? "myfxbook",
       last_updated: new Date().toISOString(),
     };
+
+    // Always write an EXPLICIT impact — never rely on the upsert preserving an
+    // omitted column. Priority: the resolved (never-downgraded) value; else the
+    // existing stored value (a flaky placeholder must not clobber it); else a
+    // normalized fallback for brand-new rows.
+    row.impact = resolvedImpact
+      ?? normalizeImpact(existingImpact)
+      ?? normalizeImpact(e.impact as string)
+      ?? "Low";
 
     // Only include value fields if present
     if (e.actual) row.actual_value = e.actual;
@@ -246,26 +292,13 @@ Deno.serve(async (req) => {
 
     log(`Bulk refreshing economic calendar - fetching all events`);
 
-    let freshEvents: Record<string, unknown>[] = [];
-    let dataSource = "unknown";
-
-    // Try MyFXBook first (via ScraperAPI), fallback to MQL5
-    try {
-      log("Attempting to fetch from MyFXBook...");
-      freshEvents = await fetchFromMyFXBookWeekly();
-      dataSource = "myfxbook";
-      log(`MyFXBook returned ${freshEvents.length} events`);
-    } catch (myfxbookError) {
-      log("MyFXBook failed, trying MQL5...", "warn", myfxbookError);
-      try {
-        freshEvents = await fetchFromMQL5Weekly();
-        dataSource = "mql5";
-        log(`MQL5 returned ${freshEvents.length} events`);
-      } catch (mql5Error) {
-        log("Both sources failed", "error", { myfxbookError, mql5Error });
-        throw new Error(`All data sources failed`);
-      }
-    }
+    // MyFXBook is the sole source of event rows. No MQL5 fallback: if MyFXBook
+    // fails we surface the error instead of forking a parallel MQL5 dataset that
+    // can't be deduped against MyFXBook's rows.
+    log("Fetching from MyFXBook (sole source)...");
+    const freshEvents = await fetchFromMyFXBookWeekly();
+    const dataSource = "myfxbook";
+    log(`MyFXBook returned ${freshEvents.length} events`);
 
     const impactCounts = {
       high: freshEvents.filter(e => e.impact === 'High').length,

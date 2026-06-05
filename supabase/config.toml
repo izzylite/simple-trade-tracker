@@ -39,6 +39,14 @@ verify_jwt = false
 [functions.refresh-economic-calendar]
 verify_jwt = false
 
+# Internal-only: called by refresh-economic-calendar with the service-role key
+# (not a valid JWT post API-key migration). Authenticates via the
+# X-Process-Secret shared secret instead. Must stay verify_jwt=false or the
+# gateway 401s the internal call (which silently forced the MQL5 fallback and
+# created cross-source duplicates).
+[functions.process-economic-events]
+verify_jwt = false
+
 [functions.auto-refresh-economic-calendar]
 verify_jwt = false
 

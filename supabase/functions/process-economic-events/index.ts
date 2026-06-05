@@ -27,6 +27,15 @@ interface ProcessEventsPayload {
   htmlContent: string
 }
 
+// Single source of truth for the currencies the calendar covers. The parser
+// gates on this in three places (precheck regex, extraction regex, validity
+// list) plus the storage filter — keep them all derived from here so they never
+// drift (NZD/CNY were previously missing from the regexes, silently dropping
+// those rows). NZD completes the AUD/CAD/NZD comm-dollar trio; CNY drives global
+// risk sentiment. The UI already offers all of these as filter chips.
+const CALENDAR_CURRENCIES = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF', 'NZD', 'CNY']
+const CURRENCY_REGEX = new RegExp(`\\b(${CALENDAR_CURRENCIES.join('|')})\\b`)
+
 // DB row mapping for economic_events table
 export type EconomicEventDBRow = {
   external_id: string
@@ -223,7 +232,7 @@ async function parseMyFXBookWeeklyEnhancedHTML(html: string): Promise<EconomicEv
     const events: EconomicEvent[] = []
     const rows = doc.querySelectorAll('tr')
 
-    const validCurrencies = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF']
+    const validCurrencies = CALENDAR_CURRENCIES
     const validImpacts = ['High', 'Medium', 'Low']
 
     for (const row of Array.from(rows)) {
@@ -236,13 +245,13 @@ async function parseMyFXBookWeeklyEnhancedHTML(html: string): Promise<EconomicEv
 
         const hasEnoughCells = cells.length >= 4
         const hasDatePattern = /(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}|\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)|\d{1,2}\/\d{1,2}\/\d{2,4}|\d{4}-\d{1,2}-\d{1,2}/i.test(text)
-        const hasCurrency = /\b(USD|EUR|GBP|JPY|AUD|CAD|CHF)\b/.test(text)
+        const hasCurrency = CURRENCY_REGEX.test(text)
         if (!(hasEnoughCells && hasDatePattern && hasCurrency)) continue
 
         // Extract currency
         let currency = ''
         for (const cell of cellTexts) {
-          const m = cell.match(/\b(USD|EUR|GBP|JPY|AUD|CAD|CHF)\b/)
+          const m = cell.match(CURRENCY_REGEX)
           if (m && validCurrencies.includes(m[1])) { currency = m[1]; break }
         }
 
@@ -531,6 +540,21 @@ Deno.serve(async (req: Request) => {
   const corsResponse = handleCors(req)
   if (corsResponse) return corsResponse
 
+  // Internal-only endpoint. Deployed verify_jwt=false because its only caller
+  // (refresh-economic-calendar) authenticates with the service-role key, which
+  // the gateway can't validate as a JWT after the API-key migration. We instead
+  // require a shared secret so the (now public) endpoint can't be used to inject
+  // economic-calendar rows. Fail closed if the secret is not configured.
+  const expectedSecret = Deno.env.get('PROCESS_EVENTS_SECRET')
+  if (!expectedSecret) {
+    log('PROCESS_EVENTS_SECRET not configured — refusing request', 'error')
+    return errorResponse('Server auth not configured', 500)
+  }
+  if (req.headers.get('x-process-secret') !== expectedSecret) {
+    log('Rejected request: missing/invalid X-Process-Secret', 'warn')
+    return errorResponse('Unauthorized', 401)
+  }
+
   try {
     log('Process economic events request received')
 
@@ -566,10 +590,9 @@ Deno.serve(async (req: Request) => {
       })
     }
 
-    // Filter for major currencies
-    const majorCurrencies = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF']
+    // Filter to the currencies the calendar surfaces (single source of truth).
     const majorCurrencyEvents = events.filter(event =>
-      majorCurrencies.includes(event.currency)
+      CALENDAR_CURRENCIES.includes(event.currency)
     )
 
     log(`Filtered ${events.length} total events to ${majorCurrencyEvents.length} major currency events`)
