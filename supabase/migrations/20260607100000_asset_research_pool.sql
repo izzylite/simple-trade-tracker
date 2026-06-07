@@ -6,14 +6,14 @@
 
 CREATE TABLE public.asset_research_pool (
   id             UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-  asset          TEXT        NOT NULL,
+  asset          TEXT        NOT NULL CHECK (char_length(asset) <= 20),
   status         TEXT        NOT NULL DEFAULT 'processing'
                              CHECK (status IN ('processing','fresh','failed')),
   refreshed_at   TIMESTAMPTZ,
   expires_at     TIMESTAMPTZ,
   briefing_html  TEXT,
   briefing_plain TEXT,
-  significance   TEXT        CHECK (significance IN ('low','medium','high','critical')),
+  significance   TEXT        CHECK (significance IN ('low','medium','high')),
   queries_used   TEXT[]      DEFAULT '{}',
   error_detail   TEXT,
   created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -36,6 +36,7 @@ CREATE OR REPLACE FUNCTION public.claim_asset_for_research(p_asset TEXT)
 RETURNS BOOLEAN
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public
 AS $$
 DECLARE
   v_rows INT;
@@ -56,3 +57,6 @@ BEGIN
   RETURN v_rows > 0;
 END;
 $$;
+
+REVOKE ALL ON FUNCTION public.claim_asset_for_research(TEXT) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.claim_asset_for_research(TEXT) TO service_role;
