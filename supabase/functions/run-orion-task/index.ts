@@ -4,153 +4,13 @@ import {
   log,
   createServiceClient,
 } from '../_shared/supabase.ts';
+import {
+  storeTaskResult,
+  markTaskSuccess,
+  markTaskFailure,
+} from '../_shared/storeTaskResult.ts';
 import { getHandler } from './handlers.ts';
 import type { OrionTask, TaskResult } from './types.ts';
-
-const TASK_TYPE_LABELS: Record<string, string> = {
-  market_research: 'Market Research',
-};
-
-function prettyTaskType(taskType: string): string {
-  if (TASK_TYPE_LABELS[taskType]) return TASK_TYPE_LABELS[taskType];
-  // Defensive fallback: the enum currently has only `market_research`, so this
-  // branch is unreachable at runtime. Kept because (a) the dispatcher consumes
-  // task_type from log payloads where a stale/malformed value is possible, and
-  // (b) adding a future scalable task type should not require updating this
-  // function just to get a readable label in logs.
-  return taskType
-    .split('_')
-    .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : ''))
-    .join(' ')
-    .trim() || 'Orion Task';
-}
-
-async function storeResult(
-  serviceClient: ReturnType<typeof createServiceClient>,
-  task: OrionTask,
-  result: TaskResult
-): Promise<{ ok: boolean; resultId?: string }> {
-  const { data: insertedRow, error: insertError } = await serviceClient
-    .from('orion_task_results')
-    .insert({
-      task_id: task.id,
-      user_id: task.user_id,
-      task_type: task.task_type,
-      content_html: result.content_html,
-      content_plain: result.content_plain,
-      significance: result.significance,
-      metadata: result.metadata,
-      group_date: new Date().toISOString().split('T')[0],
-    })
-    .select('id')
-    .single();
-
-  if (insertError || !insertedRow) {
-    log('Failed to store task result', 'error', insertError);
-    return { ok: false };
-  }
-
-  // Surface the task result in the user's notification inbox. Failures are
-  // non-fatal: the task result is already persisted and will appear in the
-  // Tasks tab on its own; missing the inbox row degrades discoverability
-  // but doesn't lose data.
-  try {
-    const isError = (result.metadata as { error?: boolean } | null)?.error === true;
-    const previewSource = (result.content_plain || '').replace(/\s+/g, ' ').trim();
-    const preview = previewSource.length > 120
-      ? previewSource.slice(0, 117) + '…'
-      : previewSource;
-    const metaTitle = (result.metadata as { title?: string } | null)?.title?.trim();
-    const baseTitle = metaTitle || prettyTaskType(task.task_type);
-    const title = (isError ? `${baseTitle} — failed` : baseTitle).slice(0, 200);
-
-    const { error: notifErr } = await serviceClient
-      .from('notifications')
-      .insert({
-        user_id: task.user_id,
-        type: 'orion_task_result',
-        title,
-        payload: {
-          taskId: task.id,
-          resultId: insertedRow.id,
-          taskType: task.task_type,
-          significance: result.significance ?? null,
-          isError,
-          preview,
-        },
-      });
-    if (notifErr) {
-      log('Notification insert (task_result) failed (non-fatal)', 'warn', {
-        taskId: task.id,
-        error: notifErr.message,
-      });
-    }
-  } catch (notifThrow) {
-    log('Notification insert (task_result) threw (non-fatal)', 'warn', {
-      taskId: task.id,
-      error: notifThrow instanceof Error ? notifThrow.message : String(notifThrow),
-    });
-  }
-
-  return { ok: true, resultId: insertedRow.id };
-}
-
-// Reset failure counters after a successful (or suppressed) run.
-async function markTaskSuccess(
-  serviceClient: ReturnType<typeof createServiceClient>,
-  taskId: string
-) {
-  const { error } = await serviceClient
-    .from('orion_tasks')
-    .update({
-      last_error: null,
-      last_error_at: null,
-      consecutive_failures: 0,
-    })
-    .eq('id', taskId)
-    .gt('consecutive_failures', 0); // only touch row if there's state to clear
-  if (error) log('Failed to clear failure state', 'warn', error);
-}
-
-// Bump failure counters. We do NOT zero this elsewhere — the dispatcher's
-// advance_orion_tasks_next_run_at only moves the schedule, not the counters.
-async function markTaskFailure(
-  serviceClient: ReturnType<typeof createServiceClient>,
-  taskId: string,
-  message: string
-) {
-  // Truncate to keep the row small — full stack goes to edge function logs.
-  const truncated = message.length > 500 ? message.slice(0, 497) + '...' : message;
-  const { data, error: selectErr } = await serviceClient
-    .from('orion_tasks')
-    .select('consecutive_failures')
-    .eq('id', taskId)
-    .single();
-  if (selectErr) {
-    log('Failed to read failure counter', 'warn', selectErr);
-    return;
-  }
-  const next = (data?.consecutive_failures ?? 0) + 1;
-  // Auto-disable after 10 consecutive failures. Matches the custom-tools webhook
-  // pattern. Persistent failures here usually mean (a) the user's Gemini key is
-  // dead, (b) the watchlist resolves to nothing, or (c) the news provider is
-  // down — none of which a retry will fix without user intervention. The
-  // disabled status flips the UI pill to DISABLED so the user sees the state
-  // without us having to surface raw error JSON.
-  const shouldDisable = next >= 10;
-  const updatePayload: Record<string, unknown> = {
-    last_error: truncated,
-    last_error_at: new Date().toISOString(),
-    consecutive_failures: next,
-  };
-  if (shouldDisable) updatePayload.status = 'disabled';
-
-  const { error: updateErr } = await serviceClient
-    .from('orion_tasks')
-    .update(updatePayload)
-    .eq('id', taskId);
-  if (updateErr) log('Failed to persist failure state', 'warn', updateErr);
-}
 
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req);
@@ -216,7 +76,7 @@ Deno.serve(async (req) => {
         significance: null,
         metadata: { error: true, message },
       };
-      await storeResult(serviceClient, orionTask, failureResult);
+      await storeTaskResult(serviceClient, orionTask, failureResult);
       await markTaskFailure(serviceClient, orionTask.id, message);
       // storeResult-side notification covers the inbox surface; no extra
       // work needed here even on failure.
@@ -242,7 +102,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const stored = await storeResult(serviceClient, orionTask, result);
+    const stored = await storeTaskResult(serviceClient, orionTask, result);
     if (!stored.ok) {
       return new Response(
         JSON.stringify({ success: false, error: 'Failed to store result' }),
