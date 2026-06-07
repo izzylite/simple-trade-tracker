@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
     const queries = (queryRows ?? []).map((r: { query: string }) => r.query);
     if (queries.length === 0) {
       log('Asset research: no queries for asset', 'warn', { asset });
-      await markPoolFailed(serviceClient, asset, 'No queries configured');
+      await markPoolFailed(serviceClient, poolRow.id, 'No queries configured');
       return successResponse({ skipped: true, reason: 'no_queries' });
     }
 
@@ -159,7 +159,8 @@ Deno.serve(async (req) => {
         queries_used: queries,
         error_detail: null,
       })
-      .eq('asset', asset);
+      .eq('id', poolRow.id)
+      .eq('status', 'processing');  // belt-and-suspenders guard
 
     if (writeErr) throw new Error(`pool write: ${writeErr.message}`);
 
@@ -169,17 +170,21 @@ Deno.serve(async (req) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     log('Asset research failed', 'error', { asset, message });
-    await markPoolFailed(serviceClient, asset, message);
+    await markPoolFailed(serviceClient, poolRow.id, message);
     return errorResponse(message, 500);
   }
 });
 
 async function markPoolFailed(
   serviceClient: ReturnType<typeof createServiceClient>,
-  asset: string,
+  poolRowId: string,
   message: string
 ): Promise<void> {
   const backoffMs = 15 * 60 * 1000;
+  // If this update silently fails (edge fn killed mid-flight), the pool row
+  // stays in 'processing'. The dispatcher will re-claim it after the row's
+  // processing_claimed_at TTL (not yet implemented). Manual reset:
+  // UPDATE asset_research_pool SET status='failed' WHERE asset='EURUSD' AND status='processing';
   const { error } = await serviceClient
     .from('asset_research_pool')
     .update({
@@ -187,8 +192,8 @@ async function markPoolFailed(
       error_detail: message.slice(0, 500),
       expires_at: new Date(Date.now() + backoffMs).toISOString(),
     })
-    .eq('asset', asset);
-  if (error) log('Failed to mark pool row as failed', 'warn', { asset, error: error.message });
+    .eq('id', poolRowId);
+  if (error) log('Failed to mark pool row as failed', 'warn', { poolRowId, error: error.message });
 }
 
 function deduplicateNews(results: NewsResult[]): NewsResult[] {
