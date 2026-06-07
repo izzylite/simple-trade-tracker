@@ -8,12 +8,11 @@
  * Called by cron job: Sunday and Wednesday at 3 AM UTC
  */
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-// NOTE: MyFXBook is the SOLE source of economic-event rows. MQL5 is
-// enrichment-only (see fetch-mql5-event, which only UPDATES existing rows). The
-// MQL5 weekly fallback was removed because a second row-creating source produced
-// un-dedupable cross-source duplicates. `mql5-extractor.ts` is retained only for
-// the impact helpers below; its scraping/enrichment exports are now unused here.
-import { normalizeImpact, resolveImpact } from './mql5-extractor.ts'
+// MyFXBook is the SOLE source of economic-event rows. MQL5 is enrichment-only
+// (see fetch-mql5-event, which only UPDATES existing rows). The MQL5 weekly
+// fallback + scraper were removed because a second row-creating source produced
+// un-dedupable cross-source duplicates.
+import { normalizeImpact, resolveImpact } from '../_shared/impact.ts'
 
 // CORS headers
 const corsHeaders = {
@@ -185,7 +184,7 @@ async function updateEventsInDatabase(events: Record<string, unknown>[]): Promis
   // weekly enrichment writes "Low" both for genuinely-low events AND as a
   // placeholder when the per-event page fetch fails; without this guard a
   // failed fetch silently reverts a High/Medium event (e.g. it was reverting
-  // Nonfarm Payrolls / CAD jobs every 4h). See resolveImpact in mql5-extractor.
+  // Nonfarm Payrolls / CAD jobs every 4h). See resolveImpact in _shared/impact.ts.
   const externalIds = events
     .map((e) => e.external_id)
     .filter((id): id is string => typeof id === "string" && id.length > 0);
@@ -318,7 +317,11 @@ Deno.serve(async (req) => {
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    log("Error refreshing economic calendar", "error", { message: errorMessage });
+    // Distinctive, greppable marker: MyFXBook is the sole source (no fallback),
+    // so a failure here means the calendar stops updating. Configure a
+    // log-based alert on "ECON_CALENDAR_REFRESH_FAILED" — this is the exact
+    // silent-outage mode that previously masked weeks of MQL5-fallback dupes.
+    log(`ECON_CALENDAR_REFRESH_FAILED: ${errorMessage}`, "error", { message: errorMessage });
     return errorResponse(`Refresh failed: ${errorMessage}`, 500);
   }
 });

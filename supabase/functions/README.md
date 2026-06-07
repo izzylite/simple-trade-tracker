@@ -14,6 +14,16 @@ This directory contains all Edge Functions for the Simple Trade Tracker applicat
 2. Fill in your Supabase project credentials
 3. Set any additional API keys as needed
 
+**Required secrets (functions fail closed without them):**
+- `SCRAPER_API_KEY` — ScraperAPI key used by `refresh-economic-calendar` to
+  fetch the MyFXBook calendar.
+- `PROCESS_EVENTS_SECRET` — shared secret authenticating the internal
+  `refresh-economic-calendar` → `process-economic-events` call. The latter runs
+  `verify_jwt=false` (the service-role key isn't a valid JWT post API-key
+  migration), so it authenticates on this header instead and returns 500 if the
+  secret is unset. Set the same value once via `supabase secrets set`; both
+  functions read it from the project env.
+
 ### Local Development
 
 #### Start Supabase locally:

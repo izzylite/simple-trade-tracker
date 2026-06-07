@@ -22,19 +22,12 @@ import type {
 
 // Import deno-dom for HTML parsing (replaces cheerio)
 import { DOMParser, Element } from "https://deno.land/x/deno_dom@v0.1.45/deno-dom-wasm.ts"
+import { CALENDAR_CURRENCIES, CURRENCY_REGEX } from './currency.ts'
+import { constantTimeEquals } from '../_shared/crypto.ts'
 
 interface ProcessEventsPayload {
   htmlContent: string
 }
-
-// Single source of truth for the currencies the calendar covers. The parser
-// gates on this in three places (precheck regex, extraction regex, validity
-// list) plus the storage filter — keep them all derived from here so they never
-// drift (NZD/CNY were previously missing from the regexes, silently dropping
-// those rows). NZD completes the AUD/CAD/NZD comm-dollar trio; CNY drives global
-// risk sentiment. The UI already offers all of these as filter chips.
-const CALENDAR_CURRENCIES = ['USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF', 'NZD', 'CNY']
-const CURRENCY_REGEX = new RegExp(`\\b(${CALENDAR_CURRENCIES.join('|')})\\b`)
 
 // DB row mapping for economic_events table
 export type EconomicEventDBRow = {
@@ -550,7 +543,7 @@ Deno.serve(async (req: Request) => {
     log('PROCESS_EVENTS_SECRET not configured — refusing request', 'error')
     return errorResponse('Server auth not configured', 500)
   }
-  if (req.headers.get('x-process-secret') !== expectedSecret) {
+  if (!constantTimeEquals(req.headers.get('x-process-secret') ?? '', expectedSecret)) {
     log('Rejected request: missing/invalid X-Process-Secret', 'warn')
     return errorResponse('Unauthorized', 401)
   }

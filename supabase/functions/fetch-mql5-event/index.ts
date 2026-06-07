@@ -28,7 +28,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
  */
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { resolveImpact } from "./impact.ts";
+import { resolveImpact } from "../_shared/impact.ts";
 
 // Cache freshness threshold (5 minutes)
 const CACHE_FRESHNESS_MS = 5 * 60 * 1000;
