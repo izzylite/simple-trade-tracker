@@ -128,7 +128,7 @@ export async function handleMarketResearch(
     await Promise.all([
       gatherMarketNews(supabase, config),
       fetchUpcomingEvents(supabase, userSymbols),
-      fetchRecentBriefings(supabase, task.id, 5),
+      fetchRecentBriefings(supabase, task.id, 24), // last 24 hours of briefings for deduplication context
       getMarketPrices(supabase, watchlist, 60),
     ]);
 
