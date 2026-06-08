@@ -196,3 +196,50 @@ export function matchInstrumentCatalog(input: string): InstrumentCatalogEntry[] 
     (e) => e.symbol.toLowerCase().includes(q) || e.label.toLowerCase().includes(q),
   );
 }
+
+/**
+ * Broker symbol (instrumentCatalog format) → Yahoo Finance symbol.
+ * Used by run-asset-research to convert EURUSD → EURUSD=X for price fetching.
+ * Instruments with no Yahoo equivalent map to undefined.
+ */
+export const BROKER_TO_YAHOO: Record<string, string> = {
+  EURUSD: 'EURUSD=X', GBPUSD: 'GBPUSD=X', USDJPY: 'USDJPY=X',
+  AUDUSD: 'AUDUSD=X', USDCAD: 'USDCAD=X', NZDUSD: 'NZDUSD=X',
+  USDCHF: 'USDCHF=X', EURJPY: 'EURJPY=X', EURGBP: 'EURGBP=X',
+  EURAUD: 'EURAUD=X', EURCAD: 'EURCAD=X', EURCHF: 'EURCHF=X',
+  EURNZD: 'EURNZD=X', GBPJPY: 'GBPJPY=X', GBPAUD: 'GBPAUD=X',
+  GBPCAD: 'GBPCAD=X', AUDJPY: 'AUDJPY=X', CADJPY: 'CADJPY=X',
+  CHFJPY: 'CHFJPY=X', NZDJPY: 'NZDJPY=X', AUDNZD: 'AUDNZD=X',
+  XAUUSD: 'GC=F',     XAGUSD: 'SI=F',
+  BTCUSD: 'BTC-USD',  ETHUSD: 'ETH-USD',
+  US30: '^DJI',       NAS100: '^IXIC',  SPX500: '^GSPC', US2000: '^RUT',
+  GER40: '^GDAXI',    EU50: '^STOXX50E', UK100: '^FTSE',
+  JP225: '^N225',     AUS200: '^AXJO',
+};
+
+/**
+ * Broker symbol → ISO currency codes for economic-event filtering.
+ * Mirrors getCurrenciesForInstrument in src/features/events/services/instrumentCatalog.ts.
+ * Keep in sync when INSTRUMENT_MAPPINGS changes.
+ */
+export const BROKER_CURRENCIES: Record<string, string[]> = {
+  EURUSD: ['EUR','USD'], GBPUSD: ['GBP','USD'], USDJPY: ['USD','JPY'],
+  AUDUSD: ['AUD','USD'], USDCAD: ['USD','CAD'], NZDUSD: ['NZD','USD'],
+  USDCHF: ['USD','CHF'], EURJPY: ['EUR','JPY'], EURGBP: ['EUR','GBP'],
+  EURAUD: ['EUR','AUD'], EURCAD: ['EUR','CAD'], EURCHF: ['EUR','CHF'],
+  EURNZD: ['EUR','NZD'], GBPJPY: ['GBP','JPY'], GBPAUD: ['GBP','AUD'],
+  GBPCAD: ['GBP','CAD'], GBPCHF: ['GBP','CHF'], GBPNZD: ['GBP','NZD'],
+  AUDJPY: ['AUD','JPY'], CADJPY: ['CAD','JPY'], CHFJPY: ['CHF','JPY'],
+  NZDJPY: ['NZD','JPY'], AUDCAD: ['AUD','CAD'], AUDCHF: ['AUD','CHF'],
+  AUDNZD: ['AUD','NZD'], CADCHF: ['CAD','CHF'], NZDCAD: ['NZD','CAD'],
+  NZDCHF: ['NZD','CHF'], XAUUSD: ['USD'], XAGUSD: ['USD'],
+  BTCUSD: ['USD'],       ETHUSD: ['USD'],
+  US30: ['USD'],  NAS100: ['USD'], SPX500: ['USD'], US2000: ['USD'],
+  GER40: ['EUR'], EU50: ['EUR'],   UK100: ['GBP'],
+  JP225: ['JPY'], AUS200: ['AUD'],
+};
+
+/** Get currencies for a broker-format symbol. Falls back to ['USD']. */
+export function getBrokerCurrencies(brokerSymbol: string): string[] {
+  return BROKER_CURRENCIES[brokerSymbol] ?? ['USD'];
+}

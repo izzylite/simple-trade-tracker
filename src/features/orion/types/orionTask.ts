@@ -30,22 +30,16 @@ export type AlertMinSignificance = 'medium' | 'high';
  * clears `min_significance` — central-bank surprise, political statement,
  * geopolitical shock, unexpected data, commodity disruption, etc.
  *
- * `watchlist_symbols` is the single source of user intent: Yahoo symbols drive
- * price grounding, per-instrument news queries (via a symbol→readable-name
- * mapping), and economic-event currency filtering (via a symbol→currencies
- * mapping). Required non-empty at save time.
- *
- * `macro_queries` holds the user's picks from the DB-backed macro query
- * catalog (public.macro_query_catalog). Stored as query strings (not catalog
- * IDs) so the edge function runs them directly and renaming a catalog entry
- * never breaks a running task.
+ * `subscribed_assets` is the single source of user intent: broker-format
+ * symbols (e.g. EURUSD, XAUUSD, BTCUSD) the user wants briefed. Results are
+ * delivered from the shared `asset_research_pool` table — no per-user Gemini
+ * calls. Required non-empty at save time.
  */
 export interface MarketResearchConfig {
-  markets: string[];
   frequency_minutes: AlertFrequency;
   min_significance: AlertMinSignificance;
-  macro_queries: string[];
-  watchlist_symbols: string[];
+  /** Broker-format symbols the user wants briefed (e.g. EURUSD, XAUUSD). */
+  subscribed_assets: string[];
 }
 
 export type TaskConfig = MarketResearchConfig;
@@ -118,33 +112,12 @@ export const TASK_TYPE_COLORS: Record<TaskType, string> = {
   market_research: '#7C4DFF', // purple
 };
 
-/**
- * Starter pack pre-populated into new market_research tasks. Five market-wide
- * queries from the catalog (is_market_wide=true) so they fire regardless of
- * which markets/watchlist the user picks. Gives new users immediate signal
- * on day 1 without needing to navigate the catalog.
- *
- * MUST stay in sync with corresponding entries in public.macro_query_catalog —
- * exact string match is required for cache reuse and catalog lookup. If you
- * rename a catalog entry here, update the matching query string in the DB
- * (or vice versa) or new tasks will fire uncached one-off strings.
- */
-const MARKET_RESEARCH_STARTER_QUERIES = [
-  'Federal Reserve OR FOMC speech statement policy today',
-  'geopolitical tension war sanctions markets today',
-  'White House OR US President statement market impact today',
-  'US CPI inflation data release reaction today',
-  'US Treasury yields bond market today',
-];
-
 export function buildDefaultConfigs(): Record<TaskType, TaskConfig> {
   return {
     market_research: {
-      markets: ['forex'],
       frequency_minutes: 60,
       min_significance: 'high',
-      macro_queries: [...MARKET_RESEARCH_STARTER_QUERIES],
-      watchlist_symbols: [],
+      subscribed_assets: [],
     },
   };
 }

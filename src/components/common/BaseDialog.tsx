@@ -34,6 +34,7 @@ export interface BaseDialogProps extends Omit<DialogProps, 'title'> {
   primaryButtonText?: string;
   primaryButtonAction?: (e?: React.FormEvent) => void;
   isSubmitting?: boolean;
+  primaryButtonDisabled?: boolean;
   contentSx?: any;
 }
 
@@ -54,6 +55,7 @@ const BaseDialog: React.FC<BaseDialogProps> = ({
   primaryButtonText = 'Save',
   primaryButtonAction,
   isSubmitting = false,
+  primaryButtonDisabled = false,
   contentSx = {},
   ...rest
 }) => {
@@ -148,7 +150,7 @@ const BaseDialog: React.FC<BaseDialogProps> = ({
           {primaryButtonAction && (
             <Button
               onClick={primaryButtonAction}
-              disabled={isSubmitting}
+              disabled={isSubmitting || primaryButtonDisabled}
               variant="contained"
               endIcon={
                 isSubmitting ? (
