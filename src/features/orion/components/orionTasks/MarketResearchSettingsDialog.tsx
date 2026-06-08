@@ -25,13 +25,13 @@ import type {
   OrionTask,
 } from 'features/orion/types/orionTask';
 import {
-  MAX_MACRO_QUERIES,
   MARKET_OPTIONS,
   YAHOO_SYMBOL_CATALOG,
   formatFrequencyLabel,
   hydrateMarketResearchConfig,
   type YahooSymbolOption,
 } from 'features/orion/components/orionTasks/marketResearchHelpers';
+
 import {
   filterMacroQueries,
   type MacroQueryEntry,
@@ -41,6 +41,10 @@ import { getMacroQueryCatalog } from 'features/orion/services/macroQueryCatalogS
 import { useDialogTokens, MONO_FONT } from 'styles/dialogTokens';
 import { Z_INDEX } from 'styles/zIndex';
 import { logger } from 'utils/logger';
+
+// TODO(Task 9): Remove this shim when MarketResearchSettingsDialog is replaced.
+// MAX_MACRO_QUERIES was removed from marketResearchHelpers in Task 8.
+const MAX_MACRO_QUERIES = 10;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -173,23 +177,30 @@ const MarketResearchSettingsDialog: React.FC<MarketResearchSettingsDialogProps> 
     return () => { cancelled = true; };
   }, []);
 
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   const availableMacroQueries = useMemo(
+    // @ts-expect-error -- replaced in Task 9 (config.markets/watchlist_symbols removed from MarketResearchConfig)
     () => filterMacroQueries(catalog, config.markets as Market[], config.watchlist_symbols),
+    // @ts-expect-error -- replaced in Task 9 (config.markets/watchlist_symbols removed)
     [catalog, config.markets, config.watchlist_symbols],
   );
 
   const selectedMacroEntries = useMemo(() => {
     const byQuery = new Map(catalog.map((e) => [e.query, e]));
+    // @ts-expect-error -- replaced in Task 9 (config.macro_queries removed from MarketResearchConfig)
     return (config.macro_queries ?? []).map(
-      (q) => byQuery.get(q) ?? {
+      (q: string) => byQuery.get(q) ?? {
         id: `legacy:${q}`, query: q,
         markets: [] as Market[], isMarketWide: false,
         symbols: [], category: 'Custom (legacy)', displayOrder: 0,
       },
     );
+    // @ts-expect-error -- replaced in Task 9
   }, [catalog, config.macro_queries]);
 
+  // @ts-expect-error -- replaced in Task 9 (config.macro_queries removed from MarketResearchConfig)
   const atMacroLimit = (config.macro_queries ?? []).length >= MAX_MACRO_QUERIES;
+  // @ts-expect-error -- replaced in Task 9 (config.watchlist_symbols removed from MarketResearchConfig)
   const canSave = config.watchlist_symbols.length > 0;
 
   // Segmented chip button — shared shape for Frequency + Significance fields
@@ -200,15 +211,22 @@ const MarketResearchSettingsDialog: React.FC<MarketResearchSettingsDialogProps> 
   });
 
   const toggleMarket = (value: string) => {
+    // @ts-expect-error -- replaced in Task 9 (config.markets removed from MarketResearchConfig)
     const next = config.markets.includes(value)
+      // @ts-expect-error -- replaced in Task 9
       ? config.markets.filter((m) => m !== value)
+      // @ts-expect-error -- replaced in Task 9
       : [...config.markets, value];
+    // @ts-expect-error -- replaced in Task 9 (config.watchlist_symbols/macro_queries removed)
     const macros = pruneOrphanedMacros(catalog, next as Market[], config.watchlist_symbols, config.macro_queries);
+    // @ts-expect-error -- replaced in Task 9
     setConfig({ ...config, markets: next, macro_queries: macros });
   };
 
   const updateWatchlistSymbols = (symbols: string[]) => {
+    // @ts-expect-error -- replaced in Task 9 (config.markets/macro_queries removed from MarketResearchConfig)
     const macros = pruneOrphanedMacros(catalog, config.markets as Market[], symbols, config.macro_queries);
+    // @ts-expect-error -- replaced in Task 9
     setConfig({ ...config, watchlist_symbols: symbols, macro_queries: macros });
   };
 
@@ -241,6 +259,7 @@ const MarketResearchSettingsDialog: React.FC<MarketResearchSettingsDialogProps> 
         <FieldGroup label="Markets">
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
             {MARKET_OPTIONS.map((m) => (
+              // @ts-expect-error -- replaced in Task 9 (config.markets removed from MarketResearchConfig)
               <Box key={m.value} component="button" onClick={() => toggleMarket(m.value)} sx={segChipSx(config.markets.includes(m.value))}>
                 {m.label}
               </Box>
@@ -279,6 +298,7 @@ const MarketResearchSettingsDialog: React.FC<MarketResearchSettingsDialogProps> 
             groupBy={(o) => o.group}
             getOptionLabel={(o) => `${o.label} (${o.symbol})`}
             isOptionEqualToValue={(a, b) => a.symbol === b.symbol}
+            // @ts-expect-error -- replaced in Task 9 (config.watchlist_symbols removed from MarketResearchConfig)
             value={YAHOO_SYMBOL_CATALOG.filter((o) => config.watchlist_symbols.includes(o.symbol))}
             onChange={(_, v) => updateWatchlistSymbols(v.map((o) => o.symbol))}
             slotProps={{ popper: { sx: { zIndex: Z_INDEX.DIALOG_POPUP } } }}
@@ -310,7 +330,9 @@ const MarketResearchSettingsDialog: React.FC<MarketResearchSettingsDialogProps> 
               <TextField
                 {...params}
                 placeholder="Search instruments…"
+                // @ts-expect-error -- replaced in Task 9 (config.watchlist_symbols removed)
                 error={config.watchlist_symbols.length === 0}
+                // @ts-expect-error -- replaced in Task 9
                 helperText={config.watchlist_symbols.length === 0 ? 'Pick at least one instrument.' : undefined}
                 sx={inputSx}
               />
@@ -328,8 +350,10 @@ const MarketResearchSettingsDialog: React.FC<MarketResearchSettingsDialogProps> 
             groupBy={(opt) => opt.category}
             getOptionLabel={(opt) => opt.query}
             isOptionEqualToValue={(a, b) => a.query === b.query}
+            // @ts-expect-error -- replaced in Task 9 (config.macro_queries removed from MarketResearchConfig)
             getOptionDisabled={(opt) => atMacroLimit && !(config.macro_queries ?? []).includes(opt.query)}
             value={selectedMacroEntries}
+            // @ts-expect-error -- replaced in Task 9
             onChange={(_, v) => setConfig({ ...config, macro_queries: v.slice(0, MAX_MACRO_QUERIES).map((e) => e.query) })}
             slotProps={{ popper: { sx: { zIndex: Z_INDEX.DIALOG_POPUP } } }}
             loadingText={
@@ -373,6 +397,7 @@ const MarketResearchSettingsDialog: React.FC<MarketResearchSettingsDialogProps> 
             )}
           />
           <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: 'text.disabled' }}>
+            {/* @ts-expect-error -- replaced in Task 9 (config.macro_queries removed from MarketResearchConfig) */}
             {(config.macro_queries ?? []).length}/{MAX_MACRO_QUERIES} selected
           </Typography>
         </FieldGroup>

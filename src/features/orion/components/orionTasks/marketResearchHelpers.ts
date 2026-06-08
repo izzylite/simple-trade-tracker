@@ -1,7 +1,5 @@
 import type { MarketResearchConfig } from 'features/orion/types/orionTask';
 
-export const MAX_MACRO_QUERIES = 10;
-
 export const MARKET_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'forex', label: 'Forex' },
   { value: 'stocks', label: 'Stocks' },
@@ -135,36 +133,23 @@ export function formatFrequencyLabel(minutes: number): string {
 }
 
 /**
- * Backfill fields on legacy task configs so the form never sees undefined
- * arrays. Preserves prior `custom_topics` by merging them into `macro_queries`.
- *
- * Sub-hourly frequencies (15/30) are upgraded to 60 — those are no longer
+ * Backfill fields on stored task configs so the form never sees undefined
+ * values. Coerces sub-hourly frequencies (15/30) to 60 — those are no longer
  * supported (the 1h NEWS_CACHE_TTL kept cold-missing across consecutive runs).
  */
 export function hydrateMarketResearchConfig(
   raw: Record<string, unknown>
 ): MarketResearchConfig {
-  const legacyTopics = Array.isArray(raw.custom_topics)
-    ? (raw.custom_topics as string[])
-    : [];
-  const macroQueries = Array.isArray(raw.macro_queries)
-    ? (raw.macro_queries as string[])
-    : legacyTopics;
-  // Coerce frequency to the supported set. Sub-hourly (15/30) is no longer
-  // supported — those legacy rows get upgraded to 60. Anything else outside
-  // the supported list (defensive: a corrupted config) also falls back to 60.
   const rawFreq = raw.frequency_minutes as number | undefined;
   const supportedFreqs = new Set([60, 120, 180, 240, 360, 1440]);
   const frequency = supportedFreqs.has(rawFreq ?? 0)
     ? (rawFreq as 60 | 120 | 180 | 240 | 360 | 1440)
     : 60;
   return {
-    markets: (raw.markets as string[]) ?? ['forex'],
     frequency_minutes: frequency,
     min_significance: (raw.min_significance as 'medium' | 'high') ?? 'high',
-    macro_queries: macroQueries.slice(0, MAX_MACRO_QUERIES),
-    watchlist_symbols: Array.isArray(raw.watchlist_symbols)
-      ? (raw.watchlist_symbols as string[])
+    subscribed_assets: Array.isArray(raw.subscribed_assets)
+      ? (raw.subscribed_assets as string[])
       : [],
   };
 }

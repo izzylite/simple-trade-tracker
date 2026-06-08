@@ -27,21 +27,22 @@ export type TaskHandler = (
   supabase: SupabaseClient
 ) => Promise<TaskResult | null>;
 
+/**
+ * Config stored in orion_tasks.config for market_research tasks.
+ *
+ * `subscribed_assets` holds broker-format symbols (e.g. EURUSD, XAUUSD,
+ * BTCUSD) the user wants monitored. Results are delivered from the shared
+ * `asset_research_pool` table — no per-user Gemini calls. Required
+ * non-empty at save time.
+ *
+ * Sweep cadence in minutes. Sub-hourly removed (broke cross-user cache
+ * reuse). Supported: 60 | 120 | 180 | 240 | 360 | 1440. The 1h cache TTL
+ * is safe at any cadence ≥ 60 — longer cadences just see more cache hits
+ * from other users firing within the TTL window.
+ */
 export interface MarketResearchConfig {
-  markets: string[];
-  /** Sweep cadence in minutes. Sub-hourly removed (broke cross-user cache
-   *  reuse). Supported: 60 | 120 | 180 | 240 | 360 | 1440. The 1h cache TTL
-   *  is safe at any cadence ≥ 60 — longer cadences just see more cache hits
-   *  from other users firing within the TTL window. */
   frequency_minutes: 60 | 120 | 180 | 240 | 360 | 1440;
   min_significance: 'medium' | 'high';
-  /** User-picked queries from the public.macro_query_catalog. Stored as raw
-   *  strings (not catalog IDs) so the handler runs them directly and a
-   *  catalog rename never breaks running tasks. Optional for legacy rows. */
-  macro_queries?: string[];
-  /** Yahoo symbols for price grounding, news queries, and economic-event
-   *  currency filtering. UI requires non-empty at save time; handler caps
-   *  at MAX_WATCHLIST_SIZE after merging with `markets` defaults. */
-  watchlist_symbols?: string[];
+  subscribed_assets: string[];
 }
 
