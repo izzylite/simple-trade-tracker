@@ -106,10 +106,13 @@ const MarketResearchSettingsDialog: React.FC<MarketResearchSettingsDialogProps> 
   });
 
   const toggleAsset = (symbol: string) => {
-    const next = config.subscribed_assets.includes(symbol)
-      ? config.subscribed_assets.filter((s) => s !== symbol)
-      : [...config.subscribed_assets, symbol];
-    setConfig((prev) => ({ ...prev, subscribed_assets: next }));
+    setConfig((prev) => {
+      const assets = prev.subscribed_assets;
+      const next = assets.includes(symbol)
+        ? assets.filter((s) => s !== symbol)
+        : [...assets, symbol];
+      return { ...prev, subscribed_assets: next };
+    });
   };
 
   const handleSave = async () => {
@@ -129,6 +132,7 @@ const MarketResearchSettingsDialog: React.FC<MarketResearchSettingsDialogProps> 
       primaryButtonText={isEditMode ? 'Save' : 'Set Up'}
       primaryButtonAction={handleSave}
       isSubmitting={saving}
+      primaryButtonDisabled={!canSave}
     >
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
 
