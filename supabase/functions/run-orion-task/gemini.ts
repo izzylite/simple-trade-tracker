@@ -1,5 +1,9 @@
 import { log } from '../_shared/supabase.ts';
 import { callGemini } from '../_shared/gemini.ts';
+import type {
+  GeminiFunctionCall,
+  GeminiFunctionDeclaration,
+} from '../_shared/gemini.ts';
 
 const BRIEFING_RESPONSE_SCHEMA = {
   type: 'object',
@@ -86,31 +90,73 @@ const SCRAPE_TOOL_DECLARATION = {
   },
 };
 
+// An optional extra tool offered alongside scrape_url in Round 1. The caller
+// owns the declaration (what Gemini sees) and the execute fn (what runs), so
+// gemini.ts stays free of market-data / Supabase concerns. `maxCalls` caps how
+// many of this tool's calls are honoured per briefing — the bound that keeps a
+// model-driven tool from turning the fixed 2-round flow into an open loop.
+export interface BriefingExtraTool {
+  declaration: GeminiFunctionDeclaration;
+  execute: (args: Record<string, unknown>) => Promise<string>;
+  maxCalls: number;
+}
+
+// Hard ceiling on each extra tool call's wall time. Twelve Data / Yahoo can
+// hang (HTTP-200-on-error, no-data quirks); without this a single stuck lookup
+// stalls the whole briefing and trips the edge function's ~10s-hang → 502.
+// On timeout we feed an error string back so Gemini omits that number rather
+// than waiting or hallucinating it.
+const EXTRA_TOOL_TIMEOUT_MS = 8000;
+
+function withTimeout(p: Promise<string>, ms: number, fallback: string): Promise<string> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<string>((resolve) => {
+    timer = setTimeout(() => resolve(fallback), ms);
+  });
+  return Promise.race([
+    p.then((v) => { clearTimeout(timer); return v; },
+           (e) => { clearTimeout(timer); throw e; }),
+    timeout,
+  ]);
+}
+
 export interface BriefingWithScrapeResult {
   json: string;
   scrapedUrls: string[];
   scrapedUrlsFailed: string[];
+  /** Extra-tool calls Gemini actually made (for tools-used metadata + audit). */
+  extraToolCalls: Array<{ name: string; args: Record<string, unknown> }>;
 }
 
 /**
- * Run the briefing flow with scrape_url available as an optional tool.
+ * Run the briefing flow with scrape_url — and optionally extra model-driven
+ * tools — available in a single Round-1 batch.
  *
- * `scraper` is injected by the caller so this file stays free of Supabase
- * client and cache concerns. Called at most MAX_SCRAPES_PER_BRIEFING times
- * per briefing; extras are silently dropped.
+ * `scraper` and each `extraTools[].execute` are injected by the caller so this
+ * file stays free of Supabase client and cache concerns. The flow stays a fixed
+ * two rounds (decide-and-fetch, then write): every tool call Gemini emits in
+ * Round 1 runs in parallel, results feed back, Round 2 produces the JSON under
+ * schema with tools forced off. Per-tool call caps bound cost and latency;
+ * over-cap or unknown calls are silently dropped.
  */
 export async function generateBriefingWithScrape(
   systemPrompt: string,
   userPrompt: string,
-  scraper: (url: string) => Promise<{ url: string; title: string; text: string } | null>
+  scraper: (url: string) => Promise<{ url: string; title: string; text: string } | null>,
+  extraTools: BriefingExtraTool[] = []
 ): Promise<BriefingWithScrapeResult> {
+  const toolDeclarations = [
+    SCRAPE_TOOL_DECLARATION,
+    ...extraTools.map((t) => t.declaration),
+  ];
+
   // ---- Round 1: allow tool calls, no response schema yet ----
   // (responseSchema + function_calling are mutually exclusive per Gemini API
   //  — asking for structured JSON while also offering tools 400s.)
   const round1 = await callGemini({
     systemInstruction: systemPrompt,
     contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-    tools: [SCRAPE_TOOL_DECLARATION],
+    tools: toolDeclarations,
     toolMode: 'AUTO',
   });
 
@@ -118,46 +164,78 @@ export async function generateBriefingWithScrape(
   // schema, so re-run as a straight JSON generation to get the final briefing
   // shape. Happens when the news/price snapshot is enough to decide alone.
   if (round1.functionCalls.length === 0) {
-    log('Market research: no scrape calls, going straight to briefing', 'info');
+    log('Market research: no tool calls, going straight to briefing', 'info');
     const json = await generateContent(systemPrompt, userPrompt);
-    return { json, scrapedUrls: [], scrapedUrlsFailed: [] };
+    return { json, scrapedUrls: [], scrapedUrlsFailed: [], extraToolCalls: [] };
   }
 
-  // Cap the number of scrapes; Gemini can sometimes over-call.
-  const calls = round1.functionCalls
-    .filter((c) => c.name === 'scrape_url')
-    .slice(0, MAX_SCRAPES_PER_BRIEFING);
+  // Partition Gemini's calls by tool, capping each per-tool, while preserving
+  // emission order — function responses must come back in the order the calls
+  // were made or Gemini's tool-result matching drifts.
+  const extraByName = new Map(extraTools.map((t) => [t.declaration.name, t]));
+  const perToolCount = new Map<string, number>();
+  type Planned =
+    | { kind: 'scrape'; call: GeminiFunctionCall }
+    | { kind: 'extra'; call: GeminiFunctionCall; tool: BriefingExtraTool };
+  const planned: Planned[] = [];
+  for (const call of round1.functionCalls) {
+    const used = perToolCount.get(call.name) ?? 0;
+    if (call.name === 'scrape_url') {
+      if (used >= MAX_SCRAPES_PER_BRIEFING) continue;
+      perToolCount.set(call.name, used + 1);
+      planned.push({ kind: 'scrape', call });
+    } else if (extraByName.has(call.name)) {
+      const tool = extraByName.get(call.name)!;
+      if (used >= tool.maxCalls) continue;
+      perToolCount.set(call.name, used + 1);
+      planned.push({ kind: 'extra', call, tool });
+    }
+    // Unknown / over-cap call — drop it (no response part emitted for it).
+  }
 
-  log('Market research: executing scrape tool calls', 'info', {
+  log('Market research: executing tool calls', 'info', {
     requested: round1.functionCalls.length,
-    executing: calls.length,
-    urls: calls.map((c) => (c.args.url as string) ?? '(missing)'),
+    executing: planned.length,
+    scrapes: planned.filter((p) => p.kind === 'scrape').length,
+    extra: planned.filter((p) => p.kind === 'extra').length,
   });
 
-  // Execute scrapes in parallel. Null results still get reported back so
-  // Gemini knows the URL was tried — hiding failures can lead it to
-  // hallucinate "per the article..." for content it never received.
-  const scrapeResults = await Promise.all(
-    calls.map(async (call) => {
-      const scrapeUrl = (call.args.url as string) ?? '';
-      const article = scrapeUrl ? await scraper(scrapeUrl) : null;
-      return { call, article };
+  // Execute all planned calls in parallel. Failures still get reported back so
+  // Gemini knows the call was tried — hiding them invites hallucinated
+  // "per the article…" / fabricated price levels for data it never received.
+  const executed = await Promise.all(
+    planned.map(async (p) => {
+      if (p.kind === 'scrape') {
+        const scrapeUrl = (p.call.args.url as string) ?? '';
+        const article = scrapeUrl ? await scraper(scrapeUrl) : null;
+        return { ...p, article, dataText: null as string | null };
+      }
+      const dataText = await withTimeout(
+        p.tool.execute(p.call.args),
+        EXTRA_TOOL_TIMEOUT_MS,
+        `${p.call.name} timed out after ${EXTRA_TOOL_TIMEOUT_MS}ms — omit this data from the briefing.`
+      ).catch((e) =>
+        `${p.call.name} failed: ${e instanceof Error ? e.message : String(e)} — omit this data.`
+      );
+      return { ...p, article: null as { url: string; title: string; text: string } | null, dataText };
     })
   );
 
-  // ---- Round 2: feed scraped content back, enforce JSON schema ----
+  // ---- Round 2: feed tool results back, enforce JSON schema ----
   // Echo the raw round-1 parts verbatim so Gemini 3.x thoughtSignature
   // (if present) round-trips. Then append a user turn with functionResponse
   // parts in the same order as the calls were made.
-  const functionResponseParts = scrapeResults.map(({ call, article }) => ({
+  const functionResponseParts = executed.map((e) => ({
     functionResponse: {
-      name: call.name,
-      response: article
-        ? { url: article.url, title: article.title, text: article.text }
-        : {
-            url: (call.args.url as string) ?? '',
-            error: 'Scrape failed or returned no content.',
-          },
+      name: e.call.name,
+      response: e.kind === 'scrape'
+        ? (e.article
+            ? { url: e.article.url, title: e.article.title, text: e.article.text }
+            : {
+                url: (e.call.args.url as string) ?? '',
+                error: 'Scrape failed or returned no content.',
+              })
+        : { result: e.dataText },
     },
   }));
 
@@ -169,23 +247,27 @@ export async function generateBriefingWithScrape(
       { role: 'user', parts: functionResponseParts },
     ],
     // Keep tools declared so Gemini's model state stays consistent, but force
-    // a text response — no more tool calls after the scrape round.
-    tools: [SCRAPE_TOOL_DECLARATION],
+    // a text response — no more tool calls after the fetch round.
+    tools: toolDeclarations,
     toolMode: 'NONE',
     responseSchema: BRIEFING_RESPONSE_SCHEMA,
   });
 
-  const scrapedUrls = scrapeResults
-    .filter(({ article }) => article !== null)
-    .map(({ article }) => article!.url);
+  const scrapedUrls = executed
+    .filter((e) => e.kind === 'scrape' && e.article !== null)
+    .map((e) => e.article!.url);
 
   // Track failed scrapes so callers can surface them as metrics. Silently
   // dropping failures hides quality degradation: a briefing generated after
   // 3/3 scrapes failed is materially worse than 3/3 succeeded, but both
   // would look identical without this.
-  const scrapedUrlsFailed = scrapeResults
-    .filter(({ article }) => article === null)
-    .map(({ call }) => (call.args.url as string) ?? '(missing)');
+  const scrapedUrlsFailed = executed
+    .filter((e) => e.kind === 'scrape' && e.article === null)
+    .map((e) => (e.call.args.url as string) ?? '(missing)');
+
+  const extraToolCalls = executed
+    .filter((e) => e.kind === 'extra')
+    .map((e) => ({ name: e.call.name, args: e.call.args }));
 
   if (scrapedUrlsFailed.length > 0) {
     log('Market research: scrape failures', 'warn', {
@@ -195,5 +277,5 @@ export async function generateBriefingWithScrape(
     });
   }
 
-  return { json: round2.text, scrapedUrls, scrapedUrlsFailed };
+  return { json: round2.text, scrapedUrls, scrapedUrlsFailed, extraToolCalls };
 }

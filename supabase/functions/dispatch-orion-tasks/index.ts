@@ -89,7 +89,13 @@ Deno.serve(async (req) => {
       const isFresh = row?.status === 'fresh' &&
         row.expires_at != null &&
         new Date(row.expires_at) > new Date();
-      const isProcessing = row?.status === 'processing';
+      // A 'processing' row is only in-flight while its claim TTL (expires_at,
+      // stamped now()+10min by claim_asset_for_research) is unexpired. An
+      // expired TTL means the worker was killed mid-flight — fall through and
+      // reclaim it (the claim RPC's ON CONFLICT recovers stale processing rows).
+      const isProcessing = row?.status === 'processing' &&
+        row.expires_at != null &&
+        new Date(row.expires_at) > new Date();
       const isInBackoff = row?.status === 'failed' &&
         row.expires_at != null &&
         new Date(row.expires_at) > new Date();
@@ -197,7 +203,9 @@ Deno.serve(async (req) => {
     // Fetch fresh pool results for this task's assets
     const { data: poolResults } = await serviceClient
       .from('asset_research_pool')
-      .select('asset, briefing_html, briefing_plain, significance, refreshed_at')
+      .select(
+        'asset, briefing_html, briefing_plain, significance, refreshed_at, citations, tool_calls'
+      )
       .in('asset', subscribedAssets)
       .eq('status', 'fresh')
       .gt('expires_at', new Date().toISOString());
@@ -209,10 +217,15 @@ Deno.serve(async (req) => {
         briefing_plain: string | null;
         significance: string | null;
         refreshed_at: string | null;
+        citations: unknown;
+        tool_calls: unknown;
       }>
     ).filter((p) => meetsThreshold(p.significance, minSignificance));
 
     for (const poolResult of qualifying) {
+      // Carry the shared attribution (Sources pill + tools-used chip) onto each
+      // subscriber's result. Only attach when present so quiet/outage rows don't
+      // write empty arrays the card would try to render.
       const stored = await storeTaskResult(serviceClient, task, {
         content_html: poolResult.briefing_html ?? '',
         content_plain: poolResult.briefing_plain ?? '',
@@ -222,6 +235,8 @@ Deno.serve(async (req) => {
           asset: poolResult.asset,
           generated_at: poolResult.refreshed_at,
           source: 'pool',
+          ...(poolResult.citations ? { citations: poolResult.citations } : {}),
+          ...(poolResult.tool_calls ? { tool_calls: poolResult.tool_calls } : {}),
         },
       });
       if (stored.ok) {

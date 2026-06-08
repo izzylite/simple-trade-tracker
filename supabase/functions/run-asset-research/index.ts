@@ -22,11 +22,28 @@ import type { SupabaseClient as RunOrionSupabaseClient } from '../run-orion-task
 import { scrapeArticle } from '../_shared/scrapeProvider.ts';
 import { buildTemporalContext } from '../ai-trading-agent/systemPrompt.ts';
 import { BROKER_TO_YAHOO, getBrokerCurrencies } from '../_shared/instruments.ts';
+import { summarizeToolCalls, type ToolCallSummary } from '../_shared/toolLabels.ts';
+import {
+  getMarketDataTool,
+  executeGetMarketData,
+} from '../ai-trading-agent/tools/market-data/index.ts';
 import { buildAssetResearchSystemPrompt } from './asset-research-prompt.ts';
 
 const NEWS_CACHE_TTL_SECONDS = 3600;
 const BREAKING_CACHE_TTL_SECONDS = 120;
 const ALWAYS_ON_SYMBOLS = ['^VIX', 'DX-Y.NYB'];
+
+// How many news / breaking items get rendered into the Gemini prompt. The
+// citation list is built from these same sliced sets, so "Sources" on the card
+// is an exact audit trail of what Gemini actually read — no more, no fewer.
+const MAX_PROMPT_NEWS = 30;
+const MAX_PROMPT_BREAKING = 15;
+
+// Cap on Gemini-driven get_market_data calls per briefing. Pre-fetched prices
+// cover the asset + risk tells; this budget lets Gemini pull live numbers for
+// correlated/secondary instruments a catalyst is about. Bounded so the
+// fixed-2-round flow can't fan out into an unbounded data loop.
+const MAX_MARKET_DATA_CALLS = 5;
 
 const BREAKING_MACRO_QUERIES = [
   'US President statement announcement',
@@ -124,6 +141,8 @@ Deno.serve(async (req) => {
     let significance: string;
     let briefingHtml: string;
     let briefingPlain: string;
+    let citations: CitationEntry[] = [];
+    let toolCalls: ToolCallSummary[] = [];
 
     if (totalQueries > 0 && totalErrors === totalQueries) {
       significance = 'low';
@@ -137,12 +156,53 @@ Deno.serve(async (req) => {
       const briefingResult = await generateBriefingWithScrape(
         buildAssetResearchSystemPrompt(),
         userPrompt,
-        (url: string) => scrapeArticle(serviceClient, url, NEWS_CACHE_TTL_SECONDS, 'tavily')
+        (url: string) => scrapeArticle(serviceClient, url, NEWS_CACHE_TTL_SECONDS, 'tavily'),
+        [{
+          declaration: getMarketDataTool,
+          maxCalls: MAX_MARKET_DATA_CALLS,
+          // Charts are a chat affordance — force them off so the briefing gets
+          // numbers, not a QuickChart URL embedded in the card HTML.
+          execute: (args: Record<string, unknown>) =>
+            executeGetMarketData(
+              { ...args, include_chart: false, chart_only: false },
+              serviceClient as unknown as Parameters<typeof executeGetMarketData>[1]
+            ),
+        }]
       );
       const parsed = parseBriefing(briefingResult.json);
       significance = parsed.significance ?? 'low';
       briefingHtml = parsed.briefing_html;
       briefingPlain = parsed.briefing_plain;
+
+      // Attribution surfaced on the delivered card (Sources pill + tools-used
+      // chip). Built once here and stored on the shared pool row, so every
+      // subscriber to this asset gets the same citation set and tool count —
+      // consistent with the pooled-result design. Sources mirror EXACTLY the
+      // news/breaking items rendered into the prompt (same slice limits), so
+      // the list is a faithful "what Gemini read" trail the user can verify.
+      // One search_web tool entry per successfully-executed query (errored
+      // queries excluded), one per price snapshot, one for the economic-events
+      // lookup, and one per scrape attempt.
+      citations = buildCitations([
+        ...allNews.slice(0, MAX_PROMPT_NEWS),
+        ...breaking.slice(0, MAX_PROMPT_BREAKING),
+      ]);
+      const successfulSearches = Math.max(
+        0,
+        (macroBatch.totalQueries - macroBatch.errorCount) +
+          (breakingBatch.totalQueries - breakingBatch.errorCount)
+      );
+      const rawToolCalls: Array<{ name: string; args?: Record<string, unknown> }> = [
+        ...Array.from({ length: successfulSearches }, () => ({ name: 'search_web' })),
+        ...prices.map(() => ({ name: 'get_market_data', args: { action: 'quote' } })),
+        ...(events.length > 0 ? [{ name: 'get_economic_events' }] : []),
+        ...briefingResult.scrapedUrls.map(() => ({ name: 'scrape_url' })),
+        ...briefingResult.scrapedUrlsFailed.map(() => ({ name: 'scrape_url' })),
+        // Gemini-driven market-data lookups it chose to make (action carries
+        // the per-call label, e.g. get_market_data:quote → "Checking price").
+        ...briefingResult.extraToolCalls,
+      ];
+      toolCalls = summarizeToolCalls(rawToolCalls);
     }
 
     // 6. Write result to pool
@@ -157,6 +217,8 @@ Deno.serve(async (req) => {
         briefing_plain: briefingPlain,
         significance,
         queries_used: queries,
+        citations: citations.length > 0 ? citations : null,
+        tool_calls: toolCalls.length > 0 ? toolCalls : null,
         error_detail: null,
       })
       .eq('id', poolRow.id)
@@ -181,10 +243,10 @@ async function markPoolFailed(
   message: string
 ): Promise<void> {
   const backoffMs = 15 * 60 * 1000;
-  // If this update silently fails (edge fn killed mid-flight), the pool row
-  // stays in 'processing'. The dispatcher will re-claim it after the row's
-  // processing_claimed_at TTL (not yet implemented). Manual reset:
-  // UPDATE asset_research_pool SET status='failed' WHERE asset='EURUSD' AND status='processing';
+  // If this update never runs (edge fn killed mid-flight), the pool row stays
+  // 'processing'. That self-heals: claim_asset_for_research stamps a 10-min TTL
+  // on expires_at at claim time, and the dispatcher reclaims a 'processing' row
+  // once that TTL lapses (see migration 20260608100000_asset_research_claim_ttl).
   const { error } = await serviceClient
     .from('asset_research_pool')
     .update({
@@ -194,6 +256,40 @@ async function markPoolFailed(
     })
     .eq('id', poolRowId);
   if (error) log('Failed to mark pool row as failed', 'warn', { poolRowId, error: error.message });
+}
+
+interface CitationEntry {
+  id: string;
+  url: string;
+  title?: string;
+  source?: string;
+  toolName: string;
+}
+
+// Every distinct source URL Gemini was given, deduped by exact link (NOT by
+// domain — two different articles from the same site are two sources the user
+// may want to verify) and uncapped. Renders as the "Sources" pill on the
+// delivered card (TaskResultCard reads metadata.citations; the popover scrolls,
+// so an arbitrary count is fine). The caller passes the same sliced sets that
+// were rendered into the prompt, so this is a faithful audit of Gemini's reads.
+function buildCitations(news: NewsResult[]): CitationEntry[] {
+  const seen = new Set<string>();
+  const out: CitationEntry[] = [];
+  for (const item of news) {
+    if (!item.link || seen.has(item.link)) continue;
+    seen.add(item.link);
+    let domain = item.link;
+    try { domain = new URL(item.link).hostname.replace(/^www\./, ''); }
+    catch { /* unparseable link — keep raw URL as the source label */ }
+    out.push({
+      id: `cite-${out.length}`,
+      url: item.link,
+      title: item.title,
+      source: item.source || domain,
+      toolName: 'search_web',
+    });
+  }
+  return out;
 }
 
 function deduplicateNews(results: NewsResult[]): NewsResult[] {
@@ -250,7 +346,7 @@ function buildUserPrompt(
   const newsSection =
     news.length > 0
       ? news
-          .slice(0, 30)
+          .slice(0, MAX_PROMPT_NEWS)
           .map(
             (n) =>
               `- [${n.source || 'Web'}] ${n.title}: ${n.snippet}` +
@@ -263,7 +359,7 @@ function buildUserPrompt(
   const breakingSection =
     breaking.length > 0
       ? breaking
-          .slice(0, 15)
+          .slice(0, MAX_PROMPT_BREAKING)
           .map(
             (n) =>
               `- [${n.source || 'Web'}] ${n.title}: ${n.snippet}` +
