@@ -586,10 +586,11 @@ async function callGeminiForBriefing(
 
   // Temporal context lives in the user turn (not systemInstruction) to keep
   // the cache prefix stable across sweeps — same pattern as chat briefings.
+  // TODO: remove in Task 10 (market-research handler is dead code)
   const userPrompt = `[Current time — ${buildTemporalContext()}]
 
 Generate a market research briefing.
-Markets of interest: ${config.markets.join(', ')}.
+Markets of interest: ${(config.markets ?? []).join(', ')}.
 
 ## Previously Reported (DEDUPLICATE AGAINST THESE)
 These are briefings already sent to the trader for this same task. Do NOT re-surface these events unless there is a genuinely new development. If the current news cycle is dominated by these already-reported stories, return significance="low" and keep the briefing brief — the system will suppress the output.
