@@ -2,11 +2,11 @@ import { log, createServiceClient } from './supabase.ts';
 
 type ServiceClient = ReturnType<typeof createServiceClient>;
 
-export interface TaskResultPayload {
-  content_html: string;
-  content_plain: string;
+export interface ThinResultPayload {
+  briefingId: string;
+  title: string;
   significance: string | null;
-  metadata: Record<string, unknown>;
+  preview: string; // notification body, from briefing.content_plain
 }
 
 interface TaskRef {
@@ -15,78 +15,59 @@ interface TaskRef {
   task_type: string;
 }
 
-function prettyTaskType(taskType: string): string {
-  const LABELS: Record<string, string> = { market_research: 'Market Research' };
-  return LABELS[taskType] ?? (taskType
-    .split('_')
-    .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : ''))
-    .join(' ')
-    .trim() || 'Orion Task');
+export function buildThinResultRow(
+  task: TaskRef,
+  p: ThinResultPayload,
+): Record<string, unknown> {
+  return {
+    task_id: task.id,
+    user_id: task.user_id,
+    task_type: task.task_type,
+    briefing_id: p.briefingId,
+    title: p.title,
+    significance: p.significance,
+    group_date: new Date().toISOString().split('T')[0],
+  };
 }
 
 export async function storeTaskResult(
   serviceClient: ServiceClient,
   task: TaskRef,
-  result: TaskResultPayload
+  p: ThinResultPayload,
 ): Promise<{ ok: boolean; resultId?: string }> {
   const { data: insertedRow, error: insertError } = await serviceClient
     .from('orion_task_results')
-    .insert({
-      task_id: task.id,
-      user_id: task.user_id,
-      task_type: task.task_type,
-      content_html: result.content_html,
-      content_plain: result.content_plain,
-      significance: result.significance,
-      metadata: result.metadata,
-      group_date: new Date().toISOString().split('T')[0],
+    .upsert(buildThinResultRow(task, p), {
+      onConflict: 'user_id,briefing_id',
+      ignoreDuplicates: true,
     })
     .select('id')
-    .single();
+    .maybeSingle();
 
-  if (insertError || !insertedRow) {
+  if (insertError) {
     log('Failed to store task result', 'error', insertError);
     return { ok: false };
   }
+  if (!insertedRow) return { ok: true }; // duplicate (already delivered) — not an error
 
-  try {
-    const isError = (result.metadata as { error?: boolean } | null)?.error === true;
-    const previewSource = (result.content_plain || '').replace(/\s+/g, ' ').trim();
-    const preview = previewSource.length > 120
-      ? previewSource.slice(0, 117) + '…'
-      : previewSource;
-    const metaTitle = (result.metadata as { title?: string } | null)?.title?.trim();
-    const baseTitle = metaTitle || prettyTaskType(task.task_type);
-    const title = (isError ? `${baseTitle} — failed` : baseTitle).slice(0, 200);
-
-    const { error: notifErr } = await serviceClient
-      .from('notifications')
-      .insert({
-        user_id: task.user_id,
-        type: 'orion_task_result',
-        title,
-        payload: {
-          taskId: task.id,
-          resultId: insertedRow.id,
-          taskType: task.task_type,
-          significance: result.significance ?? null,
-          isError,
-          preview,
-        },
-      });
-    if (notifErr) {
-      log('Notification insert (task_result) failed (non-fatal)', 'warn', {
-        taskId: task.id,
-        error: notifErr.message,
-      });
-    }
-  } catch (notifThrow) {
-    log('Notification insert (task_result) threw (non-fatal)', 'warn', {
+  const preview = p.preview.replace(/\s+/g, ' ').trim().slice(0, 117);
+  const title = (p.title || 'Market Research').slice(0, 200);
+  const { error: notifErr } = await serviceClient.from('notifications').insert({
+    user_id: task.user_id,
+    type: 'orion_task_result',
+    title,
+    payload: {
       taskId: task.id,
-      error: notifThrow instanceof Error ? notifThrow.message : String(notifThrow),
-    });
+      resultId: insertedRow.id,
+      taskType: task.task_type,
+      significance: p.significance ?? null,
+      isError: false,
+      preview,
+    },
+  });
+  if (notifErr) {
+    log('Notification insert failed (non-fatal)', 'warn', { error: notifErr.message });
   }
-
   return { ok: true, resultId: insertedRow.id };
 }
 
