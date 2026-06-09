@@ -145,10 +145,11 @@ Deno.serve(async (req) => {
     let toolCalls: ToolCallSummary[] = [];
 
     if (totalQueries > 0 && totalErrors === totalQueries) {
-      significance = 'low';
-      briefingHtml =
-        '<p>Data source unavailable — news providers unreachable. Research will retry on next cycle.</p>';
-      briefingPlain = 'Data source unavailable. Research will retry on next cycle.';
+      // Full search outage — produce NO briefing. Marking failed (backoff) means
+      // no snapshot, no result rows, no error cards fanned out to subscribers.
+      log('Asset research: search outage, marking failed (no briefing)', 'warn', { asset });
+      await markPoolFailed(serviceClient, poolRow.id, 'Search providers unavailable');
+      return successResponse({ skipped: true, reason: 'search_outage' });
     } else {
       const allNews = deduplicateNews(macroBatch.results);
       const breaking = deduplicateNews(breakingBatch.results);
@@ -206,13 +207,34 @@ Deno.serve(async (req) => {
     }
 
     // 6. Write result to pool
+    // Insert the immutable shared snapshot first.
+    const generatedAt = new Date().toISOString();
+    const { data: briefingRow, error: briefingErr } = await serviceClient
+      .from('asset_research_briefings')
+      .insert({
+        asset,
+        content_html: briefingHtml,
+        content_plain: briefingPlain,
+        significance,
+        citations: citations.length > 0 ? citations : null,
+        tool_calls: toolCalls.length > 0 ? toolCalls : null,
+        generated_at: generatedAt,
+      })
+      .select('id')
+      .single();
+    if (briefingErr || !briefingRow) {
+      throw new Error(`briefing snapshot insert: ${briefingErr?.message ?? 'no row'}`);
+    }
+
+    // Point the pool row at the snapshot and mark fresh.
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
     const { error: writeErr } = await serviceClient
       .from('asset_research_pool')
       .update({
         status: 'fresh',
-        refreshed_at: new Date().toISOString(),
+        refreshed_at: generatedAt,
         expires_at: expiresAt,
+        current_briefing_id: briefingRow.id,
         briefing_html: briefingHtml,
         briefing_plain: briefingPlain,
         significance,
