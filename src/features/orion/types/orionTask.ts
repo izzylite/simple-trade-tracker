@@ -85,11 +85,26 @@ export interface AITasksBundle {
   refetchResults: () => Promise<void>;
 }
 
+export interface BriefingSnapshot {
+  content_html: string;
+  content_plain: string;
+  significance: Significance | null;
+  citations?: unknown;
+  tool_calls?: unknown;
+}
+
 export interface OrionTaskResult {
   id: string;
   task_id: string;
   user_id: string;
   task_type: TaskType;
+  briefing_id: string | null;
+  title: string | null;
+  /** Embedded shared briefing (present for pooled rows fetched with the embed). */
+  briefing?: BriefingSnapshot | null;
+  /** Legacy/non-pool inline content. Empty/absent for thin pooled rows (read via
+   *  `briefing` instead); kept typed `string` since it is only ever read through
+   *  the `briefing ?? inline` fallback, never dereferenced directly. */
   content_html: string;
   content_plain: string;
   significance: Significance | null;
