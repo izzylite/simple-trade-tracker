@@ -203,9 +203,7 @@ Deno.serve(async (req) => {
     // Fetch fresh pool results for this task's assets
     const { data: poolResults } = await serviceClient
       .from('asset_research_pool')
-      .select(
-        'asset, briefing_html, briefing_plain, significance, refreshed_at, citations, tool_calls'
-      )
+      .select('asset, significance, refreshed_at, current_briefing_id, briefing_plain')
       .in('asset', subscribedAssets)
       .eq('status', 'fresh')
       .gt('expires_at', new Date().toISOString());
@@ -213,31 +211,20 @@ Deno.serve(async (req) => {
     const qualifying = (
       poolResults ?? [] as Array<{
         asset: string;
-        briefing_html: string | null;
-        briefing_plain: string | null;
         significance: string | null;
         refreshed_at: string | null;
-        citations: unknown;
-        tool_calls: unknown;
+        current_briefing_id: string | null;
+        briefing_plain: string | null;
       }>
-    ).filter((p) => meetsThreshold(p.significance, minSignificance));
+    ).filter((p) => p.current_briefing_id && meetsThreshold(p.significance, minSignificance));
 
     for (const poolResult of qualifying) {
-      // Carry the shared attribution (Sources pill + tools-used chip) onto each
-      // subscriber's result. Only attach when present so quiet/outage rows don't
-      // write empty arrays the card would try to render.
+      // Deliver a thin row referencing the shared briefing — no content copied.
       const stored = await storeTaskResult(serviceClient, task, {
-        content_html: poolResult.briefing_html ?? '',
-        content_plain: poolResult.briefing_plain ?? '',
+        briefingId: poolResult.current_briefing_id!,
+        title: `${poolResult.asset} Market Research`,
         significance: poolResult.significance,
-        metadata: {
-          title: `${poolResult.asset} Market Research`,
-          asset: poolResult.asset,
-          generated_at: poolResult.refreshed_at,
-          source: 'pool',
-          ...(poolResult.citations ? { citations: poolResult.citations } : {}),
-          ...(poolResult.tool_calls ? { tool_calls: poolResult.tool_calls } : {}),
-        },
+        preview: poolResult.briefing_plain ?? '',
       });
       if (stored.ok) {
         resultsWritten++;
