@@ -98,7 +98,7 @@ const TaskResultCard: React.FC<TaskResultCardProps> = ({
   // Fetch referenced entities only when the card is expanded. Collapsed briefings
   // stay cheap — no round-trips until the user opens them.
   const { embeddedTrades, embeddedEvents, embeddedNotes } = useBriefingEmbedded(
-    result.content_html,
+    result.briefing?.content_html ?? result.content_html,
     expanded
   );
 
@@ -355,7 +355,7 @@ const TaskResultCard: React.FC<TaskResultCardProps> = ({
         <Collapse in={expanded} timeout="auto" onClick={(e) => e.stopPropagation()}>
           <Box sx={{ mt: 0.25 }}>
             <HtmlMessageRenderer
-              html={result.content_html}
+              html={result.briefing?.content_html ?? result.content_html ?? ''}
               textColor="text.primary"
               embeddedTrades={embeddedTrades}
               embeddedEvents={embeddedEvents}
@@ -383,12 +383,11 @@ const TaskResultCard: React.FC<TaskResultCardProps> = ({
           </Box>
 
           {(() => {
-            const citations = Array.isArray(result.metadata?.citations)
-              ? (result.metadata!.citations as Citation[])
-              : [];
-            const toolCalls = Array.isArray(result.metadata?.tool_calls)
-              ? (result.metadata!.tool_calls as ToolUsageEntry[])
-              : [];
+            const src = result.briefing ?? result.metadata;
+            const citations = Array.isArray((src as Record<string, unknown>)?.citations)
+              ? ((src as Record<string, unknown>).citations as Citation[]) : [];
+            const toolCalls = Array.isArray((src as Record<string, unknown>)?.tool_calls)
+              ? ((src as Record<string, unknown>).tool_calls as ToolUsageEntry[]) : [];
             const hasAny = citations.length > 0 || toolCalls.length > 0;
             if (!hasAny) return null;
             return (

@@ -88,7 +88,9 @@ export const orionTaskService = {
   ): Promise<OrionTaskResult[]> {
     let query = supabase
       .from('orion_task_results')
-      .select('*')
+      .select(
+        '*, briefing:asset_research_briefings(content_html, content_plain, significance, citations, tool_calls)'
+      )
       .eq('user_id', userId)
       .is('hidden_at', null)
       .order('created_at', { ascending: false })
