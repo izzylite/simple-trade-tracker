@@ -19,6 +19,7 @@ import {
 import { IconButton, Tooltip } from '@mui/material';
 import { format, isToday, isYesterday } from 'date-fns';
 import { scrollbarStyles } from 'styles/scrollbarStyles';
+import { formatRelativeTime } from 'utils/formatters';
 import { useDialogTokens } from 'styles/dialogTokens';
 import EconomicEventShimmer from 'features/events/components/EconomicEventShimmer';
 import ConfirmationDialog from 'components/common/ConfirmationDialog';
@@ -149,6 +150,18 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
     );
   }, [results]);
 
+  // Most recent delivery time for the task — drives the "updated Xm ago" label
+  // so the user has a quiet health signal instead of error cards.
+  const lastUpdated = useMemo(() => {
+    let latest: string | null = null;
+    for (const r of results) {
+      if (r.task_id === mrTask?.id && (!latest || r.created_at > latest)) {
+        latest = r.created_at;
+      }
+    }
+    return latest;
+  }, [results, mrTask?.id]);
+
   if (loading) {
     return <EconomicEventShimmer count={6} />;
   }
@@ -210,6 +223,14 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
             >
               {mrTask.status.toUpperCase()}
             </Box>
+            {lastUpdated && (
+              <Typography
+                component="span"
+                sx={{ fontSize: '0.62rem', color: 'text.secondary' }}
+              >
+                updated {formatRelativeTime(lastUpdated)}
+              </Typography>
+            )}
             {/* Threshold-gated failure summary. Stays hidden for 1-2 transient
                 blips (Gemini 503s etc.) and surfaces only when failures
                 accumulate. Once we hit 10 the server auto-disables and the

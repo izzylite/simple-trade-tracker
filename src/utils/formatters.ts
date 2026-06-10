@@ -12,6 +12,22 @@ export const formatCount = (
 };
 
 /**
+ * Format an ISO timestamp as a short relative time (e.g. "8m ago", "2h ago").
+ * Returns "just now" under 45s and "" for an unparseable input.
+ */
+export const formatRelativeTime = (iso: string): string => {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return '';
+  const sec = Math.max(0, Math.floor((Date.now() - then) / 1000));
+  if (sec < 45) return 'just now';
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  return `${Math.floor(hr / 24)}d ago`;
+};
+
+/**
  * Format a numeric value as currency
  * @param amount The amount to format
  * @returns Formatted currency string
