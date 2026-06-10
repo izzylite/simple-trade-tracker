@@ -1,6 +1,7 @@
 import { supabase } from 'config/supabase';
 import { logger } from 'utils/logger';
 import type {
+  BriefingSnapshot,
   OrionTask,
   OrionTaskResult,
   TaskStatus,
@@ -106,6 +107,19 @@ export const orionTaskService = {
       throw error;
     }
     return data ?? [];
+  },
+
+  async getBriefing(briefingId: string): Promise<BriefingSnapshot | null> {
+    const { data, error } = await supabase
+      .from('asset_research_briefings')
+      .select('content_html, content_plain, significance, citations, tool_calls')
+      .eq('id', briefingId)
+      .maybeSingle();
+    if (error) {
+      logger.error('Failed to fetch briefing', error);
+      return null;
+    }
+    return data as BriefingSnapshot | null;
   },
 
   async markResultRead(resultId: string): Promise<void> {

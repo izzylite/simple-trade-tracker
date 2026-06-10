@@ -188,6 +188,15 @@ export function useOrionTasks(userId: string | undefined, calendarId?: string): 
           playTaskNotificationSound().catch((err) => {
             logger.debug('Task notification sound failed', err);
           });
+          // Realtime payloads carry no PostgREST embed — resolve the shared
+          // briefing so the expanded card has content.
+          if (newResult.briefing_id && !newResult.briefing) {
+            orionTaskService.getBriefing(newResult.briefing_id).then((briefing) => {
+              if (!briefing) return;
+              setResults((prev) =>
+                prev.map((r) => (r.id === newResult.id ? { ...r, briefing } : r)));
+            });
+          }
         }
       )
       .on(
@@ -211,8 +220,8 @@ export function useOrionTasks(userId: string | undefined, calendarId?: string): 
             });
           } else {
             setResults((prev) =>
-              prev.map((r) => (r.id === updated.id ? updated : r))
-            );
+              prev.map((r) =>
+                r.id === updated.id ? { ...updated, briefing: r.briefing } : r));
           }
         }
       )
