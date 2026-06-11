@@ -200,13 +200,21 @@ Deno.serve(async (req) => {
     const minSignificance: string = (task.config?.min_significance as string) ?? 'high';
     if (subscribedAssets.length === 0) continue;
 
-    // Fetch fresh pool results for this task's assets
+    // Deliver the LATEST COMPLETED briefing per asset — current_briefing_id
+    // survives reprocessing (the claim RPC never clears it), and the
+    // (user_id, briefing_id) dedup guard means a briefing is delivered at most
+    // once per user, so "latest available" can never spam.
+    //
+    // Deliberately NOT gated on status='fresh' + unexpired: the task's due
+    // time and the pool's 1h TTL advance on the same +60min cadence, so once
+    // they align, every due tick found the pool just-expired/reprocessing and
+    // delivered nothing — forever (phase-locked starvation; briefings 22:05 &
+    // 23:10 on 2026-06-11 generated but never delivered).
     const { data: poolResults } = await serviceClient
       .from('asset_research_pool')
       .select('asset, significance, refreshed_at, current_briefing_id, briefing_plain')
       .in('asset', subscribedAssets)
-      .eq('status', 'fresh')
-      .gt('expires_at', new Date().toISOString());
+      .not('current_briefing_id', 'is', null);
 
     const qualifying = (
       poolResults ?? [] as Array<{
