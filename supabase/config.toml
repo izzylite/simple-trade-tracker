@@ -62,6 +62,12 @@ verify_jwt = false
 [functions.run-orion-task]
 verify_jwt = false
 
+# Fired by dispatch-orion-tasks with the X-Orion-Dispatcher-Secret header
+# (service-to-service, no JWT). Must stay verify_jwt=false or Phase 1 asset
+# refreshes silently 401 at the gateway.
+[functions.run-asset-research]
+verify_jwt = false
+
 # Public-by-design: reached by unauthenticated end users — invite recipients
 # before they have an account, and public share-link viewers — so there is no
 # JWT to verify.

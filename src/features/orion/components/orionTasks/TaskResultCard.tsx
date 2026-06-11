@@ -98,7 +98,7 @@ const TaskResultCard: React.FC<TaskResultCardProps> = ({
   // Fetch referenced entities only when the card is expanded. Collapsed briefings
   // stay cheap — no round-trips until the user opens them.
   const { embeddedTrades, embeddedEvents, embeddedNotes } = useBriefingEmbedded(
-    result.briefing?.content_html ?? result.content_html,
+    result.briefing?.content_html ?? result.content_html ?? '',
     expanded
   );
 

@@ -10,6 +10,8 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { log } from "../../_shared/supabase.ts";
 import {
+  BROKER_TO_YAHOO,
+  getBrokerCurrencies,
   INSTRUMENT_CATALOG,
   type InstrumentCatalogEntry,
   isBriefingCurrency,
@@ -106,10 +108,18 @@ async function getRecentOrionBriefings(
       }
     }
 
+    // Thin (briefing-pointer) rows carry no content/asset in metadata, so the
+    // instrument/currency filter runs in code after fetch (see matchesFilter).
+    // Over-fetch when a filter is active so post-filter rows can still fill
+    // the requested limit; briefings are at most hourly per asset, so 60 rows
+    // comfortably covers the window.
+    const fetchLimit = filterMode ? 60 : boundedLimit;
+
     let query = supabase
       .from("orion_task_results")
       .select(
-        "id, significance, metadata, content_plain, created_at",
+        "id, significance, metadata, content_plain, title, created_at, " +
+          "briefing:asset_research_briefings(asset, content_plain, citations)",
       )
       .eq("user_id", userId)
       // Drop search-outage rows (current + legacy serper outage flag).
@@ -117,7 +127,7 @@ async function getRecentOrionBriefings(
       .not("metadata", "cs", '{"serper_outage":true}')
       .gte("created_at", sinceIso)
       .order("created_at", { ascending: false })
-      .limit(boundedLimit);
+      .limit(fetchLimit);
 
     // Belt-and-braces: keep this tool scoped to market_research even if a
     // future migration widens the orion_task_type enum. The 2026-05-26
@@ -128,27 +138,6 @@ async function getRecentOrionBriefings(
     if (untilDate) {
       query = query.lt("created_at", new Date(untilDate).toISOString());
     }
-    if (filterMode === "currency" && normalizedCurrency) {
-      query = query.filter(
-        "metadata",
-        "cs",
-        JSON.stringify({ currencies: [normalizedCurrency] }),
-      );
-    }
-    if (filterMode === "instrument") {
-      if (instrumentMatches.length === 1) {
-        query = query.filter(
-          "metadata",
-          "cs",
-          JSON.stringify({ symbols: [instrumentMatches[0].symbol] }),
-        );
-      } else {
-        const orParts = instrumentMatches.map(
-          (m) => `metadata.cs.${JSON.stringify({ symbols: [m.symbol] })}`,
-        );
-        query = query.or(orParts.join(","));
-      }
-    }
 
     const { data, error } = await query;
 
@@ -157,7 +146,57 @@ async function getRecentOrionBriefings(
       return `Failed to fetch briefings: ${error.message}`;
     }
 
-    const rows = data ?? [];
+    interface BriefingCitation {
+      url?: string;
+      title?: string;
+      source?: string;
+    }
+
+    interface BriefingRow {
+      id: string;
+      significance: string | null;
+      metadata: Record<string, unknown> | null;
+      content_plain: string | null;
+      title: string | null;
+      created_at: string;
+      briefing: {
+        asset: string | null;
+        content_plain: string | null;
+        citations: BriefingCitation[] | null;
+      } | null;
+    }
+
+    // Instrument/currency filtering across all three row eras:
+    // - thin rows:        asset on the embedded briefing (broker format, "EURUSD")
+    // - pool-fat rows:    asset in metadata (broker format)
+    // - legacy per-user:  currencies[]/symbols[] (Yahoo format) in metadata
+    const matchesFilter = (r: BriefingRow): boolean => {
+      if (!filterMode) return true;
+      const meta = r.metadata as {
+        asset?: string;
+        currencies?: string[];
+        symbols?: string[];
+      } | null;
+      const asset = r.briefing?.asset ?? meta?.asset;
+
+      if (filterMode === "currency") {
+        if (asset) return getBrokerCurrencies(asset).includes(normalizedCurrency!);
+        return Array.isArray(meta?.currencies) &&
+          meta!.currencies!.includes(normalizedCurrency!);
+      }
+
+      const matchSymbols = new Set(instrumentMatches.map((m) => m.symbol));
+      if (asset) {
+        const yahoo = BROKER_TO_YAHOO[asset];
+        return yahoo !== undefined && matchSymbols.has(yahoo);
+      }
+      return Array.isArray(meta?.symbols) &&
+        meta!.symbols!.some((s) => matchSymbols.has(s));
+    };
+
+    const rows = ((data ?? []) as unknown as BriefingRow[])
+      .filter(matchesFilter)
+      .slice(0, boundedLimit);
 
     if (rows.length === 0) {
       const rangeDesc = sinceDate
@@ -179,21 +218,18 @@ async function getRecentOrionBriefings(
       return `No Market Research briefings found ${rangeDesc}.`;
     }
 
-    interface BriefingCitation {
-      url?: string;
-      title?: string;
-      source?: string;
-    }
-
     const lines = rows.map((r, i) => {
       const meta = r.metadata as
         | { title?: string; citations?: BriefingCitation[] }
         | null;
-      const title = meta?.title ?? "Briefing";
+      // Thin rows: title on the row, body/citations on the embedded briefing.
+      // Older rows: everything inline / in metadata.
+      const title = r.title ?? meta?.title ?? "Briefing";
       const sig = r.significance ? r.significance.toUpperCase() : "—";
-      const body = r.content_plain ?? "";
+      const body = r.briefing?.content_plain ?? r.content_plain ?? "";
 
-      const citations = Array.isArray(meta?.citations) ? meta!.citations : [];
+      const rawCitations = r.briefing?.citations ?? meta?.citations;
+      const citations = Array.isArray(rawCitations) ? rawCitations : [];
       const sourceLines = citations
         .filter((c): c is BriefingCitation & { url: string } =>
           typeof c?.url === "string" && c.url.length > 0

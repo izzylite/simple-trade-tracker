@@ -5,12 +5,38 @@ import {
   createServiceClient,
 } from '../_shared/supabase.ts';
 import {
-  storeTaskResult,
   markTaskSuccess,
   markTaskFailure,
 } from '../_shared/storeTaskResult.ts';
 import { getHandler } from './handlers.ts';
 import type { OrionTask, TaskResult } from './types.ts';
+
+// Legacy inline store. This generic runner is dead-routed (the dispatcher
+// sends market_research through the asset pool, and no other task types
+// exist), but the shared storeTaskResult moved to thin briefing-pointer rows
+// which this runner has no briefing to reference. Keep the old fat insert
+// local so the source stays type-consistent if the function is ever revived.
+async function storeLegacyResult(
+  serviceClient: ReturnType<typeof createServiceClient>,
+  task: { id: string; user_id: string; task_type: string },
+  result: TaskResult,
+): Promise<{ ok: boolean }> {
+  const { error } = await serviceClient.from('orion_task_results').insert({
+    task_id: task.id,
+    user_id: task.user_id,
+    task_type: task.task_type,
+    content_html: result.content_html,
+    content_plain: result.content_plain,
+    significance: result.significance,
+    metadata: result.metadata,
+    group_date: new Date().toISOString().split('T')[0],
+  });
+  if (error) {
+    log('Failed to store task result', 'error', error);
+    return { ok: false };
+  }
+  return { ok: true };
+}
 
 Deno.serve(async (req) => {
   const corsResponse = handleCors(req);
@@ -76,7 +102,7 @@ Deno.serve(async (req) => {
         significance: null,
         metadata: { error: true, message },
       };
-      await storeTaskResult(serviceClient, orionTask, failureResult);
+      await storeLegacyResult(serviceClient, orionTask, failureResult);
       await markTaskFailure(serviceClient, orionTask.id, message);
       // storeResult-side notification covers the inbox surface; no extra
       // work needed here even on failure.
@@ -102,7 +128,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const stored = await storeTaskResult(serviceClient, orionTask, result);
+    const stored = await storeLegacyResult(serviceClient, orionTask, result);
     if (!stored.ok) {
       return new Response(
         JSON.stringify({ success: false, error: 'Failed to store result' }),

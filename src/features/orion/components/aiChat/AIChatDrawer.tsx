@@ -282,7 +282,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
       user_id: user.uid,
       calendar_id: calendar?.id ?? null,
       title: `Orion Briefing: ${taskLabel} — ${formattedDate}`,
-      content: result.briefing?.content_plain ?? result.content_plain,
+      content: result.briefing?.content_plain ?? result.content_plain ?? '',
       by_assistant: true,
       tags: ['orion', 'briefing'],
     });
@@ -290,7 +290,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
 
   const handleFollowupAboutResult = (result: OrionTaskResult) => {
     const title = result.title ?? (result.metadata as { title?: string } | null)?.title ?? 'this briefing';
-    const seed = `I'd like to follow up on "${title}":\n\n${result.briefing?.content_plain ?? result.content_plain}\n\nMy question: `;
+    const seed = `I'd like to follow up on "${title}":\n\n${result.briefing?.content_plain ?? result.content_plain ?? ''}\n\nMy question: `;
     setChatSeedMessage(seed);
     setActiveTab(0);
   };
