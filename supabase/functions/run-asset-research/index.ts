@@ -123,13 +123,14 @@ Deno.serve(async (req) => {
     const currencies = getBrokerCurrencies(asset);
 
     // 4. Parallel data fetch
-    const [macroBatch, breakingBatch, events, priceMap] = await Promise.all([
+    const [macroBatch, breakingBatch, events, priceMap, recentBriefings] = await Promise.all([
       searchNewsMultipleCached(serviceClient, queries, 3, NEWS_CACHE_TTL_SECONDS, 'tavily'),
       searchBreakingMultipleCached(
         serviceClient, BREAKING_MACRO_QUERIES, 'qdr:h', 3, BREAKING_CACHE_TTL_SECONDS, 'serper'
       ),
       fetchEconomicEvents(serviceClient, currencies),
       getMarketPrices(serviceClient as unknown as RunOrionSupabaseClient, watchlist, 60),
+      fetchRecentAssetBriefings(serviceClient, asset, 5),
     ]);
 
     const prices = Object.values(priceMap).filter((p): p is PriceSnapshot => p !== null);
@@ -153,7 +154,7 @@ Deno.serve(async (req) => {
     } else {
       const allNews = deduplicateNews(macroBatch.results);
       const breaking = deduplicateNews(breakingBatch.results);
-      const userPrompt = buildUserPrompt(asset, allNews, breaking, events, prices);
+      const userPrompt = buildUserPrompt(asset, allNews, breaking, events, prices, recentBriefings);
       const briefingResult = await generateBriefingWithScrape(
         buildAssetResearchSystemPrompt(),
         userPrompt,
@@ -358,12 +359,47 @@ async function fetchEconomicEvents(
   return (data ?? []) as EconomicEvent[];
 }
 
+interface RecentBriefing {
+  content_plain: string;
+  created_at: string;
+}
+
+// Last N completed briefings for this asset, fed into the Gemini prompt as
+// "Previously Reported" dedup context. Without it, a catalyst that stays in
+// the news cycle for hours (an ECB hike, a ceasefire) re-fires as a fresh
+// high-significance alert every sweep — subscribers got the same story as an
+// hourly card all night (observed 2026-06-12). This is the per-asset, shared
+// equivalent of the old per-user fetchRecentBriefings dedup that was lost in
+// the pool refactor: Gemini rates already-reported cycles 'low' and the
+// delivery threshold (medium/high) suppresses the card.
+async function fetchRecentAssetBriefings(
+  serviceClient: ReturnType<typeof createServiceClient>,
+  asset: string,
+  limit: number
+): Promise<RecentBriefing[]> {
+  const { data, error } = await serviceClient
+    .from('asset_research_briefings')
+    .select('content_plain, created_at')
+    .eq('asset', asset)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) {
+    log('Failed to fetch recent briefings for dedup context', 'warn', {
+      asset,
+      error: error.message,
+    });
+    return [];
+  }
+  return (data ?? []) as RecentBriefing[];
+}
+
 function buildUserPrompt(
   asset: string,
   news: NewsResult[],
   breaking: NewsResult[],
   events: EconomicEvent[],
-  prices: PriceSnapshot[]
+  prices: PriceSnapshot[],
+  recentBriefings: RecentBriefing[]
 ): string {
   const newsSection =
     news.length > 0
@@ -408,9 +444,24 @@ function buildUserPrompt(
       ? prices.map((p) => `- ${formatPriceLine(p)}`).join('\n')
       : '(No price data available — describe moves qualitatively.)';
 
+  const previouslyReportedSection =
+    recentBriefings.length > 0
+      ? recentBriefings
+          .map(
+            (b, i) =>
+              `[${i + 1}] Sent at ${b.created_at}\n    ${b.content_plain.substring(0, 500)}${b.content_plain.length > 500 ? '...' : ''}`
+          )
+          .join('\n\n')
+      : '(No previous briefings — this is the first for this asset.)';
+
   return `[Current time — ${buildTemporalContext()}]
 
 Generate a market research briefing for the instrument: ${asset}.
+
+## Previously Reported (DEDUPLICATE AGAINST THESE)
+These briefings were already delivered for this asset. Do NOT re-surface these catalysts unless there is a genuinely new development — e.g. an already-reported ceasefire BREAKING DOWN is new; a third article describing the same rate hike is NOT. If the current news cycle is dominated by these already-reported stories, set significance="low" and keep the briefing brief — the system suppresses low-significance cycles instead of re-alerting traders. Prices inside these excerpts are STALE — never cite them; current numbers come only from the Price Snapshot or get_market_data.
+
+${previouslyReportedSection}
 
 ## Breaking Content (past hour — HIGHEST PRIORITY)
 ${breakingSection}

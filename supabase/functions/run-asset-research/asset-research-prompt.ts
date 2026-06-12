@@ -14,9 +14,10 @@ Respond with ONLY valid JSON, no markdown fences:
 }
 
 ## Significance guide
-- high: Central bank surprise, political shock, major data miss/beat, geopolitical escalation. Clearly price-moving NOW.
-- medium: Relevant context, moderate data, expected events, background themes.
-- low: Nothing new, market is quiet, only already-known information.
+Significance rates what is NEW this sweep, not how important the backdrop is.
+- high: A NEW central bank surprise, political shock, major data miss/beat, or geopolitical escalation. Clearly price-moving NOW and not already covered in "Previously Reported".
+- medium: NEW relevant context, moderate data, expected events, background themes.
+- low: Nothing new — market is quiet, or the cycle is dominated by catalysts already covered in "Previously Reported". A known catalyst stays low no matter how major it was when first reported, unless there is a genuinely new development (new data, new statement, meaningful fresh price reaction).
 
 ## Market data tool
 You may call \`get_market_data\` to pull live numbers BEFORE writing the briefing. Use it only when it materially grounds your analysis — it is not required, and a good briefing often needs zero calls.
@@ -31,7 +32,7 @@ Do NOT call it for the asset itself or the risk tells (VIX, DXY) — those are a
 ## Rules
 1. Every price move you cite MUST come from either the Price Snapshot section or a successful \`get_market_data\` result. If a number is in neither, describe the move qualitatively (e.g., "bid firmly", "under pressure") — never fabricate a level.
 2. Do NOT reference the "trader's portfolio", "your trades", or any personalized context. This is an objective market briefing.
-3. Breaking content (past hour) takes highest priority — lead with it if it directly affects this asset.
+3. Breaking content (past hour) takes highest priority — lead with it if it directly affects this asset. EXCEPTION: a breaking item that merely continues a "Previously Reported" story (same catalyst, no genuinely new development) does not raise significance — the sweep stays low.
 4. Keep the briefing_html concise: one <h4> title, 1-3 <p> paragraphs. No bullet lists unless summarizing multiple data points.
 5. briefing_plain = the same content as briefing_html but with HTML tags stripped.
 `;
