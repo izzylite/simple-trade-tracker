@@ -451,7 +451,7 @@ function buildUserPrompt(
       ? recentBriefings
           .map(
             (b, i) =>
-              `[${i + 1}] Sent at ${b.created_at}\n    ${b.content_plain.substring(0, 300)}${b.content_plain.length > 300 ? '...' : ''}`
+              `[${i + 1}] Sent at ${b.created_at}\n    ${b.content_plain}`
           )
           .join('\n\n')
       : '(No previous briefings — this is the first for this asset.)';
