@@ -130,7 +130,7 @@ Deno.serve(async (req) => {
       ),
       fetchEconomicEvents(serviceClient, currencies),
       getMarketPrices(serviceClient as unknown as RunOrionSupabaseClient, watchlist, 60),
-      fetchRecentAssetBriefings(serviceClient, asset, 5),
+      fetchRecentAssetBriefings(serviceClient, asset, 24),
     ]);
 
     const prices = Object.values(priceMap).filter((p): p is PriceSnapshot => p !== null);
@@ -364,14 +364,16 @@ interface RecentBriefing {
   created_at: string;
 }
 
-// Last N completed briefings for this asset, fed into the Gemini prompt as
-// "Previously Reported" dedup context. Without it, a catalyst that stays in
-// the news cycle for hours (an ECB hike, a ceasefire) re-fires as a fresh
-// high-significance alert every sweep — subscribers got the same story as an
-// hourly card all night (observed 2026-06-12). This is the per-asset, shared
-// equivalent of the old per-user fetchRecentBriefings dedup that was lost in
-// the pool refactor: Gemini rates already-reported cycles 'low' and the
-// delivery threshold (medium/high) suppresses the card.
+// Last N completed briefings for this asset (24 = a full day at hourly
+// cadence, so a morning catalyst is still "already reported" by evening),
+// fed into the Gemini prompt as "Previously Reported" dedup context. Without
+// it, a catalyst that stays in the news cycle for hours (an ECB hike, a
+// ceasefire) re-fires as a fresh high-significance alert every sweep —
+// subscribers got the same story as an hourly card all night (observed
+// 2026-06-12). This is the per-asset, shared equivalent of the old per-user
+// fetchRecentBriefings dedup that was lost in the pool refactor: Gemini rates
+// already-reported cycles 'low' and the delivery threshold (medium/high)
+// suppresses the card.
 async function fetchRecentAssetBriefings(
   serviceClient: ReturnType<typeof createServiceClient>,
   asset: string,
@@ -449,7 +451,7 @@ function buildUserPrompt(
       ? recentBriefings
           .map(
             (b, i) =>
-              `[${i + 1}] Sent at ${b.created_at}\n    ${b.content_plain.substring(0, 500)}${b.content_plain.length > 500 ? '...' : ''}`
+              `[${i + 1}] Sent at ${b.created_at}\n    ${b.content_plain.substring(0, 300)}${b.content_plain.length > 300 ? '...' : ''}`
           )
           .join('\n\n')
       : '(No previous briefings — this is the first for this asset.)';
