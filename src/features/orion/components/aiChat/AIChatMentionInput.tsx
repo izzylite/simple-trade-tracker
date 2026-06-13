@@ -692,6 +692,13 @@ const AIChatMentionInput = forwardRef<AIChatMentionInputHandle, AIChatMentionInp
         anchorEl={anchorEl}
         placement="top-start"
         sx={{ zIndex: Z_INDEX.RICH_TEXT_MENU }}
+        modifiers={[
+          // Keep the popup inside the viewport on narrow phones so its right
+          // edge never spills off-screen (the editor sits near the screen edge
+          // inside the full-screen chat).
+          { name: 'flip', options: { boundary: 'viewport' } },
+          { name: 'preventOverflow', options: { boundary: 'viewport', padding: 8 } },
+        ]}
       >
         <Paper
           ref={popperRef}
@@ -699,8 +706,8 @@ const AIChatMentionInput = forwardRef<AIChatMentionInputHandle, AIChatMentionInp
           sx={{
             ...paperSx,
             maxHeight: 280,
-            minWidth: 280,
-            maxWidth: 420,
+            minWidth: { xs: 'min(280px, calc(100vw - 24px))', sm: 280 },
+            maxWidth: { xs: 'calc(100vw - 24px)', sm: 420 },
             mb: 0.75,
           }}
         >

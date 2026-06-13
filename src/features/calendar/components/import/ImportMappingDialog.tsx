@@ -48,6 +48,7 @@ import BaseDialog from 'components/common/BaseDialog';
 import { useDialogTokens, MONO_FONT } from 'styles/dialogTokens';
 import { loadXLSX } from '../../utils/loadXLSX';
 import { ASSET_TAG_GROUP } from 'features/events/services/instrumentCatalog';
+import { useIsMobile } from 'hooks/useResponsive';
 
 interface ImportMappingDialogProps {
   open: boolean;
@@ -138,6 +139,7 @@ export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
   file,
 }) => {
   const theme = useTheme();
+  const isMobile = useIsMobile();
   const {
     isDark,
     violet,
@@ -632,6 +634,7 @@ export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
               </Box>
               <Typography
                 sx={{
+                  display: { xs: 'none', sm: 'inline-flex' },
                   fontFamily: MONO_FONT,
                   fontSize: '0.7rem',
                   fontWeight: 500,
@@ -709,15 +712,19 @@ export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
         }
         slotProps={{
           paper: {
-            sx: {
-              borderRadius: 2,
-              border: `1px solid ${hairline}`,
-              boxShadow: theme.shadows[10],
-              backgroundImage: 'none',
-              maxWidth: 560,
-              height: '85vh',
-              overflow: 'hidden',
-            },
+            // On phones, defer entirely to BaseDialog's own full-screen paper —
+            // the custom maxWidth/85vh/borderRadius here would clobber it.
+            sx: isMobile
+              ? undefined
+              : {
+                  borderRadius: 2,
+                  border: `1px solid ${hairline}`,
+                  boxShadow: theme.shadows[10],
+                  backgroundImage: 'none',
+                  maxWidth: 560,
+                  height: '85vh',
+                  overflow: 'hidden',
+                },
           },
         }}
         // flex: 1 + minHeight: 0 makes the body fill remaining vertical space

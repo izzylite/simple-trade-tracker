@@ -46,6 +46,12 @@ import { scrollbarStyles } from 'styles/scrollbarStyles';
 import { dialogProps } from 'styles/dialogStyles';
 import { Z_INDEX } from 'styles/zIndex';
 import { useDialogTokens, MONO_FONT } from 'styles/dialogTokens';
+import { useIsMobile } from 'hooks/useResponsive';
+import {
+  useFullScreenDialog,
+  SAFE_AREA_TOP,
+  SAFE_AREA_BOTTOM,
+} from 'components/common/useFullScreenDialog';
 import TradeList from '../trades/TradeList';
 import TradeCardShimmer from '../TradeCardShimmer';
 import { useTradeOperations } from '../../contexts/TradeOperationsContext';
@@ -189,7 +195,7 @@ const SearchContent: React.FC<SearchContentProps> = ({
             component="button"
             onClick={() => setIsFilterDialogOpen(true)}
             sx={{
-              height: 34,
+              height: { xs: 44, sm: 34 },
               px: 1.25,
               display: 'flex',
               alignItems: 'center',
@@ -474,8 +480,8 @@ const SearchContent: React.FC<SearchContentProps> = ({
                     onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                     aria-label="Previous page"
                     sx={{
-                      width: 28,
-                      height: 28,
+                      width: { xs: 40, sm: 28 },
+                      height: { xs: 40, sm: 28 },
                       borderRadius: '8px',
                       border: `1px solid ${theme.palette.divider}`,
                       bgcolor: subtleBg,
@@ -519,8 +525,8 @@ const SearchContent: React.FC<SearchContentProps> = ({
                     onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                     aria-label="Next page"
                     sx={{
-                      width: 28,
-                      height: 28,
+                      width: { xs: 40, sm: 28 },
+                      height: { xs: 40, sm: 28 },
                       borderRadius: '8px',
                       border: `1px solid ${theme.palette.divider}`,
                       bgcolor: subtleBg,
@@ -657,6 +663,8 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
   onClearAll,
 }) => {
   const theme = useTheme();
+  const isMobile = useIsMobile();
+  const { fullScreen, fullScreenPaperSx } = useFullScreenDialog();
   const {
     violet, violetSoft, violetBorder,
     surfaceInset, hairline,
@@ -665,22 +673,38 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
     primaryButtonSx, ghostButtonSx,
   } = useDialogTokens();
 
+  // On phones the X DatePickers force their desktop variant (desktopPaper),
+  // whose popper overflows the viewport. Dropping the forced desktop slot lets
+  // MUI X pick the responsive/mobile picker (full-screen modal) instead.
+  const datePickerSlotProps = {
+    textField: { fullWidth: true, size: 'small' as const, sx: inputSx },
+    popper: { sx: { zIndex: Z_INDEX.DIALOG_POPUP } },
+    ...(isMobile ? {} : { desktopPaper: { sx: { zIndex: Z_INDEX.DIALOG_POPUP } } }),
+  };
+
   return (
     <Dialog
       open={open}
       onClose={onClose}
       maxWidth="sm"
       fullWidth
+      fullScreen={fullScreen}
       {...dialogProps}
       sx={{ zIndex: Z_INDEX.DIALOG }}
       slotProps={{
         paper: {
-          sx: paperSx,
+          sx: {
+            ...paperSx,
+            // Full-screen: stack header/body/footer in a flex column so the
+            // body can flex to fill and the footer pins to the bottom.
+            ...(fullScreen ? { display: 'flex', flexDirection: 'column' } : {}),
+            ...fullScreenPaperSx,
+          },
         },
       }}
     >
       {/* Header */}
-      <Box sx={headerSx}>
+      <Box sx={{ ...headerSx, pt: fullScreen ? SAFE_AREA_TOP : undefined }}>
         <Box sx={iconAvatarSx}>
           <FilterIcon sx={{ fontSize: 18 }} />
         </Box>
@@ -715,7 +739,9 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
           gap: 2.25,
           ...scrollbarStyles(theme),
           overflowY: 'auto',
-          maxHeight: '70vh',
+          // Drop the fixed cap when full-screen so the body flexes to fill
+          // the dialog; otherwise keep the bounded scroll region.
+          ...(fullScreen ? { flex: 1, minHeight: 0 } : { maxHeight: '70vh' }),
         }}
       >
         {/* Pinned-only row */}
@@ -946,11 +972,7 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
               label="Select date"
               value={dateFilter.startDate}
               onChange={onStartDateChange}
-              slotProps={{
-                textField: { fullWidth: true, size: 'small', sx: inputSx },
-                popper: { sx: { zIndex: Z_INDEX.DIALOG_POPUP } },
-                desktopPaper: { sx: { zIndex: Z_INDEX.DIALOG_POPUP } },
-              }}
+              slotProps={datePickerSlotProps}
             />
           )}
 
@@ -960,22 +982,14 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
                 label="Start date"
                 value={dateFilter.startDate}
                 onChange={onStartDateChange}
-                slotProps={{
-                  textField: { fullWidth: true, size: 'small', sx: inputSx },
-                  popper: { sx: { zIndex: Z_INDEX.DIALOG_POPUP } },
-                  desktopPaper: { sx: { zIndex: Z_INDEX.DIALOG_POPUP } },
-                }}
+                slotProps={datePickerSlotProps}
               />
               <DatePicker
                 label="End date"
                 value={dateFilter.endDate}
                 onChange={onEndDateChange}
                 minDate={dateFilter.startDate || undefined}
-                slotProps={{
-                  textField: { fullWidth: true, size: 'small', sx: inputSx },
-                  popper: { sx: { zIndex: Z_INDEX.DIALOG_POPUP } },
-                  desktopPaper: { sx: { zIndex: Z_INDEX.DIALOG_POPUP } },
-                }}
+                slotProps={datePickerSlotProps}
               />
             </Box>
           )}
@@ -983,7 +997,13 @@ const FilterDialog: React.FC<FilterDialogProps> = ({
       </Box>
 
       {/* Footer */}
-      <Box sx={{ ...footerSx, justifyContent: 'space-between' }}>
+      <Box
+        sx={{
+          ...footerSx,
+          justifyContent: 'space-between',
+          pb: fullScreen ? SAFE_AREA_BOTTOM : undefined,
+        }}
+      >
         <Button
           onClick={onClearAll}
           disabled={activeFilterCount === 0}

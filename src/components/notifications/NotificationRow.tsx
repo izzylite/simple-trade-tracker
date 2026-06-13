@@ -131,7 +131,7 @@ const NotificationRow: React.FC<NotificationRowProps> = ({
                 onDismiss(notification.id);
               }}
               sx={{
-                p: 0.25,
+                p: { xs: 1, sm: 0.25 },
                 color: 'text.disabled',
                 '&:hover': {
                   color: 'text.secondary',

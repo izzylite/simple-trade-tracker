@@ -142,8 +142,8 @@ const FloatingMonthNavigation: React.FC<FloatingMonthNavigationProps> = ({
               onClick={onPrevMonth}
               size="small"
               sx={{
-                width: 36,
-                height: 36,
+                width: { xs: 40, sm: 36 },
+                height: { xs: 40, sm: 36 },
                 borderRadius: `${theme.palette.custom.radius.md}px`,
                 color: 'text.secondary',
                 transition: `background-color 150ms ${theme.palette.custom.easing.smooth}, color 150ms ${theme.palette.custom.easing.smooth}`,
@@ -209,8 +209,8 @@ const FloatingMonthNavigation: React.FC<FloatingMonthNavigationProps> = ({
               onClick={onNextMonth}
               size="small"
               sx={{
-                width: 36,
-                height: 36,
+                width: { xs: 40, sm: 36 },
+                height: { xs: 40, sm: 36 },
                 borderRadius: `${theme.palette.custom.radius.md}px`,
                 color: 'text.secondary',
                 transition: `background-color 150ms ${theme.palette.custom.easing.smooth}, color 150ms ${theme.palette.custom.easing.smooth}`,

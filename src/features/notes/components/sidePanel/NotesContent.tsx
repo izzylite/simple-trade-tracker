@@ -290,14 +290,15 @@ const NotesContent: React.FC<NotesContentProps> = ({
           />
         </Box>
 
-        {/* Search and Filter Row */}
-        <Box sx={{ px: 2, pb: 2, display: 'flex', gap: 1, alignItems: 'center' }}>
+        {/* Search and Filter Row — on xs, search gets its own full-width row
+            and the creator Select + view-toggle wrap onto a second row. */}
+        <Box sx={{ px: 2, pb: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
           <TextField
             size="small"
             placeholder="Search notes..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            sx={{ flex: 1 }}
+            sx={{ width: '100%' }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -322,45 +323,47 @@ const NotesContent: React.FC<NotesContentProps> = ({
             }}
           />
 
-          {/* Creator Filter - compact */}
-          <FormControl size="small" sx={{ minWidth: 140 }}>
-            <Select
-              value={creatorFilter}
-              onChange={(e) => setCreatorFilter(e.target.value as 'assistant' | 'me')}
-              sx={{
-                borderRadius: 1,
-              }}
-            >
-              <MenuItem value="me">
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <PersonIcon sx={{ fontSize: '1rem', color: 'text.secondary' }} />
-                  <Typography variant="body2">My Notes</Typography>
-                </Stack>
-              </MenuItem>
-              <MenuItem value="assistant">
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <AIIcon sx={{ fontSize: '1rem', color: 'primary.main' }} />
-                  <Typography variant="body2">Orion</Typography>
-                </Stack>
-              </MenuItem>
-            </Select>
-          </FormControl>
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+            {/* Creator Filter - compact */}
+            <FormControl size="small" sx={{ minWidth: { xs: 0, sm: 140 }, flex: { xs: 1, sm: 'initial' } }}>
+              <Select
+                value={creatorFilter}
+                onChange={(e) => setCreatorFilter(e.target.value as 'assistant' | 'me')}
+                sx={{
+                  borderRadius: 1,
+                }}
+              >
+                <MenuItem value="me">
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <PersonIcon sx={{ fontSize: '1rem', color: 'text.secondary' }} />
+                    <Typography variant="body2">My Notes</Typography>
+                  </Stack>
+                </MenuItem>
+                <MenuItem value="assistant">
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <AIIcon sx={{ fontSize: '1rem', color: 'primary.main' }} />
+                    <Typography variant="body2">Orion</Typography>
+                  </Stack>
+                </MenuItem>
+              </Select>
+            </FormControl>
 
-          <ToggleButtonGroup
-            size="small"
-            exclusive
-            value={viewMode}
-            onChange={(_e, v) => v && setViewMode(v)}
-            aria-label="View mode"
-            sx={{ flexShrink: 0 }}
-          >
-            <ToggleButton value="card" aria-label="Card view">
-              <CardViewIcon fontSize="small" />
-            </ToggleButton>
-            <ToggleButton value="tag" aria-label="Tag view">
-              <TagViewIcon fontSize="small" />
-            </ToggleButton>
-          </ToggleButtonGroup>
+            <ToggleButtonGroup
+              size="small"
+              exclusive
+              value={viewMode}
+              onChange={(_e, v) => v && setViewMode(v)}
+              aria-label="View mode"
+              sx={{ flexShrink: 0 }}
+            >
+              <ToggleButton value="card" aria-label="Card view">
+                <CardViewIcon fontSize="small" />
+              </ToggleButton>
+              <ToggleButton value="tag" aria-label="Tag view">
+                <TagViewIcon fontSize="small" />
+              </ToggleButton>
+            </ToggleButtonGroup>
+          </Box>
         </Box>
 
         {/* Notes List */}
@@ -472,6 +475,7 @@ const NotesContent: React.FC<NotesContentProps> = ({
               size="small"
               startIcon={<AddIcon />}
               onClick={handleNewNote}
+              sx={{ height: { xs: 44 } }}
             >
               Add Note
             </Button>

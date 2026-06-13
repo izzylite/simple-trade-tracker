@@ -68,6 +68,28 @@ const BaseDialog: React.FC<BaseDialogProps> = ({
 
   const showFooter = !!(actions || !hideFooterCancelButton || primaryButtonAction);
 
+  // A consumer may pass its own `slotProps` (e.g. a custom paper maxWidth/height)
+  // or `sx`. Pull them out of `rest` and MERGE rather than letting the trailing
+  // `{...rest}` spread replace BaseDialog's own paper sx — otherwise the
+  // full-screen-on-mobile branch silently disappears for those dialogs.
+  const { slotProps: restSlotProps, sx: restSx, ...rest2 } = rest;
+  const restPaperSx = (restSlotProps?.paper as any)?.sx ?? {};
+  // On mobile the full-screen values win (applied last). On desktop the
+  // consumer's custom paper sizing wins (applied last) over our 90vh cap.
+  const mergedPaperSx = fullScreen
+    ? {
+        ...paperSx,
+        ...restPaperSx,
+        maxHeight: '100%',
+        height: '100%',
+        width: '100%',
+        maxWidth: '100%',
+        m: 0,
+        borderRadius: 0,
+        border: 'none',
+      }
+    : { ...paperSx, maxHeight: '90vh', ...restPaperSx };
+
   return (
     <Dialog
       open={open}
@@ -76,18 +98,15 @@ const BaseDialog: React.FC<BaseDialogProps> = ({
       fullWidth={fullWidth}
       fullScreen={fullScreen}
       {...dialogProps}
-      sx={{ zIndex: Z_INDEX.DIALOG }}
+      sx={{ zIndex: Z_INDEX.DIALOG, ...(restSx as any) }}
+      {...rest2}
       slotProps={{
+        ...restSlotProps,
         paper: {
-          sx: {
-            ...paperSx,
-            ...(fullScreen
-              ? { maxHeight: '100%', borderRadius: 0, border: 'none' }
-              : { maxHeight: '90vh' }),
-          },
+          ...(restSlotProps?.paper as any),
+          sx: mergedPaperSx,
         },
       }}
-      {...rest}
     >
       {/* Header */}
       <Box

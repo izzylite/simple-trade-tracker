@@ -22,7 +22,7 @@ const PageActionBar: React.FC<PageActionBarProps> = ({ inlineActions, rightConte
         display: 'flex',
         alignItems: 'center',
         gap: 1.5,
-        px: { xs: 2, sm: 3 },
+        px: { xs: 1, sm: 3 },
         py: 1.25,
         bgcolor: 'background.paper',
         minHeight: 56,
@@ -31,7 +31,7 @@ const PageActionBar: React.FC<PageActionBarProps> = ({ inlineActions, rightConte
       {inlineActions}
       <Box sx={{ flexGrow: 1 }} />
       {rightContent && (
-        <Stack direction="row" spacing={1} alignItems="center">
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ flexShrink: 0 }}>
           {rightContent}
         </Stack>
       )}

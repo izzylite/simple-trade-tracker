@@ -205,9 +205,10 @@ const Stat: React.FC<StatProps> = ({ label, valueNode, color }) => (
                 fontFamily: "'DM Sans', sans-serif",
                 fontFeatureSettings: TNUM,
                 fontWeight: 700,
-                fontSize: { xs: '1.25rem', md: '1.4rem' },
+                fontSize: { xs: '0.95rem', sm: '1.25rem', md: '1.4rem' },
                 color: color ?? '#f1f5f9',
                 letterSpacing: '-0.02em',
+                whiteSpace: 'nowrap',
             }}
         >
             {valueNode}

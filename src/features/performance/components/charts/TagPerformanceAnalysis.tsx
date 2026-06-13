@@ -27,6 +27,7 @@ import TagFilterDialog from 'features/calendar/components/TagFilterDialog';
 import { performanceCalculationService } from 'features/performance/services/performanceCalculationService';
 import { EYEBROW_SX, getInsetSurface } from 'styles/designTokens';
 import CardShell from 'components/common/CardShell';
+import { useIsMobile } from 'hooks/useResponsive';
 
 interface TagPerformanceAnalysisProps {
   trades: Trade[];
@@ -52,6 +53,7 @@ const TagPerformanceAnalysis: React.FC<TagPerformanceAnalysisProps> = ({
   setMultipleTradesDialog,
 }) => {
   const theme = useTheme();
+  const isMobile = useIsMobile();
   const [primaryTagsDialogOpen, setPrimaryTagsDialogOpen] = useState(false);
   const [secondaryTagsDialogOpen, setSecondaryTagsDialogOpen] = useState(false);
   const [filteredTagStats, setFilteredTagStats] = useState<any[]>([]);
@@ -113,9 +115,11 @@ const TagPerformanceAnalysis: React.FC<TagPerformanceAnalysisProps> = ({
     breakEven: theme.palette.text.tertiary,
   };
 
-  // ── Header band right-slot controls ─────────────────────────────────
-  const headerRight = (
-    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+  // ── Filter buttons (shared by desktop header-slot + mobile body toolbar)
+  // On mobile the labels are shortened to 'Primary'/'Secondary' and the
+  // buttons stretch to fill the full-width toolbar row.
+  const filterButtons = (
+    <>
       <MuiTooltip
         title="Select primary tags to filter trades that have ANY of these tags. These are your main strategies or setups to analyze."
         arrow
@@ -127,11 +131,14 @@ const TagPerformanceAnalysis: React.FC<TagPerformanceAnalysisProps> = ({
           onClick={() => setPrimaryTagsDialogOpen(true)}
           sx={{
             textTransform: 'none',
+            flex: isMobile ? 1 : 'unset',
             borderColor: primaryTags.length > 0 ? 'primary.main' : undefined,
             '&:focus-visible': { boxShadow: theme.palette.custom.focusRing },
           }}
         >
-          {primaryTags.length > 0 ? `Primary: ${primaryTags.length} tags` : 'Select Primary Tags'}
+          {isMobile
+            ? primaryTags.length > 0 ? `Primary (${primaryTags.length})` : 'Primary'
+            : primaryTags.length > 0 ? `Primary: ${primaryTags.length} tags` : 'Select Primary Tags'}
         </Button>
       </MuiTooltip>
       <MuiTooltip
@@ -146,13 +153,22 @@ const TagPerformanceAnalysis: React.FC<TagPerformanceAnalysisProps> = ({
           color={secondaryTags.length > 0 ? 'secondary' : 'primary'}
           sx={{
             textTransform: 'none',
+            flex: isMobile ? 1 : 'unset',
             borderColor: secondaryTags.length > 0 ? 'secondary.main' : undefined,
             '&:focus-visible': { boxShadow: theme.palette.custom.focusRing },
           }}
         >
-          {secondaryTags.length > 0 ? `Secondary: ${secondaryTags.length} tags` : 'Select Secondary Tags'}
+          {isMobile
+            ? secondaryTags.length > 0 ? `Secondary (${secondaryTags.length})` : 'Secondary'
+            : secondaryTags.length > 0 ? `Secondary: ${secondaryTags.length} tags` : 'Select Secondary Tags'}
         </Button>
       </MuiTooltip>
+    </>
+  );
+
+  // Tag filter dialogs — rendered once, independent of where the buttons live.
+  const filterDialogs = (
+    <>
       <TagFilterDialog
         open={primaryTagsDialogOpen}
         onClose={() => setPrimaryTagsDialogOpen(false)}
@@ -173,6 +189,14 @@ const TagPerformanceAnalysis: React.FC<TagPerformanceAnalysisProps> = ({
         showApplyButton={true}
         showClearButton={true}
       />
+    </>
+  );
+
+  // ── Header band right-slot controls (desktop only) ──────────────────
+  const headerRight = (
+    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+      {filterButtons}
+      {filterDialogs}
     </Box>
   );
 
@@ -193,9 +217,17 @@ const TagPerformanceAnalysis: React.FC<TagPerformanceAnalysisProps> = ({
             </MuiTooltip>
           </Box>
         ),
-        right: headerRight,
+        right: isMobile ? undefined : headerRight,
       }}
     >
+      {/* Mobile: filter buttons live in a full-width body toolbar instead of
+          the header right-slot. Dialogs render here too on mobile. */}
+      {isMobile && (
+        <Box sx={{ px: 2, pt: 2, display: 'flex', gap: 1 }}>
+          {filterButtons}
+          {filterDialogs}
+        </Box>
+      )}
       {primaryTags.length === 0 && secondaryTags.length === 0 ? (
         <Box sx={{ p: 2 }}>
           <Box
@@ -244,7 +276,7 @@ const TagPerformanceAnalysis: React.FC<TagPerformanceAnalysisProps> = ({
           <ResponsiveContainer width="100%" height={300}>
             <BarChart
               data={filteredTagStats}
-              margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+              margin={isMobile ? { top: 20, right: 8, left: 0, bottom: 5 } : { top: 20, right: 30, left: 20, bottom: 5 }}
               maxBarSize={50}
             >
               <CartesianGrid
@@ -257,6 +289,10 @@ const TagPerformanceAnalysis: React.FC<TagPerformanceAnalysisProps> = ({
                 axisLine={false}
                 tickLine={false}
                 tick={{ fill: theme.palette.text.secondary, fontSize: 12 }}
+                angle={isMobile ? -35 : undefined}
+                textAnchor={isMobile ? 'end' : undefined}
+                height={isMobile ? 50 : undefined}
+                interval={isMobile ? 0 : undefined}
               />
               <YAxis
                 axisLine={false}

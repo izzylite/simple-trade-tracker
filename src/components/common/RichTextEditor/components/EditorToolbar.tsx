@@ -44,6 +44,7 @@ import { handleToolbarInteraction } from 'components/common/RichTextEditor/utils
 import { getCurrentBlockType } from 'components/common/RichTextEditor/utils/editorActions';
 import { getCurrentLink } from 'components/common/RichTextEditor/utils/linkUtils';
 import { isDarkMode } from 'utils/themeMode';
+import { useIsMobile } from 'hooks/useResponsive';
 import {
   CALLOUT_VARIANTS,
   CALLOUT_LABELS,
@@ -105,6 +106,7 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
   onMenuOpenChange,
 }) => {
   const theme = useTheme();
+  const isMobile = useIsMobile();
   const internalToolbarRef = useRef<HTMLDivElement>(null);
   const toolbarRef = externalToolbarRef || internalToolbarRef;
 
@@ -614,7 +616,7 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
         p: 1,
         minHeight: 'auto',
         display: 'flex',
-        flexWrap: 'nowrap',
+        flexWrap: { xs: 'wrap', sm: 'nowrap' },
         justifyContent: variant === 'sticky' ? 'flex-start' : 'center',
         gap: 0.5,
         ...getToolbarButtonStyles(),
@@ -628,8 +630,8 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
             border: 'none',
             margin: '0 2px',
             padding: '6px 8px',
-            minWidth: '36px',
-            height: '36px',
+            minWidth: { xs: 44, sm: 36 },
+            height: { xs: 44, sm: 36 },
           }
         }}
       >
@@ -686,8 +688,8 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
             aria-label="Heading Style"
             sx={{
               padding: '6px 8px',
-              minWidth: '36px',
-              height: '36px',
+              minWidth: { xs: 44, sm: 36 },
+              height: { xs: 44, sm: 36 },
               margin: '0 2px',
             }}
           >
@@ -707,8 +709,8 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
             border: 'none',
             margin: '0 2px',
             padding: '6px 8px',
-            minWidth: '36px',
-            height: '36px',
+            minWidth: { xs: 44, sm: 36 },
+            height: { xs: 44, sm: 36 },
           }
         }}
       >
@@ -754,8 +756,8 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
                 aria-label="Insert trade share link"
                 sx={{
                   padding: '6px 8px',
-                  minWidth: '36px',
-                  height: '36px',
+                  minWidth: { xs: 44, sm: 36 },
+                  height: { xs: 44, sm: 36 },
                   margin: '0 2px',
                 }}
               >
@@ -782,8 +784,8 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
                 aria-label="Insert callout"
                 sx={{
                   padding: '6px 8px',
-                  minWidth: '36px',
-                  height: '36px',
+                  minWidth: { xs: 44, sm: 36 },
+                  height: { xs: 44, sm: 36 },
                   margin: '0 2px',
                   ...(isCurrentCallout && {
                     backgroundColor: alpha(theme.palette.primary.main, 0.12),
@@ -813,8 +815,8 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
             aria-label="Text and background color"
             sx={{
               padding: '6px 8px',
-              minWidth: '36px',
-              height: '36px',
+              minWidth: { xs: 44, sm: 36 },
+              height: { xs: 44, sm: 36 },
               margin: '0 2px',
             }}
           >
@@ -833,8 +835,8 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
             border: 'none',
             margin: '0 2px',
             padding: '6px 8px',
-            minWidth: '36px',
-            height: '36px',
+            minWidth: { xs: 44, sm: 36 },
+            height: { xs: 44, sm: 36 },
           }
         }}
       >
@@ -881,6 +883,14 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
       </ToggleButtonGroup>
     </Toolbar>
   );
+
+  // Floating selection toolbar is suppressed on phones — it relies on
+  // hover/precise-cursor positioning that doesn't translate to touch, so
+  // phones rely on the sticky toolbar instead. Returning null (rather than
+  // falling through) prevents an unintended sticky toolbar render here.
+  if (variant === 'floating' && isMobile) {
+    return null;
+  }
 
   // Render floating variant
   if (variant === 'floating' && position) {
@@ -938,6 +948,11 @@ const EditorToolbar: React.FC<EditorToolbarProps> = ({
           ...(stickyPosition === 'top' ? { top: 0 } : { bottom: 0 }),
           zIndex: Z_INDEX - 100,
           backgroundColor: theme.palette.background.paper,
+          // Let the dense toolbar scroll horizontally if it can't wrap,
+          // with the scrollbar visually suppressed.
+          overflowX: 'auto',
+          scrollbarWidth: 'none',
+          '&::-webkit-scrollbar': { display: 'none' },
           ...(stickyPosition === 'top'
             ? { borderBottom: `1px solid ${theme.palette.divider}` }
             : { borderTop: `1px solid ${theme.palette.divider}` }),

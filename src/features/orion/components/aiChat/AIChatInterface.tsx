@@ -1185,6 +1185,8 @@ const AIChatInterface = forwardRef<AIChatInterfaceRef, AIChatInterfaceProps>(({
       {/* Input Area */}
       <Box sx={{
         p: 2,
+        // Safe-area inset so the input clears the home indicator on full-screen phones.
+        pb: { xs: 'max(16px, env(safe-area-inset-bottom))', sm: 2 },
         borderTop: `1px solid ${hairline}`,
         backgroundColor: footerBg,
       }}>

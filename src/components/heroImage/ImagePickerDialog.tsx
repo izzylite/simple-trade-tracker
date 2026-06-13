@@ -16,6 +16,11 @@ import { scrollbarStyles } from 'styles/scrollbarStyles';
 import { dialogProps } from 'styles/dialogStyles';
 import { Z_INDEX } from 'styles/zIndex';
 import { useDialogTokens } from 'styles/dialogTokens';
+import {
+  useFullScreenDialog,
+  SAFE_AREA_TOP,
+  SAFE_AREA_BOTTOM,
+} from 'components/common/useFullScreenDialog';
 
 export interface ImageAttribution {
   id: string;
@@ -40,6 +45,7 @@ const ImagePickerDialog: React.FC<ImagePickerDialogProps> = ({
   title = 'Choose a cover image',
 }) => {
   const theme = useTheme();
+  const { fullScreen, fullScreenPaperSx } = useFullScreenDialog();
   const {
     violet,
     paperSx,
@@ -68,16 +74,21 @@ const ImagePickerDialog: React.FC<ImagePickerDialogProps> = ({
       onClose={onClose}
       maxWidth="md"
       fullWidth
+      fullScreen={fullScreen}
       {...dialogProps}
       sx={{ zIndex: Z_INDEX.DIALOG + 200 }}
       slotProps={{
         paper: {
-          sx: paperSx,
+          sx: {
+            ...paperSx,
+            ...(fullScreen ? { display: 'flex', flexDirection: 'column' } : {}),
+            ...fullScreenPaperSx,
+          },
         },
       }}
     >
       {/* Header */}
-      <Box sx={headerSx}>
+      <Box sx={{ ...headerSx, px: { xs: 2, sm: 2.5 }, pt: fullScreen ? SAFE_AREA_TOP : undefined }}>
         <Box sx={iconAvatarSx}>
           <ImageIcon sx={{ fontSize: 18 }} />
         </Box>
@@ -103,11 +114,12 @@ const ImagePickerDialog: React.FC<ImagePickerDialogProps> = ({
       {/* Body */}
       <Box
         sx={{
-          px: 2.5,
+          px: { xs: 2, sm: 2.5 },
           py: 2,
           ...scrollbarStyles(theme),
           overflowY: 'auto',
-          maxHeight: '75vh',
+          flex: fullScreen ? 1 : undefined,
+          maxHeight: fullScreen ? undefined : '75vh',
         }}
       >
         <UnsplashImagePicker
@@ -118,7 +130,15 @@ const ImagePickerDialog: React.FC<ImagePickerDialogProps> = ({
       </Box>
 
       {/* Footer */}
-      <Box sx={{ ...footerSx, justifyContent: 'space-between', py: 1.25 }}>
+      <Box
+        sx={{
+          ...footerSx,
+          justifyContent: 'space-between',
+          py: 1.25,
+          px: { xs: 2, sm: 2.5 },
+          pb: fullScreen ? SAFE_AREA_BOTTOM : 1.25,
+        }}
+      >
         <Typography
           sx={{
             fontSize: '0.75rem',

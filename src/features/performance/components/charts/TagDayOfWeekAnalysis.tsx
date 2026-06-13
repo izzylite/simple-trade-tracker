@@ -29,6 +29,7 @@ import { getTagDayOfWeekChartData } from 'features/performance/utils/chartDataUt
 import { EYEBROW_SX, getInsetSurface } from 'styles/designTokens';
 import CardShell from 'components/common/CardShell';
 import InfoStrip from 'components/common/InfoStrip';
+import { useIsMobile } from 'hooks/useResponsive';
 
 interface TagDayOfWeekAnalysisProps {
   trades: Trade[];
@@ -54,6 +55,7 @@ const TagDayOfWeekAnalysis: React.FC<TagDayOfWeekAnalysisProps> = ({
   setMultipleTradesDialog,
 }) => {
   const theme = useTheme();
+  const isMobile = useIsMobile();
   const [primaryTagsDialogOpen, setPrimaryTagsDialogOpen] = useState(false);
   const [secondaryTagsDialogOpen, setSecondaryTagsDialogOpen] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState<'winRate' | 'pnl'>('winRate');
@@ -154,15 +156,16 @@ const TagDayOfWeekAnalysis: React.FC<TagDayOfWeekAnalysisProps> = ({
     return null;
   };
 
-  // ── Header band right-slot controls ─────────────────────────────────
-  const headerRight = (
-    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+  // ── Metric toggle (Win Rate / P&L) ──────────────────────────────────
+  const metricToggle = (
+    <>
       <Button
         variant={selectedMetric === 'winRate' ? 'contained' : 'outlined'}
         size="small"
         onClick={() => setSelectedMetric('winRate')}
         sx={{
           textTransform: 'none',
+          flex: isMobile ? 1 : 'unset',
           '&:focus-visible': { boxShadow: theme.palette.custom.focusRing },
         }}
       >
@@ -174,11 +177,18 @@ const TagDayOfWeekAnalysis: React.FC<TagDayOfWeekAnalysisProps> = ({
         onClick={() => setSelectedMetric('pnl')}
         sx={{
           textTransform: 'none',
+          flex: isMobile ? 1 : 'unset',
           '&:focus-visible': { boxShadow: theme.palette.custom.focusRing },
         }}
       >
         P&L
       </Button>
+    </>
+  );
+
+  // ── Tag filter buttons (labels shortened on mobile) ─────────────────
+  const filterButtons = (
+    <>
       <MuiTooltip
         title="Select primary tags to filter trades that have ANY of these tags. These are your main strategies or setups to analyze."
         arrow
@@ -190,11 +200,14 @@ const TagDayOfWeekAnalysis: React.FC<TagDayOfWeekAnalysisProps> = ({
           onClick={() => setPrimaryTagsDialogOpen(true)}
           sx={{
             textTransform: 'none',
+            flex: isMobile ? 1 : 'unset',
             borderColor: primaryTags.length > 0 ? 'primary.main' : undefined,
             '&:focus-visible': { boxShadow: theme.palette.custom.focusRing },
           }}
         >
-          {primaryTags.length > 0 ? `Primary: ${primaryTags.length} tags` : 'Select Primary Tags'}
+          {isMobile
+            ? primaryTags.length > 0 ? `Primary (${primaryTags.length})` : 'Primary'
+            : primaryTags.length > 0 ? `Primary: ${primaryTags.length} tags` : 'Select Primary Tags'}
         </Button>
       </MuiTooltip>
       <MuiTooltip
@@ -209,13 +222,22 @@ const TagDayOfWeekAnalysis: React.FC<TagDayOfWeekAnalysisProps> = ({
           color={secondaryTags.length > 0 ? 'secondary' : 'primary'}
           sx={{
             textTransform: 'none',
+            flex: isMobile ? 1 : 'unset',
             borderColor: secondaryTags.length > 0 ? 'secondary.main' : undefined,
             '&:focus-visible': { boxShadow: theme.palette.custom.focusRing },
           }}
         >
-          {secondaryTags.length > 0 ? `Secondary: ${secondaryTags.length} tags` : 'Select Secondary Tags'}
+          {isMobile
+            ? secondaryTags.length > 0 ? `Secondary (${secondaryTags.length})` : 'Secondary'
+            : secondaryTags.length > 0 ? `Secondary: ${secondaryTags.length} tags` : 'Select Secondary Tags'}
         </Button>
       </MuiTooltip>
+    </>
+  );
+
+  // Tag filter dialogs — rendered once, independent of toolbar location.
+  const filterDialogs = (
+    <>
       <TagFilterDialog
         open={primaryTagsDialogOpen}
         onClose={() => setPrimaryTagsDialogOpen(false)}
@@ -236,6 +258,15 @@ const TagDayOfWeekAnalysis: React.FC<TagDayOfWeekAnalysisProps> = ({
         showApplyButton={true}
         showClearButton={true}
       />
+    </>
+  );
+
+  // ── Header band right-slot controls (desktop only) ──────────────────
+  const headerRight = (
+    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+      {metricToggle}
+      {filterButtons}
+      {filterDialogs}
     </Box>
   );
 
@@ -256,9 +287,18 @@ const TagDayOfWeekAnalysis: React.FC<TagDayOfWeekAnalysisProps> = ({
             </MuiTooltip>
           </Box>
         ),
-        right: headerRight,
+        right: isMobile ? undefined : headerRight,
       }}
     >
+      {/* Mobile: the four controls relocate to a full-width body toolbar
+          (two rows: metric toggle, then tag filters). */}
+      {isMobile && (
+        <Box sx={{ px: 2, pt: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <Box sx={{ display: 'flex', gap: 1 }}>{metricToggle}</Box>
+          <Box sx={{ display: 'flex', gap: 1 }}>{filterButtons}</Box>
+          {filterDialogs}
+        </Box>
+      )}
       {primaryTags.length === 0 ? (
         <Box sx={{ p: 2 }}>
           <Box
@@ -338,7 +378,7 @@ const TagDayOfWeekAnalysis: React.FC<TagDayOfWeekAnalysisProps> = ({
           <ResponsiveContainer width="100%" height={300}>
             <BarChart
               data={chartData}
-              margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+              margin={isMobile ? { top: 20, right: 8, left: 0, bottom: 5 } : { top: 20, right: 30, left: 20, bottom: 5 }}
               maxBarSize={50}
             >
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={hairline} />

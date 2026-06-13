@@ -281,6 +281,12 @@ const DailySummaryTable: React.FC<DailySummaryTableProps> = ({
           borderTop: `1px solid ${theme.palette.divider}`,
           '.MuiTablePagination-toolbar': {
             minHeight: 52,
+            flexWrap: 'wrap',
+            pl: { xs: 1 },
+          },
+          // On phones drop the rows-per-page selector so the pager fits 360px.
+          '.MuiTablePagination-selectLabel, .MuiTablePagination-input, .MuiTablePagination-select': {
+            display: { xs: 'none', sm: 'flex' },
           },
           '.MuiTablePagination-selectLabel, .MuiTablePagination-displayedRows': {
             fontFeatureSettings: TNUM,

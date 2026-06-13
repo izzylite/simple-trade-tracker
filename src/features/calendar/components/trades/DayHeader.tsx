@@ -120,7 +120,16 @@ const DayHeader: React.FC<DayHeaderProps> = ({
             minWidth: 0,
           }}
         >
-          <Typography sx={EYEBROW_SX}>Balance of the day</Typography>
+          <Typography
+            sx={{
+              ...EYEBROW_SX,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Balance of the day
+          </Typography>
           {loading ? (
             <Skeleton
               variant="text"
@@ -133,10 +142,13 @@ const DayHeader: React.FC<DayHeaderProps> = ({
                 fontFamily: MONO_FONT,
                 fontWeight: 700,
                 letterSpacing: '-0.015em',
-                fontSize: compact ? '1rem' : '1.5rem',
+                fontSize: { xs: '1.1rem', sm: compact ? '1rem' : '1.5rem' },
                 color: 'text.primary',
                 fontFeatureSettings: TNUM,
                 lineHeight: 1.15,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
               }}
             >
               {formatCurrency(account_balance)}

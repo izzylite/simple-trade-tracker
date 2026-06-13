@@ -110,6 +110,7 @@ import { DynamicRiskSettings } from 'features/calendar/utils/dynamicRiskUtils';
 import { Z_INDEX } from 'styles/zIndex';
 
 import FloatingMonthNavigation from 'features/calendar/components/FloatingMonthNavigation';
+import { useIsMobile } from 'hooks/useResponsive';
 import { calculateDayStats, calculateTargetProgress } from 'features/calendar/utils/statsUtils';
 import { DEFAULT_FILTER_SETTINGS as DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS } from 'features/events/hooks/useEconomicCalendarFilters';
 import EconomicEventsView from 'features/events/components/EconomicEventsView';
@@ -724,6 +725,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
   const theme = useTheme();
   const isMdDown = useMediaQuery(theme.breakpoints.down('md'));
   const isLgUp = useMediaQuery(theme.breakpoints.up('lg'));
+  const isMobile = useIsMobile();
   const navigate = useNavigate();
 
   // Side panel context (provided by SidePanelProvider wrapper)
@@ -1704,16 +1706,19 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
           <Button
             size="small"
             variant="outlined"
-            startIcon={<InsightsIcon sx={{ fontSize: 16 }} />}
+            aria-label="Month Overview"
+            title={isMobile ? 'Month Overview' : undefined}
+            startIcon={isMobile ? undefined : <InsightsIcon sx={{ fontSize: 16 }} />}
             onClick={() => togglePanel('stats', setIsStatsDrawerOpen)}
             sx={{
               textTransform: 'none',
               fontSize: '0.8125rem',
               fontWeight: 600,
-              px: 1.5,
+              px: isMobile ? 1 : 1.5,
               py: 0.5,
               borderRadius: 1,
               minWidth: 0,
+              flexShrink: 0,
               color: isStatsActive ? 'primary.main' : 'text.secondary',
               borderColor: isStatsActive ? 'primary.main' : (theme: Theme) => theme.palette.divider,
               bgcolor: isStatsActive ? (theme: Theme) => alpha(theme.palette.primary.main, 0.08) : 'transparent',
@@ -1725,7 +1730,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
               },
             }}
           >
-            Month Overview
+            {isMobile ? <InsightsIcon sx={{ fontSize: 18 }} /> : 'Month Overview'}
           </Button>
         }
         rightContent={breadcrumbRightContent}
@@ -1840,7 +1845,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
                       sx={{
                         cursor: 'pointer',
                         fontWeight: 700,
-                        fontSize: { xs: '1.5rem', sm: '1.65rem', md: '1.85rem' },
+                        fontSize: { xs: '1.25rem', sm: '1.5rem', md: '1.85rem' },
                         letterSpacing: '-0.025em',
                         color: 'text.primary',
                         mb: 0,
@@ -1857,7 +1862,14 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
                     </IconButton>
                   </Box>
 
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
+                <Box sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 0.75,
+                  flexWrap: 'wrap',
+                  width: { xs: '100%', sm: 'auto' },
+                  justifyContent: { xs: 'flex-start', sm: 'flex-end' },
+                }}>
                   {!isSameMonth(currentDate, new Date()) && (
                     <Button
                       variant="contained"
@@ -1932,13 +1944,13 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
           <Box sx={{
             display: 'flex',
             flexDirection: 'column',
-            gap: { xs: 1, md: 2 }
+            gap: { xs: 1.5, md: 2 }
           }}>
             {/* Enhanced Weekday Headers */}
             <Box sx={{
               display: 'grid',
               gridTemplateColumns: { xs: 'repeat(7, 1fr)', sm: 'repeat(8, 1fr)' },
-              gap: { xs: 1, md: 1.5 },
+              gap: { xs: 0.5, md: 1.5 },
               mb: { xs: 1, md: 2 }
             }}>
               {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Week'].map((day, index) => {
@@ -1970,9 +1982,9 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
                         justifyContent: 'center',
                         alignItems: 'center',
                         gap: 0.5,
-                        p: { xs: 1, md: 1.5 },
+                        p: { xs: 0.5, md: 1.5 },
                         fontWeight: 600,
-                        fontSize: { xs: '0.875rem', md: '1rem' },
+                        fontSize: { xs: '0.7rem', md: '1rem' },
                         color: isToday ? 'primary.main' : 'text.secondary',
                         transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                         ...(isToday && {
@@ -2006,7 +2018,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
             <Box sx={{
               display: 'grid',
               gridTemplateColumns: { xs: 'repeat(7, 1fr)', sm: 'repeat(8, 1fr)' },
-              gap: { xs: 1, md: 1.5 },
+              gap: { xs: 0.5, md: 1.5 },
               minHeight: { xs: 'auto', md: '400px' }
             }}>
               {eachWeekOfInterval(

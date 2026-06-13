@@ -4,11 +4,6 @@ import {
   Box,
   Button,
   CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
   Stack,
   Typography,
   useTheme,
@@ -19,7 +14,7 @@ import {
   ExtensionOutlined as ExtensionIcon,
 } from '@mui/icons-material';
 import CardShell from 'components/common/CardShell';
-import { Z_INDEX } from 'styles/zIndex';
+import ConfirmationDialog from 'components/common/ConfirmationDialog';
 import { AnimatedDropdown } from 'features/calendar/components/Animations';
 import {
   deleteTool,
@@ -318,38 +313,27 @@ const CustomToolsSection: React.FC = () => {
         )}
       </Stack>
 
-      <Dialog
+      <ConfirmationDialog
         open={pendingDelete !== null}
-        onClose={() => !deleting && setPendingDelete(null)}
-        maxWidth="xs"
-        fullWidth
-        sx={{ zIndex: Z_INDEX.NESTED_DIALOG }}
-      >
-        <DialogTitle>Delete custom tool?</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
+        title="Delete custom tool?"
+        message={
+          <Typography
+            sx={{ fontSize: '0.88rem', lineHeight: 1.55, color: 'text.primary' }}
+          >
             This will permanently remove{' '}
             <Box component="span" sx={{ fontWeight: 600 }}>
               {pendingDelete?.name}
             </Box>{' '}
             from Orion's catalog and revoke its webhook secret. This cannot be
             undone.
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setPendingDelete(null)} disabled={deleting}>
-            Cancel
-          </Button>
-          <Button
-            onClick={confirmDeleteTool}
-            color="error"
-            variant="contained"
-            disabled={deleting}
-          >
-            {deleting ? <CircularProgress size={18} /> : 'Delete'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+          </Typography>
+        }
+        confirmText="Delete"
+        confirmColor="error"
+        isSubmitting={deleting}
+        onConfirm={confirmDeleteTool}
+        onCancel={() => setPendingDelete(null)}
+      />
     </Box>
   );
 };

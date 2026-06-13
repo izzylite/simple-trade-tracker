@@ -264,7 +264,7 @@ const UnsplashImagePicker: React.FC<UnsplashImagePickerProps> = ({
           }}
         >
           <Typography sx={monoLabelSx}>Popular searches</Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
             {isFromCache && (
               <Box
                 sx={{
@@ -338,6 +338,7 @@ const UnsplashImagePicker: React.FC<UnsplashImagePickerProps> = ({
             alignItems: 'center',
             justifyContent: 'space-between',
             gap: 1,
+            flexWrap: 'wrap',
           }}
         >
           <Typography sx={monoLabelSx}>

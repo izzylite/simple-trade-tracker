@@ -30,13 +30,18 @@ function PerfPill<V extends string>({
     <Box
       role="tablist"
       sx={{
-        display: 'inline-flex',
+        display: fullWidth ? 'flex' : 'inline-flex',
         gap: '4px',
         padding: '4px',
         borderRadius: '10px',
         border: `1px solid ${theme.palette.divider}`,
         bgcolor: theme.palette.background.paper,
         width: fullWidth ? '100%' : 'fit-content',
+        // On phones the 5 segments share the row at flex:1; if they still
+        // overflow a 320px floor, allow the pill to scroll horizontally
+        // rather than push the page wider.
+        maxWidth: '100%',
+        overflowX: fullWidth ? 'auto' : 'visible',
       }}
     >
       {options.map((opt) => {
@@ -50,6 +55,7 @@ function PerfPill<V extends string>({
             onClick={() => onChange(opt.value)}
             sx={{
               flex: fullWidth ? 1 : 'unset',
+              whiteSpace: 'nowrap',
               background: active ? theme.palette.primary.main : 'transparent',
               border: 0,
               color: active ? theme.palette.primary.contrastText : theme.palette.text.secondary,

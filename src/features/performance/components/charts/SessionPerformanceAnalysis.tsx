@@ -203,7 +203,7 @@ const SessionPerformanceAnalysis: React.FC<SessionPerformanceAnalysisProps> = ({
                   <Row label="P&L">
                     <Typography
                       sx={{
-                        fontSize: '0.85rem',
+                        fontSize: { xs: '0.78rem', sm: '0.85rem' },
                         fontWeight: 700,
                         color:
                           session.total_pnl > 0
@@ -213,6 +213,8 @@ const SessionPerformanceAnalysis: React.FC<SessionPerformanceAnalysisProps> = ({
                               : 'text.primary',
                         fontFeatureSettings: TNUM,
                         letterSpacing: '-0.01em',
+                        textAlign: 'right',
+                        wordBreak: 'break-word',
                       }}
                     >
                       {session.total_pnl > 0 ? '▲ ' : session.total_pnl < 0 ? '▼ ' : ''}
@@ -223,7 +225,7 @@ const SessionPerformanceAnalysis: React.FC<SessionPerformanceAnalysisProps> = ({
                   <Row label="Avg P&L">
                     <Typography
                       sx={{
-                        fontSize: '0.8rem',
+                        fontSize: { xs: '0.74rem', sm: '0.8rem' },
                         fontWeight: 600,
                         color:
                           session.averagePnL > 0
@@ -232,6 +234,8 @@ const SessionPerformanceAnalysis: React.FC<SessionPerformanceAnalysisProps> = ({
                               ? theme.palette.error.main
                               : 'text.primary',
                         fontFeatureSettings: TNUM,
+                        textAlign: 'right',
+                        wordBreak: 'break-word',
                       }}
                     >
                       {formatValue(session.averagePnL)}
@@ -241,7 +245,7 @@ const SessionPerformanceAnalysis: React.FC<SessionPerformanceAnalysisProps> = ({
                   <Row label="Account %">
                     <Typography
                       sx={{
-                        fontSize: '0.8rem',
+                        fontSize: { xs: '0.74rem', sm: '0.8rem' },
                         fontWeight: 600,
                         color:
                           (session.pnlPercentage ?? 0) > 0

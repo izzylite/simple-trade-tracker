@@ -3,15 +3,24 @@ import {
   Box,
   Button,
   CircularProgress,
+  IconButton,
   Snackbar,
   alpha,
   useTheme,
 } from '@mui/material';
-import { Visibility as VisibilityIcon } from '@mui/icons-material';
+import {
+  Visibility as VisibilityIcon,
+  ArrowBack as ArrowBackIcon,
+} from '@mui/icons-material';
 
 import { Note } from 'features/notes/types/note';
 import { Calendar } from 'features/calendar/types/calendar';
 import { useAuthState } from 'contexts/AuthStateContext';
+import { useIsMobile } from 'hooks/useResponsive';
+import {
+  HEADER_HEIGHT_XS,
+  HEADER_HEIGHT_SM,
+} from 'styles/layout';
 import { useUserPinnedEvents } from 'features/events/contexts/UserPinnedEventsContext';
 import { useSelectedCalendar } from 'features/calendar/contexts/SelectedCalendarContext';
 import { useNotes } from 'features/notes/hooks/useNotes';
@@ -28,11 +37,16 @@ import NoteViewPanel from 'features/notes/components/NoteViewPanel';
 import NoteMetaPanel from 'features/notes/components/NoteMetaPanel';
 import NoteEditorBody, { NoteEditorBodyHandle } from 'features/notes/components/NoteEditorBody';
 
-const APP_HEADER_HEIGHT = 64;
+/** Full page-column height: viewport minus the responsive app header. */
+const PAGE_COLUMN_HEIGHT = {
+  xs: `calc(100dvh - ${HEADER_HEIGHT_XS}px)`,
+  sm: `calc(100dvh - ${HEADER_HEIGHT_SM}px)`,
+} as const;
 
 const NotesPage: React.FC = () => {
   const theme = useTheme();
   const { user } = useAuthState();
+  const isMobile = useIsMobile();
 
   // ─── UI state ────────────────────────────────────────────────────────────
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
@@ -213,7 +227,7 @@ const NotesPage: React.FC = () => {
     return (
       <Box
         sx={{
-          height: `calc(100vh - ${APP_HEADER_HEIGHT}px)`,
+          height: PAGE_COLUMN_HEIGHT,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -224,10 +238,23 @@ const NotesPage: React.FC = () => {
     );
   }
 
+  // On phones the master-detail collapses to a single column: show the list
+  // when nothing is selected and not editing, otherwise show the center
+  // view/editor with a Back affordance that clears selection / exits edit.
+  const showListOnMobile = isMobile && !selectedNote && !isEditing && !isNewDraft;
+  const showCenterOnMobile = isMobile && !showListOnMobile;
+
+  const handleMobileBack = () => {
+    if (isEditing || isNewDraft) {
+      handleExitEdit();
+    }
+    setSelectedNote(null);
+  };
+
   return (
     <Box
       sx={{
-        height: `calc(100vh - ${APP_HEADER_HEIGHT}px)`,
+        height: PAGE_COLUMN_HEIGHT,
         display: 'grid',
         gridTemplateRows: 'auto 1fr',
         bgcolor: 'background.default',
@@ -237,16 +264,27 @@ const NotesPage: React.FC = () => {
       {/* ── Page sub-header: creator toggle only ── */}
       <Box
         sx={{
-          px: 3,
+          px: { xs: 2, sm: 3 },
           py: 1.25,
           borderBottom: `1px solid ${theme.palette.divider}`,
           bgcolor: 'background.paper',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'flex-end',
+          justifyContent: showCenterOnMobile ? 'space-between' : 'flex-end',
           gap: 2,
         }}
       >
+        {/* Mobile back affordance — only when viewing/editing the center pane */}
+        {showCenterOnMobile && (
+          <IconButton
+            onClick={handleMobileBack}
+            aria-label="Back to notes list"
+            sx={{ height: { xs: 44 }, width: { xs: 44 }, color: 'text.secondary' }}
+          >
+            <ArrowBackIcon />
+          </IconButton>
+        )}
+
         {/* Creator toggle: My Notes / Orion */}
         <Box sx={{ display: 'flex', gap: 0.5, p: 0.5, bgcolor: alpha(theme.palette.common.white, isDarkMode(theme) ? 0.03 : 0.6), borderRadius: '999px', border: `1px solid ${theme.palette.divider}` }}>
           {(['me', 'assistant'] as const).map(c => {
@@ -293,32 +331,35 @@ const NotesPage: React.FC = () => {
           overflow: 'hidden',
         }}
       >
-        {/* Left rail */}
-        <NoteListPanel
-          notes={notes}
-          loading={loading}
-          loadingMore={loadingMore}
-          hasMore={hasMore}
-          onLoadMore={loadMore}
-          selectedNoteId={selectedNote?.id}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          onNoteClick={handleNoteClick}
-          onNewNote={handleNewNote}
-          canCreateNote={canCreateNote}
-          onTogglePin={(note) => updateNote(note.id, { is_pinned: !note.is_pinned })}
-          onToggleArchive={(note) => updateNote(note.id, { is_archived: !note.is_archived })}
-          tab={tab}
-          onTabChange={setTab}
-          pill={pillFilter}
-          onPillChange={setPillFilter}
-          total={total}
-          tabCounts={tabCounts}
-          disableExpand
-        />
+        {/* Left rail — hidden on phones while the center pane is shown */}
+        {!showCenterOnMobile && (
+          <NoteListPanel
+            notes={notes}
+            loading={loading}
+            loadingMore={loadingMore}
+            hasMore={hasMore}
+            onLoadMore={loadMore}
+            selectedNoteId={selectedNote?.id}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            onNoteClick={handleNoteClick}
+            onNewNote={handleNewNote}
+            canCreateNote={canCreateNote}
+            onTogglePin={(note) => updateNote(note.id, { is_pinned: !note.is_pinned })}
+            onToggleArchive={(note) => updateNote(note.id, { is_archived: !note.is_archived })}
+            tab={tab}
+            onTabChange={setTab}
+            pill={pillFilter}
+            onPillChange={setPillFilter}
+            total={total}
+            tabCounts={tabCounts}
+            disableExpand
+          />
+        )}
 
-        {/* Center: note viewer or inline editor */}
-        {isEditing && user?.uid ? (
+        {/* Center: note viewer or inline editor — hidden on phones while the
+            list is shown */}
+        {showListOnMobile ? null : isEditing && user?.uid ? (
           <NoteEditorBody
             ref={editorBodyRef}
             key={isNewDraft ? 'new' : selectedNote?.id ?? 'fallback'}

@@ -9,7 +9,11 @@ import {
   alpha,
   Chip,
   Tooltip,
-  CircularProgress
+  CircularProgress,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText
 } from '@mui/material';
 import {
   Close as CloseIcon,
@@ -19,7 +23,8 @@ import {
   SmartToy as AssistantIcon,
   Slideshow as SlideshowIcon,
   StickyNote2 as GamePlanIcon,
-  EventNote as EconomicIcon
+  EventNote as EconomicIcon,
+  MoreVert as MoreVertIcon
 } from '@mui/icons-material';
 import { format, parseISO } from 'date-fns';
 import { Trade, Calendar } from '../types/dualWrite';
@@ -47,6 +52,11 @@ import {
 import { useTradeSyncContextOptional } from '../contexts/TradeSyncContext';
 import { normalizeTradeDates } from '../utils/tradeUtils';
 import { DEFAULT_FILTER_SETTINGS as DEFAULT_ECONOMIC_EVENT_FILTER_SETTINGS } from 'features/events/hooks/useEconomicCalendarFilters';
+import { useIsMobile } from 'hooks/useResponsive';
+import {
+  useFullScreenDialog,
+  SAFE_AREA_TOP,
+} from 'components/common/useFullScreenDialog';
 
 interface TradeGalleryDialogProps {
   open: boolean;
@@ -104,8 +114,15 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
   const lastProcessedTimestamp = useRef(0);
 
   const theme = useTheme();
+  const isMobile = useIsMobile();
+  const { fullScreen, fullScreenPaperSx } = useFullScreenDialog();
   const { user } = useAuthState();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  // Header action overflow menu (phones only — the action cluster moves
+  // into a MoreVert menu so the header doesn't overflow at 360px).
+  const [actionMenuAnchor, setActionMenuAnchor] = useState<HTMLElement | null>(null);
+  const actionMenuOpen = Boolean(actionMenuAnchor);
+  const closeActionMenu = useCallback(() => setActionMenuAnchor(null), []);
   // Orion side-panel — auto-open in aiOnlyMode (where the user explicitly
   // launched the dialog into chat mode).
   const [orionOpen, setOrionOpen] = useState(aiOnlyMode);
@@ -719,6 +736,10 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
     [theme],
   );
 
+  // Whether any right-slot panel is open — drives the mobile full-screen
+  // overlay wrapper around Orion / Events / NoteViewer.
+  const anyRightPanelOpen = orionOpen || eventsOpen || viewerOpen;
+
   // Only return null if not in fetch mode and no trade
   if (!currentTrade && !isInitialLoading) {
     return null;
@@ -730,6 +751,7 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
       onClose={onClose}
       maxWidth="md"
       fullWidth
+      fullScreen={fullScreen}
       sx={{
         zIndex: Z_INDEX.DIALOG_POPUP
       }}
@@ -737,17 +759,24 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
         sx: {
           // Lock to a stable height range so the dialog doesn't
           // collapse when the active tab has minimal content
-          // (e.g. an empty AI chat).
-          height: '90vh',
-          minHeight: { xs: '85vh', sm: 600 },
-          maxHeight: '90vh',
+          // (e.g. an empty AI chat). On phones the dialog goes
+          // full-screen, so drop the fixed height range and let
+          // fullScreenPaperSx own the sizing.
+          ...(fullScreen
+            ? {}
+            : {
+                height: '90vh',
+                minHeight: { xs: '85vh', sm: 600 },
+                maxHeight: '90vh',
+                borderRadius: `${theme.palette.custom.radius.xl}px`,
+                border: `1px solid ${theme.palette.divider}`,
+              }),
           display: 'flex',
           flexDirection: 'column',
           backgroundColor: theme.palette.background.default,
-          borderRadius: `${theme.palette.custom.radius.xl}px`,
-          border: `1px solid ${theme.palette.divider}`,
           overflow: 'hidden',
-          position: 'relative'
+          position: 'relative',
+          ...fullScreenPaperSx
         }
       }}
     >
@@ -756,8 +785,11 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        px: 2.25,
+        flexWrap: { xs: 'wrap', sm: 'nowrap' },
+        rowGap: { xs: 1, sm: 0 },
+        px: { xs: 1.5, sm: 2.25 },
         py: 1.5,
+        pt: fullScreen ? SAFE_AREA_TOP : 1.5,
         borderBottom: `1px solid ${theme.palette.divider}`,
         backgroundColor: theme.palette.background.paper
       }}>
@@ -776,6 +808,8 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
                   disabled={isInitialLoading || effectiveTrades.length <= 1 || (isAtStart && isFetchMode)}
                   sx={{
                     ...actionBtnSx,
+                    height: { xs: 44, sm: 'auto' },
+                    width: { xs: 44, sm: 'auto' },
                     color: isInitialLoading || effectiveTrades.length <= 1 || (isAtStart && isFetchMode) ? 'text.disabled' : 'text.primary',
                   }}
                 >
@@ -848,6 +882,8 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
                   disabled={effectiveTrades.length <= 1 || isLoadingNext || (isAtEnd && !hasMoreTrades && isFetchMode)}
                   sx={{
                     ...actionBtnSx,
+                    height: { xs: 44, sm: 'auto' },
+                    width: { xs: 44, sm: 'auto' },
                     color: effectiveTrades.length <= 1 || (isAtEnd && !hasMoreTrades && isFetchMode) ? 'text.disabled' : 'text.primary',
                   }}
                 >
@@ -862,8 +898,11 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
           </Box>
         </Box>
 
-        {/* Tabs, Immersive, and History Controls */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 2 }}>
+        {/* Tabs, Immersive, and History Controls.
+            On phones this inline cluster is hidden and the same actions
+            move into the MoreVert overflow menu below so the header fits
+            at 360px. */}
+        <Box sx={{ display: { xs: 'none', sm: 'flex' }, alignItems: 'center', gap: 0.5, ml: 2 }}>
           {/* Immersive Mode Button */}
           {!isInitialLoading && currentTrade?.images &&
             currentTrade.images.length > 0 && (
@@ -947,11 +986,101 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
           </Tooltip>
         </Box>
 
+        {/* Phone-only overflow menu — folds the action cluster into a
+            MoreVert menu so the header doesn't overflow at 360px. */}
+        <Box sx={{ display: { xs: 'flex', sm: 'none' }, alignItems: 'center', ml: 'auto' }}>
+          <IconButton
+            onClick={(e) => setActionMenuAnchor(e.currentTarget)}
+            sx={{ ...actionBtnSx, height: 44, width: 44, color: 'text.primary' }}
+          >
+            <MoreVertIcon />
+          </IconButton>
+          <Menu
+            anchorEl={actionMenuAnchor}
+            open={actionMenuOpen}
+            onClose={closeActionMenu}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+            sx={{ zIndex: Z_INDEX.DIALOG_POPUP + 1 }}
+          >
+            {!isInitialLoading && currentTrade?.images &&
+              currentTrade.images.length > 0 && (
+              <MenuItem
+                onClick={() => {
+                  closeActionMenu();
+                  setImmersiveImageIndex(0);
+                  setImmersiveMode(true);
+                }}
+                sx={{ minHeight: 44 }}
+              >
+                <ListItemIcon>
+                  <SlideshowIcon sx={{ fontSize: 20 }} />
+                </ListItemIcon>
+                <ListItemText>Immersive mode</ListItemText>
+              </MenuItem>
+            )}
+
+            {(calendarId || currentTrade?.calendar_id) && (
+              <MenuItem
+                onClick={() => {
+                  closeActionMenu();
+                  handleOpenGamePlan();
+                }}
+                disabled={loadingGamePlan}
+                sx={{ minHeight: 44 }}
+              >
+                <ListItemIcon>
+                  {loadingGamePlan ? (
+                    <CircularProgress size={18} color="inherit" />
+                  ) : (
+                    <GamePlanIcon sx={{ fontSize: 20 }} />
+                  )}
+                </ListItemIcon>
+                <ListItemText>Game plan</ListItemText>
+              </MenuItem>
+            )}
+
+            {currentTrade?.session && (
+              <MenuItem
+                onClick={() => {
+                  closeActionMenu();
+                  handleToggleEvents();
+                }}
+                sx={{ minHeight: 44, color: eventsOpen ? 'primary.main' : undefined }}
+              >
+                <ListItemIcon>
+                  <EconomicIcon
+                    sx={{ fontSize: 20, color: eventsOpen ? 'primary.main' : undefined }}
+                  />
+                </ListItemIcon>
+                <ListItemText>{eventsOpen ? 'Close events' : 'Economic events'}</ListItemText>
+              </MenuItem>
+            )}
+
+            <MenuItem
+              onClick={() => {
+                closeActionMenu();
+                handleToggleOrion();
+              }}
+              sx={{ minHeight: 44, color: orionOpen ? 'primary.main' : undefined }}
+            >
+              <ListItemIcon>
+                <AssistantIcon
+                  sx={{ fontSize: 20, color: orionOpen ? 'primary.main' : undefined }}
+                />
+              </ListItemIcon>
+              <ListItemText>{orionOpen ? 'Close Orion' : 'Ask Orion'}</ListItemText>
+            </MenuItem>
+          </Menu>
+        </Box>
+
         {/* Close Button */}
         <IconButton
           onClick={onClose}
           sx={{
             ml: 0.5,
+            height: { xs: 44, sm: 'auto' },
+            width: { xs: 44, sm: 'auto' },
             color: 'text.secondary',
             borderRadius: `${theme.palette.custom.radius.md}px`,
             '&:hover': {
@@ -1105,6 +1234,31 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
         </Box>
       </Box>{/* /Main content column */}
 
+      {/* Right-slot panels (Orion / Events / NoteViewer) — mutex, one open
+          at a time.
+          • sm+ : `display: contents` so each panel stays a direct flex
+            sibling of the body row and its % width resolves correctly.
+          • xs  : when a panel is open, this wrapper becomes a full-screen
+            fixed overlay (mirrors the immersive overlay) so the panel
+            covers the dialog instead of squeezing into a flex row. The
+            panels' own `width: { xs: '100%' }` fills it. When nothing is
+            open we keep `display: contents` so the empty overlay never
+            traps touches. */}
+      <Box
+        sx={
+          isMobile && anyRightPanelOpen
+            ? {
+                position: 'fixed',
+                inset: 0,
+                zIndex: Z_INDEX.DIALOG_POPUP + 5,
+                bgcolor: 'background.default',
+                display: 'flex',
+                flexDirection: 'row',
+                overflow: 'hidden',
+              }
+            : { display: 'contents' }
+        }
+      >
       {/* Orion side-panel — direct flex sibling so its % widths
           resolve against the real flex-row width. */}
       <OrionPanel
@@ -1168,6 +1322,7 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
         emptyTitle={viewerEmptyTitle}
         emptyMessage={viewerEmptyMessage}
       />
+      </Box>{/* /Right-slot panels wrapper */}
       </Box>{/* /Flex row */}
 
       {/* Economic Event Detail Dialog */}
@@ -1206,8 +1361,12 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            px: 3,
+            flexWrap: { xs: 'wrap', sm: 'nowrap' },
+            rowGap: { xs: 1, sm: 0 },
+            gap: { xs: 1, sm: 0 },
+            px: { xs: 1.5, sm: 3 },
             py: 1.5,
+            pt: fullScreen ? SAFE_AREA_TOP : 1.5,
             background:
               'linear-gradient(to bottom, rgba(0,0,0,0.7), transparent)',
             position: 'absolute',
@@ -1217,7 +1376,8 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
             zIndex: 2
           }}>
             <Box sx={{
-              display: 'flex', alignItems: 'center', gap: 1.5
+              display: 'flex', alignItems: 'center', gap: 1.5,
+              flexWrap: 'wrap', minWidth: 0
             }}>
               <CalendarIcon sx={{ fontSize: 18, color: '#fff' }} />
               <Typography sx={{
@@ -1239,12 +1399,32 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
             </Box>
 
             <Box sx={{
-              display: 'flex', alignItems: 'center', gap: 1.5
+              display: 'flex', alignItems: 'center', gap: { xs: 1, sm: 1.5 },
+              flexWrap: 'wrap'
             }}>
+              {/* Phones: a single combined counter chip so the top bar
+                  doesn't overflow. sm+ keeps the two separate chips. */}
+              <Chip
+                size="small"
+                label={(() => {
+                  const tradeTotal = isFetchMode ? totalTradeCount : effectiveTrades.length;
+                  return `${immersiveImageIndex + 1}/${currentImages.length} · Trade ${safeCurrentIndex + 1}/${tradeTotal}`;
+                })()}
+                sx={{
+                  display: { xs: 'inline-flex', sm: 'none' },
+                  backgroundColor: alpha('#fff', 0.15),
+                  color: '#fff',
+                  fontWeight: 600,
+                  fontSize: '0.8rem',
+                  fontFeatureSettings: TNUM,
+                  borderRadius: `${theme.palette.custom.radius.md}px`
+                }}
+              />
               <Chip
                 size="small"
                 label={`${immersiveImageIndex + 1} / ${currentImages.length}`}
                 sx={{
+                  display: { xs: 'none', sm: 'inline-flex' },
                   backgroundColor: alpha('#fff', 0.15),
                   color: '#fff',
                   fontWeight: 600,
@@ -1260,6 +1440,7 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
                   : `Trade ${safeCurrentIndex + 1} of ${effectiveTrades.length}`
                 }
                 sx={{
+                  display: { xs: 'none', sm: 'inline-flex' },
                   backgroundColor: alpha('#fff', 0.15),
                   color: '#fff',
                   fontWeight: 600,
@@ -1381,10 +1562,15 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
           {currentImages.length > 1 && (
             <Box sx={{
               display: 'flex',
-              justifyContent: 'center',
+              // Phones: scroll the strip horizontally and left-align so a
+              // long set of thumbnails doesn't overflow / shrink. sm+ keeps
+              // the centered static strip.
+              justifyContent: { xs: 'flex-start', sm: 'center' },
+              overflowX: { xs: 'auto', sm: 'visible' },
               gap: 1,
               pb: 2,
               px: 3,
+              ...scrollbarStyles(theme),
               background:
                 'linear-gradient(to top, rgba(0,0,0,0.7), transparent)',
               position: 'absolute',
@@ -1403,6 +1589,7 @@ const TradeGalleryDialog: React.FC<TradeGalleryDialogProps> = ({
                   sx={{
                     width: 56,
                     height: 40,
+                    flexShrink: 0,
                     objectFit: 'cover',
                     borderRadius: `${theme.palette.custom.radius.xs}px`,
                     cursor: 'pointer',

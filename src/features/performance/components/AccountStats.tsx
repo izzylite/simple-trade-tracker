@@ -163,7 +163,7 @@ const AccountStats: React.FC<AccountStatsProps> = ({
           <Typography
             sx={{
               mt: 0.375,
-              fontSize: '1.05rem',
+              fontSize: { xs: '0.9rem', sm: '1.05rem' },
               fontWeight: 700,
               color: pnlColor,
               fontFeatureSettings: TNUM,
@@ -200,7 +200,7 @@ const AccountStats: React.FC<AccountStatsProps> = ({
           <Typography
             sx={{
               mt: 0.375,
-              fontSize: '1.05rem',
+              fontSize: { xs: '0.9rem', sm: '1.05rem' },
               fontWeight: 700,
               color: totalValueColor,
               fontFeatureSettings: TNUM,
@@ -424,12 +424,13 @@ const RiskTile: React.FC<RiskTileProps> = ({
       </Box>
       <Typography
         sx={{
-          fontSize: '0.92rem',
+          fontSize: { xs: '0.82rem', sm: '0.92rem' },
           fontWeight: 700,
           color: active ? accent : theme.palette.text.disabled,
           fontFeatureSettings: TNUM,
           letterSpacing: '-0.01em',
           lineHeight: 1.2,
+          wordBreak: 'break-word',
         }}
       >
         ${amount.toLocaleString(undefined, {

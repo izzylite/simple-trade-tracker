@@ -130,7 +130,17 @@ const CustomToolCard: React.FC<Props> = ({
           </Box>
         ),
         right: (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              gap: 0.25,
+              // On phones the title + this 4-control cluster can't share one
+              // row at 360px; let the cluster wrap under the title.
+              flexWrap: { xs: 'wrap', sm: 'nowrap' },
+            }}
+          >
             <Switch
               checked={tool.is_enabled}
               onChange={(e) => onToggle(tool.id, e.target.checked)}
@@ -145,7 +155,7 @@ const CustomToolCard: React.FC<Props> = ({
                   onClick={() => onTest(tool)}
                   disabled={!tool.is_enabled || isTesting}
                   aria-label={`Test ${tool.name}`}
-                  sx={{ color: theme.palette.text.secondary }}
+                  sx={{ color: theme.palette.text.secondary, p: { xs: 1, sm: 0.75 } }}
                 >
                   {isTesting
                     ? <CircularProgress size={14} thickness={5} />
@@ -159,7 +169,7 @@ const CustomToolCard: React.FC<Props> = ({
                 onClick={() => onToggleExpanded(tool.id)}
                 aria-label={expanded ? `Collapse ${tool.name}` : `Expand ${tool.name}`}
                 aria-expanded={expanded}
-                sx={{ color: theme.palette.text.secondary }}
+                sx={{ color: theme.palette.text.secondary, p: { xs: 1, sm: 0.75 } }}
               >
                 {expanded
                   ? <ExpandLessIcon fontSize="small" />
@@ -171,7 +181,7 @@ const CustomToolCard: React.FC<Props> = ({
                 size="small"
                 onClick={() => onDelete(tool)}
                 aria-label={`Delete ${tool.name}`}
-                sx={{ color: theme.palette.text.secondary }}
+                sx={{ color: theme.palette.text.secondary, p: { xs: 1, sm: 0.75 } }}
               >
                 <DeleteIcon fontSize="small" />
               </IconButton>

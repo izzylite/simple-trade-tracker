@@ -69,7 +69,7 @@ const PricingPage: React.FC = () => {
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'custom.pageBackground', py: { xs: 6, md: 10 } }}>
       <Container maxWidth="lg">
-        <Typography variant="h2" sx={{ mb: 1, fontWeight: 600 }}>Pricing</Typography>
+        <Typography variant="h2" sx={{ mb: 1, fontWeight: 600, fontSize: { xs: '2rem', sm: '3rem' } }}>Pricing</Typography>
         <Typography variant="body1" sx={{ color: 'text.secondary', mb: 4 }}>
           Free journal. Paid plans add Orion, your trading AI.
         </Typography>

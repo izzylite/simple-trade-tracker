@@ -156,7 +156,7 @@ const EventsDemo: React.FC = () => {
                             {ev.time}
                         </Typography>
                     </Stack>
-                    <Box>
+                    <Box sx={{ minWidth: 0 }}>
                         <Typography
                             sx={{
                                 fontFamily: "'DM Sans', sans-serif",
@@ -164,6 +164,7 @@ const EventsDemo: React.FC = () => {
                                 fontSize: '0.92rem',
                                 color: '#f1f5f9',
                                 letterSpacing: '-0.01em',
+                                overflowWrap: 'break-word',
                             }}
                         >
                             {ev.name}
@@ -175,6 +176,7 @@ const EventsDemo: React.FC = () => {
                                 fontSize: '0.72rem',
                                 color: 'rgba(255,255,255,0.5)',
                                 mt: 0.375,
+                                overflowWrap: 'break-word',
                             }}
                         >
                             {ev.meta}

@@ -21,6 +21,11 @@ import { dialogProps } from 'styles/dialogStyles';
 import { scrollbarStyles } from 'styles/scrollbarStyles';
 import { Z_INDEX } from 'styles/zIndex';
 import { useDialogTokens, MONO_FONT } from 'styles/dialogTokens';
+import {
+  useFullScreenDialog,
+  SAFE_AREA_TOP,
+  SAFE_AREA_BOTTOM,
+} from 'components/common/useFullScreenDialog';
 import { tagService, TagSuggestion } from '../services/tagService';
 import { useAuthState } from 'contexts/AuthStateContext';
 import { formatTagForDisplay, getTagColor } from 'utils/tagColors';
@@ -64,6 +69,7 @@ const TagSuggestionReviewDialog: React.FC<TagSuggestionReviewDialogProps> = ({
     primaryButtonSx,
     ghostButtonSx,
   } = useDialogTokens();
+  const { fullScreen, fullScreenPaperSx } = useFullScreenDialog();
   const { user } = useAuthState();
 
   const [rows, setRows] = useState<ReviewRow[]>([]);
@@ -160,16 +166,17 @@ const TagSuggestionReviewDialog: React.FC<TagSuggestionReviewDialogProps> = ({
       onClose={() => !saving && !loading && onClose()}
       maxWidth="sm"
       fullWidth
+      fullScreen={fullScreen}
       {...dialogProps}
       sx={{ zIndex: Z_INDEX.DIALOG }}
       slotProps={{
         paper: {
-          sx: paperSx,
+          sx: { ...paperSx, ...fullScreenPaperSx },
         },
       }}
     >
       {/* Header */}
-      <Box sx={headerSx}>
+      <Box sx={{ ...headerSx, pt: fullScreen ? SAFE_AREA_TOP : undefined }}>
         <Box sx={iconAvatarSx}>
           <AIIcon sx={{ fontSize: 18 }} />
         </Box>
@@ -201,7 +208,8 @@ const TagSuggestionReviewDialog: React.FC<TagSuggestionReviewDialogProps> = ({
       {/* Body */}
       <Box
         sx={{
-          maxHeight: '60vh',
+          maxHeight: fullScreen ? undefined : '60vh',
+          ...(fullScreen ? { flex: 1, minHeight: 0 } : {}),
           overflowY: 'auto',
           ...scrollbarStyles(theme),
         }}
@@ -385,8 +393,22 @@ const TagSuggestionReviewDialog: React.FC<TagSuggestionReviewDialogProps> = ({
       </Box>
 
       {/* Footer */}
-      <Box sx={{ ...footerSx, justifyContent: 'space-between' }}>
-        <Typography sx={{ fontSize: '0.78rem', color: 'text.secondary' }}>
+      <Box
+        sx={{
+          ...footerSx,
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: 1,
+          pb: fullScreen ? SAFE_AREA_BOTTOM : undefined,
+        }}
+      >
+        <Typography
+          sx={{
+            fontSize: '0.78rem',
+            color: 'text.secondary',
+            display: { xs: 'none', sm: 'block' },
+          }}
+        >
           {loading || error || rows.length <= 1
             ? ''
             : `${acceptedCount} of ${rows.length} selected`}

@@ -23,6 +23,11 @@ import { scrollbarStyles } from 'styles/scrollbarStyles';
 import { Z_INDEX } from 'styles/zIndex';
 import { dialogProps } from 'styles/dialogStyles';
 import { useDialogTokens, MONO_FONT } from 'styles/dialogTokens';
+import {
+  useFullScreenDialog,
+  SAFE_AREA_TOP,
+  SAFE_AREA_BOTTOM,
+} from 'components/common/useFullScreenDialog';
 
 interface TagFilterDialogProps {
   open: boolean;
@@ -59,6 +64,7 @@ const TagFilterDialog: React.FC<TagFilterDialogProps> = ({
     ghostButtonSx,
     chipStyle: baseChipStyle,
   } = useDialogTokens();
+  const { fullScreen, fullScreenPaperSx } = useFullScreenDialog();
 
   const [selectedTagGroup, setSelectedTagGroup] = useState<string>('');
 
@@ -105,16 +111,17 @@ const TagFilterDialog: React.FC<TagFilterDialogProps> = ({
       onClose={onClose}
       maxWidth="sm"
       fullWidth
+      fullScreen={fullScreen}
       {...dialogProps}
       sx={{ zIndex: Z_INDEX.DIALOG }}
       slotProps={{
         paper: {
-          sx: paperSx,
+          sx: { ...paperSx, ...fullScreenPaperSx },
         },
       }}
     >
       {/* Header */}
-      <Box sx={headerSx}>
+      <Box sx={{ ...headerSx, pt: fullScreen ? SAFE_AREA_TOP : undefined }}>
         <Box sx={iconAvatarSx}>
           <FilterIcon sx={{ fontSize: 18 }} />
         </Box>
@@ -151,7 +158,7 @@ const TagFilterDialog: React.FC<TagFilterDialogProps> = ({
           display: 'flex',
           flexDirection: 'column',
           gap: 2.25,
-          maxHeight: '70vh',
+          maxHeight: fullScreen ? undefined : '70vh',
           overflowY: 'auto',
           ...scrollbarStyles(theme),
         }}
@@ -249,7 +256,13 @@ const TagFilterDialog: React.FC<TagFilterDialogProps> = ({
 
       {/* Footer */}
       {(showClearButton || showApplyButton) && (
-        <Box sx={{ ...footerSx, justifyContent: 'space-between' }}>
+        <Box
+          sx={{
+            ...footerSx,
+            justifyContent: 'space-between',
+            pb: fullScreen ? SAFE_AREA_BOTTOM : undefined,
+          }}
+        >
           <Box>
             {showClearButton && (
               <Button

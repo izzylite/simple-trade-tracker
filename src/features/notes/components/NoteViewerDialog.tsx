@@ -28,6 +28,7 @@ import {
 import { Note } from 'features/notes/types/note';
 import { scrollbarStyles } from 'styles/scrollbarStyles';
 import { Z_INDEX } from 'styles/zIndex';
+import { SAFE_AREA_TOP, SAFE_AREA_BOTTOM } from 'components/common/useFullScreenDialog';
 import NoteViewerContent from 'features/notes/components/NoteViewerContent';
 
 interface NoteViewerDialogProps {
@@ -67,6 +68,7 @@ const NoteViewerDialog: React.FC<NoteViewerDialogProps> = ({
           borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
           gap: 1,
           minHeight: 56,
+          pt: fullScreen ? SAFE_AREA_TOP : undefined,
         }}
       >
         <Stack direction="row" spacing={1} alignItems="center" sx={{ flex: 1 }}>
@@ -99,6 +101,7 @@ const NoteViewerDialog: React.FC<NoteViewerDialogProps> = ({
       <DialogContent
         sx={{
           p: 0,
+          pb: fullScreen ? SAFE_AREA_BOTTOM : undefined,
           overflowY: 'auto',
           bgcolor: 'background.default',
           ...(scrollbarStyles(theme) as any),

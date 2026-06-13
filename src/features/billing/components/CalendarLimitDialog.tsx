@@ -8,6 +8,10 @@ import {
   Button,
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
+import {
+  useFullScreenDialog,
+  SAFE_AREA_BOTTOM,
+} from 'components/common/useFullScreenDialog';
 
 interface CalendarLimitDialogProps {
   open: boolean;
@@ -29,6 +33,7 @@ export const CalendarLimitDialog: React.FC<CalendarLimitDialogProps> = ({
   onClose,
 }) => {
   const navigate = useNavigate();
+  const { fullScreen, fullScreenPaperSx } = useFullScreenDialog();
 
   const handleSeePlans = () => {
     onClose();
@@ -36,7 +41,14 @@ export const CalendarLimitDialog: React.FC<CalendarLimitDialogProps> = ({
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="xs"
+      fullWidth
+      fullScreen={fullScreen}
+      PaperProps={{ sx: { ...fullScreenPaperSx } }}
+    >
       <DialogTitle>Free plan includes one calendar</DialogTitle>
       <DialogContent>
         <DialogContentText>
@@ -45,7 +57,7 @@ export const CalendarLimitDialog: React.FC<CalendarLimitDialogProps> = ({
           strategies in parallel.
         </DialogContentText>
       </DialogContent>
-      <DialogActions>
+      <DialogActions sx={{ pb: fullScreen ? SAFE_AREA_BOTTOM : undefined }}>
         <Button onClick={onClose}>Maybe later</Button>
         <Button variant="contained" onClick={handleSeePlans}>
           See plans

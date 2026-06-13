@@ -27,6 +27,11 @@ import { ImagePickerDialog, ImageAttribution } from 'components/heroImage';
 import { scrollbarStyles } from 'styles/scrollbarStyles';
 import { dialogProps } from 'styles/dialogStyles';
 import { Z_INDEX } from 'styles/zIndex';
+import {
+  useFullScreenDialog,
+  SAFE_AREA_TOP,
+  SAFE_AREA_BOTTOM,
+} from 'components/common/useFullScreenDialog';
 
 export interface CalendarFormData {
   name: string;
@@ -76,6 +81,7 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
     monoLabelSx, monoSectionLabelSx, optionalSx, inputSx,
     primaryButtonSx, ghostButtonSx, chipStyle,
   } = useDialogTokens();
+  const { fullScreen, fullScreenPaperSx } = useFullScreenDialog();
 
   const [name, setName] = useState('');
   const [accountBalance, setAccountBalance] = useState('');
@@ -284,14 +290,15 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
       onClose={() => !isSubmitting && onClose()}
       maxWidth="sm"
       fullWidth
+      fullScreen={fullScreen}
       {...dialogProps}
       sx={{ zIndex: Z_INDEX.DIALOG }}
       slotProps={{
-        paper: { sx: paperSx },
+        paper: { sx: { ...paperSx, ...fullScreenPaperSx } },
       }}
     >
       {/* Header */}
-      <Box sx={headerSx}>
+      <Box sx={{ ...headerSx, pt: fullScreen ? SAFE_AREA_TOP : undefined }}>
         <Box sx={iconAvatarSx}>
           {isEdit ? <EditIcon sx={{ fontSize: 18 }} /> : <CalendarIcon sx={{ fontSize: 18 }} />}
         </Box>
@@ -315,7 +322,7 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
           gap: 2.5,
           ...scrollbarStyles(theme),
           overflowY: 'auto',
-          maxHeight: '70vh',
+          maxHeight: fullScreen ? undefined : '70vh',
         }}
       >
         {/* Identity */}
@@ -643,7 +650,7 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
       </Box>
 
       {/* Footer */}
-      <Box sx={footerSx}>
+      <Box sx={{ ...footerSx, pb: fullScreen ? SAFE_AREA_BOTTOM : undefined }}>
         <Button
           onClick={() => !isSubmitting && onClose()}
           disabled={isSubmitting}

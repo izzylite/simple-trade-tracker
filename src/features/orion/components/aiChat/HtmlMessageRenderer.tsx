@@ -451,8 +451,16 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
             fontSize: '0.8em',
             verticalAlign: 'super'
           },
+          // Wide briefing tables scroll horizontally inside the bubble rather
+          // than forcing the whole message (and chat surface) to overflow.
+          // `display: block` lets a raw <table> become its own scroll box
+          // since the HTML is injected via dangerouslySetInnerHTML and can't
+          // be wrapped with a React element per-table.
           '& table': {
-            width: '100%',
+            display: 'block',
+            width: 'max-content',
+            maxWidth: '100%',
+            overflowX: 'auto',
             borderCollapse: 'collapse',
             margin: '0.75rem 0',
             fontSize: '0.88em'

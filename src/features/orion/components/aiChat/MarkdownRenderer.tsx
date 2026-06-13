@@ -21,6 +21,7 @@ import {
   Chip
 } from '@mui/material';
 import { isDarkMode } from 'utils/themeMode';
+import { useIsMobile } from 'hooks/useResponsive';
 
 interface MarkdownRendererProps {
   content: string;
@@ -31,6 +32,7 @@ const remarkGfmPlugin = (remarkGfm as any).default ?? remarkGfm;
 
 const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
   const theme = useTheme();
+  const isMobile = useIsMobile();
 
   return (
     <ReactMarkdown
@@ -72,11 +74,11 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
           <TableCell
             sx={{
               fontWeight: 700,
-              fontSize: '0.875rem',
+              fontSize: isMobile ? '0.78rem' : '0.875rem',
               color: 'primary.main',
               borderBottom: `2px solid ${theme.palette.primary.main}`,
-              py: 1.5,
-              px: 2
+              py: isMobile ? 0.75 : 1.5,
+              px: isMobile ? 1 : 2
             }}
           >
             {children}
@@ -85,9 +87,9 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
         td: ({ children }) => (
           <TableCell
             sx={{
-              fontSize: '0.85rem',
-              py: 1.5,
-              px: 2,
+              fontSize: isMobile ? '0.78rem' : '0.85rem',
+              py: isMobile ? 0.75 : 1.5,
+              px: isMobile ? 1 : 2,
               borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`
             }}
           >

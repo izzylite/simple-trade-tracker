@@ -217,15 +217,28 @@ const EconomicEventCorrelationAnalysis: React.FC<EconomicEventCorrelationAnalysi
   const insetBg = getInsetSurface(theme);
 
   // Header band content for CardShell — title + eyebrow + right controls.
+  // Stacks the impact tabs + currency picker on phones so they don't
+  // overflow the card header; stays inline (row) on sm+ unchanged.
   const headerControls = (
-    <>
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: { xs: 'column', sm: 'row' },
+        alignItems: { xs: 'stretch', sm: 'center' },
+        gap: 1,
+        width: { xs: '100%', sm: 'auto' },
+      }}
+    >
       <RoundedTabs
         tabs={impactTabs}
         activeTab={getImpactTabIndex(selectedImpact)}
         onTabChange={handleImpactTabChange}
         size="small"
       />
-      <FormControl size="small" sx={{ minWidth: 140 }}>
+      <FormControl
+        size="small"
+        sx={{ minWidth: { xs: 0, sm: 140 }, width: { xs: '100%', sm: 'auto' } }}
+      >
         <InputLabel>Currency</InputLabel>
         <Select value={selectedCurrency} onChange={handleCurrencyChange} label="Currency">
           {CURRENCY_OPTIONS.map((option) => (
@@ -235,7 +248,7 @@ const EconomicEventCorrelationAnalysis: React.FC<EconomicEventCorrelationAnalysi
           ))}
         </Select>
       </FormControl>
-    </>
+    </Box>
   );
 
   const cardHead = {
@@ -533,7 +546,16 @@ const EconomicEventCorrelationAnalysis: React.FC<EconomicEventCorrelationAnalysi
                   Showing {eventList.length} of {totalEventTypes}
                 </Typography>
               </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1,
+                  flexWrap: 'wrap',
+                  rowGap: 1,
+                  width: { xs: '100%', sm: 'auto' },
+                }}
+              >
                 <ToggleButtonGroup
                   size="small"
                   value={groupEvents ? 'grouped' : 'individual'}
@@ -569,7 +591,7 @@ const EconomicEventCorrelationAnalysis: React.FC<EconomicEventCorrelationAnalysi
                       ),
                     },
                   }}
-                  sx={{ width: 240 }}
+                  sx={{ width: { xs: '100%', sm: 240 } }}
                 />
               </Box>
             </Box>
@@ -583,7 +605,10 @@ const EconomicEventCorrelationAnalysis: React.FC<EconomicEventCorrelationAnalysi
                 <Box
                   sx={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                    gridTemplateColumns: {
+                      xs: '1fr',
+                      sm: 'repeat(auto-fill, minmax(280px, 1fr))',
+                    },
                     gap: 1.5,
                   }}
                 >

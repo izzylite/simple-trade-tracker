@@ -350,7 +350,7 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
 
 
         {/* Metadata section */}
-        <Stack direction="row" spacing={3} sx={{ mb: 1.5 }}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: 1, sm: 3 }} sx={{ mb: 1.5 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
             <Box sx={{
               display: 'flex',

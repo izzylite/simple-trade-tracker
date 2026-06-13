@@ -137,7 +137,7 @@ const CitationsSection: React.FC<CitationsSectionProps> = ({
       sx={{
         display: 'flex',
         flexDirection: 'column',
-        maxWidth: compact ? 350 : '100%',
+        maxWidth: compact ? 'min(350px, calc(100vw - 24px))' : '100%',
       }}
     >
       {/* Sticky header — citations scroll beneath it */}
@@ -338,11 +338,15 @@ const CitationsSection: React.FC<CitationsSectionProps> = ({
             horizontal: 'left'
           }}
           sx={{ zIndex: 1500 }}
-          PaperProps={{
-            sx: {
-              mt: 1,
-              borderRadius: 1,
-              boxShadow: theme.shadows[8]
+          slotProps={{
+            paper: {
+              sx: {
+                mt: 1,
+                borderRadius: 1,
+                boxShadow: theme.shadows[8],
+                // Never exceed the viewport on a narrow phone.
+                maxWidth: 'min(350px, calc(100vw - 24px))',
+              }
             }
           }}
         >

@@ -41,7 +41,7 @@ export const StyledCalendarDay = styled(Box, {
     opacity: $isCurrentMonth ? 1 : 0.4,
     minHeight: '100px',
     [theme.breakpoints.down('md')]: { minHeight: '84px' },
-    [theme.breakpoints.down('sm')]: { minHeight: '60px', padding: theme.spacing(0.75) },
+    [theme.breakpoints.down('sm')]: { minHeight: '60px', padding: theme.spacing(0.5) },
     backgroundColor:
       $dayStatus === 'win'
         ? winBg
@@ -73,6 +73,9 @@ export const StyledCalendarDay = styled(Box, {
     ...($isCurrentDay && {
       border: `3px solid ${alpha(theme.palette.primary.main, 0.4)}`,
       boxShadow: `0 2px 8px ${alpha(theme.palette.primary.main, 0.25)}`,
+      [theme.breakpoints.down('sm')]: {
+        border: `2px solid ${alpha(theme.palette.primary.main, 0.4)}`,
+      },
     })
   };
 });
@@ -105,7 +108,10 @@ export const DayNumber = styled(Typography, {
   fontSize: '0.875rem',
   fontWeight: 500,
   color: $isCurrentMonth ? theme.palette.text.primary : theme.palette.text.secondary,
-  marginBottom: theme.spacing(0.5)
+  marginBottom: theme.spacing(0.5),
+  [theme.breakpoints.down('sm')]: {
+    fontSize: '0.8rem',
+  },
 }));
 
 // Trade amount styled component
@@ -132,7 +138,10 @@ export const TradeCount = styled(Typography)(({ theme }) => ({
   fontWeight: 500,
   overflow: 'hidden',
   textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap'
+  whiteSpace: 'nowrap',
+  [theme.breakpoints.down('sm')]: {
+    fontSize: '0.65rem',
+  },
 }));
 
 // Action button styled component

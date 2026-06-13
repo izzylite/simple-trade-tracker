@@ -106,6 +106,8 @@ const ReminderListItem: React.FC<ReminderListItemProps> = ({
             e.stopPropagation();
             onCancel(reminder.id);
           }}
+          // 44px tap target on phones; unchanged on desktop.
+          sx={{ width: { xs: 44, sm: 'auto' }, height: { xs: 44, sm: 'auto' } }}
         >
           <CancelIcon fontSize="small" />
         </IconButton>

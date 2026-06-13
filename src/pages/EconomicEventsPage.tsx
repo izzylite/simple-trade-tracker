@@ -37,6 +37,7 @@ import {
 } from 'date-fns';
 
 import { useEconomicEvents } from 'features/events/hooks/useEconomicEvents';
+import { useIsMobile } from 'hooks/useResponsive';
 import { useEventCountdownTime } from 'hooks/useCurrentTime';
 import { useUserPinnedEvents } from 'features/events/contexts/UserPinnedEventsContext';
 import { useTradesContext } from 'features/calendar/contexts/TradesContext';
@@ -73,16 +74,16 @@ import { useEventPageTradeOps } from 'features/events/hooks/useEventPageTradeOps
 import AllPinnedEventsContent from 'features/events/components/AllPinnedEventsContent';
 import EconomicEventShimmer from 'features/events/components/EconomicEventShimmer';
 import { Z_INDEX } from 'styles/zIndex';
+import { BELOW_HEADER_HEIGHT } from 'styles/layout';
 import { EYEBROW_SX, TNUM, getShadow } from 'styles/designTokens';
 import CardShell from 'components/common/CardShell';
 import StatTile from 'components/common/StatTile';
 import CompareBar from 'components/common/CompareBar';
 
-const APP_HEADER_HEIGHT = 64;
 // App.tsx sets pb: 0 for /events (isViewportLockedPage) so the page can
-// fill the full visible content area — only the AppHeader (pt:8 = 64px)
-// must be subtracted from 100vh.
-const APP_VIEWPORT_OFFSET = APP_HEADER_HEIGHT;
+// fill the full visible content area — only the AppHeader (56px xs / 64px
+// sm+) must be subtracted from the viewport. BELOW_HEADER_HEIGHT carries
+// the responsive offset so phones don't get an 8px dead-band.
 
 type HubTab = 'all' | 'upcoming' | 'releases';
 
@@ -522,7 +523,7 @@ const EconomicEventsPageInner: React.FC = () => {
         position: 'relative',
         display: 'flex',
         flexDirection: 'row',
-        height: { xs: 'auto', md: `calc(100vh - ${APP_VIEWPORT_OFFSET}px)` },
+        height: { xs: 'auto', md: BELOW_HEADER_HEIGHT.sm },
         width: '100%',
         overflow: { md: 'hidden' },
       }}
@@ -547,7 +548,8 @@ const EconomicEventsPageInner: React.FC = () => {
       <Box
         sx={{
           display: 'flex',
-          alignItems: 'flex-end',
+          flexDirection: { xs: 'column', sm: 'row' },
+          alignItems: { xs: 'stretch', sm: 'flex-end' },
           justifyContent: 'space-between',
           gap: 2,
           flexWrap: 'wrap',
@@ -589,7 +591,13 @@ const EconomicEventsPageInner: React.FC = () => {
           </Typography>
         </Box>
 
-        <Stack direction="row" alignItems="center" spacing={1}>
+        <Stack
+          direction="row"
+          alignItems="center"
+          spacing={1}
+          flexWrap="wrap"
+          sx={{ rowGap: 1 }}
+        >
           <FilterPill
             selected={selectedImpacts}
             onToggle={toggleImpact}
@@ -946,6 +954,7 @@ const CurrencyChips: React.FC<{
             sx={{
               px: 1.25,
               py: 0.5,
+              minHeight: { xs: 36 },
               borderRadius: 999,
               fontSize: '0.72rem',
               fontWeight: 700,
@@ -979,6 +988,7 @@ const CurrencyChips: React.FC<{
           sx={{
             px: 1,
             py: 0.5,
+            minHeight: { xs: 36 },
             borderRadius: 999,
             fontSize: '0.72rem',
             fontWeight: 600,
@@ -1118,14 +1128,18 @@ const DayRail: React.FC<{
   eventsByDate: Map<string, EconomicEvent[]>;
   theme: Theme;
 }> = ({ days, selectedDay, onSelect, eventsByDate, theme }) => {
+  // On phones the rail becomes a 7-equal-column compressing row (no
+  // horizontal scroll) so all 7 days fit a 320px viewport — mirrors the
+  // `row` layout in EconomicEventsView. md+ keeps the vertical column
+  // with the wider horizontal day cards, visually unchanged.
+  const isMobile = useIsMobile();
   return (
     <Stack
       component="aside"
       spacing={0.5}
       sx={{
         flexDirection: { xs: 'row', md: 'column' },
-        overflowX: { xs: 'auto', md: 'visible' },
-        pb: { xs: 1, md: 0 },
+        width: { xs: '100%', md: 'auto' },
       }}
       direction={{ xs: 'row', md: 'column' }}
     >
@@ -1152,79 +1166,128 @@ const DayRail: React.FC<{
             onClick={() => onSelect(d)}
             sx={{
               display: 'flex',
-              flexDirection: 'row',
+              flexDirection: { xs: 'column', md: 'row' },
               alignItems: 'center',
-              gap: 1.25,
-              px: 1.25,
-              py: 1.125,
+              gap: { xs: 0.25, md: 1.25 },
+              px: { xs: 0.5, md: 1.25 },
+              py: { xs: 0.75, md: 1.125 },
               borderRadius: 1.25,
-              minWidth: { xs: 152, md: 'auto' },
-              flexShrink: 0,
+              // xs: equal-width compressing columns; md+: original auto-width row.
+              flex: { xs: 1, md: 'none' },
+              minWidth: { xs: 0, md: 'auto' },
+              flexShrink: { xs: 1, md: 0 },
+              border: {
+                xs: `1px solid ${
+                  isActive
+                    ? alpha(theme.palette.primary.main, 0.32)
+                    : theme.palette.divider
+                }`,
+                md: 'none',
+              },
               opacity: isWeekend && dayEvents.length === 0 ? 0.45 : 1,
               bgcolor: isActive
                 ? alpha(theme.palette.primary.main, 0.16)
                 : 'transparent',
-              transition: 'background 150ms',
+              transition: 'background 150ms, border-color 150ms',
               '&:hover': {
                 bgcolor: isActive
                   ? alpha(theme.palette.primary.main, 0.2)
                   : theme.palette.action.hover,
               },
-              justifyContent: 'flex-start',
+              justifyContent: { xs: 'center', md: 'flex-start' },
             }}
           >
-            <Typography
-              sx={{
-                fontSize: '1.3rem',
-                fontWeight: 700,
-                letterSpacing: '-0.025em',
-                minWidth: 32,
-                textAlign: 'center',
-                fontFeatureSettings: "'tnum' on",
-                color: isActive ? 'primary.main' : 'text.primary',
-                lineHeight: 1,
-              }}
-            >
-              {format(d, 'd')}
-            </Typography>
-            <Box sx={{ flex: 1, textAlign: 'left' }}>
-              <Typography
-                sx={{
-                  fontSize: '0.78rem',
-                  fontWeight: 700,
-                  color: 'text.primary',
-                  lineHeight: 1.2,
-                }}
-              >
-                {format(d, 'EEE')}
-              </Typography>
-              <Typography
-                sx={{
-                  fontSize: '0.7rem',
-                  color: 'text.secondary',
-                  fontWeight: 500,
-                  fontFeatureSettings: "'tnum' on",
-                  lineHeight: 1.3,
-                }}
-              >
-                {dayEvents.length === 0
-                  ? '—'
-                  : `${dayEvents.length} event${
-                      dayEvents.length === 1 ? '' : 's'
-                    }`}
-              </Typography>
-            </Box>
-            {dotColor && (
-              <Box
-                sx={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: '50%',
-                  bgcolor: dotColor,
-                  opacity: 0.8,
-                  flexShrink: 0,
-                }}
-              />
+            {isMobile ? (
+              <>
+                <Typography
+                  sx={{
+                    fontSize: '0.6rem',
+                    fontWeight: 700,
+                    letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
+                    color: 'text.secondary',
+                    lineHeight: 1,
+                  }}
+                >
+                  {format(d, 'EEE')}
+                </Typography>
+                <Typography
+                  sx={{
+                    fontSize: '1.05rem',
+                    fontWeight: 700,
+                    fontFeatureSettings: "'tnum' on",
+                    color: isActive ? 'primary.main' : 'text.primary',
+                    lineHeight: 1.1,
+                  }}
+                >
+                  {format(d, 'd')}
+                </Typography>
+                <Box
+                  sx={{
+                    width: 5,
+                    height: 5,
+                    borderRadius: '50%',
+                    bgcolor: dotColor ?? 'transparent',
+                    mt: 0.25,
+                  }}
+                />
+              </>
+            ) : (
+              <>
+                <Typography
+                  sx={{
+                    fontSize: '1.3rem',
+                    fontWeight: 700,
+                    letterSpacing: '-0.025em',
+                    minWidth: 32,
+                    textAlign: 'center',
+                    fontFeatureSettings: "'tnum' on",
+                    color: isActive ? 'primary.main' : 'text.primary',
+                    lineHeight: 1,
+                  }}
+                >
+                  {format(d, 'd')}
+                </Typography>
+                <Box sx={{ flex: 1, textAlign: 'left' }}>
+                  <Typography
+                    sx={{
+                      fontSize: '0.78rem',
+                      fontWeight: 700,
+                      color: 'text.primary',
+                      lineHeight: 1.2,
+                    }}
+                  >
+                    {format(d, 'EEE')}
+                  </Typography>
+                  <Typography
+                    sx={{
+                      fontSize: '0.7rem',
+                      color: 'text.secondary',
+                      fontWeight: 500,
+                      fontFeatureSettings: "'tnum' on",
+                      lineHeight: 1.3,
+                    }}
+                  >
+                    {dayEvents.length === 0
+                      ? '—'
+                      : `${dayEvents.length} event${
+                          dayEvents.length === 1 ? '' : 's'
+                        }`}
+                  </Typography>
+                </Box>
+                {dotColor && (
+                  <Box
+                    sx={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: '50%',
+                      bgcolor: dotColor,
+                      opacity: 0.8,
+                      flexShrink: 0,
+                    }}
+                  />
+                )}
+              </>
             )}
           </ButtonBase>
         );

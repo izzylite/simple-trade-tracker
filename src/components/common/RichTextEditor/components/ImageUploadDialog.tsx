@@ -30,6 +30,11 @@ import { scrollbarStyles } from 'styles/scrollbarStyles';
 import { Z_INDEX } from 'styles/zIndex';
 import { dialogProps } from 'styles/dialogStyles';
 import { useDialogTokens, MONO_FONT } from 'styles/dialogTokens';
+import {
+  useFullScreenDialog,
+  SAFE_AREA_TOP,
+  SAFE_AREA_BOTTOM,
+} from 'components/common/useFullScreenDialog';
 import { useSubscription } from 'features/billing/contexts/SubscriptionContext';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -65,6 +70,7 @@ const ImageUploadDialog: React.FC<ImageUploadDialogProps> = ({
 }) => {
   const theme = useTheme();
   const isDark = isDarkMode(theme);
+  const { fullScreen, fullScreenPaperSx } = useFullScreenDialog();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   // Tier gate — free users can't upload to storage. URL + Unsplash tabs
@@ -297,16 +303,17 @@ const ImageUploadDialog: React.FC<ImageUploadDialogProps> = ({
       onClose={handleClose}
       maxWidth="md"
       fullWidth
+      fullScreen={fullScreen}
       {...dialogProps}
       sx={{ zIndex: Z_INDEX.RICH_TEXT_DIALOG }}
       slotProps={{
         paper: {
-          sx: paperSx,
+          sx: { ...paperSx, ...fullScreenPaperSx },
         },
       }}
     >
       {/* Header */}
-      <Box sx={headerSx}>
+      <Box sx={{ ...headerSx, pt: fullScreen ? SAFE_AREA_TOP : undefined }}>
         <Box sx={iconAvatarSx}>
           <ImageIcon sx={{ fontSize: 18 }} />
         </Box>
@@ -334,7 +341,9 @@ const ImageUploadDialog: React.FC<ImageUploadDialogProps> = ({
           gap: 2,
           ...scrollbarStyles(theme),
           overflowY: 'auto',
-          maxHeight: '75vh',
+          // On phones the dialog is edge-to-edge, so the body flexes to fill
+          // instead of capping at 75vh.
+          ...(fullScreen ? { flex: 1, minHeight: 0 } : { maxHeight: '75vh' }),
         }}
       >
         {renderTabs()}
@@ -604,12 +613,21 @@ const ImageUploadDialog: React.FC<ImageUploadDialogProps> = ({
       </Box>
 
       {/* Footer */}
-      <Box sx={{ ...footerSx, justifyContent: 'space-between' }}>
+      <Box
+        sx={{
+          ...footerSx,
+          justifyContent: 'space-between',
+          flexDirection: { xs: 'column', sm: 'row' },
+          alignItems: { xs: 'stretch', sm: 'center' },
+          gap: { xs: 1, sm: 0 },
+          pb: fullScreen ? SAFE_AREA_BOTTOM : undefined,
+        }}
+      >
         <Typography
           sx={{
             fontSize: '0.75rem',
             color: theme.palette.text.secondary,
-            display: 'inline-flex',
+            display: { xs: 'none', sm: 'inline-flex' },
             alignItems: 'center',
             gap: 0.75,
           }}
@@ -640,7 +658,7 @@ const ImageUploadDialog: React.FC<ImageUploadDialogProps> = ({
           )}
         </Typography>
 
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1 }}>
           <Button
             onClick={handleClose}
             disabled={uploading}

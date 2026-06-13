@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { format } from 'date-fns';
-import { Box, Typography, useTheme, useMediaQuery, Paper, Alert, Button, CircularProgress } from '@mui/material';
+import { Box, Typography, useTheme, Paper, Alert, Button, CircularProgress } from '@mui/material';
 import { Trade, Calendar } from 'features/calendar/types/dualWrite';
 import ImageZoomDialog, { ImageZoomProp } from 'features/calendar/components/ImageZoomDialog';
 import { DynamicRiskSettings } from 'features/calendar/utils/dynamicRiskUtils';
@@ -29,6 +29,7 @@ import EconomicEventCorrelationAnalysis from 'features/events/components/charts/
 import { useTradeSyncContextOptional } from 'features/calendar/contexts/TradeSyncContext';
 import { normalizeTradeDates } from 'features/calendar/utils/tradeUtils';
 import { isDarkMode } from 'utils/themeMode';
+import { useIsMobile } from 'hooks/useResponsive';
 
 // Type definition needed for module-level constants
 export type TimePeriod = 'month' | 'quarter' | 'ytd' | 'year' | 'all';
@@ -98,7 +99,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
   basicOnly = false
 }) => {
   const theme = useTheme();
-  const isXs = useMediaQuery(theme.breakpoints.down('sm'));
+  const isXs = useIsMobile();
   const chartHeights = useMemo(() => ({
     large: isXs ? 240 : 400,
     medium: isXs ? 180 : 260,

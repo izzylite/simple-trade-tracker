@@ -34,5 +34,8 @@ export const preBox = (theme: Theme) => ({
   fontSize: '0.72rem',
   lineHeight: 1.4,
   overflow: 'auto',
+  // Cap to the parent width so long unbroken snippet lines scroll INSIDE the
+  // <pre> instead of stretching the accordion past the viewport at 360px.
+  maxWidth: '100%',
   whiteSpace: 'pre' as const,
 });

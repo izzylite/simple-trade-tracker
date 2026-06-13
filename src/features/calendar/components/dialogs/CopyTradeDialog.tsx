@@ -19,6 +19,11 @@ import {
 import { dialogProps } from 'styles/dialogStyles';
 import { Z_INDEX } from 'styles/zIndex';
 import { useDialogTokens } from 'styles/dialogTokens';
+import {
+  useFullScreenDialog,
+  SAFE_AREA_TOP,
+  SAFE_AREA_BOTTOM,
+} from 'components/common/useFullScreenDialog';
 import { Trade } from 'features/calendar/types/dualWrite';
 import { useCalendars } from 'features/calendar/hooks/useCalendars';
 import {
@@ -61,6 +66,7 @@ export const CopyTradeDialog: React.FC<CopyTradeDialogProps> = ({
     ghostButtonSx,
     primaryButtonSx,
   } = useDialogTokens();
+  const { fullScreen, fullScreenPaperSx } = useFullScreenDialog();
 
   const { calendars, isLoading, refresh } = useCalendars(userId);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -143,11 +149,12 @@ export const CopyTradeDialog: React.FC<CopyTradeDialogProps> = ({
       onClose={handleClose}
       maxWidth="sm"
       fullWidth
+      fullScreen={fullScreen}
       {...dialogProps}
       sx={{ zIndex: Z_INDEX.DIALOG }}
-      slotProps={{ paper: { sx: paperSx } }}
+      slotProps={{ paper: { sx: { ...paperSx, ...fullScreenPaperSx } } }}
     >
-      <Box sx={headerSx}>
+      <Box sx={{ ...headerSx, pt: fullScreen ? SAFE_AREA_TOP : undefined }}>
         <Box sx={iconAvatarSx}>
           <CopyIcon sx={{ fontSize: 18 }} />
         </Box>
@@ -241,7 +248,7 @@ export const CopyTradeDialog: React.FC<CopyTradeDialogProps> = ({
         </Box>
       </Box>
 
-      <Box sx={footerSx}>
+      <Box sx={{ ...footerSx, pb: fullScreen ? SAFE_AREA_BOTTOM : undefined }}>
         <Button onClick={handleClose} disabled={isCopying} sx={ghostButtonSx}>
           {done ? 'Close' : 'Cancel'}
         </Button>

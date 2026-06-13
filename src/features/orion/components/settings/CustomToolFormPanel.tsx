@@ -450,7 +450,15 @@ const CustomToolFormPanel: React.FC<Props> = ({
 
         <Divider />
 
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 1,
+            flexWrap: 'wrap',
+          }}
+        >
           <Button
             onClick={goBack}
             disabled={drafting || verifying || saving}

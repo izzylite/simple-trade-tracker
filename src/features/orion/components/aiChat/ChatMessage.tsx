@@ -40,6 +40,7 @@ import { logger } from 'utils/logger';
 import { getTagChipStyles } from 'utils/tagColors';
 import { isDarkMode } from 'utils/themeMode';
 import ImageZoomDialog, { ImageZoomProp } from 'features/calendar/components/ImageZoomDialog';
+import { useIsMobile } from 'hooks/useResponsive';
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -65,6 +66,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
   availableTags = []
 }) => {
   const theme = useTheme();
+  const isMobile = useIsMobile();
   const [copied, setCopied] = useState(false);
   const [reasoningExpanded, setReasoningExpanded] = useState(false);
   const [zoomImage, setZoomImage] = useState<ImageZoomProp | null>(null);
@@ -496,15 +498,17 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
 
           {renderMessageContent()}
 
-          {/* Hover edit action */}
+          {/* Edit action — hover-only at left:-36 on desktop; on phones it's
+              unreachable (no hover) and the negative offset risks overflowing
+              the right-aligned bubble, so render it always-visible below-right. */}
           {onEdit && (
             <Box
               className="msg-actions"
               sx={{
                 position: 'absolute',
-                top: 6,
-                left: -36,
-                opacity: 0,
+                ...(isMobile
+                  ? { right: 8, bottom: -28, opacity: 1 }
+                  : { top: 6, left: -36, opacity: 0 }),
                 transition: 'opacity 0.15s'
               }}
             >

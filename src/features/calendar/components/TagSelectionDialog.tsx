@@ -21,6 +21,11 @@ import { scrollbarStyles } from 'styles/scrollbarStyles';
 import { Z_INDEX } from 'styles/zIndex';
 import { dialogProps } from 'styles/dialogStyles';
 import { useDialogTokens, MONO_FONT } from 'styles/dialogTokens';
+import {
+  useFullScreenDialog,
+  SAFE_AREA_TOP,
+  SAFE_AREA_BOTTOM,
+} from 'components/common/useFullScreenDialog';
 
 export interface SelectableItem {
   /** Stable ID used in `selected`/`onChange`. */
@@ -101,6 +106,7 @@ const TagSelectionDialog: React.FC<TagSelectionDialogProps> = ({
     inputSx,
     primaryButtonSx,
   } = useDialogTokens();
+  const { fullScreen, fullScreenPaperSx } = useFullScreenDialog();
   const [query, setQuery] = useState('');
 
   useEffect(() => {
@@ -160,16 +166,21 @@ const TagSelectionDialog: React.FC<TagSelectionDialogProps> = ({
       onClose={onClose}
       maxWidth="sm"
       fullWidth
+      fullScreen={fullScreen}
       {...dialogProps}
       sx={{ zIndex: Z_INDEX.DIALOG }}
       slotProps={{
         paper: {
-          sx: { ...paperSx, maxHeight: '82vh' },
+          sx: {
+            ...paperSx,
+            ...(fullScreen ? {} : { maxHeight: '82vh' }),
+            ...fullScreenPaperSx,
+          },
         },
       }}
     >
       {/* Header */}
-      <Box sx={headerSx}>
+      <Box sx={{ ...headerSx, pt: fullScreen ? SAFE_AREA_TOP : undefined }}>
         <Box sx={iconAvatarSx}>
           {icon ?? <TagIcon sx={{ fontSize: 18 }} />}
         </Box>
@@ -206,7 +217,7 @@ const TagSelectionDialog: React.FC<TagSelectionDialogProps> = ({
           display: 'flex',
           flexDirection: 'column',
           gap: 2,
-          maxHeight: '60vh',
+          maxHeight: fullScreen ? undefined : '60vh',
           overflowY: 'auto',
           ...scrollbarStyles(theme),
         }}
@@ -413,8 +424,12 @@ const TagSelectionDialog: React.FC<TagSelectionDialogProps> = ({
                   }}
                 >
                   <Box
-                    sx={
-                      item.chipSx
+                    sx={{
+                      minWidth: 0,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      ...(item.chipSx
                         ? {
                             display: 'inline-flex',
                             alignItems: 'center',
@@ -425,8 +440,8 @@ const TagSelectionDialog: React.FC<TagSelectionDialogProps> = ({
                             fontWeight: 600,
                             ...item.chipSx,
                           }
-                        : chipSx(false)
-                    }
+                        : chipSx(false)),
+                    }}
                   >
                     {item.label}
                   </Box>
@@ -471,7 +486,7 @@ const TagSelectionDialog: React.FC<TagSelectionDialogProps> = ({
       </Box>
 
       {/* Footer */}
-      <Box sx={footerSx}>
+      <Box sx={{ ...footerSx, pb: fullScreen ? SAFE_AREA_BOTTOM : undefined }}>
         <Button onClick={onClose} variant="contained" sx={primaryButtonSx}>
           Done
         </Button>

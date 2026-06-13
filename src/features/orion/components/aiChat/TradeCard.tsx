@@ -269,7 +269,14 @@ const TradeCard: React.FC<TradeCardProps> = ({
           </Box>
 
           {/* Right — attachments + flags + session */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, justifySelf: 'end' }}>
+          <Box sx={{
+            display: 'flex',
+            alignItems: 'center',
+            flexWrap: { xs: 'wrap', sm: 'nowrap' },
+            justifyContent: 'flex-end',
+            gap: 1,
+            justifySelf: 'end',
+          }}>
             {hasImages && (
               <Tooltip title={`${imageCount} image${imageCount === 1 ? '' : 's'}`} arrow>
                 <Box sx={metaItemSx}>

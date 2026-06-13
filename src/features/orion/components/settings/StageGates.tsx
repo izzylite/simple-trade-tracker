@@ -35,7 +35,13 @@ const StageGates: React.FC<Props> = ({
       <Typography sx={{ ...EYEBROW_SX, color: 'text.tertiary' }}>
         3. Run gates
       </Typography>
-      <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+      <Stack
+        direction="row"
+        spacing={1}
+        useFlexGap
+        flexWrap="wrap"
+        sx={{ mt: 1 }}
+      >
         <Button onClick={onAudit} disabled={auditing} variant="outlined" size="small">
           {auditing ? <CircularProgress size={16} /> : 'Run audit'}
         </Button>

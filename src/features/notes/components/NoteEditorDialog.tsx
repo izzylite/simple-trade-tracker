@@ -15,6 +15,7 @@ import {
 } from '@mui/material';
 import { Close as CloseIcon } from '@mui/icons-material';
 
+import { SAFE_AREA_TOP, SAFE_AREA_BOTTOM } from 'components/common/useFullScreenDialog';
 import { Note, DayAbbreviation } from 'features/notes/types/note';
 import type { Currency, ImpactLevel } from 'features/events/types/economicCalendar';
 import NoteEditorBody, { NoteEditorBodyHandle } from 'features/notes/components/NoteEditorBody';
@@ -80,6 +81,9 @@ const NoteEditorDialog: React.FC<NoteEditorDialogProps> = ({
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
+          // Clear the device notch / home indicator when edge-to-edge.
+          pt: fullScreen ? SAFE_AREA_TOP : undefined,
+          pb: fullScreen ? SAFE_AREA_BOTTOM : undefined,
         },
       }}
     >

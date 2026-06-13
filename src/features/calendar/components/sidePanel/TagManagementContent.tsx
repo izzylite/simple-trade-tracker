@@ -672,7 +672,7 @@ const TagManagementContent: React.FC<TagManagementContentProps> = ({
         )}
 
         {/* Search + filter */}
-        <Box sx={{ display: 'flex', gap: 0.75, mb: 1.25 }}>
+        <Box sx={{ display: 'flex', flexWrap: { xs: 'wrap', sm: 'nowrap' }, gap: 0.75, mb: 1.25 }}>
           <TextField
             fullWidth
             size="small"
@@ -693,7 +693,10 @@ const TagManagementContent: React.FC<TagManagementContentProps> = ({
               },
             }}
           />
-          <FormControl size="small" sx={{ minWidth: 130 }}>
+          <FormControl
+            size="small"
+            sx={{ minWidth: { xs: 0, sm: 130 }, flex: { xs: '1 1 100%', sm: '0 0 auto' } }}
+          >
             <Select
               value={selectedTagGroup}
               onChange={(e) => setSelectedTagGroup(e.target.value)}

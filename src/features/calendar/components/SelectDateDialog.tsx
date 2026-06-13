@@ -229,7 +229,7 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
 
   // ── header title row (title + year stepper) ──────────────────────────────
   const dialogTitle = (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%', flexWrap: 'wrap' }}>
       <Box sx={{ flex: 1, minWidth: 0 }}>
         <Typography sx={{ fontWeight: 700, fontSize: '0.95rem', lineHeight: 1.2 }}>
           Jump to a month
@@ -256,6 +256,7 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
           borderRadius: 1.5,
           backgroundColor: surfaceInset,
           border: `1px solid ${hairline}`,
+          flexShrink: 0,
         }}
       >
         <Tooltip title="Previous year">
@@ -322,6 +323,7 @@ const SelectDateDialog: React.FC<SelectDateDialogProps> = ({
               py: 0.25,
               minHeight: 0,
               ml: 0.5,
+              flexShrink: 0,
               '&:hover': { backgroundColor: violetSoft },
             }}
           >

@@ -12,9 +12,9 @@ import PerformanceCharts, { TimePeriod } from 'features/performance/components/P
 import { useSelectedCalendar } from 'features/calendar/contexts/SelectedCalendarContext';
 import { useTradeViewer } from 'features/calendar/contexts/TradeViewerContext';
 import PerformanceHeader from 'features/performance/components/PerformanceHeader';
+import { BELOW_HEADER_HEIGHT } from 'styles/layout';
 
 const SWITCH_SPINNER_MS = 350;
-const APP_HEADER_HEIGHT = 64;
 
 interface PerformancePageProps {
   /** Plumbed from App.tsx so calendar-property edits made from this page persist. */
@@ -130,7 +130,7 @@ const PerformancePage: React.FC<PerformancePageProps> = ({
     return (
       <Box
         sx={{
-          height: `calc(100vh - ${APP_HEADER_HEIGHT}px)`,
+          height: BELOW_HEADER_HEIGHT,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -146,7 +146,7 @@ const PerformancePage: React.FC<PerformancePageProps> = ({
       sx={{
         position: 'relative',
         bgcolor: theme.palette.background.default,
-        minHeight: `calc(100vh - ${APP_HEADER_HEIGHT}px)`,
+        minHeight: BELOW_HEADER_HEIGHT,
         color: theme.palette.text.primary,
       }}
     >

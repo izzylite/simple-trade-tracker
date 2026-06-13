@@ -67,11 +67,13 @@ const LandingHero: React.FC<Props> = ({ onGetStarted }) => {
                         textAlign: 'center',
                         fontFamily: "'DM Sans', sans-serif",
                         fontWeight: 900,
-                        fontSize: { xs: '2.6rem', sm: '3.5rem', md: '4.5rem' },
+                        fontSize: { xs: '2.2rem', sm: '3.5rem', md: '4.5rem' },
                         lineHeight: 1.02,
                         letterSpacing: '-0.04em',
                         color: '#f1f5f9',
                         mb: { xs: 4, md: 5 },
+                        overflowWrap: 'break-word',
+                        wordBreak: 'break-word',
                     }}
                 >
                     <Box

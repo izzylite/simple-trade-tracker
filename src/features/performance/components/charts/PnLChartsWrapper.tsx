@@ -44,7 +44,7 @@ const PnLChartsWrapper: React.FC<PnLChartsWrapperProps> = ({
 
   return (
     <Paper sx={{ p: 0, mb: 3, borderRadius: 2 }}>
-      <Box sx={{ px: 3, pt: 3 }}>
+      <Box sx={{ px: { xs: 1.5, sm: 3 }, pt: 3 }}>
         <Box sx={{ display: 'flex', justifyContent: 'start', mb: 2 }}>
           <RoundedTabs
             tabs={pnlTabs}
@@ -54,7 +54,7 @@ const PnLChartsWrapper: React.FC<PnLChartsWrapperProps> = ({
         </Box>
       </Box>
 
-      <Box sx={{ px: 3, pb: 3 }}>
+      <Box sx={{ px: { xs: 1.5, sm: 3 }, pb: 3 }}>
         {/* Heatmap Tab */}
         <TabPanel value={activeTab} index={0}>
           <PnLHeatmap

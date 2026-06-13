@@ -188,7 +188,18 @@ const OrionTasksContent: React.FC<OrionTasksContentProps> = ({
             backgroundColor: 'background.paper',
           }}
         >
-          <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
+          <Box
+            sx={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 1,
+              // Phone: let label + status pill + "updated Xm ago" + failed
+              // warning wrap instead of overflowing the 360px strip.
+              flexWrap: { xs: 'wrap', sm: 'nowrap' },
+              rowGap: { xs: 0.5, sm: 0 },
+              minWidth: 0,
+            }}
+          >
             <Typography component="span" sx={monoSectionLabelSx}>
               MARKET RESEARCH
             </Typography>

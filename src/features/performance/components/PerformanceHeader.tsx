@@ -5,6 +5,7 @@ import PerfPill, { PerfPillOption } from 'features/performance/components/PerfPi
 import { TimePeriod } from 'features/performance/components/PerformanceCharts';
 import PeriodPicker from 'features/performance/components/PeriodPicker';
 import { EYEBROW_SX } from 'styles/designTokens';
+import { useIsMobile } from 'hooks/useResponsive';
 
 const PILL_OPTIONS: ReadonlyArray<PerfPillOption<TimePeriod>> = [
   { label: 'Month', value: 'month' },
@@ -50,6 +51,7 @@ const PerformanceHeader: React.FC<PerformanceHeaderProps> = ({
   subtitleSuffix,
 }) => {
   const theme = useTheme();
+  const isMobile = useIsMobile();
   const date = selectedDate || new Date();
   const title = formatPeriod(timePeriod, date);
   const subParts = [calendarName, subtitleSuffix].filter(Boolean) as string[];
@@ -71,7 +73,7 @@ const PerformanceHeader: React.FC<PerformanceHeaderProps> = ({
           component="h1"
           sx={{
             fontWeight: 700,
-            fontSize: '1.85rem',
+            fontSize: { xs: '1.4rem', sm: '1.85rem' },
             letterSpacing: '-0.025em',
             color: theme.palette.text.primary,
             mt: '6px',
@@ -94,7 +96,16 @@ const PerformanceHeader: React.FC<PerformanceHeaderProps> = ({
           </Typography>
         )}
       </Box>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1,
+          flexWrap: 'wrap',
+          width: { xs: '100%', sm: 'auto' },
+          justifyContent: { xs: 'space-between', sm: 'flex-end' },
+        }}
+      >
         {onSelectedDateChange && (
           <PeriodPicker period={timePeriod} value={date} onChange={onSelectedDateChange} />
         )}
@@ -103,6 +114,7 @@ const PerformanceHeader: React.FC<PerformanceHeaderProps> = ({
           value={timePeriod}
           onChange={onTimePeriodChange}
           size="small"
+          fullWidth={isMobile}
         />
       </Box>
     </Box>

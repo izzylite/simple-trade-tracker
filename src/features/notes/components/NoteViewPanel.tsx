@@ -131,7 +131,7 @@ const NoteViewPanel: React.FC<NoteViewPanelProps> = ({
             0.88,
           ),
           backdropFilter: 'blur(20px) saturate(160%)',
-          px: 4,
+          px: { xs: 2, sm: 4 },
           py: 1,
           display: 'flex',
           alignItems: 'center',

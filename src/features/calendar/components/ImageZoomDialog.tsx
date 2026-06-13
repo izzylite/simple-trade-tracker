@@ -14,6 +14,7 @@ import {
 } from '@mui/icons-material';
 import { scrollbarStyles } from 'styles/scrollbarStyles';
 import { Z_INDEX } from 'styles/zIndex';
+import { useFullScreenDialog } from 'components/common/useFullScreenDialog';
 
 interface ImageZoomDialogProps {
   open: boolean;
@@ -42,6 +43,7 @@ const ImageZoomDialog: React.FC<ImageZoomDialogProps> = ({
   setImageData(imageProp);
  }
   const theme = useTheme();
+  const { fullScreen, fullScreenPaperSx } = useFullScreenDialog();
 
   // Determine if we should use solid background
   // Auto-detect if the current image is from QuickChart (AI-generated chart)
@@ -193,6 +195,7 @@ const ImageZoomDialog: React.FC<ImageZoomDialogProps> = ({
       onClose={onClose}
       maxWidth="md"
       fullWidth
+      fullScreen={fullScreen}
       sx={{
         zIndex: Z_INDEX.DIALOG_POPUP
       }}
@@ -207,7 +210,8 @@ const ImageZoomDialog: React.FC<ImageZoomDialogProps> = ({
           borderRadius: useSolidBackground ? 2 : 0,
           '& .MuiDialogContent-root': {
             ...scrollbarStyles(theme)
-          }
+          },
+          ...fullScreenPaperSx
         }
       }}
     >
@@ -295,7 +299,7 @@ const ImageZoomDialog: React.FC<ImageZoomDialogProps> = ({
           sx={{
             position: 'relative',
             width: '100%',
-            height: '80vh',
+            height: { xs: '100%', sm: '80vh' },
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',

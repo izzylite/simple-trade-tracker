@@ -155,7 +155,9 @@ const ReviewStep: React.FC<Props> = ({
               label="Tool inputs (JSON Schema)"
               value={argsSchemaJson}
               onChange={(e) => setArgsSchemaJson(e.target.value)}
-              inputProps={{ style: { fontFamily: MONO_FONT, fontSize: 13 } }}
+              inputProps={{
+                style: { fontFamily: MONO_FONT, fontSize: 13, wordBreak: 'break-word' },
+              }}
               sx={inputSx}
             />
             <TextField
@@ -165,7 +167,9 @@ const ReviewStep: React.FC<Props> = ({
               label="Sample inputs (used for the test fire)"
               value={sampleArgsJson}
               onChange={(e) => setSampleArgsJson(e.target.value)}
-              inputProps={{ style: { fontFamily: MONO_FONT, fontSize: 13 } }}
+              inputProps={{
+                style: { fontFamily: MONO_FONT, fontSize: 13, wordBreak: 'break-word' },
+              }}
               sx={inputSx}
             />
           </Stack>

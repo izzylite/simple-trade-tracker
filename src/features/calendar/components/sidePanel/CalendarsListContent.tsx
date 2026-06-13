@@ -755,7 +755,9 @@ const WatchRow: React.FC<WatchRowProps> = ({
         </Typography>
       </Box>
 
-      <Box sx={{ flexShrink: 0, opacity: 0.85 }}>
+      {/* Sparkline is decorative — hide on phones to free width for the
+          name + pnl so the row fits at 360px. */}
+      <Box sx={{ flexShrink: 0, opacity: 0.85, display: { xs: 'none', sm: 'block' } }}>
         <Sparkline
           data={empty ? null : curve}
           color={pnlColor}
@@ -770,7 +772,7 @@ const WatchRow: React.FC<WatchRowProps> = ({
         sx={{
           textAlign: 'right',
           flexShrink: 0,
-          minWidth: 78,
+          minWidth: { xs: 64, sm: 78 },
           px: 0.875,
           py: 0.5,
           borderRadius: `${theme.palette.custom.radius.sm}px`,

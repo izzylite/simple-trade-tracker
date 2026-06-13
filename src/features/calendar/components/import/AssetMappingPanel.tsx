@@ -330,7 +330,7 @@ export const AssetMappingPanel: React.FC<Props> = ({
                   key={row.value}
                   sx={{
                     display: 'grid',
-                    gridTemplateColumns: '1fr 1fr 18px 1fr',
+                    gridTemplateColumns: { xs: '1fr auto 1fr', sm: '1fr 1fr 18px 1fr' },
                     gap: 0.85,
                     alignItems: 'center',
                   }}
@@ -352,9 +352,11 @@ export const AssetMappingPanel: React.FC<Props> = ({
                   >
                     {row.value}
                   </Box>
-                  {/* Trade count */}
+                  {/* Trade count — hidden on phones so the 4-cell example
+                      collapses to source → arrow → instrument and fits 360px */}
                   <Typography
                     sx={{
+                      display: { xs: 'none', sm: 'block' },
                       fontFamily: MONO_FONT,
                       fontFeatureSettings: TNUM,
                       fontSize: '0.65rem',

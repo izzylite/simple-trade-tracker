@@ -138,7 +138,8 @@ const ToolUsageChip: React.FC<ToolUsageChipProps> = ({
               sx: {
                 mt: 0.75,
                 p: 1.25,
-                maxWidth: 380,
+                // Cap to viewport on narrow phones so the popover can't overflow.
+                maxWidth: 'min(380px, calc(100vw - 24px))',
                 borderRadius: 2,
                 border: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
                 backgroundColor: theme.palette.background.paper,

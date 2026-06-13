@@ -17,6 +17,11 @@ import { Calendar } from '../../types/calendar';
 import { dialogProps } from 'styles/dialogStyles';
 import { Z_INDEX } from 'styles/zIndex';
 import { useDialogTokens } from 'styles/dialogTokens';
+import {
+  useFullScreenDialog,
+  SAFE_AREA_TOP,
+  SAFE_AREA_BOTTOM,
+} from 'components/common/useFullScreenDialog';
 
 interface DuplicateCalendarDialogProps {
   open: boolean;
@@ -40,6 +45,7 @@ export const DuplicateCalendarDialog: React.FC<DuplicateCalendarDialogProps> = (
     paperSx, headerSx, iconAvatarSx, footerSx,
     monoSectionLabelSx, ghostButtonSx,
   } = useDialogTokens();
+  const { fullScreen, fullScreenPaperSx } = useFullScreenDialog();
 
   const monoLabelSx = monoSectionLabelSx;
 
@@ -72,16 +78,17 @@ export const DuplicateCalendarDialog: React.FC<DuplicateCalendarDialogProps> = (
       onClose={() => !isDuplicating && onClose()}
       maxWidth="sm"
       fullWidth
+      fullScreen={fullScreen}
       {...dialogProps}
       sx={{ zIndex: Z_INDEX.DIALOG }}
       slotProps={{
         paper: {
-          sx: paperSx,
+          sx: { ...paperSx, ...fullScreenPaperSx },
         },
       }}
     >
       {/* Header */}
-      <Box sx={headerSx}>
+      <Box sx={{ ...headerSx, pt: fullScreen ? SAFE_AREA_TOP : undefined }}>
         <Box sx={iconAvatarSx}>
           <CopyIcon sx={{ fontSize: 18 }} />
         </Box>
@@ -204,7 +211,7 @@ export const DuplicateCalendarDialog: React.FC<DuplicateCalendarDialogProps> = (
       </Box>
 
       {/* Footer */}
-      <Box sx={footerSx}>
+      <Box sx={{ ...footerSx, pb: fullScreen ? SAFE_AREA_BOTTOM : undefined }}>
         <Button
           onClick={onClose}
           disabled={isDuplicating}

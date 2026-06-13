@@ -198,7 +198,7 @@ const MemoryLogsPanel: React.FC<MemoryLogsPanelProps> = ({ calendarId }) => {
                           {row.before_text != null && (
                             <Box>
                               <Typography variant="caption" color="text.disabled" sx={{ fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>Before</Typography>
-                              <Box sx={{ mt: 0.5, p: 1, borderRadius: 1, bgcolor: alpha(theme.palette.error.main, 0.08), border: `1px solid ${alpha(theme.palette.error.main, 0.15)}` }}>
+                              <Box sx={{ mt: 0.5, p: 1, borderRadius: 1, overflowX: 'auto', bgcolor: alpha(theme.palette.error.main, 0.08), border: `1px solid ${alpha(theme.palette.error.main, 0.15)}` }}>
                                 <Typography variant="caption" sx={{ fontFamily: 'monospace', fontSize: '0.75rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                                   {row.before_text}
                                 </Typography>
@@ -208,7 +208,7 @@ const MemoryLogsPanel: React.FC<MemoryLogsPanelProps> = ({ calendarId }) => {
                           {row.after_text != null && (
                             <Box>
                               <Typography variant="caption" color="text.disabled" sx={{ fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>After</Typography>
-                              <Box sx={{ mt: 0.5, p: 1, borderRadius: 1, bgcolor: alpha(theme.palette.success.main, 0.08), border: `1px solid ${alpha(theme.palette.success.main, 0.15)}` }}>
+                              <Box sx={{ mt: 0.5, p: 1, borderRadius: 1, overflowX: 'auto', bgcolor: alpha(theme.palette.success.main, 0.08), border: `1px solid ${alpha(theme.palette.success.main, 0.15)}` }}>
                                 <Typography variant="caption" sx={{ fontFamily: 'monospace', fontSize: '0.75rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                                   {row.after_text}
                                 </Typography>

@@ -131,6 +131,8 @@ const ReminderBatchListItem: React.FC<ReminderBatchListItemProps> = ({
             e.stopPropagation();
             onCancelBatch(batchId);
           }}
+          // 44px tap target on phones; unchanged on desktop.
+          sx={{ width: { xs: 44, sm: 'auto' }, height: { xs: 44, sm: 'auto' } }}
         >
           <CancelIcon fontSize="small" />
         </IconButton>

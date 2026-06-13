@@ -16,6 +16,7 @@ import { formatValue } from 'utils/formatters';
 import { log } from 'utils/logger';
 import CardShell from 'components/common/CardShell';
 import { TNUM } from 'styles/designTokens';
+import { useIsMobile } from 'hooks/useResponsive';
 
 interface CumulativePnLChartProps {
   chartData: any[];
@@ -128,6 +129,7 @@ const CumulativePnLChart: React.FC<CumulativePnLChartProps> = ({
 }) => {
   const theme = useTheme();
   const radius = theme.palette.custom.radius;
+  const isMobile = useIsMobile();
 
   // Define colors
   const COLORS = {
@@ -204,7 +206,7 @@ const CumulativePnLChart: React.FC<CumulativePnLChartProps> = ({
     >
       {/* Chart body */}
       <Box sx={{ p: 2 }}>
-        <ResponsiveContainer width="100%" height={300}>
+        <ResponsiveContainer width="100%" height={isMobile ? 240 : 300}>
           <AreaChart data={chartData}>
             <defs>
               <linearGradient id="colorPnLWin" x1="0" y1="0" x2="0" y2="1">

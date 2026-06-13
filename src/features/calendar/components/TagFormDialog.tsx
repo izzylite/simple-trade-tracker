@@ -33,6 +33,11 @@ import { tagService } from '../services/tagService';
 import { useAuthState } from 'contexts/AuthStateContext';
 import { Z_INDEX } from 'styles/zIndex';
 import { dialogProps } from 'styles/dialogStyles';
+import {
+    useFullScreenDialog,
+    SAFE_AREA_TOP,
+    SAFE_AREA_BOTTOM,
+} from 'components/common/useFullScreenDialog';
 
 interface TagFormDialogProps {
     open: boolean;
@@ -79,6 +84,7 @@ const TagFormDialog: React.FC<TagFormDialogProps> = ({
         monoLabelSx, optionalSx, inputSx,
         primaryButtonSx, ghostButtonSx,
     } = useDialogTokens();
+    const { fullScreen, fullScreenPaperSx } = useFullScreenDialog();
     const { user } = useAuthState();
 
     const isEdit = !!editTag;
@@ -395,14 +401,15 @@ const TagFormDialog: React.FC<TagFormDialogProps> = ({
             onClose={() => !busy && onClose()}
             maxWidth="sm"
             fullWidth
+            fullScreen={fullScreen}
             {...dialogProps}
             sx={{ zIndex: Z_INDEX.NESTED_DIALOG }}
             slotProps={{
-                paper: { sx: paperSx },
+                paper: { sx: { ...paperSx, ...fullScreenPaperSx } },
             }}
         >
             {/* Header */}
-            <Box sx={headerSx}>
+            <Box sx={{ ...headerSx, pt: fullScreen ? SAFE_AREA_TOP : undefined }}>
                 <Box sx={iconAvatarSx}>
                     {isEdit ? <EditIcon sx={{ fontSize: 18 }} /> : <AddIcon sx={{ fontSize: 18 }} />}
                 </Box>
@@ -435,7 +442,7 @@ const TagFormDialog: React.FC<TagFormDialogProps> = ({
                     gap: 2.25,
                     ...scrollbarStyles(theme),
                     overflowY: 'auto',
-                    maxHeight: '70vh',
+                    maxHeight: fullScreen ? undefined : '70vh',
                 }}
             >
                 {/* Preview row */}
@@ -650,7 +657,15 @@ const TagFormDialog: React.FC<TagFormDialogProps> = ({
             </Box>
 
             {/* Footer */}
-            <Box sx={{ ...footerSx, justifyContent: 'space-between' }}>
+            <Box
+                sx={{
+                    ...footerSx,
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: 1,
+                    pb: fullScreen ? SAFE_AREA_BOTTOM : undefined,
+                }}
+            >
                 {isEdit ? (
                     onDelete && onTagUpdated ? (
                         <Button

@@ -48,6 +48,7 @@ import { useAuth } from 'contexts/SupabaseAuthContext';
 import { createNote } from 'features/notes/services/notesService';
 import { OrionUsageRing } from 'features/billing/components/OrionUsageRing';
 import { isDarkMode } from 'utils/themeMode';
+import { useIsMobile } from 'hooks/useResponsive';
 
 const ORION_NOTE_NS = 'a7f3d5e2-1b4c-5890-9e12-f3c4d5b6a7e8';
 
@@ -104,6 +105,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   initialTradeId,
 }) => {
   const theme = useTheme();
+  const isMobile = useIsMobile();
   const { user } = useAuth();
   const {
     isDark,
@@ -329,29 +331,32 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
         }}
       />
 
-      {/* Bottom Sheet Drawer */}
+      {/* Bottom Sheet Drawer — full-screen takeover on phones, bottom sheet sm+ */}
       <Box
         sx={{
           position: 'fixed',
+          top: { xs: 0, sm: 'auto' },
           bottom: 0,
           right: { xs: 0, sm: 20 },
           left: { xs: 0, sm: 'auto' },
           zIndex: Z_INDEX.AI_DRAWER,
-          height: open ? BOTTOM_SHEET_HEIGHTS.default : 0,
-          maxHeight: '92vh',
-          width: '100%',
+          height: open
+            ? { xs: '100dvh', sm: BOTTOM_SHEET_HEIGHTS.default }
+            : 0,
+          maxHeight: { xs: '100dvh', sm: '92vh' },
+          width: { xs: '100vw', sm: '100%' },
           maxWidth: {
-            xs: '100%', sm: '480px', md: '540px', lg: '600px'
+            xs: '100vw', sm: '480px', md: '540px', lg: '600px'
           },
-          borderTopLeftRadius: 16,
-          borderTopRightRadius: 16,
+          borderTopLeftRadius: { xs: 0, sm: 16 },
+          borderTopRightRadius: { xs: 0, sm: 16 },
           borderBottomLeftRadius: 0,
           borderBottomRightRadius: 0,
           backgroundColor: 'background.paper',
           boxShadow: isDark
             ? '0 -12px 32px rgba(0,0,0,0.55)'
             : '0 -12px 32px rgba(0,0,0,0.12)',
-          border: `1px solid ${hairline}`,
+          border: { xs: 'none', sm: `1px solid ${hairline}` },
           borderBottom: 'none',
           backgroundImage: 'none',
           transition: 'height 0.3s cubic-bezier(0.4, 0, 0.2, 1), '
@@ -372,9 +377,11 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
             sx={{
               display: 'flex',
               alignItems: 'center',
-              gap: 1.5,
-              px: 2.5,
+              gap: { xs: 1, sm: 1.5 },
+              px: { xs: 2, sm: 2.5 },
               py: 1.75,
+              // Safe-area inset so the header clears the notch on full-screen phones.
+              pt: { xs: 'max(14px, env(safe-area-inset-top))', sm: 1.75 },
               borderBottom: `1px solid ${hairline}`,
               flexShrink: 0,
             }}
@@ -462,16 +469,18 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
           </Box>
 
           {/* Tab row — chip-style segmented tabs on the left, chat-surface
-              action buttons on the right (only on Chat tab). */}
+              action buttons on the right (only on Chat tab). Wraps on phones so
+              the tab pill + 4 action IconButtons never overflow. */}
           <Box
             sx={{
-              px: 2.5,
+              px: { xs: 2, sm: 2.5 },
               pt: 1.5,
               pb: 1,
               flexShrink: 0,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
+              flexWrap: 'wrap',
               gap: 1,
             }}
           >
@@ -487,7 +496,8 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
             >
               {([
                 { label: 'Chat', icon: <ChatIcon sx={{ fontSize: 14 }} />, badge: 0 },
-                { label: 'Market Research', icon: <ManageSearchIcon sx={{ fontSize: 14 }} />, badge: aiTasks?.unreadCount ?? 0 },
+                // Shorten to 'Research' on phones so the pill + action buttons fit.
+                { label: isMobile ? 'Research' : 'Market Research', icon: <ManageSearchIcon sx={{ fontSize: 14 }} />, badge: aiTasks?.unreadCount ?? 0 },
               ] as const).map((tab, idx) => {
                 const selected = activeTab === idx;
                 return (

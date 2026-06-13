@@ -301,7 +301,7 @@ const TradeList: React.FC<TradeListProps> = ({
   return (
     <Box sx={{ mt: 2, ...sx }}>
       {!hideHeader && (
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1, flexWrap: 'wrap', gap: 1 }}>
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             <Typography variant="subtitle1" sx={{ mr: 1 }}>
              {displayedCount < tradesLength ? `${formatCount(displayedCount)} of ${formatCount(tradesLength)}` : formatCount(tradesLength)} Trades
@@ -587,6 +587,7 @@ const TradeList: React.FC<TradeListProps> = ({
                       aria-label="More actions"
                       aria-controls={menuTrade?.id === trade.id ? 'trade-actions-menu' : undefined}
                       aria-haspopup="true"
+                      sx={{ p: { xs: 1 } }}
                     >
                       {isTradeBeingDeleted(trade.id) ? (
                         <CircularProgress size={16} />

@@ -7,7 +7,6 @@ import {
   Button,
   TextField,
   useTheme,
-  useMediaQuery,
   alpha,
   CircularProgress,
   IconButton,
@@ -37,6 +36,11 @@ import { dialogProps } from 'styles/dialogStyles';
 import { scrollbarStyles } from 'styles/scrollbarStyles';
 import { useDialogTokens } from 'styles/dialogTokens';
 import { getHairline } from 'styles/designTokens';
+import {
+  useFullScreenDialog,
+  SAFE_AREA_TOP,
+  SAFE_AREA_BOTTOM,
+} from 'components/common/useFullScreenDialog';
 
 interface LoginDialogProps {
   open: boolean;
@@ -49,6 +53,8 @@ export interface LoginPromptContentProps {
   title?: string;
   subtitle?: string;
   onAfterSignIn?: () => void;
+  /** When the dialog is full-screen (phones), pad header/footer for safe areas. */
+  fullScreen?: boolean;
 }
 
 type AuthStep = 'invite' | 'auth' | 'reset-password';
@@ -59,6 +65,7 @@ export const LoginPromptContent: React.FC<LoginPromptContentProps> = ({
   title = 'Welcome back',
   subtitle = 'Sign in to continue to JournoTrades',
   onAfterSignIn,
+  fullScreen = false,
 }) => {
   const theme = useTheme();
   const isDark = isDarkMode(theme);
@@ -346,6 +353,7 @@ export const LoginPromptContent: React.FC<LoginPromptContentProps> = ({
   const footerSurfaceSx = {
     px: { xs: 2.5, sm: 3 },
     py: 1.5,
+    pb: fullScreen ? SAFE_AREA_BOTTOM : 1.5,
     borderTop: `1px solid ${hairline}`,
     backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : alpha(theme.palette.text.primary, 0.02),
   };
@@ -404,6 +412,7 @@ export const LoginPromptContent: React.FC<LoginPromptContentProps> = ({
           gap: 1.5,
           px: { xs: 2.5, sm: 3 },
           py: 1.75,
+          pt: fullScreen ? SAFE_AREA_TOP : 1.75,
           borderBottom: `1px solid ${hairline}`,
         }}
       >
@@ -920,8 +929,7 @@ const LoginDialog: React.FC<LoginDialogProps> = ({
   subtitle = 'Sign in to continue to JournoTrades',
 }) => {
   const theme = useTheme();
-  const isDark = isDarkMode(theme);
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const { fullScreen, fullScreenPaperSx } = useFullScreenDialog();
   const hairline = getHairline(theme);
 
   return (
@@ -930,19 +938,19 @@ const LoginDialog: React.FC<LoginDialogProps> = ({
       onClose={onClose}
       maxWidth="xs"
       fullWidth
-      fullScreen={isMobile}
+      fullScreen={fullScreen}
       {...dialogProps}
       PaperProps={{
         sx: {
-          borderRadius: isMobile ? 0 : 2,
-          border: isMobile ? 'none' : `1px solid ${hairline}`,
+          borderRadius: 2,
+          border: `1px solid ${hairline}`,
           boxShadow: theme.shadows[10],
           backgroundImage: 'none',
           overflow: 'hidden',
           bgcolor: 'background.paper',
-          m: isMobile ? 0 : undefined,
-          maxHeight: isMobile ? '100vh' : 'calc(100vh - 64px)',
+          maxHeight: 'calc(100vh - 64px)',
           position: 'relative',
+          ...fullScreenPaperSx,
         },
       }}
     >
@@ -953,7 +961,7 @@ const LoginDialog: React.FC<LoginDialogProps> = ({
         sx={{
           position: 'absolute',
           right: 10,
-          top: 10,
+          top: fullScreen ? SAFE_AREA_TOP : 10,
           zIndex: 1,
           color: theme.palette.text.secondary,
           '&:hover': {
@@ -976,6 +984,7 @@ const LoginDialog: React.FC<LoginDialogProps> = ({
           title={title}
           subtitle={subtitle}
           onAfterSignIn={onClose}
+          fullScreen={fullScreen}
         />
       </DialogContent>
     </Dialog>

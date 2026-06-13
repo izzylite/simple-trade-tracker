@@ -117,7 +117,7 @@ const SharedNotePage: React.FC = () => {
             mode={mode}
           />
           <Toolbar />
-          <Container maxWidth="md" sx={{ pt: 4 }}>
+          <Container maxWidth="md" sx={{ pt: { xs: 2, sm: 4 }, px: { xs: 1, sm: 3 } }}>
             <Alert severity="error">
               Invalid share link
             </Alert>

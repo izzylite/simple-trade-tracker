@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, Container, Typography } from '@mui/material';
+import { HEADER_HEIGHT_XS, HEADER_HEIGHT_SM } from 'styles/layout';
 
 interface LegalPageProps {
   title: string;
@@ -29,10 +30,14 @@ const LegalPage: React.FC<LegalPageProps> = ({ title, lastUpdated, children }) =
   return (
   <Box
     sx={{
-      // Shell locks non-landing routes to 100vh with overflow:hidden and adds
-      // pt:8 (64px) for the fixed AppHeader. We own our own scroll container
-      // sized to the visible area below that header.
-      height: 'calc(100vh - 64px)',
+      // Shell locks non-landing routes to full height with overflow:hidden and
+      // offsets the fixed AppHeader (56px on phones, 64px on tablet+). We own
+      // our own scroll container sized to the visible area below that header.
+      // 100dvh (not 100vh) so the mobile URL bar doesn't clip the bottom.
+      height: {
+        xs: `calc(100dvh - ${HEADER_HEIGHT_XS}px)`,
+        sm: `calc(100dvh - ${HEADER_HEIGHT_SM}px)`,
+      },
       overflowY: 'auto',
       bgcolor: 'custom.pageBackground',
     }}

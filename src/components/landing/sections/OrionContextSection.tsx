@@ -441,6 +441,7 @@ const SynthesisAnswer: React.FC<{ enabled: boolean }> = ({ enabled }) => {
                             fontSize: '0.94rem',
                             lineHeight: 1.7,
                             position: 'relative',
+                            minHeight: { xs: 220, sm: 'auto' },
                         }}
                     >
                         {/* Hidden spacer reserves final height so the card doesn't
@@ -544,6 +545,7 @@ const PostMortemAnswer: React.FC<{ enabled: boolean }> = ({ enabled }) => {
                             fontSize: '0.94rem',
                             lineHeight: 1.7,
                             position: 'relative',
+                            minHeight: { xs: 200, sm: 'auto' },
                         }}
                     >
                         {/* Spacer reserves final height so the card doesn't grow as text types */}

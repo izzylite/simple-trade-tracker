@@ -224,6 +224,7 @@ const DayTradesContent: React.FC<DayTradesContentProps> = ({
         bgcolor: 'background.paper',
         display: 'flex',
         justifyContent: 'flex-end',
+        flexWrap: 'wrap',
         gap: 1,
         flexShrink: 0,
       }}>

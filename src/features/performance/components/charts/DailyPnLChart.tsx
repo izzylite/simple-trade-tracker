@@ -17,6 +17,7 @@ import { formatValue } from 'utils/formatters';
 import { log } from 'utils/logger';
 import CardShell from 'components/common/CardShell';
 import { TNUM } from 'styles/designTokens';
+import { useIsMobile } from 'hooks/useResponsive';
 
 interface DailyPnLChartProps {
   chartData: any[];
@@ -122,6 +123,7 @@ const DailyPnLChart: React.FC<DailyPnLChartProps> = ({
   timePeriod
 }) => {
   const theme = useTheme();
+  const isMobile = useIsMobile();
 
   // Define colors — keep semantic palette references but make the chart cohesive
   const COLORS = {
@@ -153,7 +155,7 @@ const DailyPnLChart: React.FC<DailyPnLChartProps> = ({
     >
       {/* Chart body */}
       <Box sx={{ p: 2 }}>
-        <ResponsiveContainer width="100%" height={300}>
+        <ResponsiveContainer width="100%" height={isMobile ? 240 : 300}>
           <BarChart data={chartData}>
             <CartesianGrid
               strokeDasharray="3 3"

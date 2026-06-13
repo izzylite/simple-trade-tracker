@@ -85,9 +85,11 @@ const ImageBlock: React.FC<ImageBlockProps> = ({ block, contentState, blockProps
       <Box
         sx={{
           position: 'relative',
-          maxWidth: width || '100%',
+          // Cap an explicit pixel width to the available space so wide images
+          // never push the editor/viewer past the viewport on small screens.
+          maxWidth: width ? `min(${typeof width === 'number' ? `${width}px` : width}, 100%)` : '100%',
           width: '100%',
-          overflow: 'hidden', 
+          overflow: 'hidden',
           // Ensure minimum dimensions during loading
           minHeight: isLoading ? 150 : undefined,
           minWidth: isLoading ? 200 : undefined,

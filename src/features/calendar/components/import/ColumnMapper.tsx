@@ -178,7 +178,7 @@ export const ColumnMapper: React.FC<ColumnMapperProps> = ({
         sx={{
           display: 'grid',
           gridTemplateColumns: '1fr 24px 1fr 20px',
-          gap: 1.25,
+          gap: { xs: 1, sm: 1.25 },
           px: 1.5,
           pb: 0.5,
         }}
@@ -221,7 +221,7 @@ export const ColumnMapper: React.FC<ColumnMapperProps> = ({
               sx={{
                 display: 'grid',
                 gridTemplateColumns: '1fr 24px 1fr 20px',
-                gap: 1.25,
+                gap: { xs: 1, sm: 1.25 },
                 alignItems: 'center',
                 px: 1.5,
                 py: 0.5,
@@ -333,7 +333,7 @@ export const ColumnMapper: React.FC<ColumnMapperProps> = ({
                       '& .MuiSelect-select': {
                         py: 0.75,
                         pl: 1.25,
-                        pr: 4,
+                        pr: 3,
                       },
                     }}
                   >
