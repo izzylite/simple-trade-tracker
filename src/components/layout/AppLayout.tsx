@@ -11,11 +11,12 @@ import {
   useMediaQuery,
 } from '@mui/material';
 import {
-  Menu as MenuIcon,
   Close as CloseIcon,
   CalendarToday as CalendarIcon,
 } from '@mui/icons-material';
 import { Outlet } from 'react-router-dom';
+import { useMobileNav } from 'contexts/MobileNavContext';
+import { BELOW_HEADER_HEIGHT } from 'styles/layout';
 import SideNav, { SIDE_NAV_WIDTH } from 'components/layout/SideNav';
 import CalendarLockedOverlay from 'features/calendar/components/calendars/CalendarLockedOverlay';
 import { useCalendarsListPanel } from 'features/calendar/contexts/CalendarsListPanelContext';
@@ -54,7 +55,7 @@ const RouteSuspenseFallback: React.FC = () => (
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      minHeight: 'calc(100vh - 64px)',
+      minHeight: BELOW_HEADER_HEIGHT,
     }}
   >
     <CircularProgress size={28} />
@@ -98,7 +99,7 @@ interface AppLayoutProps {
 const AppLayout: React.FC<AppLayoutProps> = ({ children, onNewCalendar, isLocked = false }) => {
   const theme = useTheme();
   const isLgUp = useMediaQuery(theme.breakpoints.up('lg'));
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const { open: mobileNavOpen, closeNav } = useMobileNav();
 
   // Brief top progress bar on every route transition. Suspense fires the
   // skeleton fallback when the chunk needs fetching (first nav); for cached
@@ -142,33 +143,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, onNewCalendar, isLocked
   return (
     // App outer Box owns overflow:hidden + height:100vh, with 64px top
     // padding for the AppHeader — so AppLayout fills the remaining viewport.
-    <Box sx={{ display: 'flex', height: 'calc(100vh - 64px)', position: 'relative' }}>
+    <Box sx={{ display: 'flex', height: BELOW_HEADER_HEIGHT, position: 'relative' }}>
       <SideNav
         onNewCalendar={onNewCalendar}
         mobileOpen={mobileNavOpen}
-        onMobileClose={() => setMobileNavOpen(false)}
+        onMobileClose={closeNav}
       />
-
-      {/* Floating mobile-nav trigger — temporary until AppHeader gets a hamburger */}
-      {!isLgUp && (
-        <IconButton
-          onClick={() => setMobileNavOpen(true)}
-          aria-label="open navigation"
-          sx={{
-            position: 'fixed',
-            top: 72,
-            left: 8,
-            zIndex: theme.zIndex.appBar - 1,
-            bgcolor: 'background.paper',
-            border: `1px solid ${theme.palette.divider}`,
-            boxShadow: theme.shadows[2],
-            '&:hover': { bgcolor: 'background.paper' },
-          }}
-          size="small"
-        >
-          <MenuIcon fontSize="small" />
-        </IconButton>
-      )}
 
       <Box
         component="main"
@@ -215,7 +195,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, onNewCalendar, isLocked
             try to render against zero calendars. The dim overlay below sits
             on top of an empty placeholder so the column keeps its size. */}
         {showLockOverlay ? (
-          <Box sx={{ minHeight: 'calc(100vh - 64px)' }} />
+          <Box sx={{ minHeight: BELOW_HEADER_HEIGHT }} />
         ) : (
           children ?? (
             <Suspense fallback={<RouteSuspenseFallback />}>

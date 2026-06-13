@@ -42,6 +42,7 @@ import { TradeOperationsProvider } from 'features/calendar/contexts/TradeOperati
 import { EventNotificationsProvider } from 'features/events/contexts/EventNotificationsContext';
 import { SubscriptionProvider } from 'features/billing/contexts/SubscriptionContext';
 import { PanelMutexProvider, usePanelMutexSlot } from 'contexts/PanelMutexContext';
+import { MobileNavProvider } from 'contexts/MobileNavContext';
 import { useCalendarsListPanel } from 'features/calendar/contexts/CalendarsListPanelContext';
 
 // Lazy load page components from pages directory
@@ -415,7 +416,8 @@ function AppContent() {
             bgcolor: isLandingPage ? '#000' : 'custom.pageBackground',
             position: 'relative',
             pb: isLandingPage ? 0 : 0,
-            pt: isLandingPage ? 0 : 8, // Add top padding to account for fixed AppBar
+            // Clear the fixed AppBar — 56px on xs, 64px on sm+ (8 * 8 = 64).
+            pt: isLandingPage ? 0 : { xs: 7, sm: 8 },
             transition: theme.transitions.create(['margin', 'width'], {
               duration: theme.transitions.duration.shorter,
             })
@@ -730,12 +732,14 @@ function App() {
             <NotificationsProvider>
               <TradeSyncProvider>
                 <LocalizationProvider dateAdapter={AdapterDateFns}>
-                  <Router>
-                    <ScrollToTop />
-                    <Suspense fallback={<LoadingFallback />}>
-                      <AppContent />
-                    </Suspense>
-                  </Router>
+                  <MobileNavProvider>
+                    <Router>
+                      <ScrollToTop />
+                      <Suspense fallback={<LoadingFallback />}>
+                        <AppContent />
+                      </Suspense>
+                    </Router>
+                  </MobileNavProvider>
                 </LocalizationProvider>
               </TradeSyncProvider>
             </NotificationsProvider>

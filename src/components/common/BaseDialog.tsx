@@ -14,6 +14,7 @@ import { dialogProps } from 'styles/dialogStyles';
 import { scrollbarStyles } from 'styles/scrollbarStyles';
 import { Z_INDEX } from 'styles/zIndex';
 import { useDialogTokens } from 'styles/dialogTokens';
+import { useIsMobile } from 'hooks/useResponsive';
 
 export interface BaseDialogProps extends Omit<DialogProps, 'title'> {
   open: boolean;
@@ -61,6 +62,9 @@ const BaseDialog: React.FC<BaseDialogProps> = ({
 }) => {
   const theme = useTheme();
   const { paperSx, headerSx, iconAvatarSx, footerSx, primaryButtonSx, ghostButtonSx } = useDialogTokens();
+  // Phones get a full-screen dialog: edge-to-edge, no rounded corners/border,
+  // and header/footer that clear the notch + home-indicator safe areas.
+  const fullScreen = useIsMobile();
 
   const showFooter = !!(actions || !hideFooterCancelButton || primaryButtonAction);
 
@@ -70,17 +74,29 @@ const BaseDialog: React.FC<BaseDialogProps> = ({
       onClose={onClose}
       maxWidth={maxWidth}
       fullWidth={fullWidth}
+      fullScreen={fullScreen}
       {...dialogProps}
       sx={{ zIndex: Z_INDEX.DIALOG }}
       slotProps={{
         paper: {
-          sx: { ...paperSx, maxHeight: '90vh' },
+          sx: {
+            ...paperSx,
+            ...(fullScreen
+              ? { maxHeight: '100%', borderRadius: 0, border: 'none' }
+              : { maxHeight: '90vh' }),
+          },
         },
       }}
       {...rest}
     >
       {/* Header */}
-      <Box sx={{ ...headerSx, flexShrink: 0 }}>
+      <Box
+        sx={{
+          ...headerSx,
+          flexShrink: 0,
+          ...(fullScreen && { pt: 'max(14px, env(safe-area-inset-top))' }),
+        }}
+      >
         {headerIcon && <Box sx={iconAvatarSx}>{headerIcon}</Box>}
         <Box sx={{ flex: 1, minWidth: 0 }}>
           {typeof title === 'string' ? (
@@ -134,7 +150,13 @@ const BaseDialog: React.FC<BaseDialogProps> = ({
 
       {/* Footer */}
       {showFooter && (
-        <Box sx={{ ...footerSx, flexShrink: 0 }}>
+        <Box
+          sx={{
+            ...footerSx,
+            flexShrink: 0,
+            ...(fullScreen && { pb: 'max(12px, env(safe-area-inset-bottom))' }),
+          }}
+        >
           {(!hideFooterCancelButton || cancelButtonAction) && (
             <Button
               onClick={cancelButtonAction || onClose}

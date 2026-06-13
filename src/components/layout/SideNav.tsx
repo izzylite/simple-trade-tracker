@@ -27,9 +27,14 @@ import { useAuth } from 'contexts/SupabaseAuthContext';
 import { useCalendars } from 'features/calendar/hooks/useCalendars';
 import { useSubscription } from 'features/billing/contexts/SubscriptionContext';
 import type { Calendar } from 'features/calendar/types/dualWrite';
+import {
+  HEADER_HEIGHT,
+  HEADER_HEIGHT_SM,
+  BELOW_HEADER_HEIGHT,
+  BELOW_HEADER_HEIGHT_PCT,
+} from 'styles/layout';
 
 export const SIDE_NAV_WIDTH = 92;
-const APP_HEADER_HEIGHT = 64;
 const TILE_SIZE = 44;
 
 /**
@@ -364,8 +369,8 @@ const SideNav: React.FC<SideNavProps> = ({
           '& .MuiDrawer-paper': {
             width: SIDE_NAV_WIDTH,
             boxSizing: 'border-box',
-            top: APP_HEADER_HEIGHT,
-            height: `calc(100vh - ${APP_HEADER_HEIGHT}px)`,
+            top: HEADER_HEIGHT_SM,
+            height: BELOW_HEADER_HEIGHT.sm,
             borderRight: 0,
           },
         }}
@@ -385,11 +390,11 @@ const SideNav: React.FC<SideNavProps> = ({
         '& .MuiDrawer-paper': {
           width: SIDE_NAV_WIDTH,
           boxSizing: 'border-box',
-          top: APP_HEADER_HEIGHT,
-          height: `calc(100% - ${APP_HEADER_HEIGHT}px)`,
+          top: HEADER_HEIGHT,
+          height: BELOW_HEADER_HEIGHT_PCT,
         },
         '& .MuiBackdrop-root': {
-          top: APP_HEADER_HEIGHT,
+          top: HEADER_HEIGHT,
         },
       }}
     >

@@ -19,11 +19,14 @@ import {
   LightMode as LightModeIcon,
   DarkMode as DarkModeIcon,
   Logout as LogoutIcon,
-  BugReport as BugReportIcon
+  BugReport as BugReportIcon,
+  Menu as MenuIcon
 } from '@mui/icons-material';
 import { useTheme, alpha } from '@mui/material/styles';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from 'contexts/SupabaseAuthContext';
+import { useMobileNavOptional } from 'contexts/MobileNavContext';
+import { useIsDesktop } from 'hooks/useResponsive';
 import { error } from 'utils/logger';
 import DebugPanel from 'components/common/DebugPanel';
 import NotificationsBell from 'components/notifications/NotificationsBell';
@@ -61,6 +64,11 @@ const AppHeader: React.FC<AppHeaderProps> = ({ onToggleTheme, mode }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, signOut } = useAuth();
+  // Hamburger opens the SideNav drawer below `lg`. The drawer lives in
+  // AppLayout (a sibling), so the open state is shared via MobileNavContext.
+  const isLgUp = useIsDesktop();
+  const mobileNav = useMobileNavOptional();
+  const showMenuButton = !!user && !isLgUp && !!mobileNav;
 
   const [debugPanelOpen, setDebugPanelOpen] = useState(false);
   const [loginDialogOpen, setLoginDialogOpen] = useState(false);
@@ -118,11 +126,27 @@ const AppHeader: React.FC<AppHeaderProps> = ({ onToggleTheme, mode }) => {
       >
         <Toolbar
           sx={{
-            px: { xs: 2, sm: 3 },
+            px: { xs: 1.5, sm: 3 },
             minHeight: { xs: 56, sm: 64 },
-            gap: 2
+            gap: { xs: 1, sm: 2 }
           }}
         >
+          {/* Hamburger — opens the SideNav drawer below `lg` (auth users only). */}
+          {showMenuButton && (
+            <IconButton
+              edge="start"
+              onClick={() => mobileNav?.openNav()}
+              aria-label="open navigation menu"
+              sx={{
+                color: 'text.secondary',
+                mr: { xs: 0, sm: 0.5 },
+                '&:hover': { color: 'text.primary' }
+              }}
+            >
+              <MenuIcon />
+            </IconButton>
+          )}
+
           {/* Logo */}
           <Box
             onClick={() => navigate(user ? '/dashboard' : '/')}
@@ -242,7 +266,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({ onToggleTheme, mode }) => {
               </IconButton>
             )}
 
-            {/* Discord */}
+            {/* Discord — hidden on phones to keep the 360px toolbar uncluttered. */}
             <IconButton
               component="a"
               href="https://discord.gg/tAYGUXsnJr"
@@ -250,6 +274,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({ onToggleTheme, mode }) => {
               rel="noopener noreferrer"
               size="small"
               sx={{
+                display: { xs: 'none', sm: 'inline-flex' },
                 color: 'text.secondary',
                 '&:hover': {
                   color: '#5865F2',
