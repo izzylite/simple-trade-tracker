@@ -69,7 +69,11 @@ const UnifiedDrawer: React.FC<UnifiedDrawerProps> = ({
   };
 
   const headerStyles = {
-    p: '16px 20px',
+    px: '20px',
+    py: '16px',
+    // Clear the status-bar / notch safe area when the drawer is full-height on
+    // phones (it sits flush with the top edge).
+    pt: { xs: 'max(16px, env(safe-area-inset-top))', sm: '16px' },
     borderBottom: `1px solid ${theme.palette.divider}`,
     display: 'flex',
     alignItems: 'center',
@@ -160,6 +164,8 @@ const UnifiedDrawer: React.FC<UnifiedDrawerProps> = ({
         <Box sx={{
           flex: 1,
           overflow: 'auto',
+          // Clear the home-indicator safe area at the bottom on phones.
+          pb: 'env(safe-area-inset-bottom)',
           ...contentSx
         }}>
           {children}

@@ -20,6 +20,7 @@ import {
 import { dialogProps } from 'styles/dialogStyles';
 import { Z_INDEX } from 'styles/zIndex';
 import { useDialogTokens } from 'styles/dialogTokens';
+import { useFullScreenDialog, SAFE_AREA_TOP, SAFE_AREA_BOTTOM } from 'components/common/useFullScreenDialog';
 
 type ConfirmColor = 'primary' | 'error' | 'warning' | 'success' | 'info';
 
@@ -73,6 +74,7 @@ const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
   } = useDialogTokens(accent);
 
   const Icon = ICONS[confirmColor];
+  const { fullScreen, fullScreenPaperSx } = useFullScreenDialog();
 
   return (
     <Dialog
@@ -80,12 +82,13 @@ const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
       onClose={onCancel}
       maxWidth="xs"
       fullWidth
+      fullScreen={fullScreen}
       {...dialogProps}
       sx={{ zIndex: Z_INDEX.DIALOG, ...sx }}
-      slotProps={{ paper: { sx: paperSx } }}
+      slotProps={{ paper: { sx: { ...paperSx, ...fullScreenPaperSx } } }}
     >
       {/* Header */}
-      <Box sx={headerSx}>
+      <Box sx={{ ...headerSx, ...(fullScreen && { pt: SAFE_AREA_TOP }) }}>
         <Box sx={iconAvatarSx}>
           <Icon sx={{ fontSize: 18 }} />
         </Box>
@@ -122,7 +125,7 @@ const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
       </Box>
 
       {/* Footer */}
-      <Box sx={footerSx}>
+      <Box sx={{ ...footerSx, ...(fullScreen && { pb: SAFE_AREA_BOTTOM }) }}>
         <Button onClick={onCancel} disabled={isSubmitting} sx={ghostButtonSx}>
           {cancelText}
         </Button>

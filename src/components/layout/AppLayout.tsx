@@ -361,7 +361,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children, onNewCalendar, isLocked
             flexDirection: 'column',
           }}
         >
-          <SidePanel renderView={appRenderView} />
+          {/* UnifiedDrawer already renders the title + close chrome — suppress
+              SidePanel's own header so phones don't get two stacked headers. */}
+          <SidePanel renderView={appRenderView} hideHeader />
         </UnifiedDrawer>
       )}
     </Box>

@@ -36,7 +36,7 @@ const SidePanelHeader: React.FC<SidePanelHeaderProps> = ({ title, icon, hideBack
         <IconButton
           onClick={popPanel}
           size="small"
-          sx={{ mr: 0.5 }}
+          sx={{ mr: 0.5, p: { xs: 1, sm: 0.5 } }}
           aria-label="Go back"
         >
           <ArrowBackIcon fontSize="small" />
@@ -68,6 +68,7 @@ const SidePanelHeader: React.FC<SidePanelHeaderProps> = ({ title, icon, hideBack
         aria-label="Close panel"
         sx={{
           color: 'text.secondary',
+          p: { xs: 1, sm: 0.5 },
           '&:hover': {
             color: 'text.primary',
           },
