@@ -1,9 +1,22 @@
 # Mobile Responsive Support — Design & Plan
 
-**Status:** In progress
+**Status:** Implemented (P0–P4 complete) — pending review/merge
 **Branch:** `feat/mobile-responsive-support`
-**Started:** 2026-06-13
+**Started / Completed:** 2026-06-13
 **Owner:** app-wide UI
+
+## Outcome (2026-06-13)
+
+Shipped P0–P3 across 5 commits. Verification: `tsc --noEmit` clean (all
+changed files), `npm run build` green, `npm run test:ci` green, static
+overflow sweep clean. Playwright at 360px **and** 320px on the public routes
+(`/`, `/pricing`, `/about`, `/terms`) → **0 horizontal page overflow**, 0
+console errors. The authenticated pillars (calendar/performance/notes/events/
+orion) were fixed against the structured audit + reviewed at the diff level but
+**not** driven through Playwright (Supabase auth — no test credentials in this
+environment); a future manual/logged-in pass at 360px is the remaining check.
+
+Audit basis: `mobile-audit-findings.json` (179 surfaces) + `mobile-audit-tasks.txt`.
 
 ## Goal
 
