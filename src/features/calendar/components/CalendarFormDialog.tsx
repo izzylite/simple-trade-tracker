@@ -323,6 +323,9 @@ export const CalendarFormDialog: React.FC<CalendarFormDialogProps> = ({
           ...scrollbarStyles(theme),
           overflowY: 'auto',
           maxHeight: fullScreen ? undefined : '70vh',
+          // Under full-screen the body must flex+scroll so the footer stays
+          // pinned and the Create/Save action is reachable on phones.
+          ...(fullScreen ? { flex: 1, minHeight: 0 } : {}),
         }}
       >
         {/* Identity */}

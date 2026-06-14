@@ -34,6 +34,7 @@ import {
 } from '../../services/sharingService';
 import { Z_INDEX } from 'styles/zIndex';
 import { useDialogTokens, MONO_FONT } from 'styles/dialogTokens';
+import { useFullScreenDialog, SAFE_AREA_TOP, SAFE_AREA_BOTTOM } from 'components/common/useFullScreenDialog';
 
 // Generic interface for shareable items
 interface ShareableItem {
@@ -72,6 +73,7 @@ const ShareButton: React.FC<ShareButtonProps> = (props) => {
   const { type, item, onUpdateItemProperty } = props;
   const { user } = useAuthState();
   const theme = useTheme();
+  const { fullScreen, fullScreenPaperSx } = useFullScreenDialog();
   const {
     violet, surfaceInset, hairline,
     paperSx, headerSx, iconAvatarSx, footerSx,
@@ -288,16 +290,17 @@ const ShareButton: React.FC<ShareButtonProps> = (props) => {
               onClick={(e) => e.stopPropagation()}
               maxWidth="sm"
               fullWidth
+              fullScreen={fullScreen}
               {...dialogProps}
               sx={{ zIndex: Z_INDEX.TOOLTIP }}
               slotProps={{
                 paper: {
-                  sx: paperSx,
+                  sx: { ...paperSx, ...fullScreenPaperSx },
                 },
               }}
             >
               {/* Header */}
-              <Box sx={headerSx}>
+              <Box sx={{ ...headerSx, ...(fullScreen && { pt: SAFE_AREA_TOP }) }}>
                 <Box sx={iconAvatarSx}>
                   <LinkIcon sx={{ fontSize: 18 }} />
                 </Box>
@@ -362,7 +365,7 @@ const ShareButton: React.FC<ShareButtonProps> = (props) => {
               </Box>
 
               {/* Footer */}
-              <Box sx={footerSx}>
+              <Box sx={{ ...footerSx, ...(fullScreen && { pb: SAFE_AREA_BOTTOM }) }}>
                 <Button
                   onClick={() => setShareDialogOpen(false)}
                   sx={ghostButtonSx}

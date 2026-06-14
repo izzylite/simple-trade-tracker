@@ -159,6 +159,9 @@ const TagFilterDialog: React.FC<TagFilterDialogProps> = ({
           flexDirection: 'column',
           gap: 2.25,
           maxHeight: fullScreen ? undefined : '70vh',
+          // Under full-screen the body must flex+scroll so the footer
+          // (Clear/Apply) stays pinned and reachable on tag-heavy calendars.
+          ...(fullScreen ? { flex: 1, minHeight: 0 } : {}),
           overflowY: 'auto',
           ...scrollbarStyles(theme),
         }}

@@ -22,6 +22,7 @@ import { alpha } from '@mui/material/styles';
 import { dialogProps } from 'styles/dialogStyles';
 import { scrollbarStyles } from 'styles/scrollbarStyles';
 import { useDialogTokens } from 'styles/dialogTokens';
+import { useFullScreenDialog, SAFE_AREA_TOP, SAFE_AREA_BOTTOM } from 'components/common/useFullScreenDialog';
 import { Editor, EditorState, Modifier, convertToRaw } from 'draft-js';
 import 'draft-js/dist/Draft.css';
 
@@ -235,6 +236,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
 }, ref) => {
   const theme = useTheme();
   const linkDialogTokens = useDialogTokens();
+  const { fullScreen, fullScreenPaperSx } = useFullScreenDialog();
   const Z_INDEX = 2000;
 
   // Refs must be declared before any useEffect that uses them
@@ -1355,14 +1357,15 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
             onClose={handleClose}
             maxWidth="sm"
             fullWidth
+            fullScreen={fullScreen}
             disableScrollLock
             disableRestoreFocus
             {...dialogProps}
             sx={{ zIndex: Z_INDEX }}
-            slotProps={{ paper: { sx: paperSx } }}
+            slotProps={{ paper: { sx: { ...paperSx, ...fullScreenPaperSx } } }}
           >
             {/* Header */}
-            <Box sx={headerSx}>
+            <Box sx={{ ...headerSx, ...(fullScreen && { pt: SAFE_AREA_TOP }) }}>
               <Box sx={iconAvatarSx}>
                 {hasExistingLink ? (
                   <EditIcon sx={{ fontSize: 18 }} />
@@ -1449,7 +1452,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
             </Box>
 
             {/* Footer */}
-            <Box sx={{ ...footerSx, justifyContent: 'space-between' }}>
+            <Box sx={{ ...footerSx, justifyContent: 'space-between', ...(fullScreen && { pb: SAFE_AREA_BOTTOM }) }}>
               {hasExistingLink ? (
                 <Button
                   onClick={() => {

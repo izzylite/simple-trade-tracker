@@ -155,7 +155,7 @@ const CustomToolCard: React.FC<Props> = ({
                   onClick={() => onTest(tool)}
                   disabled={!tool.is_enabled || isTesting}
                   aria-label={`Test ${tool.name}`}
-                  sx={{ color: theme.palette.text.secondary, p: { xs: 1, sm: 0.75 } }}
+                  sx={{ color: theme.palette.text.secondary, p: { xs: 1 } }}
                 >
                   {isTesting
                     ? <CircularProgress size={14} thickness={5} />
@@ -169,7 +169,7 @@ const CustomToolCard: React.FC<Props> = ({
                 onClick={() => onToggleExpanded(tool.id)}
                 aria-label={expanded ? `Collapse ${tool.name}` : `Expand ${tool.name}`}
                 aria-expanded={expanded}
-                sx={{ color: theme.palette.text.secondary, p: { xs: 1, sm: 0.75 } }}
+                sx={{ color: theme.palette.text.secondary, p: { xs: 1 } }}
               >
                 {expanded
                   ? <ExpandLessIcon fontSize="small" />
@@ -181,7 +181,7 @@ const CustomToolCard: React.FC<Props> = ({
                 size="small"
                 onClick={() => onDelete(tool)}
                 aria-label={`Delete ${tool.name}`}
-                sx={{ color: theme.palette.text.secondary, p: { xs: 1, sm: 0.75 } }}
+                sx={{ color: theme.palette.text.secondary, p: { xs: 1 } }}
               >
                 <DeleteIcon fontSize="small" />
               </IconButton>

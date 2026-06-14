@@ -456,11 +456,13 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
           // `display: block` lets a raw <table> become its own scroll box
           // since the HTML is injected via dangerouslySetInnerHTML and can't
           // be wrapped with a React element per-table.
+          // Gate the scroll-box treatment to phones — sm+ keeps the original
+          // full-width `display: table` rendering so desktop is unchanged.
           '& table': {
-            display: 'block',
-            width: 'max-content',
+            display: { xs: 'block', sm: 'table' },
+            width: { xs: 'max-content', sm: '100%' },
             maxWidth: '100%',
-            overflowX: 'auto',
+            overflowX: { xs: 'auto', sm: 'visible' },
             borderCollapse: 'collapse',
             margin: '0.75rem 0',
             fontSize: '0.88em'

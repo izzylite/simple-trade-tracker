@@ -290,15 +290,25 @@ const NotesContent: React.FC<NotesContentProps> = ({
           />
         </Box>
 
-        {/* Search and Filter Row — on xs, search gets its own full-width row
-            and the creator Select + view-toggle wrap onto a second row. */}
-        <Box sx={{ px: 2, pb: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
+        {/* Search and Filter Row — single row on sm+ (unchanged desktop). On
+            xs it stacks: search gets its own full-width row and the creator
+            Select + view-toggle drop to a second row. */}
+        <Box
+          sx={{
+            px: 2,
+            pb: 2,
+            display: 'flex',
+            flexDirection: { xs: 'column', sm: 'row' },
+            alignItems: { xs: 'stretch', sm: 'center' },
+            gap: 1,
+          }}
+        >
           <TextField
             size="small"
             placeholder="Search notes..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            sx={{ width: '100%' }}
+            sx={{ width: { xs: '100%' }, flex: { sm: 1 } }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">

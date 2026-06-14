@@ -333,7 +333,9 @@ export const ColumnMapper: React.FC<ColumnMapperProps> = ({
                       '& .MuiSelect-select': {
                         py: 0.75,
                         pl: 1.25,
-                        pr: 3,
+                        // Keep MUI's default caret clearance on desktop; only
+                        // tighten on phones to recover width.
+                        pr: { xs: 3, sm: 4 },
                       },
                     }}
                   >

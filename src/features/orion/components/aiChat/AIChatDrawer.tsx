@@ -480,7 +480,8 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              flexWrap: 'wrap',
+              // Wrap only on phones; desktop bottom-sheet keeps the single row.
+              flexWrap: { xs: 'wrap', sm: 'nowrap' },
               gap: 1,
             }}
           >

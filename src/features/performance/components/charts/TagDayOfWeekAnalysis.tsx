@@ -166,6 +166,7 @@ const TagDayOfWeekAnalysis: React.FC<TagDayOfWeekAnalysisProps> = ({
         sx={{
           textTransform: 'none',
           flex: isMobile ? 1 : 'unset',
+          minHeight: { xs: 44, sm: 'auto' },
           '&:focus-visible': { boxShadow: theme.palette.custom.focusRing },
         }}
       >
@@ -178,6 +179,7 @@ const TagDayOfWeekAnalysis: React.FC<TagDayOfWeekAnalysisProps> = ({
         sx={{
           textTransform: 'none',
           flex: isMobile ? 1 : 'unset',
+          minHeight: { xs: 44, sm: 'auto' },
           '&:focus-visible': { boxShadow: theme.palette.custom.focusRing },
         }}
       >
@@ -201,6 +203,7 @@ const TagDayOfWeekAnalysis: React.FC<TagDayOfWeekAnalysisProps> = ({
           sx={{
             textTransform: 'none',
             flex: isMobile ? 1 : 'unset',
+            minHeight: { xs: 44, sm: 'auto' },
             borderColor: primaryTags.length > 0 ? 'primary.main' : undefined,
             '&:focus-visible': { boxShadow: theme.palette.custom.focusRing },
           }}
@@ -223,6 +226,7 @@ const TagDayOfWeekAnalysis: React.FC<TagDayOfWeekAnalysisProps> = ({
           sx={{
             textTransform: 'none',
             flex: isMobile ? 1 : 'unset',
+            minHeight: { xs: 44, sm: 'auto' },
             borderColor: secondaryTags.length > 0 ? 'secondary.main' : undefined,
             '&:focus-visible': { boxShadow: theme.palette.custom.focusRing },
           }}

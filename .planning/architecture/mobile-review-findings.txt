@@ -1,0 +1,149 @@
+CONFIRMED 16 | unverified 0 | low 15
+bySeverity {"critical":0,"high":3,"medium":8}
+
+#1 [high/mobile-incomplete] src/features/calendar/components/TagFormDialog.tsx
+   @ body Box (component="form") sx, ~line 434-446 (maxHeight: fullScreen ? undefined : '70vh')
+   PROBLEM: Same defect as CalendarFormDialog. Under fullScreen `maxHeight` is removed but the form body lacks `flex: 1, minHeight: 0`, so on a phone the tall tag form (preview row, name, group select, color picker, etc.) grows past the full-screen paper and the footer — which holds Delete (edit mode) and Cancel/Create-or-Save — is clipped by paperSx `overflow: hidden`. The submit action becomes unreachable on small phones. TagSuggestionReviewDialog applied the correct `flex:1/minHeight:0` fix; this one did not.
+   FIX: In src/features/calendar/components/TagFormDialog.tsx, on the body form Box sx (the block at lines ~437-446 containing `overflowY: 'auto', maxHeight: fullScreen ? undefined : '70vh'`), add `...(fullScreen ? { flex: 1, minHeight: 0 } : {})`. This makes the body the flexible, internally-scrolling element under fullScreen (it already has overflowY:'auto'), so the header and footer stay pinned and the Create/Save/Delete actions remain reachable on phones. This mirrors the correct pattern already used in TagSuggestionReviewDialog.tsx line 212. (CalendarFormDialog.tsx line 325 needs the same fix but is out of scope for this finding.)
+
+#2 [high/mobile-incomplete] src/features/calendar/components/TagSelectionDialog.tsx
+   @ body Box sx, ~line 213-223 (maxHeight: fullScreen ? undefined : '60vh')
+   PROBLEM: Same defect. The item list body had `maxHeight: '60vh'` precisely because the selectable-tag list can be long; under fullScreen the cap is dropped to `undefined` with no `flex: 1, minHeight: 0`. With many tags on a phone the list body expands beyond the full-screen paper and the footer (the 'Done' button — the only way to confirm/close-with-selection) is clipped by paperSx `overflow: hidden`, so the body's `overflowY: auto` never kicks in.
+   FIX: In src/features/calendar/components/TagSelectionDialog.tsx, in the Body Box sx (around lines 213-224), add `...(fullScreen ? { flex: 1, minHeight: 0 } : {})` alongside the existing `maxHeight: fullScreen ? undefined : '60vh'` and `overflowY: 'auto'`, matching TagSuggestionReviewDialog. Concretely:
+
+  <Box
+    sx={{
+      px: 2.5,
+      py: 2,
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 2,
+      maxHeight: fullScreen ? undefined : '60vh',
+      ...(fullScreen ? { flex: 1, minHeight: 0 } : {}),
+      overflowY: 'auto',
+      ...scrollbarStyles(theme),
+    }}
+  >
+
+Desktop keeps the gated 60vh cap unchanged; under fullScreen the body now grows to fill remaining Paper height, scrolls internally, and the footer 'Done' button stays visible.
+
+#3 [high/desktop-regression] src/features/notes/components/sidePanel/NotesContent.tsx
+   @ line 295 (Search and Filter Row container Box)
+   PROBLEM: The search/filter row container was changed from a single horizontal row (`display:'flex', gap:1, alignItems:'center'`) to `display:'flex', flexDirection:'column', gap:1` UNCONDITIONALLY — it applies to ALL breakpoints, not just xs. The accompanying comment even states 'on xs, search gets its own full-width row', but the code does not gate the column direction behind xs. NotesContent renders in the desktop side panel (EconomicEventsPage 'Gameplan'/'Notes' panel + NotesDrawer), so on desktop the layout visibly regresses from one row (search | creator-select | view-toggle) to two stacked rows (full-width search on row 1, select+toggle on row 2). This violates the CRITICAL RULE that sm+/desktop appearance must be unchanged.
+   FIX: Gate the container direction so desktop keeps its single row. In NotesContent.tsx line 295 change the container to: `sx={{ px: 2, pb: 2, display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: { sm: 'center' }, gap: 1 }}`. Change the TextField sx (line 301) from `width: '100%'` to `width: { xs: '100%' }, flex: { sm: 1 }` so it stacks full-width on xs but flexes within the row on sm+ as before. The inner Box wrapping the Select + ToggleButtonGroup can keep `display:'flex', gap:1, alignItems:'center', flexWrap:'wrap'` (flexWrap only matters on xs); on sm+ it sits to the right of the flexing search field, reproducing the original [search | select | toggle] single-row desktop layout. The FormControl's existing `minWidth: { xs: 0, sm: 140 }, flex: { xs: 1, sm: 'initial' }` props are already correct for both breakpoints.
+
+#4 [medium/mobile-incomplete] src/features/calendar/components/trades/DayHeader.tsx
+   @ lines 95-108 (Day P&L tile / PnlValue) vs 140-156 (Balance tile)
+   PROBLEM: The mobile overflow fix was applied to only one of two symmetric `flex: 1` tiles. The Balance tile got an xs font reduction (`{ xs: '1.1rem', sm: compact ? '1rem' : '1.5rem' }`) plus overflow/ellipsis/nowrap. The adjacent Day P&L tile still renders PnlValue at `size='lg'` (hard-coded 1.5rem, inline-flex, no shrink, no ellipsis) with no xs treatment. On a 360px phone (e.g. TradeFormDialog which goes full-screen via BaseDialog) the P&L magnitude at 1.5rem mono can exceed its half-width tile and overflow/push, since PnlValue is inline-flex inside a `minWidth:0` box but never truncates. The two tiles will also look mismatched (P&L 1.5rem vs Balance 1.1rem) at xs.
+   FIX: Give the Day P&L tile parity with the Balance tile. In DayHeader.tsx, change the PnlValue render (lines 103-107) to reduce size on phones and add overflow protection. Concretely: pass a smaller size at xs (e.g. drop to 'md'/1rem on narrow screens, since PnlValue has no responsive size, use its `sx` prop to override fontSize responsively: `sx={{ fontSize: { xs: '1.1rem', sm: compact ? '1rem' : '1.5rem' }, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-flex' }}`) so the number both matches the Balance tile's xs scale and cannot overflow its half-width tile. This mirrors exactly the treatment already applied to the Balance Typography (fontSize xs override + overflow:hidden/textOverflow:ellipsis/whiteSpace:nowrap) so the two tiles stay visually symmetric and neither overflows on a 360px phone.
+
+#5 [medium/mobile-incomplete] src/features/calendar/components/TagFilterDialog.tsx
+   @ body Box sx, ~line 154-164 (maxHeight: fullScreen ? undefined : '70vh')
+   PROBLEM: Same structural defect: under fullScreen the body loses its `maxHeight: '70vh'` cap without gaining `flex: 1, minHeight: 0`. When a calendar has many tag groups / many tags, the filter chip list body grows past the full-screen paper and the footer (Clear / Apply buttons) is pushed off-screen and clipped by paperSx `overflow: hidden`. Severity slightly lower than the form dialogs only because the chip content is sometimes short, but the unbounded-growth bug is identical and triggers on tag-heavy calendars.
+   FIX: In the body Box sx (src/features/calendar/components/TagFilterDialog.tsx ~line 161), add `...(fullScreen ? { flex: 1, minHeight: 0 } : {})` immediately after the `maxHeight: fullScreen ? undefined : '70vh'` line, mirroring the sibling TagSuggestionReviewDialog.tsx:211-212. This makes the chip area grow to fill available paper space and scroll internally on phones, keeping the Clear/Cancel/Apply footer pinned and visible.
+
+#6 [medium/tap-target] src/features/performance/components/charts/TagPerformanceAnalysis.tsx
+   @ lines 126-167 (filterButtons) rendered in the mobile body toolbar at lines ~225-230
+   PROBLEM: The two filter buttons ('Primary'/'Secondary') relocated into the full-width mobile body toolbar use size="small" with only `flex: isMobile ? 1` and no height override. With the theme's MuiButton root padding (`8px 20px`, lineHeight 1) and a ~0.8125rem font, the rendered button height lands ~28-32px — below the 44px tap-target floor the sweep's CRITICAL RULE mandates on phones. The buttons stretch full-width (easy to hit horizontally) but are too short vertically. The sweep's own audit note for this surface ended with 'Ensure t[ap targets]...' confirming 44px was intended but not implemented.
+   FIX: Gate a mobile-only vertical hit-area bump on both relocated filter buttons, matching the commit's own convention. In the `sx` of each Button (lines ~132 and ~154), alongside the existing `flex: isMobile ? 1 : 'unset'`, add `minHeight: { xs: 44, sm: 'auto' }` (or `{ xs: 44, sm: 36 }` to mirror EditorToolbar). This brings the phone tap target to the 44px floor while leaving desktop (sm+, where the buttons sit in the header right-slot) unchanged. Verified file: c:\Users\Izzy\Documents\Projects\simple-trade-tracker\src\features\performance\components\charts\TagPerformanceAnalysis.tsx
+
+#7 [medium/tap-target] src/pages/EconomicEventsPage.tsx
+   @ CurrencyChips ButtonBase, lines ~957 and ~991 (minHeight: { xs: 36 })
+   PROBLEM: The xs override added to the currency filter chips and the 'Clear' chip lands at `minHeight: { xs: 36 }`. The sweep's stated requirement is 44px tap targets on phones. 36px is below the 44px minimum, so the intended tap-target fix is under-spec. These are genuinely small, finger-targeted toggle chips on the phone events toolbar.
+   FIX: Raise the mobile hit area to 44px on both chips while leaving desktop unaffected. In CurrencyChips, change the per-currency ButtonBase (line ~957) and the Clear ButtonBase (line ~991) from `minHeight: { xs: 36 }` to `minHeight: { xs: 44, sm: 36 }`, matching the 44/36 pattern the same sweep applied to EditorToolbar.tsx. Horizontal sizing (px) is already fine; only the vertical hit area needs to reach 44 on phones. This keeps the canonical 36px chip height on desktop and brings the touch target up to the sweep's stated bar.
+
+#8 [medium/mobile-incomplete] src/pages/NotesPage.tsx
+   @ lines 128-136 (auto-select effect) vs lines 241-242 (showListOnMobile/showCenterOnMobile)
+   PROBLEM: The master-detail mobile collapse relies on `showListOnMobile = isMobile && !selectedNote && !isEditing && !isNewDraft` to show the list when nothing is selected. But the auto-select effect (lines 128-136) is NOT gated by isMobile and unconditionally sets `selectedNote = notes[0]` on first load whenever notes exist. On a phone this fires immediately, so `selectedNote` is non-null on entry → `showListOnMobile` is false → `showCenterOnMobile` is true. Result: phone users land directly in the single-note detail view with a Back button and NEVER see the notes list on entry (until they tap Back). The SPECIAL requirement 'no note + not editing -> list' is therefore not actually reachable on first load on mobile when any note exists — defeating the list-first master-detail intent.
+   FIX: Gate the auto-select effect so it does not run on phones, leaving mobile to land on the list. In src/pages/NotesPage.tsx, add an early-out at the top of the effect body and add isMobile to the dependency array:
+
+  useEffect(() => {
+    if (didAutoSelectRef.current) return;
+    if (isMobile) return;            // phones land on the list (master-detail); desktop unchanged
+    if (loading) return;
+    if (selectedNote || isNewDraft || isEditing) return;
+    if (notes.length === 0) return;
+    didAutoSelectRef.current = true;
+    setSelectedNote(notes[0]);
+  }, [loading, notes, selectedNote, isNewDraft, isEditing, isMobile]);
+
+Desktop auto-select behavior is preserved exactly (isMobile is false there). On mobile, selectedNote stays null on entry, so showListOnMobile is true and NoteListPanel renders; tapping a note (handleNoteClick) opens the center pane as intended, and the Back button clears selection back to the list.
+
+#9 [medium/desktop-regression] src/features/orion/components/aiChat/HtmlMessageRenderer.tsx
+   @ lines 459-467, '& table' style block
+   PROBLEM: The '& table' rule was changed from a gated/plain `width: '100%'` to an UNGATED `display: 'block', width: 'max-content', maxWidth: '100%', overflowX: 'auto'`. This applies to ALL breakpoints, including desktop. On desktop, briefing/HTML tables that previously filled the message bubble at 100% width (cells distributed edge-to-edge, native `display: table` layout) now shrink to their natural content width (`max-content`) and render as a `display: block` horizontal scroll box. This visibly changes the desktop appearance of every assistant message that contains a table — wide tables no longer span the bubble and narrow tables no longer stretch to 100%. The horizontal-scroll-on-overflow behavior was a mobile-overflow fix but it was applied to the base style instead of being gated behind xs, so it regresses desktop. (The dangerouslySetInnerHTML constraint that prevents a per-table React wrapper is real, but the fix still must be gated.)
+   FIX: Gate the overflow treatment to xs only so sm+ keeps the original full-width table layout. In HtmlMessageRenderer.tsx replace the `& table` block with:
+
+'& table': {
+  display: { xs: 'block', sm: 'table' },
+  width: { xs: 'max-content', sm: '100%' },
+  maxWidth: '100%',
+  overflowX: { xs: 'auto', sm: 'visible' },
+  borderCollapse: 'collapse',
+  margin: '0.75rem 0',
+  fontSize: '0.88em'
+}
+
+This preserves the pre-bd5c02b `display: table` / `width: 100%` desktop rendering (narrow tables stretch to fill the bubble, wide tables auto-fit) on sm+, and only switches to the content-width horizontal-scroll box on phones where the mobile overflow fix is actually needed.
+
+#10 [medium/mobile-incomplete] src/features/calendar/components/sharing/ShareButton.tsx
+   @ lines 285-297 (the share-link <Dialog>)
+   PROBLEM: GENUINE MISSED SURFACE. ShareButton renders a RAW MUI <Dialog maxWidth="sm" fullWidth> for the 'Share trade / Share calendar' link dialog with slotProps={{paper:{sx:paperSx}}} where paperSx comes from useDialogTokens() (the desktop paper). It has NO fullScreen, NO useIsMobile(), NO useFullScreenDialog, and NO safe-area insets (grep for useIsMobile|fullScreen|SAFE_AREA in the file returns NONE). The spread {...dialogProps} only sets a backdrop color, so nothing injects full-screen. This dialog is NOT in the 179-surface mobile-audit-findings.json at all (the audit covered SharedTradePage/SharedCalendarPage but never the ShareButton dialog itself), so it slipped the whole sweep. A mobile user who taps Share on a trade or calendar gets a centered ~296px floating card containing a long share-URL TextField + copy controls instead of the full-screen treatment every other dialog now uses — a direct violation of the shipped full-screen-on-phones backbone, and the cramped URL field is the worst content for a narrow card.
+   FIX: In ShareButton.tsx, import { useFullScreenDialog, SAFE_AREA_TOP, SAFE_AREA_BOTTOM } from 'components/common/useFullScreenDialog'; call const { fullScreen, fullScreenPaperSx } = useFullScreenDialog(); inside the component. On the <Dialog> add fullScreen={fullScreen} and change slotProps to { paper: { sx: { ...paperSx, ...fullScreenPaperSx } } } (fullScreenPaperSx spread LAST so it wins). Add ...(fullScreen && { pt: SAFE_AREA_TOP }) to the header Box sx (currently sx={headerSx}) and ...(fullScreen && { pb: SAFE_AREA_BOTTOM }) to the footer Box sx (currently sx={footerSx}). Note: the dialog currently sets sx={{ zIndex: Z_INDEX.TOOLTIP }} after {...dialogProps}, which discards the backdrop sx — harmless to the fix but keep the zIndex. This mirrors ConfirmationDialog.tsx exactly. Alternatively migrate the whole dialog to BaseDialog, which bakes in fullScreen + safe-area automatically.
+
+#11 [medium/mobile-incomplete] src/components/common/RichTextEditor.tsx
+   @ lines 1353-1362 (the insert/edit-link <Dialog>)
+   PROBLEM: GENUINE MISSED SURFACE. The RichTextEditor 'Insert link' / 'Edit link' dialog is a RAW <Dialog maxWidth="sm" fullWidth> with slotProps={{paper:{sx:paperSx}}} and NO fullScreen / useIsMobile / useFullScreenDialog / safe-area handling anywhere in the file (verified: grep returns NONE; file is NOT in the branch diff). It is reachable on mobile whenever a user adds a link inside the note editor (Draft.js toolbar Link button). Because the body is just a small URL+text form it still FITS inside 360px (so it does NOT trigger horizontal page overflow — this is why it is medium not high), but it renders as a centered floating card on phones instead of the full-screen treatment the sweep standardized, and its header/footer do not clear the notch/home-indicator. The audit graded RichTextEditor 'minor' and it was correctly the kind of thing the sweep should have caught but didn't.
+   FIX: In src/components/common/RichTextEditor.tsx, import `useFullScreenDialog, SAFE_AREA_TOP, SAFE_AREA_BOTTOM` from 'components/common/useFullScreenDialog' (mirror the sibling ImageUploadDialog.tsx). Call `const { fullScreen, fullScreenPaperSx } = useFullScreenDialog();` in the component body. On the link `<Dialog>` (line 1353), add `fullScreen={fullScreen}` and change the paper sx to `slotProps={{ paper: { sx: { ...paperSx, ...fullScreenPaperSx } } }}` (fullScreenPaperSx spread LAST so it wins). On the header Box (line 1365) add `pt: fullScreen ? SAFE_AREA_TOP : undefined` and on the footer Box (line 1452) add `pb: fullScreen ? SAFE_AREA_BOTTOM : undefined`. This makes the link dialog match ImageUploadDialog and the rest of the swept raw-Dialog surfaces.
+
+#12 [low/desktop-regression] src/features/calendar/components/import/ColumnMapper.tsx
+   @ line 336 (`.MuiSelect-select` sx)
+   PROBLEM: The mapping-target Select had `pr: 4` reduced to `pr: 3` as a PLAIN (ungated) value, so the right padding shrinks on EVERY breakpoint, not just xs. This is the exact pattern the sweep was told to avoid (changing a base/sm/md value instead of ADDING an xs override). `pr` reserves clearance for the dropdown caret; reducing it to 24px on desktop brings the selected text closer to / potentially under the arrow on desktop, altering the previously-chosen desktop appearance. Every other change in this file (`gap: 1.25 -> { xs: 1, sm: 1.25 }`) was correctly gated — only this one regressed base.
+   FIX: In src/features/calendar/components/import/ColumnMapper.tsx, line 336, gate the padding so desktop keeps MUI's default 32px caret clearance and only phones get the tighter 24px:
+
+'& .MuiSelect-select': {
+  py: 0.75,
+  pl: 1.25,
+  pr: { xs: 3, sm: 4 },
+},
+
+This matches the gating pattern already used for the sibling `gap: { xs: 1, sm: 1.25 }` changes and restores the unchanged desktop appearance.
+
+#13 [low/tap-target] src/features/performance/components/charts/TagDayOfWeekAnalysis.tsx
+   @ metricToggle (lines ~163-186) and filterButtons (lines ~196-232) rendered in the mobile body toolbar at lines 295-301
+   PROBLEM: All four controls relocated to the mobile body toolbar (Win Rate / P&L metric toggle + Primary/Secondary filter buttons) are size="small" Buttons with `flex: isMobile ? 1` and no minHeight. Rendered height is ~28-32px, under the 44px tap-target floor required on phones. This is the densest relocated toolbar (two rows of full-width buttons) so the short vertical hit area is the most felt here.
+   FIX: Add `minHeight: { xs: 44 }` to the `sx` of all four buttons in `metricToggle` (lines 166-170 and 178-182) and `filterButtons` (lines 201-206 and 223-228). The responsive object only applies at xs (< sm = phone), so desktop, where the same JSX renders in `headerRight`, is unchanged. This matches the existing `flex: isMobile ? 1` mobile-gating pattern. Equivalent: `py: { xs: 1 }`, but `minHeight: { xs: 44 }` is the precise floor.
+
+#14 [low/desktop-regression] src/features/events/components/charts/EconomicEventCorrelationAnalysis.tsx
+   @ ~lines 220-251 (headerControls)
+   PROBLEM: headerControls was a fragment (`<>`) whose two children — RoundedTabs and the Currency FormControl — were DIRECT flex children of CardShell's HeaderBand. The HeaderBand is `display:flex; alignItems:center; gap:1.5; flexWrap:wrap`, so on every breakpoint those two controls were separated by a 12px (gap:1.5) gap and wrapped independently. The change wraps both in a new Box with `flexDirection:{xs:'column',sm:'row'}, alignItems:{xs:'stretch',sm:'center'}, gap:1`. On sm+/md/lg the inter-control gap is now driven by this wrapper's `gap:1` = 8px, not the band's 12px, and the two controls now wrap as a single unit instead of individually. That is a DESKTOP change (spacing + wrap grouping) that is NOT gated behind xs — it alters the base/sm appearance, violating the desktop-unchanged rule. Note the wrapper's gap:1 is unconditional (no `{xs,sm}` object), so it hits desktop.
+   FIX: In src/features/events/components/charts/EconomicEventCorrelationAnalysis.tsx, make the headerControls wrapper Box gap responsive so sm+ matches the original 12px HeaderBand gap that the old bare-fragment markup inherited. Change `gap: 1` to `gap: { xs: 1, sm: 1.5 }` in the wrapper sx (lines 224-230). The xs flexDirection:'column' / alignItems:'stretch' / width:'100%' stacking and the FormControl's xs full-width adjustments are correctly gated and should stay. Verify the RoundedTabs-to-Currency spacing is identical to main at sm/md/lg after the change.
+
+#15 [low/tap-target] src/features/orion/components/aiChat/ChatMessage.tsx
+   @ lines 504-533 (edit action IconButton, width/height 28)
+   PROBLEM: The edit action was correctly made always-visible on mobile (opacity:1 branch, since there is no hover on phones), but the IconButton inside it keeps `width: 28, height: 28` for all sizes (lines 520-521). The sweep's stated rule is 44px tap targets on phones. The edit affordance is now reachable on mobile but its tap target is only 28x28px — below the 44px minimum (sibling Cancel buttons in ReminderListItem/ReminderBatchListItem were correctly bumped to 44px on xs in this same sweep, so this one was missed).
+   FIX: In ChatMessage.tsx, change the edit IconButton's sx width/height from the flat `width: 28, height: 28` (lines 520-521) to xs-gated values that preserve the desktop size: `width: { xs: 44, sm: 28 }, height: { xs: 44, sm: 28 }`. Keep `<EditIcon sx={{ fontSize: 14 }} />` unchanged. This matches the pattern already applied to ReminderListItem/ReminderBatchListItem in the same sweep (those use `sm: 'auto'`, but since this button has an explicit 28px desktop size, use `sm: 28` to leave desktop visually identical). Phones get a 44px target; desktop stays 28x28.
+
+#16 [low/desktop-regression] src/features/orion/components/settings/CustomToolCard.tsx
+   @ lines 158, 172, 184 (the three IconButton sx blocks in the head.right cluster)
+   PROBLEM: The three header IconButtons changed from sx={{ color: text.secondary }} (no padding override) to sx={{ color: text.secondary, p: { xs: 1, sm: 0.75 } }}. The 'sm: 0.75' value resolves to theme.spacing(0.75) = 6px (theme has no custom spacing factor, so default 8 applies). But MUI v7 IconButton with size="small" ships a built-in default padding of 5px. So this explicitly OVERRIDES the desktop value: desktop padding goes 5px -> 6px on all three controls, widening the control cluster ~6px and altering each button's hit area. Per the CRITICAL RULE this is a desktop regression — the change set a base/sm value instead of adding an xs-only override. The xs:1 (8px, for a 44px tap target) is the only part that should change.
+   FIX: Drop the `sm` key from all three header IconButton sx blocks so desktop falls back to MUI's native `size="small"` padding (5px). Change `p: { xs: 1, sm: 0.75 }` to `p: { xs: 1 }` on lines 158, 172, and 184. This keeps the enlarged ~44px-friendly phone tap area (xs:1 = 8px) while leaving desktop exactly as it was before the mobile commit (native 5px). Do not pin `sm: 0.75`.
+
+========== UNVERIFIED (verifier errored — review manually) ==========
+
+========== LOW (reviewer-flagged, not verified) ==========
+- src/components/common/BaseDialog.tsx @ lines 79-91 (mergedPaperSx fullScreen branch) vs src/components/common/useFullScreenDialog.ts lines 10-18: BaseDialog hand-inlines the full-screen paper override (maxHeight:'100%', height:'100%', width:'100%', maxWidt
+- src/components/common/UnifiedDrawer.tsx @ lines 164-169 (content Box pb): The content-area `pb: 'env(safe-area-inset-bottom)'` is applied UNGATED at every breakpoint rather than gated 
+- src/features/calendar/components/FloatingMonthNavigation.tsx @ lines 145-146 and 212-213 (prev/next month IconButtons): The prev/next month buttons were bumped to `width/height: { xs: 40, sm: 36 }`. 40px is an improvement but stil
+- src/pages/TradeCalendarPage.tsx @ lines 1706-1733 (Month Overview Button, icon-only on mobile): On mobile the Month Overview pill renders icon-only (InsightsIcon fontSize 18) with `px: isMobile ? 1 : 1.5` a
+- src/features/calendar/components/trades/TradeList.tsx @ line 583-590 (More actions IconButton, sx p:{xs:1}): The per-trade 'More actions' IconButton (size='small', MoreVertIcon fontSize='small' ~20px) got `sx={{ p: { xs
+- src/features/calendar/components/TagSelectionDialog.tsx @ item label Box sx, ~line 426-444 (minWidth/overflow/textOverflow/whiteSpace added): The label-clamp (`minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'`) was added 
+- src/features/calendar/components/TradeGalleryDialog.tsx @ lines 1378-1381 and 1401-1404 (immersive-overlay top bar, both inner Boxes): Both inner flex rows of the immersive top bar gained `flexWrap: 'wrap'` (the left date/name Box also gained `m
+- src/features/calendar/components/TradeGalleryDialog.tsx @ line 1592 (thumbnail `<Box component="img">` sx): `flexShrink: 0` was added to each thumbnail as a PLAIN value, but the immersive thumbnail strip is full-screen
+- src/features/calendar/components/sidePanel/DayTradesContent.tsx @ line 227 (footer Box sx): `flexWrap: 'wrap'` was added to the panel footer (`justifyContent: flex-end`) as a PLAIN value with no breakpo
+- src/features/calendar/components/sidePanel/SearchContent.tsx @ lines 676-682 (`datePickerSlotProps`) + 971/981/987 DatePicker usages: The change conditionally drops the `desktopPaper` slot on mobile with the comment 'the X DatePickers force the
+- src/features/calendar/components/sidePanel/TagManagementContent.tsx @ lines 696-698 (FormControl sx): The group-filter FormControl gained `flex: { xs: '1 1 100%', sm: '0 0 auto' }`. The `sm` value `'0 0 auto'` is
+- src/features/performance/components/charts/DailySummaryTable.tsx @ lines 287-290 (TablePagination sx rule for selectLabel/input/select): The rule `'.MuiTablePagination-selectLabel, .MuiTablePagination-input, .MuiTablePagination-select': { display:
+- src/pages/EconomicEventsPage.tsx @ Week-nav toolbar, lines ~669-697 (prev/next IconButton size="small", 'Today' ButtonBase): The sweep selectively bumped the CurrencyChips tap targets on this page but left the adjacent date-controls ro
+- src/features/orion/components/aiChat/AIChatDrawer.tsx @ line 483, tab-row Box sx `flexWrap: 'wrap'`: `flexWrap: 'wrap'` was added to the BASE sx of the tab-row Box (not gated to xs), even though the adjacent com
+- src/features/billing/components/CalendarLimitDialog.tsx @ lines 49-65 (DialogTitle at 52): When fullScreen is true the dialog stretches edge-to-edge (FULLSCREEN_PAPER_SX) and the DialogTitle sits flush

@@ -517,8 +517,8 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                   size="small"
                   onClick={() => onEdit(message.id)}
                   sx={{
-                    width: 28,
-                    height: 28,
+                    width: { xs: 44, sm: 28 },
+                    height: { xs: 44, sm: 28 },
                     color: 'text.disabled',
                     '&:hover': {
                       color: 'text.primary',

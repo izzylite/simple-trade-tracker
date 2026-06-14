@@ -988,7 +988,7 @@ const CurrencyChips: React.FC<{
           sx={{
             px: 1,
             py: 0.5,
-            minHeight: { xs: 36 },
+            minHeight: { xs: 44, sm: 36 },
             borderRadius: 999,
             fontSize: '0.72rem',
             fontWeight: 600,

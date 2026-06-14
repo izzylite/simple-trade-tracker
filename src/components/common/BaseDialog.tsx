@@ -15,6 +15,7 @@ import { scrollbarStyles } from 'styles/scrollbarStyles';
 import { Z_INDEX } from 'styles/zIndex';
 import { useDialogTokens } from 'styles/dialogTokens';
 import { useIsMobile } from 'hooks/useResponsive';
+import { FULLSCREEN_PAPER_SX } from 'components/common/useFullScreenDialog';
 
 export interface BaseDialogProps extends Omit<DialogProps, 'title'> {
   open: boolean;
@@ -77,17 +78,7 @@ const BaseDialog: React.FC<BaseDialogProps> = ({
   // On mobile the full-screen values win (applied last). On desktop the
   // consumer's custom paper sizing wins (applied last) over our 90vh cap.
   const mergedPaperSx = fullScreen
-    ? {
-        ...paperSx,
-        ...restPaperSx,
-        maxHeight: '100%',
-        height: '100%',
-        width: '100%',
-        maxWidth: '100%',
-        m: 0,
-        borderRadius: 0,
-        border: 'none',
-      }
+    ? { ...paperSx, ...restPaperSx, ...FULLSCREEN_PAPER_SX }
     : { ...paperSx, maxHeight: '90vh', ...restPaperSx };
 
   return (

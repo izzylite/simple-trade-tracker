@@ -443,6 +443,9 @@ const TagFormDialog: React.FC<TagFormDialogProps> = ({
                     ...scrollbarStyles(theme),
                     overflowY: 'auto',
                     maxHeight: fullScreen ? undefined : '70vh',
+                    // Under full-screen the body must flex+scroll so the footer
+                    // (Save/Delete) stays pinned and reachable on tall phones.
+                    ...(fullScreen ? { flex: 1, minHeight: 0 } : {}),
                 }}
             >
                 {/* Preview row */}

@@ -128,12 +128,16 @@ const NotesPage: React.FC = () => {
   const didAutoSelectRef = useRef(false);
   useEffect(() => {
     if (didAutoSelectRef.current) return;
+    // Phones land on the list (master-detail); auto-selecting would drop the
+    // user straight into the detail pane and hide the list on entry. Desktop
+    // (multi-column) keeps auto-select so the reading pane is never empty.
+    if (isMobile) return;
     if (loading) return;
     if (selectedNote || isNewDraft || isEditing) return;
     if (notes.length === 0) return;
     didAutoSelectRef.current = true;
     setSelectedNote(notes[0]);
-  }, [loading, notes, selectedNote, isNewDraft, isEditing]);
+  }, [loading, notes, selectedNote, isNewDraft, isEditing, isMobile]);
 
   // ─── Handlers ─────────────────────────────────────────────────────────────
   const handleNoteClick = useCallback((note: Note) => {

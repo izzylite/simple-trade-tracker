@@ -218,6 +218,9 @@ const TagSelectionDialog: React.FC<TagSelectionDialogProps> = ({
           flexDirection: 'column',
           gap: 2,
           maxHeight: fullScreen ? undefined : '60vh',
+          // Under full-screen the body must flex+scroll so the footer ('Done')
+          // stays pinned and reachable when the tag list is long on phones.
+          ...(fullScreen ? { flex: 1, minHeight: 0 } : {}),
           overflowY: 'auto',
           ...scrollbarStyles(theme),
         }}

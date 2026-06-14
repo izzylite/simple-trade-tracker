@@ -225,7 +225,9 @@ const EconomicEventCorrelationAnalysis: React.FC<EconomicEventCorrelationAnalysi
         display: 'flex',
         flexDirection: { xs: 'column', sm: 'row' },
         alignItems: { xs: 'stretch', sm: 'center' },
-        gap: 1,
+        // Match the original HeaderBand 12px gap on sm+ so desktop spacing is
+        // unchanged; tighter only when stacked on phones.
+        gap: { xs: 1, sm: 1.5 },
         width: { xs: '100%', sm: 'auto' },
       }}
     >
