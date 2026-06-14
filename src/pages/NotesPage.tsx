@@ -21,12 +21,12 @@ import {
   HEADER_HEIGHT_XS,
   HEADER_HEIGHT_SM,
 } from 'styles/layout';
+import { getShadow, getControlClusterSx } from 'styles/designTokens';
 import { useUserPinnedEvents } from 'features/events/contexts/UserPinnedEventsContext';
 import { useSelectedCalendar } from 'features/calendar/contexts/SelectedCalendarContext';
 import { useNotes } from 'features/notes/hooks/useNotes';
 import { CalendarRepository } from 'services/repositories/CalendarRepository';
 import { logger } from 'utils/logger';
-import { isDarkMode } from 'utils/themeMode';
 import * as notesService from 'features/notes/services/notesService';
 
 import NoteListPanel, {
@@ -272,6 +272,7 @@ const NotesPage: React.FC = () => {
           py: 1.25,
           borderBottom: `1px solid ${theme.palette.divider}`,
           bgcolor: 'background.paper',
+          boxShadow: getShadow(theme, 'sm'),
           display: 'flex',
           alignItems: 'center',
           justifyContent: showCenterOnMobile ? 'space-between' : 'flex-end',
@@ -290,7 +291,7 @@ const NotesPage: React.FC = () => {
         )}
 
         {/* Creator toggle: My Notes / Orion */}
-        <Box sx={{ display: 'flex', gap: 0.5, p: 0.5, bgcolor: alpha(theme.palette.common.white, isDarkMode(theme) ? 0.03 : 0.6), borderRadius: '999px', border: `1px solid ${theme.palette.divider}` }}>
+        <Box sx={{ display: 'flex', gap: 0.5, p: 0.5, ...getControlClusterSx(theme), borderRadius: '999px' }}>
           {(['me', 'assistant'] as const).map(c => {
             const active = creator === c;
             return (

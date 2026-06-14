@@ -1,6 +1,7 @@
 import { Box } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import { isDarkMode } from 'utils/themeMode';
+import { getShadow } from 'styles/designTokens';
 
 export const CalendarGrid = styled(Box)(({ theme }) => ({
   display: 'grid',
@@ -9,7 +10,7 @@ export const CalendarGrid = styled(Box)(({ theme }) => ({
   padding: theme.spacing(2),
   backgroundColor: theme.palette.background.paper,
   borderRadius: theme.shape.borderRadius,
-  boxShadow: theme.shadows[1],
+  boxShadow: getShadow(theme, 'md'),
   width: '100%',
   minHeight: '600px',
   alignContent: 'start'

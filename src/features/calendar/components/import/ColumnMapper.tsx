@@ -18,6 +18,7 @@ import {
   ArrowForward as ArrowIcon,
 } from '@mui/icons-material';
 import { ColumnMapping, MappingTarget, TradeField } from '../../types/import';
+import { getShadow } from 'styles/designTokens';
 import {
   TRADE_FIELD_METADATA,
   getAllTradeFields,
@@ -307,7 +308,7 @@ export const ColumnMapper: React.FC<ColumnMapperProps> = ({
                           maxHeight: 360,
                           borderRadius: 1.25,
                           border: `1px solid ${hairline}`,
-                          boxShadow: theme.shadows[12],
+                          boxShadow: getShadow(theme, 'lg'),
                           backgroundImage: 'none',
                         },
                       },

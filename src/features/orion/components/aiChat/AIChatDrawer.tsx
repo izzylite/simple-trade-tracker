@@ -35,6 +35,7 @@ import { Calendar } from 'features/calendar/types/calendar';
 import { TradeOperationsProps } from 'features/calendar/types/tradeOperations';
 import { Z_INDEX } from 'styles/zIndex';
 import { useDialogTokens } from 'styles/dialogTokens';
+import { getShadow, getControlClusterSx } from 'styles/designTokens';
 import AIChatContent from 'features/orion/components/sidePanel/AIChatContent';
 import { UseAIChatReturn, useAIChat } from 'features/orion/hooks/useAIChat';
 import { ConversationRepository } from 'services/repositories/ConversationRepository';
@@ -353,9 +354,7 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
           borderBottomLeftRadius: 0,
           borderBottomRightRadius: 0,
           backgroundColor: 'background.paper',
-          boxShadow: isDark
-            ? '0 -12px 32px rgba(0,0,0,0.55)'
-            : '0 -12px 32px rgba(0,0,0,0.12)',
+          boxShadow: getShadow(theme, 'xl'),
           border: { xs: 'none', sm: `1px solid ${hairline}` },
           borderBottom: 'none',
           backgroundImage: 'none',
@@ -490,9 +489,8 @@ const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
                 display: 'inline-flex',
                 p: 0.375,
                 borderRadius: 999,
-                backgroundColor: surfaceInset,
-                border: `1px solid ${hairline}`,
                 gap: 0.25,
+                ...getControlClusterSx(theme),
               }}
             >
               {([

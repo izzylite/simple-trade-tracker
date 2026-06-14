@@ -55,6 +55,7 @@ const WeekdayWinRate: React.FC<WeekdayWinRateProps> = ({ trades }) => {
   return (
     <Box sx={{ mb: 2.5 }}>
       <CardShell
+        elevation="md"
         head={{
           icon: <span aria-hidden>▦</span>,
           title: 'By weekday',

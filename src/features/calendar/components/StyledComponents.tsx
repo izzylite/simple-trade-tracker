@@ -1,6 +1,6 @@
 import { styled, alpha } from '@mui/material/styles';
 import { Paper, Box, Typography, Button, IconButton, Chip, DialogTitle, DialogContent, DialogActions } from '@mui/material';
-import { MONO_FONT, TNUM } from 'styles/designTokens';
+import { MONO_FONT, TNUM, getShadow } from 'styles/designTokens';
 import { isDarkMode } from 'utils/themeMode';
 
 export type DayStatus = 'win' | 'loss' | 'neutral' | 'breakeven';
@@ -51,7 +51,7 @@ export const StyledCalendarDay = styled(Box, {
             ? breakevenBg
             : theme.palette.background.paper,
     border: isDark ? 'none' : `1px solid ${theme.palette.divider}`,
-    boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
+    boxShadow: getShadow(theme, 'sm'),
     position: 'relative',
     overflow: 'hidden',
     '&:hover': {
@@ -232,7 +232,7 @@ export const PrimaryButton = styled(Button)(({ theme }) => ({
   textTransform: 'none',
   boxShadow: 'none',
   '&:hover': {
-    boxShadow: theme.shadows[2],
+    boxShadow: getShadow(theme, 'sm'),
   },
 }));
 
@@ -287,13 +287,8 @@ export const TradeListItem = styled(Box, {
 })<{ $type?: 'win' | 'loss' | 'breakeven' }>(({ theme, $type }) => {
   const isDark = isDarkMode(theme);
 
-  const restingShadow = isDark
-    ? '0 1px 2px rgba(0,0,0,0.45), 0 6px 14px rgba(0,0,0,0.32), 0 2px 4px rgba(0,0,0,0.20)'
-    : '0 1px 2px rgba(15,23,42,0.06), 0 4px 12px rgba(15,23,42,0.08), 0 2px 4px rgba(15,23,42,0.04)';
-
-  const hoverShadow = isDark
-    ? '0 2px 4px rgba(0,0,0,0.55), 0 12px 28px rgba(0,0,0,0.45), 0 4px 8px rgba(0,0,0,0.28)'
-    : '0 2px 4px rgba(15,23,42,0.08), 0 10px 24px rgba(15,23,42,0.14), 0 4px 8px rgba(15,23,42,0.06)';
+  const restingShadow = getShadow(theme, 'md');
+  const hoverShadow = getShadow(theme, 'lg');
 
   const winBg = isDark
     ? alpha(theme.palette.success.main, 0.1)

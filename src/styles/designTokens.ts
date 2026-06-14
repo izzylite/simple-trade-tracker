@@ -5,6 +5,7 @@
  * - EYEBROW_SX: uppercase neutral label (the 0.6875rem / 600 / 0.05em pattern)
  * - TNUM: tabular-numeric font-feature string
  * - SHADOWS / getShadow(theme, size): the mode-aware elevation scale
+ * - getControlClusterSx(theme): the elevated segmented-control / pill-row surface
  * - getInsetSurface(theme): the 3%-tinted surface used inside outer cards
  * - getInsetHoverSurface(theme): the slightly-deeper hover variant of the above
  * - getHairline(theme): the 8%-white / divider hairline used across cards & dialogs
@@ -44,6 +45,54 @@ export type ShadowSize = keyof typeof SHADOWS['dark'];
 /** Mode-aware elevation string. Prefer over inlining the literal shadow value. */
 export function getShadow(theme: Theme, size: ShadowSize): string {
   return SHADOWS[isDarkMode(theme) ? 'dark' : 'light'][size];
+}
+
+/**
+ * Canonical elevation role → tier map. Every surface reads from `getShadow`
+ * (or the helpers below) so the scale stays consistent app-wide:
+ *
+ * - `sm`  — app-chrome header bars (AppHeader, PageActionBar, page sub-headers,
+ *           sticky note header). Subtle downward separation over scrolling content.
+ * - `md`  — control clusters (segmented pills / tab rows / filter pills via
+ *           `getControlClusterSx`) AND top-level cards (analysis cards, list
+ *           cards, sidebar cards). The default "this surface floats above the page" tier.
+ * - `lg`  — the single primary/focus card per view, popovers, menus, floating buttons.
+ * - `xl`  — dialogs, drawers, bottom sheets (mostly via theme overrides / dialogTokens).
+ *
+ * NEVER elevate: inset tiles (`getInsetTileSx`/StatTile), nested cards inside a
+ * dialog/panel, chat bubbles, list rows, in-flow sibling panels, in-panel
+ * header/footer bands — these stay flat ("Cards never nest" + the divider
+ * carries the edge).
+ */
+
+/**
+ * Elevated control-cluster surface — the segmented pill / tab-row / filter-pill
+ * container treatment used by the Economic Events page (HubTabs, FilterPill) and
+ * mirrored across Performance, Notes, Orion, and the calendar action pills.
+ * Solid paper + hairline border + the `md` card-tier shadow. Spread into the
+ * container's sx; layout (padding, radius, direction) comes from the consumer.
+ */
+export function getControlClusterSx(theme: Theme) {
+  return {
+    bgcolor: 'background.paper',
+    border: `1px solid ${theme.palette.divider}`,
+    boxShadow: getShadow(theme, 'md'),
+  } as const;
+}
+
+/**
+ * Modal / dialog / drawer backdrop scrim. Light mode uses a stronger alpha than
+ * dark because a pale page background needs a deeper scrim to read as "dimmed".
+ * Single source — consumed by the `MuiBackdrop` theme override and `dialogProps`.
+ */
+export const SCRIM = {
+  dark: 'rgba(0,0,0,0.6)',
+  light: 'rgba(0,0,0,0.72)',
+} as const;
+
+/** Mode-aware backdrop scrim color. */
+export function getScrim(theme: Theme): string {
+  return SCRIM[isDarkMode(theme) ? 'dark' : 'light'];
 }
 
 /** Tabular-figure font-feature string. Use wherever numbers stack. */

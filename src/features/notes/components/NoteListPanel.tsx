@@ -48,6 +48,7 @@ import {
 import { scrollbarStyles } from 'styles/scrollbarStyles';
 import { getTagDisplayLabel } from 'features/notes/components/NoteEditorDialogTags';
 import { isDarkMode } from 'utils/themeMode';
+import { getShadow, getControlClusterSx } from 'styles/designTokens';
 
 /** Lifecycle tab — mutually exclusive, drives useNotes activeTab. */
 export type NotesTab = 'all' | 'pinned' | 'archived';
@@ -186,8 +187,7 @@ const TabsCompact: React.FC<TabsCompactProps> = ({ tab, onTabChange, counts }) =
     <Box
       sx={{
         display: 'flex',
-        bgcolor: alpha(isDark ? '#fff' : '#000', isDark ? 0.04 : 0.04),
-        border: `1px solid ${theme.palette.divider}`,
+        ...getControlClusterSx(theme),
         borderRadius: '8px',
         padding: '3px',
         gap: '2px',
@@ -935,9 +935,10 @@ const NoteListPanel: React.FC<NoteListPanelProps> = ({
         {loading ? (
           <Box
             sx={{
-              bgcolor: alpha(isDark ? '#fff' : '#000', 0.02),
+              bgcolor: 'background.paper',
               border: `1px solid ${theme.palette.divider}`,
               borderRadius: '10px',
+              boxShadow: getShadow(theme, 'md'),
               overflow: 'hidden',
             }}
           >
@@ -995,9 +996,10 @@ const NoteListPanel: React.FC<NoteListPanelProps> = ({
           <>
             <Box
               sx={{
-                bgcolor: alpha(isDark ? '#fff' : '#000', isDark ? 0.02 : 0.015),
+                bgcolor: 'background.paper',
                 border: `1px solid ${theme.palette.divider}`,
                 borderRadius: '10px',
+                boxShadow: getShadow(theme, 'md'),
                 overflow: 'hidden',
               }}
             >

@@ -15,7 +15,7 @@ import { useMemo } from 'react';
 import { alpha, useTheme } from '@mui/material';
 import type { Theme } from '@mui/material/styles';
 import { isDarkMode } from 'utils/themeMode';
-import { getHairline, getInsetSurface, MONO_FONT } from 'styles/designTokens';
+import { getHairline, getInsetSurface, getShadow, MONO_FONT } from 'styles/designTokens';
 
 // Re-exported so the many `import { MONO_FONT } from 'styles/dialogTokens'`
 // callsites keep working. Canonical declaration lives in `styles/designTokens`
@@ -73,7 +73,7 @@ function buildTokens(theme: Theme, accentOverride?: string): DialogTokens {
   const paperSx = {
     borderRadius: 2,
     border: `1px solid ${hairline}`,
-    boxShadow: theme.shadows[10],
+    boxShadow: getShadow(theme, 'xl'),
     backgroundImage: 'none',
     overflow: 'hidden',
   };

@@ -204,6 +204,7 @@ const TagPerformanceAnalysis: React.FC<TagPerformanceAnalysisProps> = ({
 
   return (
     <CardShell
+      elevation="md"
       radius="lg"
       head={{
         icon: <BarChartIcon sx={{ fontSize: 16 }} />,

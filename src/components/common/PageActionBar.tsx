@@ -1,6 +1,7 @@
 // src/components/common/PageActionBar.tsx
 import React from 'react';
-import { Box, Stack } from '@mui/material';
+import { Box, Stack, useTheme } from '@mui/material';
+import { getShadow, getHairline } from 'styles/designTokens';
 
 interface PageActionBarProps {
   /** Optional inline actions rendered on the left (after where the selector used to sit). */
@@ -16,6 +17,7 @@ interface PageActionBarProps {
  * spacing/border treatment so the visual transition is invisible to users.
  */
 const PageActionBar: React.FC<PageActionBarProps> = ({ inlineActions, rightContent }) => {
+  const theme = useTheme();
   return (
     <Box
       sx={{
@@ -26,6 +28,12 @@ const PageActionBar: React.FC<PageActionBarProps> = ({ inlineActions, rightConte
         py: 1.25,
         bgcolor: 'background.paper',
         minHeight: 56,
+        // Header-chrome elevation: subtle downward separation over the
+        // scrolling page content + a bottom hairline (matches AppHeader).
+        borderBottom: `1px solid ${getHairline(theme)}`,
+        boxShadow: getShadow(theme, 'sm'),
+        position: 'relative',
+        zIndex: 1,
       }}
     >
       {inlineActions}

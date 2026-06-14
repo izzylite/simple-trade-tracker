@@ -23,6 +23,7 @@ import {
   Language as LanguageIcon
 } from '@mui/icons-material';
 import { Citation } from 'features/orion/types/aiChat';
+import { getShadow } from 'styles/designTokens';
 
 interface CitationsSectionProps {
   citations: Citation[];
@@ -343,7 +344,7 @@ const CitationsSection: React.FC<CitationsSectionProps> = ({
               sx: {
                 mt: 1,
                 borderRadius: 1,
-                boxShadow: theme.shadows[8],
+                boxShadow: getShadow(theme, 'lg'),
                 // Never exceed the viewport on a narrow phone.
                 maxWidth: 'min(350px, calc(100vw - 24px))',
               }

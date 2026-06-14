@@ -84,7 +84,7 @@ const AccountBillingPage: React.FC = () => {
         </Alert>
       )}
 
-      <CardShell sx={{ p: { xs: 2, sm: 4 } }}>
+      <CardShell elevation="md" sx={{ p: { xs: 2, sm: 4 } }}>
         <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 2 }}>
           <Typography variant="h5" sx={{ fontWeight: 500 }}>{tierLabel}</Typography>
           {sub?.status && sub.status !== 'active' && (

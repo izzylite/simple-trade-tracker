@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, Typography, alpha, useTheme } from '@mui/material';
+import { getShadow } from 'styles/designTokens';
 import { ArrowBack as ArrowBackIcon } from '@mui/icons-material';
 
 interface CalendarLockedOverlayProps {
@@ -65,7 +66,7 @@ const CalendarLockedOverlay: React.FC<CalendarLockedOverlayProps> = ({
           borderRadius: 999,
           bgcolor: alpha(theme.palette.background.paper, 0.92),
           border: `1px solid ${theme.palette.divider}`,
-          boxShadow: theme.shadows[2],
+          boxShadow: getShadow(theme, 'md'),
         }}
       >
         <ArrowBackIcon sx={{ fontSize: 18, color: 'primary.main' }} />

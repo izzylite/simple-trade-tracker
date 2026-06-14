@@ -9,6 +9,7 @@ import {
   useTheme,
 } from '@mui/material';
 import { useDialogTokens } from 'styles/dialogTokens';
+import { getShadow } from 'styles/designTokens';
 import {
   TrendingUp as TrendingUpIcon,
   Edit as EditIcon,
@@ -1357,7 +1358,7 @@ const TradeFormDialog: React.FC<FormDialogProps> = ({
                     sx: {
                       borderRadius: 1.5,
                       border: `1px solid ${hairline}`,
-                      boxShadow: theme.shadows[8],
+                      boxShadow: getShadow(theme, 'lg'),
                       backgroundImage: 'none',
                       mt: 0.5,
                     },

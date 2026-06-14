@@ -7,6 +7,7 @@ import {
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import { isDarkMode } from 'utils/themeMode';
+import { getShadow } from 'styles/designTokens';
 
 export interface TabItem {
   label: string;
@@ -126,7 +127,7 @@ const RoundedTabs: React.FC<RoundedTabsProps> = ({
           '&.Mui-selected': {
             backgroundColor: theme.palette.primary.main,
             color: '#ffffff',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.3)'
+            boxShadow: getShadow(theme, 'sm')
           },
           '&:hover:not(.Mui-selected)': {
             backgroundColor: alpha(theme.palette.primary.main, 0.05),
@@ -146,7 +147,7 @@ const RoundedTabs: React.FC<RoundedTabsProps> = ({
         '&.Mui-selected': {
           backgroundColor: theme.palette.primary.main,
           color: '#ffffff',
-          boxShadow: '0 1px 2px rgba(0,0,0,0.3)'
+          boxShadow: getShadow(theme, 'sm')
         },
         '&:hover:not(.Mui-selected)': {
           backgroundColor: alpha(theme.palette.primary.main, 0.05),

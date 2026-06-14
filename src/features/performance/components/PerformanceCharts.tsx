@@ -30,6 +30,7 @@ import { useTradeSyncContextOptional } from 'features/calendar/contexts/TradeSyn
 import { normalizeTradeDates } from 'features/calendar/utils/tradeUtils';
 import { isDarkMode } from 'utils/themeMode';
 import { useIsMobile } from 'hooks/useResponsive';
+import { getShadow } from 'styles/designTokens';
 
 // Type definition needed for module-level constants
 export type TimePeriod = 'month' | 'quarter' | 'ytd' | 'year' | 'all';
@@ -553,7 +554,6 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
           backgroundImage: 'none',
           border: `1px solid ${theme.palette.divider}`,
           borderRadius: `${theme.palette.custom.radius.xl}px`,
-          boxShadow: 'none',
         },
       }}
     >
@@ -729,7 +729,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
 
                {/* Tag Performance Analysis with Tabs */}
-          <Paper sx={{ p: { xs: 2, sm: 3 }, mb: 3, borderRadius: 2 }}>
+          <Paper sx={{ p: { xs: 2, sm: 3 }, mb: 3, borderRadius: `${theme.palette.custom.radius.xl}px`, boxShadow: getShadow(theme, 'md') }}>
             <Box sx={{
               display: 'flex',
               justifyContent: { xs: 'center', sm: 'space-between' },

@@ -276,6 +276,7 @@ const TagDayOfWeekAnalysis: React.FC<TagDayOfWeekAnalysisProps> = ({
 
   return (
     <CardShell
+      elevation="md"
       radius="lg"
       head={{
         icon: <CalendarViewWeek sx={{ fontSize: 16 }} />,

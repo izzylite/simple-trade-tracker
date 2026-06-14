@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Fade, useTheme } from '@mui/material';
 import CompareBar from 'components/common/CompareBar';
+import { getShadow } from 'styles/designTokens';
 
 interface TradeLoadingIndicatorProps {
   isLoading: boolean;
@@ -77,7 +78,7 @@ const TradeLoadingIndicator: React.FC<TradeLoadingIndicatorProps> = ({ isLoading
           right: 0,
           zIndex: 1100,
           bgcolor: 'background.paper',
-          boxShadow: theme.shadows[3],
+          boxShadow: getShadow(theme, 'lg'),
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',

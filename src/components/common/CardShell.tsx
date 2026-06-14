@@ -15,7 +15,7 @@
 
 import React from 'react';
 import { Box, BoxProps, Typography, useTheme } from '@mui/material';
-import { EYEBROW_SX, TNUM, getCardShellSx } from 'styles/designTokens';
+import { EYEBROW_SX, TNUM, getCardShellSx, getShadow } from 'styles/designTokens';
 
 export interface CardHeadProps {
   /** Optional icon node — rendered inside a 28×28 violet-tinted pill */
@@ -106,6 +106,13 @@ export interface CardShellProps extends BoxProps {
   head?: CardHeadProps;
   /** Outer radius — defaults to 'xl' (16px) for top-level cards */
   radius?: 'lg' | 'xl';
+  /**
+   * Resting elevation tier. Defaults to `'none'` (flat — the divider carries
+   * the edge). Top-level cards opt into `'md'`; the single primary/focus card
+   * per view uses `'lg'`. Nested cards (inside a dialog/panel) must stay `'none'`.
+   * See the elevation role→tier map in `styles/designTokens`.
+   */
+  elevation?: 'none' | 'md' | 'lg';
   /** Optional sx applied to the inner body wrapper (after the head band) */
   innerSx?: BoxProps['sx'];
 }
@@ -113,6 +120,7 @@ export interface CardShellProps extends BoxProps {
 const CardShell: React.FC<CardShellProps> = ({
   head,
   radius = 'xl',
+  elevation = 'none',
   children,
   innerSx,
   sx,
@@ -120,7 +128,15 @@ const CardShell: React.FC<CardShellProps> = ({
 }) => {
   const theme = useTheme();
   return (
-    <Box sx={{ ...getCardShellSx(theme, radius), color: 'text.primary', ...sx }} {...rest}>
+    <Box
+      sx={{
+        ...getCardShellSx(theme, radius),
+        ...(elevation !== 'none' && { boxShadow: getShadow(theme, elevation) }),
+        color: 'text.primary',
+        ...sx,
+      }}
+      {...rest}
+    >
       {head && <HeaderBand {...head} />}
       {innerSx ? <Box sx={innerSx}>{children}</Box> : children}
     </Box>

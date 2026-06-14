@@ -217,6 +217,7 @@ const MonthlyStats: React.FC<MonthlyStatsProps> = ({
 
   return (
     <CardShell
+      elevation="md"
       radius="lg"
       head={{
         title: 'Monthly performance',

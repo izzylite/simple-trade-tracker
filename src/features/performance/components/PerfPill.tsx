@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, useTheme } from '@mui/material';
+import { getShadow } from 'styles/designTokens';
 
 export interface PerfPillOption<V extends string> {
   label: string;
@@ -36,6 +37,7 @@ function PerfPill<V extends string>({
         borderRadius: '10px',
         border: `1px solid ${theme.palette.divider}`,
         bgcolor: theme.palette.background.paper,
+        boxShadow: getShadow(theme, 'md'),
         width: fullWidth ? '100%' : 'fit-content',
         // On phones the 5 segments share the row at flex:1; if they still
         // overflow a 320px floor, allow the pill to scroll horizontally

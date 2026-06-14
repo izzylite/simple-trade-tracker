@@ -10,6 +10,7 @@ import {
   alpha,
   useTheme,
 } from '@mui/material';
+import { getShadow } from 'styles/designTokens';
 import {
   Save,
   FolderOpenOutlined as FolderIcon,
@@ -719,7 +720,7 @@ export const ImportMappingDialog: React.FC<ImportMappingDialogProps> = ({
               : {
                   borderRadius: 2,
                   border: `1px solid ${hairline}`,
-                  boxShadow: theme.shadows[10],
+                  boxShadow: getShadow(theme, 'xl'),
                   backgroundImage: 'none',
                   maxWidth: 560,
                   height: '85vh',

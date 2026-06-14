@@ -6,6 +6,7 @@
 
 import React from 'react';
 import { Box, Typography, alpha, useTheme, Theme, keyframes } from '@mui/material';
+import { getShadow } from 'styles/designTokens';
 import {
   pink,
   purple,
@@ -121,9 +122,7 @@ const NoteCard: React.FC<NoteCardProps> = ({ note, index, totalCards, isHovered,
           borderRadius: 1.5,
           overflow: 'hidden',
           backgroundColor: alpha(baseColor, isDark ? 0.85 : 0.9),
-          boxShadow: isDark
-            ? `0 4px 12px ${alpha(theme.palette.common.black, 0.4)}`
-            : `0 4px 12px ${alpha(theme.palette.common.black, 0.15)}`,
+          boxShadow: getShadow(theme, 'md'),
           border: `1px solid ${alpha(theme.palette.common.white, 0.1)}`,
           transform: isHovered ? fannedTransform : stackedTransform,
           transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -136,9 +135,7 @@ const NoteCard: React.FC<NoteCardProps> = ({ note, index, totalCards, isHovered,
             animation: `${slideInAnimation} 0.6s cubic-bezier(0.4, 0, 0.2, 1) ${animationDelay} both`,
           }),
           '&:hover': {
-            boxShadow: isDark
-              ? `0 6px 16px ${alpha(theme.palette.common.black, 0.5)}`
-              : `0 6px 16px ${alpha(theme.palette.common.black, 0.2)}`,
+            boxShadow: getShadow(theme, 'lg'),
           },
         }}
       >

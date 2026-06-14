@@ -252,6 +252,7 @@ const WinLossStats: React.FC<WinLossStatsProps> = ({
 
   return (
     <CardShell
+      elevation="md"
       sx={{ mb: 3 }}
       head={{
         icon: <EmojiEvents sx={{ fontSize: 16 }} />,

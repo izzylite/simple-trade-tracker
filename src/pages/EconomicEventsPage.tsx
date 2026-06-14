@@ -1761,10 +1761,7 @@ const AllPinnedEventsDrawer: React.FC<{
           maxWidth: '100vw',
           backgroundColor: theme.palette.background.paper,
           borderLeft: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-          boxShadow:
-            isDarkMode(theme)
-              ? '0 8px 32px rgba(0, 0, 0, 0.4)'
-              : '0 8px 32px rgba(0, 0, 0, 0.12)',
+          boxShadow: getShadow(theme, 'xl'),
           display: 'flex',
           flexDirection: 'column',
         },

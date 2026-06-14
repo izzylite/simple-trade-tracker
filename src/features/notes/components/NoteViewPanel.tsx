@@ -29,6 +29,7 @@ import { scrollbarStyles } from 'styles/scrollbarStyles';
 import { getSharedTrade } from 'features/calendar/services/sharingService';
 import { logger } from 'utils/logger';
 import { isDarkMode } from 'utils/themeMode';
+import { getShadow } from 'styles/designTokens';
 import TradeGalleryDialog from 'features/calendar/components/TradeGalleryDialog';
 import ImageZoomDialog, { ImageZoomProp } from 'features/calendar/components/ImageZoomDialog';
 
@@ -131,6 +132,7 @@ const NoteViewPanel: React.FC<NoteViewPanelProps> = ({
             0.88,
           ),
           backdropFilter: 'blur(20px) saturate(160%)',
+          boxShadow: getShadow(theme, 'sm'),
           px: { xs: 2, sm: 4 },
           py: 1,
           display: 'flex',

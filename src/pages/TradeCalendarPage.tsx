@@ -24,7 +24,7 @@ import {
   ListItemIcon,
   ListItemText,
 } from '@mui/material';
-import { EYEBROW_SX, TNUM, MONO_FONT } from 'styles/designTokens';
+import { EYEBROW_SX, TNUM, MONO_FONT, getShadow, getControlClusterSx } from 'styles/designTokens';
 import CompareBar from 'components/common/CompareBar';
 import {
   ChevronLeft,
@@ -391,8 +391,8 @@ const TagFilter = React.memo<TagFilterProps>(({ allTags, selectedTags, onTagsCha
             minWidth: 0,
             borderColor: isPillActive ? theme.palette.primary.main : theme.palette.divider,
             color: isPillActive ? 'primary.main' : 'text.secondary',
-            bgcolor: isPillActive ? alpha(theme.palette.primary.main, 0.08) : 'transparent',
-            boxShadow: 'none',
+            bgcolor: isPillActive ? alpha(theme.palette.primary.main, 0.08) : 'background.paper',
+            boxShadow: getShadow(theme, 'md'),
             '&:hover': {
               borderColor: isPillActive ? 'primary.dark' : 'text.primary',
               bgcolor: isPillActive
@@ -1721,7 +1721,8 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
               flexShrink: 0,
               color: isStatsActive ? 'primary.main' : 'text.secondary',
               borderColor: isStatsActive ? 'primary.main' : (theme: Theme) => theme.palette.divider,
-              bgcolor: isStatsActive ? (theme: Theme) => alpha(theme.palette.primary.main, 0.08) : 'transparent',
+              bgcolor: isStatsActive ? (theme: Theme) => alpha(theme.palette.primary.main, 0.08) : 'background.paper',
+              boxShadow: (theme: Theme) => getShadow(theme, 'md'),
               '&:hover': {
                 borderColor: isStatsActive ? 'primary.dark' : 'text.primary',
                 bgcolor: isStatsActive
@@ -1799,8 +1800,8 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
               color: active ? 'primary.main' : 'text.secondary',
               bgcolor: active
                 ? alpha(theme.palette.primary.main, 0.08)
-                : 'transparent',
-              boxShadow: 'none',
+                : 'background.paper',
+              boxShadow: getShadow(theme, 'md'),
               '&:hover': {
                 borderColor: active ? 'primary.dark' : 'text.primary',
                 bgcolor: active
@@ -1814,11 +1815,9 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
               height: 32,
               borderRadius: `${theme.palette.custom.radius.md}px`,
               color: 'text.secondary',
-              border: `1px solid ${theme.palette.divider}`,
-              bgcolor: 'background.paper',
+              bgcolor: 'transparent',
               '&:hover': {
                 color: 'primary.main',
-                borderColor: alpha(theme.palette.primary.main, 0.4),
                 bgcolor: alpha(theme.palette.primary.main, 0.06),
               },
             };
@@ -1835,7 +1834,7 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
                   mb: { xs: 1.5, sm: 2, md: 3 },
                 }}
               >
-               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, mt: '6px' }}>
+               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, mt: '6px', ...getControlClusterSx(theme), px: 1, py: 0.5, borderRadius: `${theme.palette.custom.radius.lg}px` }}>
                     <IconButton onClick={handlePrevMonth} size="small" sx={chevronBtnSx} aria-label="Previous month">
                       <ChevronLeft sx={{ fontSize: 18 }} />
                     </IconButton>

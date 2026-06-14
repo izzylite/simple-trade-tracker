@@ -59,6 +59,7 @@ import {
 import EconomicEventShimmer from 'features/events/components/EconomicEventShimmer';
 import EconomicEventDetailDialog from 'features/events/components/EconomicEventDetailDialog';
 import EconomicEventRow, { impactColor } from 'features/events/components/EconomicEventRow';
+import { getControlClusterSx } from 'styles/designTokens';
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
@@ -169,8 +170,7 @@ export const FilterPill: React.FC<{
       sx={{
         p: compact ? 0.375 : 0.5,
         borderRadius: 1.25,
-        border: `1px solid ${theme.palette.divider}`,
-        bgcolor: alpha(theme.palette.background.paper, 0.4),
+        ...getControlClusterSx(theme),
       }}
     >
       {IMPACT_LEVELS.map((opt) => {
@@ -291,8 +291,7 @@ export const HubTabs: React.FC<{
     sx={{
       p: compact ? 0.375 : 0.5,
       borderRadius: 1.5,
-      border: `1px solid ${theme.palette.divider}`,
-      bgcolor: alpha(theme.palette.background.paper, 0.4),
+      ...getControlClusterSx(theme),
     }}
   >
     {HUB_TABS.map((opt) => {
@@ -367,7 +366,7 @@ const DatePickerTrigger: React.FC<any> = (props) => {
         color: theme.palette.text.secondary,
         fontSize: '0.78rem', fontWeight: 600,
         fontFamily: 'inherit',
-        bgcolor: alpha(theme.palette.background.paper, 0.4),
+        bgcolor: 'transparent',
         transition: 'background 150ms, color 150ms, border-color 150ms',
         '&:hover': {
           color: theme.palette.text.primary,

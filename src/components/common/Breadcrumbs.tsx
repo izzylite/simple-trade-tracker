@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Box, Breadcrumbs as MuiBreadcrumbs, Link, Typography, useTheme, alpha, IconButton, Tooltip, Menu, MenuItem, Stack, Button, Divider } from '@mui/material';
 import { NavigateNext as NavigateNextIcon, KeyboardArrowDown as ArrowDownIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
+import { getShadow } from 'styles/designTokens';
 
 export interface DropdownItem {
   label: string;
@@ -211,7 +212,7 @@ const Breadcrumbs: React.FC<BreadcrumbsProps> = ({ items, buttons, rightContent 
                 maxHeight: 420,
                 bgcolor: theme.palette.background.paper,
                 border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-                boxShadow: theme.shadows[8]
+                boxShadow: getShadow(theme, 'lg')
               }
             }
           }}

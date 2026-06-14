@@ -12,7 +12,7 @@ import {
   ChevronRight,
 } from '@mui/icons-material';
 import { format, isToday } from 'date-fns';
-import { TNUM } from 'styles/designTokens';
+import { TNUM, getShadow } from 'styles/designTokens';
 
 interface FloatingMonthNavigationProps {
   currentDate: Date;
@@ -125,7 +125,7 @@ const FloatingMonthNavigation: React.FC<FloatingMonthNavigationProps> = ({
           sx={{
             bgcolor: 'background.paper',
             borderRadius: `${theme.palette.custom.radius.xxl}px`,
-            boxShadow: theme.shadows[3],
+            boxShadow: getShadow(theme, 'lg'),
             border: `1px solid ${theme.palette.divider}`,
             p: 0.5,
             display: 'flex',

@@ -208,6 +208,7 @@ const PeriodPicker: React.FC<PeriodPickerProps> = ({ period, value, onChange }) 
           borderRadius: '10px',
           border: `1px solid ${theme.palette.divider}`,
           bgcolor: theme.palette.background.paper,
+          boxShadow: getShadow(theme, 'md'),
           opacity: disabled ? 0.5 : 1,
         }}
       >

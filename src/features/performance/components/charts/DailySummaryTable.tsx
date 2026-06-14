@@ -94,6 +94,7 @@ const DailySummaryTable: React.FC<DailySummaryTableProps> = ({
 
   return (
     <CardShell
+      elevation="md"
       sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}
       head={{
         icon: <CalendarMonth sx={{ fontSize: 16 }} />,

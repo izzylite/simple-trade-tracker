@@ -35,7 +35,7 @@ import { isDarkMode } from 'utils/themeMode';
 import { dialogProps } from 'styles/dialogStyles';
 import { scrollbarStyles } from 'styles/scrollbarStyles';
 import { useDialogTokens } from 'styles/dialogTokens';
-import { getHairline } from 'styles/designTokens';
+import { getHairline, getShadow } from 'styles/designTokens';
 import {
   useFullScreenDialog,
   SAFE_AREA_TOP,
@@ -944,7 +944,7 @@ const LoginDialog: React.FC<LoginDialogProps> = ({
         sx: {
           borderRadius: 2,
           border: `1px solid ${hairline}`,
-          boxShadow: theme.shadows[10],
+          boxShadow: getShadow(theme, 'xl'),
           backgroundImage: 'none',
           overflow: 'hidden',
           bgcolor: 'background.paper',

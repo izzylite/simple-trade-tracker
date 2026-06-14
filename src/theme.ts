@@ -1,5 +1,5 @@
 import { createTheme, alpha } from '@mui/material/styles';
-import { SHADOWS } from 'styles/designTokens';
+import { SHADOWS, SCRIM } from 'styles/designTokens';
 
 // Design tokens — sourced from DESIGN.md
 const palette = {
@@ -366,6 +366,20 @@ export function createAppTheme(mode: 'light' | 'dark') {
           paper: {
             boxShadow: s.xl,
             backgroundImage: 'none',
+          },
+        },
+      },
+      MuiBackdrop: {
+        // Single source for the modal/dialog/drawer dim scrim. Light mode uses
+        // a deeper alpha than dark (a pale page bg needs a stronger scrim to
+        // read as dimmed). Invisible backdrops (menus, popovers, selects) keep
+        // their transparent treatment.
+        styleOverrides: {
+          root: {
+            backgroundColor: isDark ? SCRIM.dark : SCRIM.light,
+            '&.MuiBackdrop-invisible': {
+              backgroundColor: 'transparent',
+            },
           },
         },
       },

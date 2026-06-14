@@ -41,6 +41,7 @@ const RiskRewardChart: React.FC<RiskRewardChartProps> = ({ riskRewardStats }) =>
 
   return (
     <CardShell
+      elevation="md"
       head={{
         icon: <ShowChart sx={{ fontSize: 16 }} />,
         title: 'Risk / Reward',

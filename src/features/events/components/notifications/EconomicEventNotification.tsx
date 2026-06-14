@@ -32,7 +32,7 @@ import {
 import { EconomicEvent } from 'features/events/types/economicCalendar';
 import { alpha } from '@mui/material/styles';
 import { format, parseISO } from 'date-fns';
-import { EYEBROW_SX, TNUM, getCardShellSx, getInsetTileSx } from 'styles/designTokens';
+import { EYEBROW_SX, TNUM, getCardShellSx, getInsetTileSx, getShadow } from 'styles/designTokens';
 
 interface EconomicEventNotificationProps {
   event: EconomicEvent | null;
@@ -181,7 +181,7 @@ const EconomicEventNotification: React.FC<EconomicEventNotificationProps> = ({
             ...getCardShellSx(theme, 'lg'),
             width: 320,
             maxWidth: 'calc(100vw - 24px)',
-            boxShadow: theme.shadows[6],
+            boxShadow: getShadow(theme, 'lg'),
             pointerEvents: 'auto', // Enable clicks (container has pointerEvents: none)
           }}
         >

@@ -27,7 +27,7 @@ import { format, isValid } from 'date-fns';
 import { Calendar } from '../types/calendar';
 import { CalendarStats } from '../services/calendarService';
 import ShareButton from './sharing/ShareButton';
-import { EYEBROW_SX, TNUM, getCardShellSx, getInsetTileSx } from 'styles/designTokens';
+import { EYEBROW_SX, TNUM, getCardShellSx, getInsetTileSx, getShadow } from 'styles/designTokens';
 import PnlValue from 'components/common/PnlValue';
 
 /**
@@ -179,6 +179,7 @@ const CalendarCard: React.FC<CalendarCardProps> = ({
       onClick={() => onCalendarClick(calendar.id)}
       sx={{
         ...getCardShellSx(theme, 'lg'),
+        boxShadow: getShadow(theme, 'md'),
         cursor: 'pointer',
         position: 'relative',
         display: 'flex',

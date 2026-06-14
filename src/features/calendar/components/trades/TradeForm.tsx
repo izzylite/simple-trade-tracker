@@ -17,6 +17,7 @@ import {
   NotesOutlined as NotesTabIcon,
 } from '@mui/icons-material';
 import { useDialogTokens } from 'styles/dialogTokens';
+import { getShadow } from 'styles/designTokens';
 import { DatePicker } from '@mui/x-date-pickers';
 import { Trade, TradeEconomicEvent, PinnedEvent } from '../../types/dualWrite';
 import { FormField } from '../StyledComponents';
@@ -646,7 +647,7 @@ const TradeForm: React.FC<TradeFormProps> = ({
                 sx: {
                   borderRadius: 1.5,
                   border: `1px solid ${hairline}`,
-                  boxShadow: theme.shadows[8],
+                  boxShadow: getShadow(theme, 'lg'),
                   backgroundImage: 'none',
                   mt: 0.5,
                 },

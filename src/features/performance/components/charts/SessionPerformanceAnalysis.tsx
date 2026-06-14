@@ -52,6 +52,7 @@ const SessionPerformanceAnalysis: React.FC<SessionPerformanceAnalysisProps> = ({
 
   return (
     <CardShell
+      elevation="md"
       sx={{
         height: '100%',
         display: 'flex',

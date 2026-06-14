@@ -33,7 +33,7 @@ const LoginPrompt: React.FC<LoginPromptProps> = ({
       }}
     >
       <Container maxWidth="sm">
-        <CardShell radius="xl">
+        <CardShell radius="xl" elevation="lg">
           <LoginPromptContent title={title} subtitle={subtitle} />
         </CardShell>
       </Container>

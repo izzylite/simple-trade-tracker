@@ -169,7 +169,7 @@ const TagPatternAnalysis: React.FC<TagPatternAnalysisProps> = ({
   if (isLoading && !analysis) {
     return (
       <>
-        <CardShell sx={{ mb: 3 }} head={headProps}>
+        <CardShell elevation="md" sx={{ mb: 3 }} head={headProps}>
           <Box sx={{ p: 2.5 }}>
             <Stack spacing={1.25}>
               {[0, 1, 2].map((i) => (
@@ -186,7 +186,7 @@ const TagPatternAnalysis: React.FC<TagPatternAnalysisProps> = ({
   if (!analysis || trades.length < MIN_TRADES) {
     return (
       <>
-        <CardShell sx={{ mb: 3 }} head={headProps}>
+        <CardShell elevation="md" sx={{ mb: 3 }} head={headProps}>
           <Box sx={{ p: 2.5 }}>
             <InfoStrip tone="violet">
               Add at least {MIN_TRADES} trades to surface tag patterns.
@@ -205,7 +205,7 @@ const TagPatternAnalysis: React.FC<TagPatternAnalysisProps> = ({
 
   return (
     <>
-      <CardShell sx={{ mb: 3 }} head={headProps}>
+      <CardShell elevation="md" sx={{ mb: 3 }} head={headProps}>
         <Box sx={{ p: 2.5, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
           {nothing && (
             <InfoStrip tone="violet">

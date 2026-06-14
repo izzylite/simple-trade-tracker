@@ -12,6 +12,7 @@
  */
 import React, { useState, useRef } from 'react';
 import { Box, Chip, Popover, Typography, useTheme, alpha } from '@mui/material';
+import { getShadow } from 'styles/designTokens';
 import {
   BuildCircleOutlined as ToolsIcon,
   ExpandMore as ExpandMoreIcon,
@@ -143,6 +144,7 @@ const ToolUsageChip: React.FC<ToolUsageChipProps> = ({
                 borderRadius: 2,
                 border: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
                 backgroundColor: theme.palette.background.paper,
+                boxShadow: getShadow(theme, 'lg'),
               },
             },
           }}

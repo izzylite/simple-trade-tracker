@@ -10,6 +10,7 @@ import {
   Theme
 } from '@mui/material';
 import { Close as CloseIcon } from '@mui/icons-material';
+import { getShadow } from 'styles/designTokens';
 
 export interface UnifiedDrawerProps {
   // Basic drawer props
@@ -65,7 +66,7 @@ const UnifiedDrawer: React.FC<UnifiedDrawerProps> = ({
     backgroundColor: 'background.paper',
     borderLeft: anchor === 'right' ? `1px solid ${theme.palette.divider}` : undefined,
     borderRight: anchor === 'left' ? `1px solid ${theme.palette.divider}` : undefined,
-    boxShadow: '0 8px 24px rgba(0,0,0,0.5)'
+    boxShadow: getShadow(theme, 'xl')
   };
 
   const headerStyles = {

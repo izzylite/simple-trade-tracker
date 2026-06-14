@@ -48,6 +48,7 @@ import { getTagDayOfWeekChartData } from 'features/performance/utils/chartDataUt
 import { TradeOperationsProps } from 'features/calendar/types/tradeOperations';
 import { BaseDialog } from 'components/common';
 import { useDialogTokens } from 'styles/dialogTokens';
+import { getShadow } from 'styles/designTokens';
 
 interface TradesDialogProps {
   open: boolean;
@@ -485,7 +486,7 @@ const TradesListDialog: React.FC<TradesDialogProps> = ({
                           bgcolor: 'background.paper',
                           border: `1px solid ${hairline}`,
                           borderRadius: 1.25,
-                          boxShadow: theme.shadows[6],
+                          boxShadow: getShadow(theme, 'md'),
                           minWidth: 140,
                         }}
                       >

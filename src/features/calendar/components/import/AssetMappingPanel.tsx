@@ -16,6 +16,7 @@ import {
 } from '@mui/icons-material';
 import { ImportFileData } from '../../types/import';
 import { useDialogTokens, MONO_FONT } from 'styles/dialogTokens';
+import { getShadow } from 'styles/designTokens';
 import { Z_INDEX } from 'styles/zIndex';
 import { getInstrumentMappings } from 'features/events/services/instrumentCatalog';
 
@@ -178,7 +179,7 @@ export const AssetMappingPanel: React.FC<Props> = ({
                     maxHeight: 320,
                     borderRadius: 1.25,
                     border: `1px solid ${hairline}`,
-                    boxShadow: theme.shadows[12],
+                    boxShadow: getShadow(theme, 'lg'),
                     backgroundImage: 'none',
                   },
                 },
@@ -564,7 +565,7 @@ export const AssetMappingPanel: React.FC<Props> = ({
                         sx: {
                           borderRadius: 1.25,
                           border: `1px solid ${hairline}`,
-                          boxShadow: theme.shadows[12],
+                          boxShadow: getShadow(theme, 'lg'),
                           backgroundImage: 'none',
                         },
                       },

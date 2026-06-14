@@ -32,6 +32,7 @@ import DebugPanel from 'components/common/DebugPanel';
 import NotificationsBell from 'components/notifications/NotificationsBell';
 import HeaderCalendarSelector from 'components/common/HeaderCalendarSelector';
 import { isDarkMode } from 'utils/themeMode';
+import { getShadow } from 'styles/designTokens';
 
 // Login dialog opens only on user action; lazy keeps auth UI out of main bundle.
 const LoginDialog = lazy(() => import('components/auth/LoginDialog'));
@@ -118,10 +119,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({ onToggleTheme, mode }) => {
           bgcolor: 'background.paper',
           borderBottom: 1,
           borderColor: 'divider',
-          boxShadow: (theme) =>
-            isDarkMode(theme)
-              ? '0 1px 2px rgba(0,0,0,0.3)'
-              : '0 1px 2px rgba(0,0,0,0.05)',
+          boxShadow: (theme) => getShadow(theme, 'sm'),
         }}
       >
         <Toolbar
@@ -345,7 +343,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({ onToggleTheme, mode }) => {
                         mt: 1,
                         minWidth: 200,
                         borderRadius: 2,
-                        boxShadow: theme.shadows[8],
+                        boxShadow: getShadow(theme, 'lg'),
                         border: `1px solid ${alpha(theme.palette.divider, 0.08)}`
                       }
                     }

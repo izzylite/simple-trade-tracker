@@ -96,6 +96,7 @@ const WinLossDistribution: React.FC<WinLossDistributionProps> = ({
 
   return (
     <CardShell
+      elevation="md"
       sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}
       head={{
         icon: <PieChartIcon sx={{ fontSize: 16 }} />,

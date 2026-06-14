@@ -7,6 +7,7 @@ import React from 'react';
 import { Box, alpha, useTheme, keyframes } from '@mui/material';
 import { Add as AddIcon } from '@mui/icons-material';
 import { isDarkMode } from 'utils/themeMode';
+import { getShadow } from 'styles/designTokens';
 
 interface PlaceholderNoteCardProps {
   index: number;
@@ -81,10 +82,8 @@ const PlaceholderNoteCard: React.FC<PlaceholderNoteCardProps> = ({
           borderRadius: 1.5,
           overflow: 'hidden',
           backgroundColor: alpha(baseColor, isDark ? 0.3 : 0.2),
-          boxShadow: isDark
-            ? `0 4px 12px ${alpha(theme.palette.common.black, 0.3)}`
-            : `0 4px 12px ${alpha(theme.palette.common.black, 0.1)}`,
-          border: `2px  ${alpha(isDark ? theme.palette.common.white : theme.palette.common.black, 0.3)}`,
+          boxShadow: getShadow(theme, 'md'),
+          border: `2px solid ${alpha(isDark ? theme.palette.common.white : theme.palette.common.black, 0.3)}`,
           transform: isHovered ? fannedTransform : stackedTransform,
           transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
           zIndex,

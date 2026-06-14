@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Box, Paper } from '@mui/material';
+import { Box, Paper, useTheme } from '@mui/material';
+import { getShadow } from 'styles/designTokens';
 import CumulativePnLChart from 'features/performance/components/charts/CumulativePnLChart';
 import DailyPnLChart from 'features/performance/components/charts/DailyPnLChart';
 import PnLHeatmap from 'features/performance/components/charts/PnLHeatmap';
@@ -30,6 +31,7 @@ const PnLChartsWrapper: React.FC<PnLChartsWrapperProps> = ({
   trades,
   selectedDate
 }) => {
+  const theme = useTheme();
   const [activeTab, setActiveTab] = useState(0);
 
   const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
@@ -43,7 +45,7 @@ const PnLChartsWrapper: React.FC<PnLChartsWrapperProps> = ({
   ];
 
   return (
-    <Paper sx={{ p: 0, mb: 3, borderRadius: 2 }}>
+    <Paper sx={{ p: 0, mb: 3, borderRadius: `${theme.palette.custom.radius.xl}px`, boxShadow: getShadow(theme, 'md') }}>
       <Box sx={{ px: { xs: 1.5, sm: 3 }, pt: 3 }}>
         <Box sx={{ display: 'flex', justifyContent: 'start', mb: 2 }}>
           <RoundedTabs

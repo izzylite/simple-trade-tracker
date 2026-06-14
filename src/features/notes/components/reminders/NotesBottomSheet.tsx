@@ -23,7 +23,7 @@ import {
 import { Note } from 'features/notes/types/note';
 import { Z_INDEX } from 'styles/zIndex';
 import { scrollbarStyles } from 'styles/scrollbarStyles';
-import { EYEBROW_SX } from 'styles/designTokens';
+import { EYEBROW_SX, getShadow } from 'styles/designTokens';
 import RichTextEditor from 'components/common/RichTextEditor';
 import NoteEditorDialog from 'features/notes/components/NoteEditorDialog';
 import { getSharedTrade } from 'features/calendar/services/sharingService';
@@ -273,7 +273,7 @@ const NotesBottomSheet: React.FC<NotesBottomSheetProps> = ({
           borderTopLeftRadius: `${radius.xl}px`,
           borderTopRightRadius: `${radius.xl}px`,
           bgcolor: 'background.paper',
-          boxShadow: theme.shadows[8],
+          boxShadow: getShadow(theme, 'xl'),
           border: `1px solid ${theme.palette.divider}`,
           borderBottom: 'none',
           transition: `height 240ms ${easing}, transform 240ms ${easing}`,

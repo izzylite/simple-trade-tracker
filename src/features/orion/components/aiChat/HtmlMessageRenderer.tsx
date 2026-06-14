@@ -25,6 +25,7 @@ import {
   Note as NoteIcon
 } from '@mui/icons-material';
 import DOMPurify from 'dompurify';
+import { getShadow } from 'styles/designTokens';
 import ImageZoomDialog, { ImageZoomProp } from 'features/calendar/components/ImageZoomDialog';
 import type { Trade } from 'features/calendar/types/trade';
 import type { EconomicEvent } from 'features/events/types/economicCalendar';
@@ -444,7 +445,7 @@ const HtmlMessageRenderer: React.FC<HtmlMessageRendererProps> = ({
             transition: 'transform 0.2s, box-shadow 0.2s',
             '&:hover': {
               transform: 'scale(1.02)',
-              boxShadow: theme.shadows[4]
+              boxShadow: getShadow(theme, 'md')
             }
           },
           '& sup': {
