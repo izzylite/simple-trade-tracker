@@ -108,7 +108,7 @@ const CalendarSelectorBar: React.FC<CalendarSelectorBarProps> = ({
             fontSize: '0.9375rem',
             fontWeight: 600,
             letterSpacing: '-0.015em',
-            maxWidth: { xs: 140, sm: 240 },
+            maxWidth: { xs: 100, sm: 240 },
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',

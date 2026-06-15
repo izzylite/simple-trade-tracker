@@ -745,7 +745,12 @@ const TradeCalendarInner: FC<TradeCalendarProps> = (props): React.ReactElement =
   const closeLocalPanel = useCallback(() => {
     setPanelOpen(false);
   }, [setPanelOpen]);
-  usePanelMutexSlot('page-side-panel', isPanelOpen, closeLocalPanel);
+  // The inline page panel only renders at lg+ (below that the surfaces become
+  // overlay drawers with their own state). The provider defaults `isPanelOpen`
+  // to true, so on phones the mutex would otherwise report this slot "open"
+  // even though nothing is on screen — which hides the global Orion FAB. Gate
+  // the reported open-state to lg+ so the FAB stays visible on mobile.
+  usePanelMutexSlot('page-side-panel', isLgUp && isPanelOpen, closeLocalPanel);
 
   // Ref for main content scroll container (used by floating nav scroll detection)
   const mainContentRef = useRef<HTMLDivElement>(null);

@@ -672,7 +672,14 @@ const AIChatMentionInput = forwardRef<AIChatMentionInputHandle, AIChatMentionInp
             overflowY: 'auto',
             ...scrollbarStyles(theme)
           },
-          '& .public-DraftEditorPlaceholder-root': { whiteSpace: 'pre-wrap' },
+          '& .public-DraftEditorPlaceholder-root': {
+            whiteSpace: 'pre-wrap',
+            // Constrain the (absolutely-positioned) placeholder to the editor
+            // width so a long hint wraps instead of overflowing across the
+            // image/send buttons on a narrow phone.
+            maxWidth: '100%',
+            overflowWrap: 'anywhere',
+          },
           ...sx
         }}
       >

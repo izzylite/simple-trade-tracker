@@ -286,11 +286,14 @@ const AppHeader: React.FC<AppHeaderProps> = ({ onToggleTheme, mode }) => {
             {/* Notifications — auth only */}
             {user && <NotificationsBell />}
 
-            {/* Theme Toggle */}
+            {/* Theme Toggle — on phones, authenticated users get this inside the
+                avatar menu instead (keeps the 360px toolbar from overflowing).
+                Signed-out mobile keeps it here since that toolbar is far lighter. */}
             <IconButton
               onClick={onToggleTheme}
               size="small"
               sx={{
+                display: { xs: user ? 'none' : 'inline-flex', sm: 'inline-flex' },
                 color: 'text.secondary',
                 '&:hover': {
                   color: mode === 'dark' ? 'warning.light' : 'primary.main',
@@ -358,6 +361,20 @@ const AppHeader: React.FC<AppHeaderProps> = ({ onToggleTheme, mode }) => {
                     </Typography>
                   </Box>
                   <Divider />
+                  {/* Theme toggle — phones only (the standalone header button is
+                      hidden on xs for authenticated users to save toolbar width). */}
+                  <MenuItem
+                    onClick={() => { handleUserMenuClose(); onToggleTheme(); }}
+                    sx={{ display: { xs: 'flex', sm: 'none' }, py: 1.5 }}
+                  >
+                    <ListItemIcon>
+                      {mode === 'dark'
+                        ? <LightModeIcon fontSize="small" />
+                        : <DarkModeIcon fontSize="small" />}
+                    </ListItemIcon>
+                    <ListItemText>{mode === 'dark' ? 'Light mode' : 'Dark mode'}</ListItemText>
+                  </MenuItem>
+                  <Divider sx={{ display: { xs: 'block', sm: 'none' } }} />
                   <MenuItem
                     onClick={handleSignOut}
                     sx={{
