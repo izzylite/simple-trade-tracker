@@ -13,6 +13,13 @@ import {
 
 const MAX_TASKS_PER_DISPATCH = 500;
 
+// Stale-delivery ceiling: a first-time subscriber must not receive a briefing
+// older than this as a fresh-looking card. Far above the ~65min refresh cadence
+// (1h TTL + next 5-min tick), so a healthy asset always passes; only a
+// persistently-failing/wedged asset's stale snapshot gets withheld. Decoupled
+// from the 1h TTL so it can't reintroduce the phase-locked delivery starvation.
+const MAX_BRIEFING_AGE_MS = 6 * 60 * 60 * 1000;
+
 function constantTimeEquals(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
   let mismatch = 0;
@@ -200,16 +207,21 @@ Deno.serve(async (req) => {
     const minSignificance: string = (task.config?.min_significance as string) ?? 'high';
     if (subscribedAssets.length === 0) continue;
 
-    // Deliver the LATEST COMPLETED briefing per asset — current_briefing_id
+    // Deliver the LATEST COMPLETED briefing per asset. current_briefing_id
     // survives reprocessing (the claim RPC never clears it), and the
     // (user_id, briefing_id) dedup guard means a briefing is delivered at most
     // once per user, so "latest available" can never spam.
     //
-    // Deliberately NOT gated on status='fresh' + unexpired: the task's due
-    // time and the pool's 1h TTL advance on the same +60min cadence, so once
-    // they align, every due tick found the pool just-expired/reprocessing and
-    // delivered nothing — forever (phase-locked starvation; briefings 22:05 &
-    // 23:10 on 2026-06-11 generated but never delivered).
+    // Two gates, deliberately distinct:
+    // - NOT gated on the pool's status='fresh' + unexpired: the task due time
+    //   and the 1h TTL share a +60min cadence, so that gate phase-locked and
+    //   delivered nothing forever (starvation; 2026-06-11). A 1h-old briefing
+    //   must still ship.
+    // - IS gated on briefing AGE (refreshed_at == the snapshot's generated_at)
+    //   with a generous ceiling decoupled from the 1h TTL. A healthy asset
+    //   refreshes ~hourly so it always passes; an asset whose refresh
+    //   PERSISTENTLY fails (chronic outage / wedged) stops advertising its
+    //   stale snapshot to a first-time subscriber as a fresh-looking card.
     const { data: poolResults } = await serviceClient
       .from('asset_research_pool')
       .select('asset, significance, refreshed_at, current_briefing_id, briefing_plain')
@@ -224,7 +236,12 @@ Deno.serve(async (req) => {
         current_briefing_id: string | null;
         briefing_plain: string | null;
       }>
-    ).filter((p) => p.current_briefing_id && meetsThreshold(p.significance, minSignificance));
+    ).filter((p) =>
+      p.current_briefing_id &&
+      p.refreshed_at != null &&
+      Date.now() - new Date(p.refreshed_at).getTime() < MAX_BRIEFING_AGE_MS &&
+      meetsThreshold(p.significance, minSignificance)
+    );
 
     for (const poolResult of qualifying) {
       // Deliver a thin row referencing the shared briefing — no content copied.
